@@ -593,9 +593,9 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                 </div>
                 <button
                   onClick={() => setDisplayMode(prev => prev === 'products' ? 'variants' : 'products')}
-                  className="px-4 py-2 bg-gray-100 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-200"
+                  className="px-3 md:px-4 py-2 bg-gray-100 rounded-xl font-bold text-[10px] md:text-sm text-gray-600 hover:bg-gray-200 whitespace-nowrap"
                 >
-                  {displayMode === 'products' ? 'Voir les variantes' : 'Voir les produits'}
+                  {displayMode === 'products' ? 'Variantes' : 'Produits'}
                 </button>
                 <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full">
                   <X className="w-5 h-5 md:w-6 md:h-6" />
@@ -739,18 +739,18 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                   initial={{ opacity: 0, scale: 0.9, y: 40 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: 40 }}
-                  className="relative bg-white w-full max-w-5xl h-full max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row"
+                  className="relative bg-white w-full max-w-5xl h-full max-h-[95vh] md:max-h-[90vh] rounded-3xl md:rounded-[3rem] shadow-2xl overflow-hidden flex flex-col md:flex-row"
                 >
                   <button
                     onClick={() => setPreviewTemplate(null)}
-                    className="absolute top-8 right-8 z-10 p-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all"
+                    className="absolute top-4 right-4 md:top-8 md:right-8 z-10 p-2 md:p-3 bg-white/80 backdrop-blur-md text-gray-900 rounded-full shadow-lg hover:bg-gray-200 transition-all"
                   >
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5 md:w-6 md:h-6" />
                   </button>
 
-                  <div className="flex-1 bg-gray-50 p-12 flex items-center justify-center overflow-hidden">
+                  <div className="flex-1 bg-gray-50 p-6 md:p-12 flex items-center justify-center overflow-hidden min-h-[300px] md:min-h-0">
                     <div className={`w-full h-full max-w-2xl max-h-full flex items-center justify-center`}>
-                      <div className={`w-full shadow-2xl rounded-3xl overflow-hidden bg-white ${getAspectRatioClass(previewTemplate.size)}`}>
+                      <div className={`w-full shadow-2xl rounded-2xl md:rounded-3xl overflow-hidden bg-white ${getAspectRatioClass(previewTemplate.size)}`}>
                         {previewTemplate.coverImage ? (
                           <img 
                             src={previewTemplate.coverImage} 
@@ -772,28 +772,28 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                     </div>
                   </div>
 
-                  <div className="w-full md:w-96 p-12 flex flex-col justify-center">
-                    <div className="mb-8">
-                      <div className="flex items-center space-x-2 mb-4">
-                        <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full">
+                  <div className="w-full md:w-96 p-6 md:p-12 flex flex-col justify-center overflow-y-auto">
+                    <div className="mb-6 md:mb-8">
+                      <div className="flex items-center space-x-2 mb-3 md:mb-4">
+                        <span className="px-3 py-1 bg-primary/10 text-primary text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full">
                           Modèle Officiel
                         </span>
-                        <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-widest rounded-full">
+                        <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full">
                           {previewTemplate.size}
                         </span>
                       </div>
-                      <h3 className="text-4xl font-black text-gray-900 tracking-tighter mb-4 leading-none">
+                      <h3 className="text-2xl md:text-4xl font-black text-gray-900 tracking-tighter mb-3 md:mb-4 leading-none">
                         {previewTemplate.name}
                       </h3>
-                      <p className="text-gray-500 font-bold leading-relaxed">
+                      <p className="text-xs md:text-sm text-gray-500 font-bold leading-relaxed">
                         Ce modèle a été conçu pour offrir un rendu professionnel immédiat. Personnalisez les textes, les couleurs et les images pour l'adapter à votre marque.
                       </p>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3 md:space-y-4">
                       <button
                         onClick={() => handleSelectProduct(previewTemplate)}
-                        className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black text-lg hover:bg-gray-800 transition-all shadow-xl shadow-gray-900/20"
+                        className="w-full py-4 md:py-5 bg-gray-900 text-white rounded-xl md:rounded-2xl font-black text-base md:text-lg hover:bg-gray-800 transition-all shadow-xl shadow-gray-900/20"
                       >
                         Voir les variantes
                       </button>
