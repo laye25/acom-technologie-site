@@ -33,11 +33,22 @@ class ErrorBoundary extends Component<Props, State> {
       
       try {
         if (this.state.error?.message) {
-          const parsedError = JSON.parse(this.state.error.message);
-          if (parsedError.error) {
-            errorDetails = parsedError.error;
-            if (errorDetails.includes('Missing or insufficient permissions')) {
-              errorMessage = "Vous n'avez pas les permissions nécessaires pour effectuer cette action.";
+          const message = this.state.error.message;
+          
+          if (message.includes('removeChild') || message.includes('Node')) {
+            errorMessage = "Une extension de navigateur (comme Google Traduction) perturbe l'affichage.";
+            errorDetails = "Veuillez désactiver la traduction automatique ou vos extensions pour ce site.";
+          } else {
+            try {
+              const parsedError = JSON.parse(message);
+              if (parsedError.error) {
+                errorDetails = parsedError.error;
+                if (errorDetails.includes('Missing or insufficient permissions')) {
+                  errorMessage = "Vous n'avez pas les permissions nécessaires pour effectuer cette action.";
+                }
+              }
+            } catch (e) {
+              errorDetails = message;
             }
           }
         } else if (this.state.error) {

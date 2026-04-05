@@ -55,7 +55,7 @@ function AppContent() {
     <div className="min-h-screen bg-white font-sans text-gray-900 selection:bg-primary-light selection:text-primary">
       <Toaster position="top-center" reverseOrder={false} />
       {!isEditor && <Navbar />}
-      <main className={isEditor ? 'h-screen' : ''}>
+      <main key={location.key} className={isEditor ? 'h-screen' : ''}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
