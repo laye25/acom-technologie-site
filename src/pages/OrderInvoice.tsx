@@ -1,0 +1,394 @@
+import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { Order, Service } from '../types';
+import { SERVICES as STATIC_SERVICES } from '../constants';
+import { 
+  ChevronLeft, 
+  Printer, 
+  Download, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Globe,
+  CheckCircle2,
+  Loader2,
+  FileText
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { getOrderDiscountedTotal } from '../lib/promotions';
+import { dbService as db } from '../services/firebaseDbService';
+import { SiteSettings } from '../types';
+
+const OrderInvoice = () => {
+  const { orderId } = useParams();
+  const navigate = useNavigate();
+  const { user, isAdmin, isManager } = useAuth();
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await db.settings.get('global');
+        if (data) setSettings(data as SiteSettings);
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const orderOptions = useMemo(() => ({
+    collectionName: 'orders' as CollectionName,
+    filters: [
+      { column: 'id', value: orderId },
+      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.uid }] : [])
+    ],
+    skip: !user || !orderId
+  }), [orderId, user, isAdmin, isManager]);
+
+  const serviceOptions = useMemo(() => ({
+    collectionName: 'services' as CollectionName
+  }), []);
+
+  const { data: orderData, loading: orderLoading } = useFirebaseData<Order>(orderOptions);
+  const { data: dynamicServices } = useFirebaseData<Service>(serviceOptions);
+
+  const order = orderData?.[0] || null;
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      return format(new Date(dateStr), 'dd MMMM yyyy', { locale: fr });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const allServices = useMemo(() => {
+    const combined = [...STATIC_SERVICES];
+    dynamicServices.forEach(ds => {
+      if (!combined.find(s => s.id === ds.id)) {
+        combined.push(ds);
+      }
+    });
+    return combined;
+  }, [dynamicServices]);
+
+  const service = order ? allServices.find(s => s.id === order.serviceId) : null;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!printRef.current || !order) return;
+    
+    setIsDownloading(true);
+    try {
+      const element = printRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Facture_Acom_${order.id.toUpperCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Une erreur est survenue lors de la génération du PDF.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  if (orderLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center pt-32">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Facture introuvable</h2>
+        <p className="text-gray-500 mb-8">Nous n'avons pas pu trouver les informations de cette facture.</p>
+        <button onClick={() => navigate('/dashboard')} className="px-6 py-3 bg-primary text-white rounded-2xl font-bold">
+          Retour au tableau de bord
+        </button>
+      </div>
+    );
+  }
+
+  const isPaid = order.status === 'completed' || order.paid;
+  const totalPaid = (order.depositPaid ? (order.depositAmount || 0) : 0) + (order.balancePaid ? (order.balanceAmount || 0) : 0);
+  const discountedTotal = getOrderDiscountedTotal(order);
+  const remainingBalance = discountedTotal - totalPaid;
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 pt-32 pb-12">
+      {/* Top Controls */}
+      <div className="mb-8 no-print flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <button 
+          onClick={() => navigate(-1)}
+          className="flex items-center text-gray-500 hover:text-primary transition-colors group"
+        >
+          <ChevronLeft className="w-5 h-5 mr-1 group-hover:-translate-x-1 transition-transform" />
+          Retour
+        </button>
+        
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handlePrint}
+            className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
+          >
+            <Printer className="w-4 h-4 mr-2" />
+            Imprimer
+          </button>
+          <button 
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="flex items-center px-4 py-2 bg-primary text-white rounded-xl font-bold hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+          >
+            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Invoice Document */}
+      <div ref={printRef} className="bg-white rounded-[2.5rem] border border-black/5 shadow-2xl shadow-black/5 overflow-hidden print:shadow-none print:border-none print:rounded-none relative">
+        
+        {/* Paid Watermark */}
+        {isPaid && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-35deg] pointer-events-none select-none opacity-[0.08] z-0">
+            <p className="text-[120px] sm:text-[200px] font-black border-[20px] border-green-600 text-green-600 px-12 rounded-[4rem]">PAYÉ</p>
+          </div>
+        )}
+
+        {/* Header / Branding */}
+        <div className="p-6 sm:p-12 md:p-16 bg-white border-b border-black/5 flex flex-col md:flex-row justify-between items-start gap-12 relative z-10">
+          <div>
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-2xl flex items-center justify-center">
+                <span className="text-xl sm:text-2xl font-black text-white">{(settings?.brandName || 'Acom')[0]}</span>
+              </div>
+              <span className="text-xl sm:text-2xl font-black tracking-tighter uppercase text-gray-900">{settings?.brandName || 'Acom Technologie'}</span>
+            </div>
+            <div className="space-y-2 text-gray-500 text-xs sm:text-sm font-medium">
+              <p className="flex items-center"><MapPin className="w-4 h-4 mr-2 text-primary" /> {settings?.footer.address || 'Dakar, Sénégal'}</p>
+              <p className="flex items-center"><Phone className="w-4 h-4 mr-2 text-primary" /> {settings?.footer.phone || '+221 77 123 45 67'}</p>
+              <p className="flex items-center"><Mail className="w-4 h-4 mr-2 text-primary" /> {settings?.footer.email || 'contact@acomtechnologie.com'}</p>
+              <p className="flex items-center"><Globe className="w-4 h-4 mr-2 text-primary" /> {settings?.footer.socialLinks?.website || 'www.acomtechnologie.com'}</p>
+            </div>
+          </div>
+          <div className="text-left md:text-right w-full md:w-auto">
+            <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter mb-4 text-primary">Facture</h1>
+            <p className="text-gray-400 text-[10px] sm:text-sm font-bold uppercase tracking-widest mb-8">N° {order.id.toUpperCase()}</p>
+            <div className="space-y-4 text-xs sm:text-sm">
+              <div>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-1">Date de facture</p>
+                <p className="font-black text-gray-900">{order.createdAt?.toDate ? format(order.createdAt.toDate(), 'dd MMMM yyyy', { locale: fr }) : '...'}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-1">Statut du paiement</p>
+                <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                  isPaid ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                }`}>
+                  {isPaid ? 'Payée' : 'En attente'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Client & Info */}
+        <div className="p-6 sm:p-12 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12 sm:gap-16 border-b border-black/5 relative z-10">
+          <div>
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Facturé à</h3>
+            <div className="space-y-2">
+              <p className="text-lg sm:text-xl font-black text-gray-900">{order.details?.fullName || 'Client Acom'}</p>
+              <p className="text-sm sm:text-base text-gray-500 font-medium">{order.details?.email || 'Email non renseigné'}</p>
+              <p className="text-sm sm:text-base text-gray-500 font-medium">{order.details?.phone || 'Téléphone non renseigné'}</p>
+              <p className="text-sm sm:text-base text-gray-500 font-medium">{order.details?.address || 'Sénégal'}</p>
+            </div>
+          </div>
+          <div className="md:text-right">
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">Détails de la commande</h3>
+            <p className="text-lg sm:text-xl font-black text-gray-900">{service?.name || 'Prestation de service'}</p>
+            <p className="text-sm sm:text-base text-gray-500 font-medium mt-2">Mode de paiement: {order.paymentMethod === 'stripe' ? 'Carte Bancaire (Stripe)' : 'Paiement à la caisse'}</p>
+          </div>
+        </div>
+
+        {/* Items Table */}
+        <div className="p-6 sm:p-12 md:p-16 relative z-10">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left min-w-[600px]">
+              <thead>
+                <tr className="border-b-2 border-gray-900">
+                  <th className="py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Description</th>
+                  <th className="py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qté</th>
+                  <th className="py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Prix Unitaire</th>
+                  <th className="py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                <tr>
+                  <td className="py-8">
+                    <p className="font-black text-gray-900 mb-2">{service?.name}</p>
+                    <p className="text-sm text-gray-500 max-w-md leading-relaxed">
+                      {service?.description || 'Développement et mise en place de votre solution digitale personnalisée.'}
+                    </p>
+                  </td>
+                  <td className="py-8 text-center font-bold text-gray-900">1</td>
+                  <td className="py-8 text-right font-bold text-gray-900">{order.totalPrice.toLocaleString()} FCFA</td>
+                  <td className="py-8 text-right font-black text-gray-900">{order.totalPrice.toLocaleString()} FCFA</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Totals & Footer */}
+        <div className="p-6 sm:p-12 md:p-16 bg-gray-50 flex flex-col md:flex-row justify-between gap-12 relative z-10">
+          <div className="max-w-sm">
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">Note</h4>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Cette facture est générée électroniquement. Merci de votre confiance en {settings?.brandName || 'Acom Technologie'} pour vos projets digitaux.
+            </p>
+          </div>
+          <div className="w-full md:w-80 space-y-4">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500 font-bold">Total Hors Taxes</span>
+              <span className="text-gray-900 font-bold">{order.totalPrice.toLocaleString()} FCFA</span>
+            </div>
+            <div className="flex justify-between items-center text-sm text-primary font-bold">
+              <div className="flex flex-col">
+                <span className="italic">Offre Spéciale (-{order.discountPercentage || 0}%)</span>
+                {order.promotionStartDate && order.promotionEndDate && (
+                  <span className="text-[10px] text-gray-400 italic font-normal">
+                    Valable du {formatDate(order.promotionStartDate)} au {formatDate(order.promotionEndDate)}
+                  </span>
+                )}
+              </div>
+              <span className="italic text-right">-{((order.totalPrice || 0) * (order.discountPercentage || 0) / 100).toLocaleString()} FCFA</span>
+            </div>
+            {order.couponDiscount > 0 && (
+              <div className="flex justify-between items-center text-sm text-orange-600 font-bold">
+                <span className="italic">Réduction négociée</span>
+                <span className="italic text-right">-{order.couponDiscount.toLocaleString()} FCFA</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm text-emerald-600 font-bold">
+              <span className="">Acompte (50%)</span>
+              <span className="">{(getOrderDiscountedTotal(order) * 0.5).toLocaleString()} FCFA</span>
+            </div>
+            <div className="flex justify-between items-center text-sm text-amber-600 font-bold">
+              <span className="">Solde (50%)</span>
+              <span className="">{(getOrderDiscountedTotal(order) * 0.5).toLocaleString()} FCFA</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500 font-bold">TVA (0%)</span>
+              <span className="text-gray-900 font-bold">0 FCFA</span>
+            </div>
+            
+            {order.depositPaid && (
+              <div className="flex justify-between items-center text-sm pt-2 border-t border-black/5">
+                <span className="text-emerald-600 font-bold">Acompte Payé</span>
+                <span className="text-emerald-600 font-black">-{order.depositAmount?.toLocaleString()} FCFA</span>
+              </div>
+            )}
+            
+            {order.balancePaid && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-emerald-600 font-bold">Solde Payé</span>
+                <span className="text-emerald-600 font-black">-{order.balanceAmount?.toLocaleString()} FCFA</span>
+              </div>
+            )}
+
+            <div className="h-px bg-black/10 my-4" />
+            <div className="flex justify-between items-end">
+              <span className="text-gray-900 font-black uppercase tracking-widest text-xs">
+                {remainingBalance <= 0 ? 'Total Payé' : 'Reste à payer'}
+              </span>
+              <span className={`text-2xl sm:text-3xl font-black ${remainingBalance <= 0 ? 'text-emerald-600' : 'text-primary'}`}>
+                {remainingBalance <= 0 ? discountedTotal.toLocaleString() : remainingBalance.toLocaleString()} FCFA
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Signature Area */}
+        <div className="p-6 sm:p-12 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12 sm:gap-16 border-t border-black/5 relative z-10">
+          <div className="relative">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-8 sm:mb-12">Cachet & Signature {settings?.brandName || 'Acom Technologie'}</p>
+            <div className="h-24 sm:h-32 border-b border-dashed border-black/20 relative flex items-center justify-center">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-5deg] pointer-events-none select-none">
+                <p className="font-signature text-3xl sm:text-4xl text-blue-600 opacity-80">{settings?.brandName || 'Acom Technologie'}</p>
+              </div>
+              <div className="absolute right-0 top-0 -translate-y-1/4 translate-x-1/4 rotate-[15deg] pointer-events-none select-none">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-blue-600/30 flex items-center justify-center p-1">
+                  <div className="w-full h-full rounded-full border-2 border-blue-600/30 flex flex-col items-center justify-center text-blue-600/40 font-black uppercase leading-none text-center">
+                    <span className="text-[8px] mb-1">{settings?.brandName || 'Acom Tech'}</span>
+                    <span className="text-[10px] text-blue-600/60">CERTIFIÉ</span>
+                    <span className="text-[8px] mt-1 tracking-tighter">{settings?.footer.address?.split(',')[0] || 'Dakar'}, Sénégal</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="md:text-right flex flex-col justify-end">
+            <p className="text-[10px] text-gray-400 italic">Merci pour votre paiement.</p>
+          </div>
+        </div>
+      </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; padding: 0 !important; }
+          .print\\:shadow-none { box-shadow: none !important; }
+          .print\\:border-none { border: none !important; }
+          .print\\:rounded-none { border-radius: 0 !important; }
+          .pt-32 { padding-top: 0 !important; }
+        }
+      `}} />
+    </div>
+  );
+};
+
+export default OrderInvoice;
