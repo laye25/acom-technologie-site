@@ -2477,6 +2477,7 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentProject, setCurrentProject] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const options = useMemo(() => ({
     collectionName: 'projects' as CollectionName,
@@ -2503,6 +2504,19 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    setSaving(true);
+    try {
+      await db.projects.delete(id);
+      toast.success('Projet supprimé');
+      setDeleteConfirm(null);
+    } catch (error) {
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex justify-between items-center">
@@ -2524,12 +2538,15 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project: any) => (
-            <div key={project.id} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group">
+            <div key={project.id} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group/card">
               <div className="flex justify-between items-start mb-4">
                 <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
                   <HardHat className="w-6 h-6 text-primary" />
                 </div>
-                <button onClick={() => { setCurrentProject(project); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4" /></button>
+                <div className="flex items-center space-x-2 transition-opacity">
+                  <button onClick={() => { setCurrentProject(project); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg"><Edit2 className="w-4 h-4" /></button>
+                  <div onClick={() => setDeleteConfirm(project.id)} className="p-2 cursor-pointer hover:bg-red-50 text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></div>
+                </div>
               </div>
               <h3 className="text-lg font-bold text-gray-900 mb-1">{project.name}</h3>
               <p className="text-sm text-gray-500 mb-4 flex items-center"><MapPin className="w-3 h-3 mr-1" /> {project.location}</p>
@@ -2585,6 +2602,31 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
           </motion.div>
         </div>
       )}
+
+      <AnimatePresence>
+        {deleteConfirm && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Supprimer le projet ?</h3>
+              <p className="text-sm text-gray-500 mb-6">Cette action est irréversible.</p>
+              <div className="flex space-x-3">
+                <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
+                <button onClick={() => handleDelete(deleteConfirm)} disabled={saving} className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all">
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Supprimer'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

@@ -8,7 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useFirebaseData } from '../../hooks/useFirebase';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
-import ProductConfigurator from '../studio/ProductConfigurator';
+import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
 
 interface DesignSelectorModalProps {
   isOpen: boolean;
@@ -369,6 +369,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [viewStep, setViewStep] = useState<ViewStep>('categories');
+  const [displayMode, setDisplayMode] = useState<'products' | 'variants'>('products');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -387,6 +388,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
     } else {
       setViewStep('products');
     }
+    setDisplayMode('products');
   }, [activeCategory]);
 
   const toggleFavorite = (id: string) => {
@@ -408,18 +410,13 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
     };
   }, [isOpen]);
 
-  const { data: dbCustomTemplates } = useFirebaseData<any>({
-    collectionName: 'design_templates',
-    order: { column: 'createdAt', direction: 'desc' }
-  });
-
   const { data: dbCategories } = useFirebaseData<any>({
     collectionName: 'studio_acom_categories' as any
   });
 
-  const { data: dbProducts } = useFirebaseData<any>({
-    collectionName: 'studio_acom_products' as any
-  });
+  // const { data: dbProducts } = useFirebaseData<any>({
+  //   collectionName: 'studio_acom_products' as any
+  // });
 
   const categories: StudioCategory[] = useMemo(() => {
     const systemCats = INITIAL_CATEGORIES.filter(c => ['all', 'favorites', 'categories', 'saved'].includes(c.id));
@@ -447,24 +444,8 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
   }, [dbCategories]);
 
   const allProducts: Product[] = useMemo(() => {
-    const dbProds = (dbProducts || []).map((t: any) => ({
-      ...t,
-      variants: t.variants || []
-    }));
-
-    // Merge initial products with database products
-    const merged = [...INITIAL_PRODUCTS];
-    dbProds.forEach((p: any) => {
-      const index = merged.findIndex(m => m.id === p.id);
-      if (index !== -1) {
-        merged[index] = p;
-      } else {
-        merged.push(p);
-      }
-    });
-
-    return merged;
-  }, [dbProducts]);
+    return INITIAL_PRODUCTS;
+  }, []);
 
   const selectedProduct = useMemo(() => 
     allProducts.find(p => p.id === selectedProductId) || null
@@ -484,14 +465,33 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
     return matchesSearch && p.categoryId === activeCategory;
   });
 
+  const displayedItems = useMemo(() => {
+    if (displayMode === 'products') {
+      return filteredProducts;
+    } else {
+      // Flatten products to variants
+      const variants: any[] = [];
+      filteredProducts.forEach(p => {
+        p.variants.forEach(v => {
+          variants.push({ ...v, productId: p.id, productName: p.name });
+        });
+      });
+      return variants;
+    }
+  }, [filteredProducts, displayMode]);
+
   const handleSelectProduct = (product: Product) => {
     setSelectedProductId(product.id);
     setViewStep('variants');
   };
 
   const handleSelectVariant = (variant: Variant) => {
-    setSelectedVariantId(variant.id);
-    setViewStep('configurator');
+    const product = allProducts.find(p => p.variants.some(v => v.id === variant.id));
+    if (product) {
+      setSelectedProductId(product.id);
+      setSelectedVariantId(variant.id);
+      setViewStep('configurator');
+    }
   };
 
   const handlePersonalize = (variant: Variant) => {
@@ -591,6 +591,12 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                     className="w-full pl-10 md:pl-12 pr-4 py-2 md:py-3 bg-gray-100 border-none rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold text-gray-600 text-sm md:text-base"
                   />
                 </div>
+                <button
+                  onClick={() => setDisplayMode(prev => prev === 'products' ? 'variants' : 'products')}
+                  className="px-4 py-2 bg-gray-100 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-200"
+                >
+                  {displayMode === 'products' ? 'Voir les variantes' : 'Voir les produits'}
+                </button>
                 <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full">
                   <X className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
@@ -598,11 +604,10 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
 
               {/* Content Area */}
               <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {viewStep === 'configurator' && selectedProduct && selectedVariant ? (
-                  <ProductConfigurator 
+                {viewStep === 'configurator' && selectedProduct ? (
+                  <MultiVariantConfigurator 
                     product={selectedProduct}
-                    variant={selectedVariant}
-                    onBack={() => setViewStep('variants')}
+                    initialVariantId={selectedVariantId || undefined}
                     onPersonalize={handlePersonalize}
                   />
                 ) : viewStep === 'variants' && selectedProduct ? (
@@ -658,14 +663,14 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                        categories.find(c => c.id === activeCategory)?.name || 'Modèles'}
                     </h2>
                     
-                    {filteredProducts.length > 0 ? (
+                    {displayedItems.length > 0 ? (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                        {filteredProducts.map((product) => (
+                        {displayedItems.map((item) => (
                           <TemplateCard 
-                            key={product.id}
-                            item={product}
-                            onSelect={handleSelectProduct}
-                            type="product"
+                            key={item.id}
+                            item={item}
+                            onSelect={displayMode === 'products' ? handleSelectProduct : handleSelectVariant}
+                            type={displayMode === 'products' ? 'product' : 'variant'}
                           />
                         ))}
                       </div>

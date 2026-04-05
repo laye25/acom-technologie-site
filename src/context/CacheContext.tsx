@@ -43,6 +43,7 @@ export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const cacheRef = useRef(cache);
   cacheRef.current = cache;
+  const fetchingRef = useRef<Record<string, boolean>>({});
 
   const setCachedData = useCallback((key: string, data: any) => {
     const newItem = { data, timestamp: Date.now() };
@@ -69,8 +70,9 @@ export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const prefetchCollection = useCallback(async (collectionName: string, constraints: any[] = []) => {
     const key = JSON.stringify({ collectionName, constraints });
-    if (getCachedData(key)) return;
+    if (getCachedData(key) || fetchingRef.current[key]) return;
 
+    fetchingRef.current[key] = true;
     try {
       const q = query(collection(db, collectionName), ...constraints);
       const snap = await getDocs(q);
@@ -79,6 +81,8 @@ export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.log(`[Prefetch] Loaded ${collectionName}`);
     } catch (e) {
       console.error(`[Prefetch] Failed for ${collectionName}`, e);
+    } finally {
+      fetchingRef.current[key] = false;
     }
   }, [getCachedData, setCachedData]);
 
