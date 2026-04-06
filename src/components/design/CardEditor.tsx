@@ -16,7 +16,7 @@ import { generateDesign } from '../../lib/gemini';
 import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
 import { collection, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
-import { CATEGORIES } from './DesignSelectorModal';
+import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
 import { CanvasElement, Design, Template } from '../../types';
 
 interface CardEditorProps {
@@ -321,7 +321,7 @@ const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick }
 const TEMPLATES = [
   {
     id: 'acom-bc-modern',
-    name: 'Carte de Visite - Acom Moderne',
+    name: 'Design Moderne',
     category: 'Papeterie & Bureautique',
     subCategory: 'Carte de Visite',
     bgColor: '#ffffff',
@@ -340,7 +340,7 @@ const TEMPLATES = [
   },
   {
     id: 'acom-flyer-vibrant',
-    name: 'Flyer A5 - Studio Acom Vibrant',
+    name: 'Design Vibrant',
     category: 'Marketing & Publicité',
     subCategory: 'Flyer A5',
     bgColor: '#4c1d95',
@@ -358,7 +358,7 @@ const TEMPLATES = [
   },
   {
     id: 'acom-letterhead-clean',
-    name: 'En-tête - Studio Acom Clean',
+    name: 'Design Clean',
     category: 'Papeterie & Bureautique',
     subCategory: 'Papier En-tête A4',
     bgColor: '#ffffff',
@@ -788,7 +788,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     return zoom;
   }, [zoom, stageSize.width, isMobileSidebarOpen]);
 
-  const loadTemplate = (template: any) => {
+  const loadTemplate = async (template: any) => {
     const hydrateElements = (elements: CanvasElement[]) => {
       return elements.map(el => {
         if (el.type === 'text') {
@@ -801,12 +801,28 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       });
     };
 
-    if (template.pages) {
+    if (template.templateSvg) {
+      // Handle Variant from studioAcom
+      try {
+        const { parseSvgToElements } = await import('../../lib/svgParser');
+        const newElements = parseSvgToElements(template.templateSvg);
+        setPages([
+          { elements: hydrateElements(newElements), bgColor: '#ffffff' },
+          { elements: [], bgColor: '#ffffff' }
+        ]);
+        if (template.name) setDesignTitle(template.name);
+        if (template.subCategory) setCurrentProductContext(template.subCategory);
+      } catch (error) {
+        console.error("Error parsing variant SVG:", error);
+      }
+    } else if (template.pages) {
+      if (template.subCategory) setCurrentProductContext(template.subCategory);
       setPages(template.pages.map((p: any) => ({
         ...p,
         elements: hydrateElements(p.elements)
       })));
     } else if (template.sides) {
+      if (template.subCategory) setCurrentProductContext(template.subCategory);
       setPages([
         { 
           elements: hydrateElements(template.sides.front.elements), 
@@ -818,6 +834,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         }
       ]);
     } else {
+      if (template.subCategory) setCurrentProductContext(template.subCategory);
       setPages([
         { 
           elements: hydrateElements(template.elements as CanvasElement[]), 
@@ -912,9 +929,11 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [templateCategory, setTemplateCategory] = useState('Fondations de Marque');
   const [templateSubCategory, setTemplateSubCategory] = useState('Logo Principal');
   const [templateSearch, setTemplateSearch] = useState('');
+  const [currentProductContext, setCurrentProductContext] = useState<string | null>(null);
   const [templatePrice, setTemplatePrice] = useState('');
   const [templatePromotion, setTemplatePromotion] = useState(false);
   const [templatePromotionPercentage, setTemplatePromotionPercentage] = useState('');
+  const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai'>('templates');
   const [prompt, setPrompt] = useState('');
   
@@ -1589,7 +1608,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           {sidebarTabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => {
+                if (tab.id === 'templates') {
+                  setIsDesignModalOpen(true);
+                }
+                setActiveTab(tab.id as any);
+              }}
               className={`w-16 h-16 flex flex-col items-center justify-center rounded-xl transition-all group ${
                 activeTab === tab.id 
                   ? 'text-primary bg-primary/5' 
@@ -1689,6 +1713,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
 
           {activeTab === 'templates' && (
             <div className="space-y-4">
+              {/* Bouton pour ouvrir le sélecteur de variantes */}
+              <button 
+                onClick={() => setIsDesignModalOpen(true)}
+                className="w-full py-4 bg-primary text-white rounded-xl font-black hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 flex items-center justify-center space-x-3 group mb-2"
+              >
+                <LayoutGrid className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                <span>Explorer les Variantes</span>
+              </button>
+
               <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
@@ -1740,10 +1773,26 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         ))}
       </div>
 
+      {currentProductContext && (
+        <div className="px-1 py-1 flex items-center justify-between">
+          <h3 className="text-[10px] font-black text-primary uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+            Variantes pour {currentProductContext}
+          </h3>
+          <button 
+            onClick={() => setCurrentProductContext(null)}
+            className="text-[9px] font-bold text-gray-400 hover:text-primary transition-colors uppercase"
+          >
+            Voir tout
+          </button>
+        </div>
+      )}
+
       {/* Template Grid (Masonry Style) */}
       <div className="columns-2 gap-2 space-y-2">
         {[...TEMPLATES, ...(dbTemplates || [])]
           .filter((t: any) => !templateCategory || t.category === templateCategory)
+          .filter((t: any) => !currentProductContext || t.subCategory === currentProductContext)
           .filter((t: any) => !templateSearch || t.name.toLowerCase().includes(templateSearch.toLowerCase()))
           .map((t: any) => {
             const { elements: tElements, bgColor: tBgColor } = getTemplateData(t);
@@ -2899,6 +2948,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           <button
             key={tab.id}
             onClick={() => {
+              if (tab.id === 'templates') {
+                setIsDesignModalOpen(true);
+              }
               setActiveTab(tab.id as any);
               setIsMobileSidebarOpen(true);
             }}
@@ -3203,6 +3255,17 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           </motion.div>
         )}
       </AnimatePresence>
+      
+      <DesignSelectorModal 
+        isOpen={isDesignModalOpen} 
+        onClose={() => setIsDesignModalOpen(false)} 
+        onSelect={(item) => {
+          loadTemplate(item);
+          setIsDesignModalOpen(false);
+        }}
+        initialDisplayMode="variants"
+        initialViewStep="products"
+      />
     </div>
   );
 };

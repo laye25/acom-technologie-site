@@ -67,12 +67,12 @@ const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ pro
       {/* Sidebar de sélection */}
       <div className="w-full lg:w-72 bg-gray-50 border-b lg:border-b-0 lg:border-r border-gray-100 p-4 lg:p-8 flex flex-col">
         <h2 className="text-[10px] lg:text-xs font-black text-gray-400 uppercase tracking-widest mb-4 lg:mb-8">Variantes du produit</h2>
-        <div className="flex lg:flex-col gap-2 lg:gap-3 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0 scrollbar-hide">
+        <div className="flex lg:flex-col gap-2 lg:gap-3 overflow-x-auto lg:overflow-x-visible pb-3 lg:pb-0 snap-x snap-mandatory scrollbar-thin">
           {product.variants.map((v) => (
             <button
               key={v.id}
               onClick={() => setActiveVariantId(v.id)}
-              className={`whitespace-nowrap lg:whitespace-normal text-left px-4 lg:px-5 py-3 lg:py-4 rounded-xl lg:rounded-2xl text-xs lg:text-sm font-bold transition-all flex items-center justify-between shrink-0 lg:shrink ${
+              className={`whitespace-nowrap lg:whitespace-normal text-left px-4 lg:px-5 py-3 lg:py-4 rounded-xl lg:rounded-2xl text-xs lg:text-sm font-bold transition-all flex items-center justify-between shrink-0 lg:shrink snap-start ${
                 activeVariantId === v.id 
                   ? 'bg-primary text-white shadow-lg shadow-primary/20' 
                   : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-100'

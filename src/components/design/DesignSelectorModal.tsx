@@ -13,6 +13,9 @@ import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
 interface DesignSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSelect?: (item: any) => void;
+  initialDisplayMode?: 'products' | 'variants';
+  initialViewStep?: ViewStep;
 }
 
 type ViewStep = 'categories' | 'products' | 'variants' | 'configurator';
@@ -365,11 +368,25 @@ const TemplateCard = ({
   );
 };
 
-const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClose }) => {
+const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSelect,
+  initialDisplayMode = 'products',
+  initialViewStep = 'categories'
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [viewStep, setViewStep] = useState<ViewStep>('categories');
-  const [displayMode, setDisplayMode] = useState<'products' | 'variants'>('products');
+  const [viewStep, setViewStep] = useState<ViewStep>(initialViewStep);
+  const [displayMode, setDisplayMode] = useState<'products' | 'variants'>(initialDisplayMode);
+  
+  // Sync initial props when modal opens
+  React.useEffect(() => {
+    if (isOpen) {
+      setDisplayMode(initialDisplayMode);
+      setViewStep(initialViewStep);
+    }
+  }, [isOpen, initialDisplayMode, initialViewStep]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -495,6 +512,13 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
   };
 
   const handlePersonalize = (variant: Variant) => {
+    if (onSelect) {
+      const product = allProducts.find(p => p.variants.some(v => v.id === variant.id));
+      onSelect({ ...variant, subCategory: product?.name });
+      onClose();
+      return;
+    }
+    
     // Integration with Studio ACOM
     const params = new URLSearchParams({
       template_id: variant.templateId || variant.id,
@@ -592,12 +616,22 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                   />
                 </div>
                 <button
-                  onClick={() => setDisplayMode(prev => prev === 'products' ? 'variants' : 'products')}
-                  className="px-3 md:px-4 py-2 bg-gray-100 rounded-xl font-bold text-[10px] md:text-sm text-gray-600 hover:bg-gray-200 whitespace-nowrap"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const nextMode = displayMode === 'products' ? 'variants' : 'products';
+                    setDisplayMode(nextMode);
+                    // On force le passage à la vue "produits" (grille) pour voir le résultat du changement
+                    setViewStep('products');
+                  }}
+                  className={`px-3 md:px-4 py-2 rounded-xl font-black text-[10px] md:text-sm transition-all shadow-sm border shrink-0 ${
+                    displayMode === 'variants' 
+                      ? 'bg-primary text-white border-primary' 
+                      : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                  } whitespace-nowrap`}
                 >
-                  {displayMode === 'products' ? 'Variantes' : 'Produits'}
+                  {displayMode === 'products' ? 'Voir les variantes' : 'Voir les produits'}
                 </button>
-                <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full">
+                <button onClick={onClose} className="p-2 text-gray-500 hover:bg-gray-100 rounded-full shrink-0">
                   <X className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
               </div>
@@ -663,36 +697,45 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                        categories.find(c => c.id === activeCategory)?.name || 'Modèles'}
                     </h2>
                     
-                    {displayedItems.length > 0 ? (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                        {displayedItems.map((item) => (
-                          <TemplateCard 
-                            key={item.id}
-                            item={item}
-                            onSelect={displayMode === 'products' ? handleSelectProduct : handleSelectVariant}
-                            type={displayMode === 'products' ? 'product' : 'variant'}
-                          />
-                        ))}
-                      </div>
+                    {/* Si on a une recherche ou si on est dans une catégorie spécifique, on affiche la grille plate */}
+                    {(searchQuery || activeCategory !== 'all') ? (
+                      displayedItems.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
+                          {displayedItems.map((item) => (
+                            <TemplateCard 
+                              key={item.id}
+                              item={item}
+                              onSelect={displayMode === 'products' ? handleSelectProduct : handleSelectVariant}
+                              type={displayMode === 'products' ? 'product' : 'variant'}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                          <FolderOpen className="w-16 h-16 mb-4 opacity-20" />
+                          <p className="font-bold">Aucun résultat trouvé</p>
+                        </div>
+                      )
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                        <FolderOpen className="w-16 h-16 mb-4 opacity-20" />
-                        <p className="font-bold">Aucun produit trouvé</p>
-                      </div>
-                    )}
-
-                    {activeCategory === 'all' && (
+                      /* Vue par défaut (Toutes les catégories) : on affiche par sections de catégories */
                       <div className="space-y-16 pb-20">
                         {categories.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id)).map((category) => {
-                          const categoryProducts = allProducts.filter(p => p.categoryId === category.id).slice(0, 4);
-                          if (categoryProducts.length === 0) return null;
+                          const categoryItems = displayMode === 'products'
+                            ? allProducts.filter(p => p.categoryId === category.id).slice(0, 4)
+                            : allProducts.filter(p => p.categoryId === category.id).flatMap(p => p.variants).slice(0, 8);
+                          
+                          if (categoryItems.length === 0) return null;
                           
                           return (
                             <div key={category.id}>
                               <div className="flex items-center justify-between mb-8">
                                 <div>
                                   <h2 className="text-2xl font-black text-gray-900 tracking-tight">{category.name}</h2>
-                                  <p className="text-sm font-bold text-gray-500">Découvrez nos produits de {category.name.toLowerCase()}</p>
+                                  <p className="text-sm font-bold text-gray-500">
+                                    {displayMode === 'products' 
+                                      ? `Découvrez nos produits de ${category.name.toLowerCase()}`
+                                      : `Découvrez nos designs de ${category.name.toLowerCase()}`}
+                                  </p>
                                 </div>
                                 <button 
                                   onClick={() => setActiveCategory(category.id)}
@@ -703,12 +746,12 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({ isOpen, onClo
                                 </button>
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                {categoryProducts.map(product => (
+                                {categoryItems.map(item => (
                                   <TemplateCard 
-                                    key={product.id} 
-                                    item={product} 
-                                    onSelect={handleSelectProduct}
-                                    type="product"
+                                    key={item.id} 
+                                    item={item} 
+                                    onSelect={displayMode === 'products' ? handleSelectProduct : handleSelectVariant}
+                                    type={displayMode === 'products' ? 'product' : 'variant'}
                                   />
                                 ))}
                               </div>
