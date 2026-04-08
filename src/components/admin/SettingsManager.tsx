@@ -204,12 +204,12 @@ const SettingsManager = () => {
       secondaryButtonLink: "/portfolio"
     },
     expertiseSection: {
-      badge: "Expertise",
+      badge: "Acom Studio",
       title: "Solutions",
       subtitle1: "Créatives",
       subtitle2: "pour Marques Ambitieuses",
       description: "Nous transformons vos idées en réalités numériques et physiques avec une précision artisanale et une vision stratégique.",
-      searchPlaceholder: "Rechercher un service ou une expertise...",
+      searchPlaceholder: "Rechercher un service ou un produit...",
       noResultsText: "Aucun service ne correspond à votre recherche.",
       resetFiltersText: "Réinitialiser les filtres"
     },
@@ -1573,7 +1573,7 @@ const SettingsManager = () => {
 
               {/* Expertise Section */}
               <div className="space-y-6 pt-8 border-t border-gray-100">
-                <h4 className="text-lg font-bold text-gray-900">Section Expertise (Services)</h4>
+                <h4 className="text-lg font-bold text-gray-900">Section Acom Studio (Services)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Badge (Petit texte)</label>

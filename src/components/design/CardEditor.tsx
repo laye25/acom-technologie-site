@@ -22,6 +22,7 @@ interface CardEditorProps {
   initialTemplate?: any; // SVG string, URL, or design object
   templateId?: string;
   onExport?: (dataUrl: string) => void;
+  autoOpenSelector?: boolean;
 }
 
 // --- Helper Functions for Template Hydration ---
@@ -413,9 +414,9 @@ const FONTS = [
   'Inter', 'Cormorant Garamond', 'Montserrat', 'Playfair Display', 'Roboto', 'Open Sans', 'Lato'
 ];
 
-export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport }) => {
+export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport, autoOpenSelector }) => {
   const { isAdmin, isManager, profile, user } = useAuth();
-  const { data: dbTemplates, refresh: refreshTemplates } = useSupabaseData<any>({
+  const { data: dbTemplates, loading: loadingTemplates, refresh: refreshTemplates } = useSupabaseData<any>({
     tableName: 'design_templates',
     order: { column: 'createdAt', direction: 'desc' },
     realtime: false,
@@ -883,7 +884,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         const { parseSvgToElements } = await import('../../lib/svgParser');
         const newElements = parseSvgToElements(template.templateSvg);
         setPages([
-          { elements: hydrateElements(newElements), bgColor: '#ffffff' },
+          { elements: hydrateElements(newElements), bgColor: template.bgColor || template.bg_color || '#ffffff' },
           { elements: [], bgColor: '#ffffff' }
         ]);
         if (template.name) setDesignTitle(template.name);
@@ -895,26 +896,30 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       if (template.subCategory) setCurrentProductContext(template.subCategory);
       setPages(template.pages.map((p: any) => ({
         ...p,
-        elements: hydrateElements(p.elements)
+        elements: hydrateElements(p.elements),
+        bgColor: p.bgColor || p.bg_color || '#ffffff'
       })));
     } else if (template.sides) {
       if (template.subCategory) setCurrentProductContext(template.subCategory);
       setPages([
         { 
           elements: hydrateElements(template.sides.front.elements), 
-          bgColor: template.sides.front.bgColor 
+          bgColor: template.sides.front.bgColor || template.sides.front.bg_color || '#ffffff'
         },
         { 
           elements: hydrateElements(template.sides.back.elements), 
-          bgColor: template.sides.back.bgColor 
+          bgColor: template.sides.back.bgColor || template.sides.back.bg_color || '#ffffff'
         }
       ]);
     } else {
       if (template.subCategory) setCurrentProductContext(template.subCategory);
+      const elements = template.elements || [];
+      const bgColor = template.bgColor || template.bg_color || '#ffffff';
+      
       setPages([
         { 
-          elements: hydrateElements(template.elements as CanvasElement[]), 
-          bgColor: template.bgColor 
+          elements: hydrateElements(elements as CanvasElement[]), 
+          bgColor: bgColor 
         },
         { elements: [], bgColor: '#ffffff' }
       ]);
@@ -990,10 +995,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       }
     };
     
-    if (dbTemplates.length > 0 || !templateId) {
+    if (!loadingTemplates || !templateId) {
       loadInitial();
     }
-  }, [initialTemplate, templateId, dbTemplates]);
+  }, [initialTemplate, templateId, dbTemplates, loadingTemplates]);
 
   const [isSvgModalOpen, setIsSvgModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -1009,7 +1014,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [templatePrice, setTemplatePrice] = useState('');
   const [templatePromotion, setTemplatePromotion] = useState(false);
   const [templatePromotionPercentage, setTemplatePromotionPercentage] = useState('');
-  const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
+  const [isDesignModalOpen, setIsDesignModalOpen] = useState(autoOpenSelector || false);
   const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai'>('templates');
   const [prompt, setPrompt] = useState('');
   

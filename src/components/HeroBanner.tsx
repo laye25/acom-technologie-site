@@ -211,7 +211,7 @@ const HeroBanner = () => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="pr-4">
-                        <p className="text-[9px] font-mono text-primary uppercase tracking-widest mb-1"><Translate>Expertise</Translate> {brandName}</p>
+                        <p className="text-[9px] font-mono text-primary uppercase tracking-widest mb-1"><Translate>Acom Studio</Translate></p>
                         <p className="text-white font-bold text-sm truncate"><Translate>{currentSlide.title}</Translate></p>
                       </div>
                       <div className="flex-shrink-0 w-9 h-9 bg-primary rounded-full flex items-center justify-center text-white shadow-lg shadow-primary/20">

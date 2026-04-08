@@ -198,7 +198,7 @@ export const DEFAULT_SETTINGS = {
       subtitle: 'Nous transformons vos idées en réalité numérique avec passion et expertise.',
       image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80',
       color: 'from-indigo-600 to-blue-700',
-      badge: 'Expertise Digitale',
+      badge: 'Acom Studio',
       icon: 'Rocket'
     },
     {

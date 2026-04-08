@@ -197,25 +197,29 @@ const StudioAcomManager = () => {
       }
 
       // Import Products
-      console.log(`Found ${INITIAL_PRODUCTS.length} products to import.`);
-      for (const product of INITIAL_PRODUCTS) {
-        console.log(`Importing product: ${product.name} (${product.id})...`);
-        try {
-          // Map to snake_case for Supabase
-          await dbService.studioAcom.products.save({
-            id: product.id,
-            name: product.name,
-            category_id: product.categoryId,
-            description: product.description,
-            cover_image: product.coverImage,
-            user_id: product.userId,
-            variants: product.variants
-          });
-          console.log(`Successfully saved product: ${product.name}`);
-        } catch (err) {
-          console.error(`Failed to save product ${product.name}:`, err);
-          throw err;
+      if (INITIAL_PRODUCTS.length > 0) {
+        console.log(`Found ${INITIAL_PRODUCTS.length} products to import.`);
+        for (const product of INITIAL_PRODUCTS) {
+          console.log(`Importing product: ${product.name} (${product.id})...`);
+          try {
+            // Map to snake_case for Supabase
+            await dbService.studioAcom.products.save({
+              id: product.id,
+              name: product.name,
+              category_id: product.categoryId,
+              description: product.description,
+              cover_image: product.coverImage,
+              user_id: product.userId,
+              variants: product.variants
+            });
+            console.log(`Successfully saved product: ${product.name}`);
+          } catch (err) {
+            console.error(`Failed to save product ${product.name}:`, err);
+            throw err;
+          }
         }
+      } else {
+        console.log('No default products found to import.');
       }
       
       console.log('Import completed successfully!');

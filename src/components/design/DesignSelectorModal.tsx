@@ -507,8 +507,6 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
       }
     } catch (error) {
       console.error('Error fetching data in DesignSelectorModal:', error);
-      // Fallback to initial data if everything fails
-      if (allProducts.length === 0) setAllProducts(INITIAL_PRODUCTS);
     } finally {
       setLoadingVariants(false);
     }
@@ -577,7 +575,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     setViewStep('variants');
   };
 
-  const handleSelectVariant = (variant: Variant) => {
+  const handleSelectVariant = (variant: any) => {
     if (onSelect) {
       const product = allProducts.find(p => p.variants.some(v => v.id === variant.id));
       onSelect({ ...variant, subCategory: product?.name });
@@ -590,6 +588,15 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
       setSelectedProductId(product.id);
       setSelectedVariantId(variant.id);
       setViewStep('configurator');
+    } else if (activeCategory === 'saved') {
+      // For saved designs, go directly to editor
+      navigate('/design-editor', { 
+        state: { 
+          design: variant,
+          templateId: variant.id
+        } 
+      });
+      onClose();
     }
   };
 
@@ -793,53 +800,68 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                           ))}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                          <FolderOpen className="w-16 h-16 mb-4 opacity-20" />
-                          <p className="font-bold">Aucun résultat trouvé</p>
+                        <div className="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-4">
+                            <LayoutGrid className="w-8 h-8 text-gray-300" />
+                          </div>
+                          <h3 className="text-lg font-black text-gray-900 mb-1">Aucun modèle trouvé</h3>
+                          <p className="text-sm text-gray-500 font-medium">Essayez une autre recherche ou catégorie</p>
                         </div>
                       )
                     ) : (
                       /* Vue par défaut (Toutes les catégories) : on affiche par sections de catégories */
                       <div className="space-y-16 pb-20">
-                        {categories.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id)).map((category) => {
-                          const categoryItems = displayMode === 'products'
-                            ? allProducts.filter(p => p.categoryId === category.id).slice(0, 4)
-                            : allProducts.filter(p => p.categoryId === category.id).flatMap(p => p.variants).slice(0, 8);
-                          
-                          if (categoryItems.length === 0) return null;
-                          
-                          return (
-                            <div key={category.id}>
-                              <div className="flex items-center justify-between mb-8">
-                                <div>
-                                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{category.name}</h2>
-                                  <p className="text-sm font-bold text-gray-500">
-                                    {displayMode === 'products' 
-                                      ? `Découvrez nos produits de ${category.name.toLowerCase()}`
-                                      : `Découvrez nos designs de ${category.name.toLowerCase()}`}
-                                  </p>
-                                </div>
-                                <button 
-                                  onClick={() => setActiveCategory(category.id)}
-                                  className="flex items-center space-x-2 text-primary font-black text-sm hover:translate-x-1 transition-transform"
-                                >
-                                  <span>Voir tout</span>
-                                  <ChevronRight className="w-4 h-4" />
-                                </button>
-                              </div>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                {categoryItems.map(item => (
-                                  <TemplateCard 
-                                    key={item.id} 
-                                    item={item} 
-                                    onSelect={displayMode === 'products' ? handleSelectProduct : handleSelectVariant}
-                                    type={displayMode === 'products' ? 'product' : 'variant'}
-                                  />
-                                ))}
-                              </div>
+                        {allProducts.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-32 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
+                            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6">
+                              <Sparkles className="w-10 h-10 text-primary/30" />
                             </div>
-                          );
-                        })}
+                            <h3 className="text-2xl font-black text-gray-900 mb-2">Studio ACOM en préparation</h3>
+                            <p className="text-gray-500 font-bold max-w-md text-center px-8">
+                              Nos modèles de production sont en cours de déploiement. Revenez très bientôt pour découvrir nos designs exclusifs.
+                            </p>
+                          </div>
+                        ) : (
+                          categories.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id)).map((category) => {
+                            const categoryItems = displayMode === 'products'
+                              ? allProducts.filter(p => p.categoryId === category.id).slice(0, 4)
+                              : allProducts.filter(p => p.categoryId === category.id).flatMap(p => p.variants).slice(0, 8);
+                            
+                            if (categoryItems.length === 0) return null;
+                            
+                            return (
+                              <div key={category.id}>
+                                <div className="flex items-center justify-between mb-8">
+                                  <div>
+                                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">{category.name}</h2>
+                                    <p className="text-sm font-bold text-gray-500">
+                                      {displayMode === 'products' 
+                                        ? `Découvrez nos produits de ${category.name.toLowerCase()}`
+                                        : `Découvrez nos designs de ${category.name.toLowerCase()}`}
+                                    </p>
+                                  </div>
+                                  <button 
+                                    onClick={() => setActiveCategory(category.id)}
+                                    className="flex items-center space-x-2 text-primary font-black text-sm hover:translate-x-1 transition-transform"
+                                  >
+                                    <span>Voir tout</span>
+                                    <ChevronRight className="w-4 h-4" />
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                  {categoryItems.map(item => (
+                                    <TemplateCard 
+                                      key={item.id} 
+                                      item={item} 
+                                      onSelect={displayMode === 'products' ? handleSelectProduct : handleSelectVariant}
+                                      type={displayMode === 'products' ? 'product' : 'variant'}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                     )}
                   </div>
