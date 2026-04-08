@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { dbService as db } from './services/firebaseDbService';
+import { dbService as db } from './services/dbService';
 
 interface ThemeContextType {
   primaryColor: string;

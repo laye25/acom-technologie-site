@@ -13,7 +13,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { useSupabaseData } from '../../hooks/useSupabase';
 import { generateDesign } from '../../lib/gemini';
-import { db, handleFirestoreError, OperationType } from '../../firebase';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
@@ -694,7 +693,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         toast.success("Design enregistré !", { id: toastId });
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'designs');
+      console.error("Erreur lors de l'enregistrement du design:", error);
       toast.error("Erreur lors de l'enregistrement.", { id: toastId });
     } finally {
       setIsSaving(false);
@@ -1125,11 +1124,6 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       refreshTemplates();
     } catch (error) {
       console.error("Error saving template:", error);
-      try {
-        handleFirestoreError(error, OperationType.CREATE, 'design_templates');
-      } catch (e) {
-        // Error already logged by handleFirestoreError
-      }
       toast.error("Erreur lors de l'enregistrement du modèle.");
     }
   };

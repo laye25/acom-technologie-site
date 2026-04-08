@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { Message, Order, Service } from '../types';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { motion, AnimatePresence } from 'motion/react';

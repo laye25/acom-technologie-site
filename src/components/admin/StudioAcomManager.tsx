@@ -8,7 +8,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSupabaseData } from '../../hooks/useSupabase';
-import { dbService } from '../../services/firebaseDbService';
+import { dbService } from '../../services/dbService';
 import { Category, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { supabase } from '../../lib/supabase';
 

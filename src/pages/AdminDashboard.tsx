@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { Order, OrderStatus, UserProfile, Service, Expense } from '../types';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { motion, AnimatePresence } from 'motion/react';
@@ -20,12 +20,11 @@ import UserManager from '../components/admin/UserManager';
 import DesignRequestManager from '../components/admin/DesignRequestManager';
 import { ExpenseManager } from '../components/admin/ExpenseManager';
 import StudioAcomManager from '../components/admin/StudioAcomManager';
-import DataMigration from '../components/admin/DataMigration';
 import { PlatformAIInsights } from '../components/admin/PlatformAIInsights';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { notificationService } from '../services/notificationService';
 
-type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom' | 'migration';
+type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom';
 
 const AdminDashboard = () => {
   const { user, isAdmin, isManager, isSuperAdmin, loading: authLoading } = useAuth();
@@ -957,7 +956,6 @@ const AdminDashboard = () => {
     { id: 'portfolio', label: 'Portfolio', icon: Database, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'blog', label: 'Blog', icon: FileText, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'settings', label: 'Réglages', icon: Settings, adminOnly: true, superAdminOnly: false, allowManager: false },
-    { id: 'migration', label: 'Migration', icon: Database, adminOnly: true, superAdminOnly: true, allowManager: false },
     { id: 'messages', label: 'Messages', icon: MessageSquare, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'pos', label: 'Caisse', icon: Calculator, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'expenses', label: 'Dépenses', icon: Receipt, adminOnly: false, superAdminOnly: false, allowManager: true },
@@ -1833,17 +1831,6 @@ const AdminDashboard = () => {
             exit={{ opacity: 0, y: -20 }}
           >
             <SettingsManager />
-          </motion.div>
-        )}
-
-        {activeTab === 'migration' && (
-          <motion.div
-            key="migration"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <DataMigration />
           </motion.div>
         )}
 

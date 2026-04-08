@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { FileText, ShieldCheck, Scale, AlertCircle, Loader2 } from 'lucide-react';
 import { Translate } from '../context/LanguageContext';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 
 const Terms = () => {
   const [settings, setSettings] = useState<any>(null);

@@ -3,7 +3,7 @@ import { Sparkles, Loader2, AlertCircle, TrendingUp, ShieldAlert, Lightbulb, Fla
 import { motion } from 'motion/react';
 import { analyzeOrder, generateOrderDraft } from '../../lib/gemini';
 import { Order, Service } from '../../types';
-import { dbService } from '../../services/firebaseDbService';
+import { dbService } from '../../services/dbService';
 import { toast } from 'react-hot-toast';
 
 interface OrderAIAnalysisProps {

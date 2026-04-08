@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, ChevronRight, Tag } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { Translate, useTranslation } from '../context/LanguageContext';
 
 const iconMap: { [key: string]: any } = {

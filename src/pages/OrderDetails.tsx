@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { dbService } from '../services/firebaseDbService';
+import { dbService } from '../services/dbService';
 import { toast } from 'react-hot-toast';
 import { getOrderDiscountedTotal, isPromotionActive } from '../lib/promotions';
 import { OrderAIAnalysis } from '../components/admin/OrderAIAnalysis';

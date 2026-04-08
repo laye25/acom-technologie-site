@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { dbService as db } from '../../services/firebaseDbService';
+import { dbService as db } from '../../services/dbService';
 import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ConfirmModal } from './ConfirmModal';

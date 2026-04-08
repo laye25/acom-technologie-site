@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
-import { dbService as db } from '../../services/firebaseDbService';
+import { dbService as db } from '../../services/dbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
 import { compressImage } from '../../lib/imageUtils';
 

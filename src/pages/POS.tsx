@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbService } from '../services/firebaseDbService';
+import { dbService } from '../services/dbService';
 import { supabase } from '../lib/supabase';
 import { Service } from '../types';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';

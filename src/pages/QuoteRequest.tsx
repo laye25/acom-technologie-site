@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { Send, CheckCircle, ArrowRight, Loader2, FileText, MessageSquare, ShieldCheck } from 'lucide-react';

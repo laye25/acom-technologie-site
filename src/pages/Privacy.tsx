@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Lock, Eye, Database, Bell, Loader2 } from 'lucide-react';
 import { Translate } from '../context/LanguageContext';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 
 const Privacy = () => {
   const [settings, setSettings] = useState<any>(null);

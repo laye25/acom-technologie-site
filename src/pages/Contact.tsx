@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Phone, Mail, MapPin, MessageCircle, Send, CheckCircle2 } from 'lucide-react';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
 
 const Contact = () => {

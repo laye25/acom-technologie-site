@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Notification } from '../types';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { Bell, CheckCircle, MessageSquare, CreditCard, Clock, X, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Facebook, Instagram, Linkedin, Twitter, Mail, Phone, MapPin, Send, ArrowUpRight } from 'lucide-react';
 import { motion } from 'motion/react';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { Translate, useTranslation } from '../context/LanguageContext';
 
 const Footer = () => {

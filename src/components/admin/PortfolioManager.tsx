@@ -3,7 +3,7 @@ import { PortfolioItem } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
-import { dbService as db } from '../../services/firebaseDbService';
+import { dbService as db } from '../../services/dbService';
 import { compressImage } from '../../lib/imageUtils';
 
 import { ConfirmModal } from './ConfirmModal';

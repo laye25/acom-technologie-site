@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { BLOG_POSTS as STATIC_POSTS } from '../constants';
 import { BlogPost as BlogPostType } from '../types';
 import { motion } from 'motion/react';

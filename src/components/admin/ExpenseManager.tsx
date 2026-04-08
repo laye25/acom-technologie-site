@@ -12,7 +12,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { dbService } from '../../services/firebaseDbService';
+import { dbService } from '../../services/dbService';
 import { Expense } from '../../types';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';

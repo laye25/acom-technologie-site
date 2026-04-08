@@ -8,9 +8,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useSupabaseData } from '../../hooks/useSupabase';
 import { useAuth } from '../../context/AuthContext';
-import { dbService } from '../../services/firebaseDbService';
+import { dbService } from '../../services/dbService';
 import { supabase } from '../../lib/supabase';
-import { db } from '../../firebase';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
 

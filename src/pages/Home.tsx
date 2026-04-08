@@ -8,7 +8,7 @@ import { Search, ArrowRight, CheckCircle2, Star, Users, Briefcase, Award, Filter
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Link } from 'react-router-dom';
 import { Translate, useTranslation } from '../context/LanguageContext';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 
 const iconMap: { [key: string]: any } = {
   Briefcase, Users, Award, Star, CheckCircle2, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code

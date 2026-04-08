@@ -3,7 +3,7 @@ import { Service } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
-import { dbService as db } from '../../services/firebaseDbService';
+import { dbService as db } from '../../services/dbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
 import { compressImage } from '../../lib/imageUtils';
 

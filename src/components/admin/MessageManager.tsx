@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { Order, UserProfile, Service } from '../../types';
-import { dbService as db } from '../../services/firebaseDbService';
+import { dbService as db } from '../../services/dbService';
 import { Link } from 'react-router-dom';
 import { MessageSquare, User, Clock, ChevronRight, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';

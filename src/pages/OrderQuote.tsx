@@ -20,7 +20,7 @@ import { fr } from 'date-fns/locale';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { getOrderDiscountedTotal } from '../lib/promotions';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 import { SiteSettings } from '../types';
 
 const OrderQuote = () => {

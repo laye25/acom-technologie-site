@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { UserProfile } from '../../types';
-import { dbService as db } from '../../services/firebaseDbService';
+import { dbService as db } from '../../services/dbService';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 

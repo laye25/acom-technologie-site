@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Minus, Search, HelpCircle, MessageCircle, Loader2 } from 'lucide-react';
 import { Translate } from '../context/LanguageContext';
-import { dbService as db } from '../services/firebaseDbService';
+import { dbService as db } from '../services/dbService';
 
 const FAQ = () => {
   const [activeCategory, setActiveCategory] = useState('Tous');

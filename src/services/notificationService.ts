@@ -1,4 +1,4 @@
-import { dbService } from './firebaseDbService';
+import { dbService } from './dbService';
 import { Order, UserProfile } from '../types';
 
 export const notificationService = {

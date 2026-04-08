@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDataCache } from '../context/CacheContext';
 import LanguageSwitcher from './LanguageSwitcher';
-import { dbService } from '../services/firebaseDbService';
+import { dbService } from '../services/dbService';
 import { LayoutDashboard, LogOut, Menu, X, ShoppingBag, MessageSquare, User, ChevronRight, Calculator, Store, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DesignSelectorModal from './design/DesignSelectorModal';
