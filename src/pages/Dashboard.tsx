@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Order, Service, UserProfile, OrderStatus, Design } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion } from 'motion/react';
@@ -9,8 +9,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
-import { db } from '../firebase';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { supabase } from '../lib/supabase';
 import { NotificationCenter } from '../components/NotificationCenter';
 import { getOrderDiscountedTotal } from '../lib/promotions';
 
@@ -32,57 +31,57 @@ const Dashboard = () => {
   const filter = useMemo(() => {
     if (!user) return undefined;
     if (isManager || isAdmin) return undefined; // Managers and admins see all orders
-    return { column: 'userId', value: user.uid };
+    return { column: 'user_id', value: user.id };
   }, [user, isManager, isAdmin]);
   
   const dashboardOptions = useMemo(() => ({
-    collectionName: 'orders' as CollectionName,
+    tableName: 'orders' as TableName,
     filter: filter as any,
     skip: !user,
-    order: (isManager || isAdmin) ? { column: 'createdAt', ascending: false } : undefined,
+    order: (isManager || isAdmin) ? { column: 'created_at', ascending: false } : undefined,
     limit: 50
   }), [filter, user, isManager, isAdmin]);
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName,
+    tableName: 'services' as TableName,
     limit: 50
   }), []);
 
   const userOptions = useMemo(() => ({
-    collectionName: 'users' as CollectionName,
+    tableName: 'users' as TableName,
     skip: !(isManager || isAdmin),
     limit: 50
   }), [isManager, isAdmin]);
 
   const designOptions = useMemo(() => ({
-    collectionName: 'designs' as CollectionName,
-    filter: { column: 'ownerId', value: user?.uid },
+    tableName: 'designs' as TableName,
+    filter: { column: 'user_id', value: user?.id },
     skip: !user,
     realtime: true,
     limit: 50
   }), [user]);
 
-  const { data: rawOrders, loading, error: ordersError } = useFirebaseData<Order>(dashboardOptions);
-  const { data: users } = useFirebaseData<UserProfile>(userOptions);
-  const { data: userDesigns, loading: designsLoading } = useFirebaseData<Design>(designOptions);
+  const { data: rawOrders, loading, error: ordersError } = useSupabaseData<Order>(dashboardOptions);
+  const { data: users } = useSupabaseData<UserProfile>(userOptions);
+  const { data: userDesigns, loading: designsLoading } = useSupabaseData<Design>(designOptions);
   
   const orders = useMemo(() => {
     if (!rawOrders || rawOrders.length === 0) return [];
     return [...rawOrders].sort((a, b) => {
-      // Handle Firestore timestamps (they have toMillis() or are null/undefined)
       const getTime = (val: any) => {
         if (!val) return 0;
+        if (typeof val === 'string') return new Date(val).getTime();
         if (typeof val.toMillis === 'function') return val.toMillis();
         if (val instanceof Date) return val.getTime();
         return 0;
       };
       
-      const timeA = getTime(a.updatedAt || a.createdAt);
-      const timeB = getTime(b.updatedAt || b.createdAt);
+      const timeA = getTime(a.updated_at || a.created_at || a.updatedAt || a.createdAt);
+      const timeB = getTime(b.updated_at || b.created_at || b.updatedAt || b.createdAt);
       return timeB - timeA;
     });
   }, [rawOrders]);
-  const { data: dynamicServices, loading: servicesLoading } = useFirebaseData<Service>(serviceOptions);
+  const { data: dynamicServices, loading: servicesLoading } = useSupabaseData<Service>(serviceOptions);
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];
@@ -128,11 +127,17 @@ const Dashboard = () => {
     }
   };
 
+  const formatDate = (date: any) => {
+    if (!date) return '...';
+    const d = typeof date === 'string' ? new Date(date) : (date.toDate ? date.toDate() : date);
+    return format(d, 'dd MMMM yyyy', { locale: fr });
+  };
+
   if (authLoading || (loading && orders.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-32">
         <Clock className="animate-spin text-primary w-10 h-10 mb-4" />
-        <p className="text-gray-500 font-medium">Chargement de vos commandes...</p>
+        <p className="text-gray-500 font-medium">Chargement de votre session...</p>
       </div>
     );
   }
@@ -236,7 +241,7 @@ const Dashboard = () => {
           <div className="grid grid-cols-1 gap-6">
             {orders.map((order) => {
               const service = allServices.find(s => s.id === order.serviceId);
-              const client = users.find(u => u.uid === order.userId);
+              const client = users.find(u => u.uid === order.userId || u.uid === order.user_id);
               
               return (
                 <motion.div
@@ -279,7 +284,7 @@ const Dashboard = () => {
                         </div>
                         <div className="flex flex-col gap-1">
                           <p className="text-sm text-gray-400">
-                            Commandé le {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'dd MMMM yyyy', { locale: fr }) : '...'}
+                            Commandé le {formatDate(order.created_at || order.createdAt)}
                           </p>
                           { (isManager || isAdmin) && (
                             <p className="text-xs font-bold text-primary flex items-center">
@@ -423,14 +428,14 @@ const Dashboard = () => {
                     <div>
                       <h3 className="font-bold text-gray-900 truncate max-w-[150px]">{design.name}</h3>
                       <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mt-1">
-                        Modifié le {design.updatedAt?.toDate ? format(design.updatedAt.toDate(), 'dd/MM/yyyy', { locale: fr }) : '...'}
+                        Modifié le {formatDate(design.updated_at || design.updatedAt)}
                       </p>
                     </div>
                     <button 
                       onClick={async () => {
                         if (window.confirm('Supprimer ce design ?')) {
                           try {
-                            await deleteDoc(doc(db, 'designs', design.id));
+                            await supabase.from('designs').delete().eq('id', design.id);
                             toast.success('Design supprimé');
                           } catch (err) {
                             console.error(err);
@@ -488,7 +493,7 @@ const Dashboard = () => {
                           </span>
                           <span className="flex items-center whitespace-nowrap">
                             <Clock className="w-3 h-3 mr-1" />
-                            {order.updatedAt?.toDate ? format(order.updatedAt.toDate(), 'dd/MM HH:mm', { locale: fr }) : '...'}
+                            {formatDate(order.updated_at || order.updatedAt)}
                           </span>
                         </div>
                       </div>
@@ -515,8 +520,8 @@ const Dashboard = () => {
           <div className="bg-white rounded-3xl border border-black/5 p-8 sm:p-12 shadow-sm">
             <div className="flex flex-col items-center text-center mb-10">
               <div className="w-24 h-24 bg-primary-light rounded-3xl flex items-center justify-center mb-6 shadow-inner">
-                {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" className="w-full h-full object-cover rounded-3xl" referrerPolicy="no-referrer" />
+                {user?.user_metadata?.avatar_url || profile?.photoURL ? (
+                  <img src={user?.user_metadata?.avatar_url || profile?.photoURL} alt="" className="w-full h-full object-cover rounded-3xl" referrerPolicy="no-referrer" />
                 ) : (
                   <User className="w-12 h-12 text-primary" />
                 )}

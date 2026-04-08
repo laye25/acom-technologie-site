@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useFirebaseData, CollectionName } from '../../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { Order, UserProfile, Service } from '../../types';
 import { dbService as db } from '../../services/firebaseDbService';
 import { Link } from 'react-router-dom';
@@ -14,24 +14,24 @@ const MessageManager = () => {
   const hasAccess = isAdmin || isManager;
   
   const orderOptions = useMemo(() => ({
-    collectionName: 'orders' as CollectionName,
+    tableName: 'orders' as TableName,
     order: { column: 'updatedAt' as const, ascending: false },
     skip: !hasAccess
   }), [hasAccess]);
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName,
+    tableName: 'services' as TableName,
     skip: !hasAccess
   }), [hasAccess]);
 
   const userOptions = useMemo(() => ({
-    collectionName: 'users' as CollectionName,
+    tableName: 'users' as TableName,
     skip: !hasAccess
   }), [hasAccess]);
 
-  const { data: orders, loading: ordersLoading } = useFirebaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirebaseData<Service>(serviceOptions);
-  const { data: users } = useFirebaseData<UserProfile>(userOptions);
+  const { data: orders, loading: ordersLoading } = useSupabaseData<Order>(orderOptions);
+  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
+  const { data: users } = useSupabaseData<UserProfile>(userOptions);
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];

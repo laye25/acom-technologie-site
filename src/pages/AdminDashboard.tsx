@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbService as db } from '../services/firebaseDbService';
 import { Order, OrderStatus, UserProfile, Service, Expense } from '../types';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
@@ -20,11 +20,12 @@ import UserManager from '../components/admin/UserManager';
 import DesignRequestManager from '../components/admin/DesignRequestManager';
 import { ExpenseManager } from '../components/admin/ExpenseManager';
 import StudioAcomManager from '../components/admin/StudioAcomManager';
+import DataMigration from '../components/admin/DataMigration';
 import { PlatformAIInsights } from '../components/admin/PlatformAIInsights';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { notificationService } from '../services/notificationService';
 
-type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom';
+type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom' | 'migration';
 
 const AdminDashboard = () => {
   const { user, isAdmin, isManager, isSuperAdmin, loading: authLoading } = useAuth();
@@ -339,42 +340,42 @@ const AdminDashboard = () => {
   }, [isRestrictedAdmin, activeTab]);
 
   const orderOptions = useMemo(() => ({
-    collectionName: 'orders' as CollectionName,
+    tableName: 'orders' as TableName,
     order: { column: 'updatedAt' as const, ascending: false },
     skip: !hasAccess || isRestrictedAdmin,
     limit: 100
   }), [hasAccess, isRestrictedAdmin]);
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName,
+    tableName: 'services' as TableName,
     skip: !hasAccess,
     limit: 50
   }), [hasAccess]);
 
   const userOptions = useMemo(() => ({
-    collectionName: 'users' as CollectionName,
+    tableName: 'users' as TableName,
     skip: !hasAccess,
     limit: 100
   }), [hasAccess]);
 
   const expenseOptions = useMemo(() => ({
-    collectionName: 'expenses' as CollectionName,
+    tableName: 'expenses' as TableName,
     order: { column: 'date' as const, ascending: false },
     skip: !hasAccess,
     limit: 100
   }), [hasAccess]);
 
   const settingsOptions = useMemo(() => ({
-    collectionName: 'settings' as CollectionName,
+    tableName: 'settings' as TableName,
     skip: !hasAccess,
     limit: 20
   }), [hasAccess]);
 
-  const { data: orders, loading: ordersLoading, error: ordersError } = useFirebaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirebaseData<Service>(serviceOptions);
-  const { data: users } = useFirebaseData<UserProfile>(userOptions);
-  const { data: expenses } = useFirebaseData<Expense>(expenseOptions);
-  const { data: settingsData } = useFirebaseData<any>(settingsOptions);
+  const { data: orders, loading: ordersLoading, error: ordersError } = useSupabaseData<Order>(orderOptions);
+  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
+  const { data: users } = useSupabaseData<UserProfile>(userOptions);
+  const { data: expenses } = useSupabaseData<Expense>(expenseOptions);
+  const { data: settingsData } = useSupabaseData<any>(settingsOptions);
   
   // Point 6: Aggregation - Fetch global stats
   const globalStats = settingsData?.find((s: any) => s.id === 'stats') || {};
@@ -956,6 +957,7 @@ const AdminDashboard = () => {
     { id: 'portfolio', label: 'Portfolio', icon: Database, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'blog', label: 'Blog', icon: FileText, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'settings', label: 'Réglages', icon: Settings, adminOnly: true, superAdminOnly: false, allowManager: false },
+    { id: 'migration', label: 'Migration', icon: Database, adminOnly: true, superAdminOnly: true, allowManager: false },
     { id: 'messages', label: 'Messages', icon: MessageSquare, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'pos', label: 'Caisse', icon: Calculator, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'expenses', label: 'Dépenses', icon: Receipt, adminOnly: false, superAdminOnly: false, allowManager: true },
@@ -1627,7 +1629,7 @@ const AdminDashboard = () => {
                           })
                           .map((order) => {
                           const service = allServices.find(s => s.id === order.serviceId);
-                          const client = users.find(u => u.uid === order.userId);
+                          const client = users.find(u => u.id === order.userId);
                           const isPos = order.details?.type === 'pos';
                           
                           return (
@@ -1831,6 +1833,17 @@ const AdminDashboard = () => {
             exit={{ opacity: 0, y: -20 }}
           >
             <SettingsManager />
+          </motion.div>
+        )}
+
+        {activeTab === 'migration' && (
+          <motion.div
+            key="migration"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <DataMigration />
           </motion.div>
         )}
 

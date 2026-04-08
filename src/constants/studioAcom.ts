@@ -34,6 +34,7 @@ export interface Product {
   categoryId: string;
   description: string;
   coverImage: string;
+  userId?: string;
   variants: Variant[];
 }
 
@@ -82,7 +83,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         shape: 'Rectangulaire',
         format: 'landscape',
         finish: 'Mat',
-        templateId: 'tpl-bc-001',
+        templateId: 'acom-bc-corporate',
         previewImage: 'https://picsum.photos/seed/bc1/400/250',
         price: 25,
         minQuantity: 100,
@@ -98,7 +99,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         shape: 'Rectangulaire',
         format: 'landscape',
         finish: 'Brillant',
-        templateId: 'tpl-bc-002',
+        templateId: 'acom-bc-modern',
         previewImage: 'https://picsum.photos/seed/bc2/400/250',
         price: 30,
         minQuantity: 100,
@@ -114,7 +115,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         shape: 'Coins arrondis',
         format: 'portrait',
         finish: 'Soft Touch',
-        templateId: 'tpl-bc-003',
+        templateId: 'acom-bc-creative',
         previewImage: 'https://picsum.photos/seed/bc3/400/250',
         price: 35,
         minQuantity: 100,
@@ -139,7 +140,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         shape: 'Standard',
         format: 'portrait',
         finish: '90g Offset',
-        templateId: 'tpl-lh-001',
+        templateId: 'acom-letterhead-clean',
         previewImage: 'https://picsum.photos/seed/lh1/400/560',
         price: 45,
         minQuantity: 100,
@@ -165,7 +166,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         shape: 'Standard',
         format: 'portrait',
         finish: '135g Brillant',
-        templateId: 'tpl-fl-001',
+        templateId: 'acom-flyer-vibrant',
         previewImage: 'https://picsum.photos/seed/fl1/400/560',
         price: 55,
         minQuantity: 100,

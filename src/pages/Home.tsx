@@ -5,7 +5,7 @@ import HeroBanner from '../components/HeroBanner';
 import { Service, ServiceCategory, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ArrowRight, CheckCircle2, Star, Users, Briefcase, Award, Filter, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, Package, FileText, BarChart3, Construction, Hospital, Truck, GraduationCap, Settings } from 'lucide-react';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Link } from 'react-router-dom';
 import { Translate, useTranslation } from '../context/LanguageContext';
 import { dbService as db } from '../services/firebaseDbService';
@@ -43,13 +43,13 @@ const Home = () => {
   }), []);
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName,
+    tableName: 'services' as TableName,
     order: { column: 'name' as const },
     mapper: serviceMapper,
     limit: 20
   }), [serviceMapper]);
 
-  const { data: dbServices, loading } = useFirebaseData<Service>(serviceOptions);
+  const { data: dbServices, loading } = useSupabaseData<Service>(serviceOptions);
 
   const [activeCategory, setActiveCategory] = useState<ServiceCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');

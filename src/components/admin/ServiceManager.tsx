@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Service } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useFirebaseData, CollectionName } from '../../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { dbService as db } from '../../services/firebaseDbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
 import { compressImage } from '../../lib/imageUtils';
@@ -32,12 +32,12 @@ const ServiceManager = () => {
   }), []);
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName,
+    tableName: 'services' as TableName,
     order: { column: 'name' as const },
     mapper: serviceMapper
   }), [serviceMapper]);
 
-  const { data: services, loading, error: fetchError, refresh } = useFirebaseData<Service>(serviceOptions);
+  const { data: services, loading, error: fetchError, refresh } = useSupabaseData<Service>(serviceOptions);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentService, setCurrentService] = useState<Partial<Service> | null>(null);
@@ -69,11 +69,9 @@ const ServiceManager = () => {
     setIsSeeding(true);
     setSeedStatus('Initialisation...');
     try {
-      await db.seedDatabase((status) => setSeedStatus(status));
-      showNotification('success', 'Données restaurées avec succès !');
+      // await db.seedDatabase((status) => setSeedStatus(status));
+      showNotification('error', 'La restauration n\'est pas supportée avec Supabase pour le moment.');
       setShowConfirmSeed(false);
-      // Instead of reload, we can just refresh or wait for onSnapshot
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error: any) {
       console.error('Error seeding data:', error);
       showNotification('error', `Erreur lors de la restauration : ${error.message}`);

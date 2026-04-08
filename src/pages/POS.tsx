@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbService } from '../services/firebaseDbService';
-import { db } from '../firebase';
+import { supabase } from '../lib/supabase';
 import { Service } from '../types';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion } from 'motion/react';
 import { ShoppingBag, Plus, Minus, Trash2, CheckCircle, Loader2, Search, Calculator, Tag } from 'lucide-react';
@@ -35,11 +35,11 @@ const POS = () => {
   const categories = ['Tous', 'Digital', 'Marketing', 'Design', 'Event'];
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName,
+    tableName: 'services' as TableName,
     limit: 100
   }), []);
 
-  const { data: dynamicServices, loading: servicesLoading } = useFirebaseData<Service>(serviceOptions);
+  const { data: dynamicServices, loading: servicesLoading } = useSupabaseData<Service>(serviceOptions);
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];
@@ -105,15 +105,10 @@ const POS = () => {
     }
     setIsSubmitting(true);
     try {
-      const { writeBatch, doc, collection } = await import('firebase/firestore');
-      const batch = writeBatch(db);
       const now = new Date();
-      
-      // Create a "POS" order
       let remainingCoupon = couponDiscount;
       
-      for (let i = 0; i < cart.length; i++) {
-        const item = cart[i];
+      const ordersToInsert = cart.map(item => {
         const itemTotal = item.price * item.quantity;
         
         // Apply coupon to items sequentially
@@ -123,43 +118,44 @@ const POS = () => {
         const finalItemTotal = itemTotal - itemCoupon;
         const amountPaid = isDeposit ? finalItemTotal * 0.5 : finalItemTotal;
 
-        const orderRef = doc(collection(db, 'orders'));
-        batch.set(orderRef, {
-          userId: user?.uid || 'pos-customer',
-          serviceId: item.serviceId,
+        return {
+          user_id: user?.id || 'pos-customer',
+          service_id: item.serviceId,
           status: isDeposit ? 'confirmed' : 'completed',
-          totalPrice: itemTotal,
-          originalPrice: itemTotal,
-          couponDiscount: itemCoupon,
+          total_price: itemTotal,
+          original_price: itemTotal,
+          coupon_discount: itemCoupon,
           paid: !isDeposit,
-          depositPaid: isDeposit,
-          depositAmount: isDeposit ? amountPaid : undefined,
-          depositPaidAt: isDeposit ? now : undefined,
-          paymentMethod: 'cash',
-          paidAt: !isDeposit ? now : undefined,
+          deposit_paid: isDeposit,
+          deposit_amount: isDeposit ? amountPaid : undefined,
+          deposit_paid_at: isDeposit ? now.toISOString() : undefined,
+          payment_method: 'cash',
+          paid_at: !isDeposit ? now.toISOString() : undefined,
           details: {
             quantity: item.quantity,
             type: 'pos',
-            processedBy: user?.email,
-            fullName: customerName,
+            processed_by: user?.email,
+            full_name: customerName,
             address: customerAddress,
             phone: customerPhone,
-            paymentType: isDeposit ? 'deposit' : 'full'
+            payment_type: isDeposit ? 'deposit' : 'full'
           },
-          createdAt: now,
-          updatedAt: now,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
           payments: [{
             id: Math.random().toString(36).substr(2, 9),
             amount: amountPaid,
             method: 'cash',
             type: isDeposit ? 'deposit' : 'full',
-            paidAt: now,
-            transactionId: 'POS_CASH_' + Date.now()
+            paid_at: now.toISOString(),
+            transaction_id: 'POS_CASH_' + Date.now()
           }]
-        });
-      }
+        };
+      });
       
-      await batch.commit();
+      const { error } = await supabase.from('orders').insert(ordersToInsert);
+      if (error) throw error;
+
       setCart([]);
       setCustomerName('');
       setCustomerAddress('');

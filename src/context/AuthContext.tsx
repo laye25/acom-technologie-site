@@ -1,19 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  onAuthStateChanged, 
-  User, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut as firebaseSignOut,
-  updateProfile,
-  signInWithPopup,
-  GoogleAuthProvider,
-  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
-  sendEmailVerification
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
+import { User } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
@@ -65,50 +53,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      
-      if (currentUser) {
-        await fetchProfile(currentUser.uid);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user);
+      } else {
+        setLoading(false);
+      }
+    }).catch(err => {
+      console.error('Error getting session:', err);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user);
       } else {
         setProfile(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProfile = async (uid: string) => {
+  const fetchProfile = async (currentUser: User) => {
     try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) return;
+      const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout fetching profile')), 10000)
+      );
+      const profilePromise = supabase
+        .from('users')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
 
-      const docRef = doc(db, 'users', uid);
-      const docSnap = await getDoc(docRef);
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
         const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
         const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
         const expectedRole = isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client');
         
-        if (data.role !== expectedRole && uid) {
-          try {
-            await setDoc(doc(db, 'users', uid), { ...data, role: expectedRole }, { merge: true });
-            console.log(`Updated user ${uid} role to ${expectedRole}`);
-          } catch (err) {
-            console.error("Error updating user role:", err);
-          }
+        if (data.role !== expectedRole) {
+          const updatePromise = supabase
+            .from('users')
+            .update({ role: expectedRole })
+            .eq('id', currentUser.id);
+          await Promise.race([updatePromise, timeoutPromise]);
         }
 
         setProfile({
-          uid: docSnap.id,
+          uid: data.id,
           email: data.email,
-          displayName: data.displayName,
-          photoURL: data.photoURL,
-          role: expectedRole, // Use expectedRole to ensure UI is consistent even if write fails
-          createdAt: data.createdAt
+          displayName: data.display_name,
+          photoURL: data.photo_url,
+          role: expectedRole,
+          createdAt: new Date(data.created_at)
         });
       } else {
         // Create profile if it doesn't exist
@@ -116,15 +122,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
         
         const newProfile: UserProfile = {
-          uid: currentUser.uid,
+          uid: currentUser.id,
           email: currentUser.email || '',
-          displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
-          photoURL: currentUser.photoURL || '',
+          displayName: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'Utilisateur',
+          photoURL: currentUser.user_metadata?.avatar_url || '',
           role: isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client'),
           createdAt: new Date()
         };
 
-        await setDoc(doc(db, 'users', currentUser.uid), newProfile);
+        const insertPromise = supabase.from('users').insert({
+          id: newProfile.uid,
+          email: newProfile.email,
+          display_name: newProfile.displayName,
+          photo_url: newProfile.photoURL,
+          role: newProfile.role,
+          created_at: newProfile.createdAt
+        });
+        await Promise.race([insertPromise, timeoutPromise]);
+        
         setProfile(newProfile);
       }
     } catch (err) {
@@ -135,20 +150,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const timeoutPromise = new Promise<{error: any}>((_, reject) => 
+      setTimeout(() => reject(new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.')), 15000)
+    );
+    const signInPromise = supabase.auth.signInWithPassword({ email, password });
+    
+    const { error } = await Promise.race([signInPromise, timeoutPromise]);
+    if (error) throw error;
   };
 
   const signUpWithEmail = async (email: string, password: string, fullName: string) => {
-    const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(newUser, { displayName: fullName });
+    const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => 
+      setTimeout(() => reject(new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.')), 15000)
+    );
+    const signUpPromise = supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName
+        }
+      }
+    });
+
+    const { data: { user: newUser }, error } = await Promise.race([signUpPromise, timeoutPromise]);
     
-    // No verification email sent as per user request
-    
+    if (error) throw error;
+    if (!newUser) return;
+
     const isAdminEmail = email && ADMIN_EMAILS.includes(email);
     const isManagerEmail = email && MANAGER_EMAILS.includes(email);
 
     const newProfile: UserProfile = {
-      uid: newUser.uid,
+      uid: newUser.id,
       email: email,
       displayName: fullName,
       photoURL: '',
@@ -156,21 +190,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date()
     };
 
-    await setDoc(doc(db, 'users', newUser.uid), newProfile);
+    await supabase.from('users').insert({
+      id: newProfile.uid,
+      email: newProfile.email,
+      display_name: newProfile.displayName,
+      photo_url: newProfile.photoURL,
+      role: newProfile.role,
+      created_at: newProfile.createdAt
+    });
+
     setProfile(newProfile);
   };
 
   const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    if (error) throw error;
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   };
 
   const resetPassword = async (email: string) => {
-    await firebaseSendPasswordResetEmail(auth, email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw error;
   };
 
   const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email);

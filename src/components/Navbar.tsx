@@ -7,7 +7,7 @@ import { dbService } from '../services/firebaseDbService';
 import { LayoutDashboard, LogOut, Menu, X, ShoppingBag, MessageSquare, User, ChevronRight, Calculator, Store, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DesignSelectorModal from './design/DesignSelectorModal';
-import { orderBy, limit } from 'firebase/firestore';
+
 
 const Navbar = () => {
   const { user, profile, isAdmin, isManager, isSuperAdmin, signOut } = useAuth();
@@ -24,7 +24,7 @@ const Navbar = () => {
     const checkMerchant = async () => {
       if (user) {
         try {
-          const merchant = await dbService.merchants.getByOwner(user.uid);
+          const merchant = await dbService.merchants.getByOwner(user.id);
           setHasMerchantAccount(!!merchant);
         } catch (error) {
           console.error('Error checking merchant account:', error);
@@ -72,11 +72,11 @@ const Navbar = () => {
   const handlePrefetch = (path: string) => {
     // Point 3: Intelligent Prefetching
     if (path === '/portfolio') {
-      prefetchCollection('portfolio', [orderBy('display_order', 'asc'), limit(50)]);
+      prefetchCollection('portfolio');
     } else if (path === '/blog') {
-      prefetchCollection('blog_posts', [orderBy('date', 'desc'), limit(20)]);
+      prefetchCollection('blog_posts');
     } else if (path === '/') {
-      prefetchCollection('services', [orderBy('name', 'asc'), limit(20)]);
+      prefetchCollection('services');
     }
   };
 

@@ -11,10 +11,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
-import { useFirebaseData } from '../../hooks/useFirebase';
+import { useSupabaseData } from '../../hooks/useSupabase';
 import { generateDesign } from '../../lib/gemini';
-import { db, auth, handleFirestoreError, OperationType } from '../../firebase';
-import { collection, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../../firebase';
+import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
 import { CanvasElement, Design, Template } from '../../types';
@@ -339,6 +339,41 @@ const TEMPLATES = [
     ]
   },
   {
+    id: 'acom-bc-corporate',
+    name: 'Design Corporate',
+    category: 'Papeterie & Bureautique',
+    subCategory: 'Carte de Visite',
+    bgColor: '#f8fafc',
+    elements: [
+      { id: 'bg', type: 'shape', x: 0, y: 0, width: 600, height: 350, fill: '#f8fafc' },
+      { id: 'header', type: 'shape', x: 0, y: 0, width: 600, height: 80, fill: '#1e293b' },
+      { id: 'logo', type: 'image', x: 40, y: 15, width: 50, height: 50, src: 'LOGO_PLACEHOLDER' },
+      { id: 'company', type: 'text', x: 100, y: 30, text: 'STUDIO ACOM', fontSize: 20, fill: '#ffffff', fontWeight: 'bold', fontFamily: 'Inter' },
+      { id: 'name', type: 'text', x: 40, y: 120, text: 'VOTRE NOM', fontSize: 32, fill: '#1e293b', fontWeight: 'bold', fontFamily: 'Inter' },
+      { id: 'title', type: 'text', x: 40, y: 165, text: 'DIRECTEUR GÉNÉRAL', fontSize: 12, fill: '#64748b', fontWeight: 'bold', fontFamily: 'Inter', letterSpacing: 2 },
+      { id: 'contact-bg', type: 'shape', x: 350, y: 120, width: 210, height: 180, fill: '#ffffff', radius: 12 },
+      { id: 'email', type: 'text', x: 370, y: 150, text: 'contact@votreentreprise.com', fontSize: 10, fill: '#1e293b', fontFamily: 'Inter' },
+      { id: 'phone', type: 'text', x: 370, y: 180, text: '+33 (0)1 23 45 67 89', fontSize: 10, fill: '#1e293b', fontFamily: 'Inter' },
+      { id: 'web', type: 'text', x: 370, y: 210, text: 'www.votreentreprise.fr', fontSize: 10, fill: '#1e293b', fontFamily: 'Inter' }
+    ]
+  },
+  {
+    id: 'acom-bc-creative',
+    name: 'Design Créatif',
+    category: 'Papeterie & Bureautique',
+    subCategory: 'Carte de Visite',
+    bgColor: '#ffffff',
+    elements: [
+      { id: 'bg', type: 'shape', x: 0, y: 0, width: 600, height: 350, fill: '#ffffff' },
+      { id: 'blob1', type: 'circle', x: 550, y: 50, radius: 120, fill: '#f43f5e', opacity: 0.2 },
+      { id: 'blob2', type: 'circle', x: 50, y: 300, radius: 80, fill: '#3b82f6', opacity: 0.2 },
+      { id: 'logo', type: 'image', x: 260, y: 60, width: 80, height: 80, src: 'LOGO_PLACEHOLDER' },
+      { id: 'name', type: 'text', x: 0, y: 160, width: 600, text: 'VOTRE NOM', fontSize: 36, fill: '#0f172a', fontWeight: 'black', fontFamily: 'Inter', align: 'center' },
+      { id: 'title', type: 'text', x: 0, y: 210, width: 600, text: 'DESIGNER CRÉATIF', fontSize: 14, fill: '#f43f5e', fontWeight: 'bold', fontFamily: 'Inter', align: 'center', letterSpacing: 4 },
+      { id: 'socials', type: 'text', x: 0, y: 280, width: 600, text: '@votrepseudo | behance.net/vous', fontSize: 12, fill: '#64748b', fontFamily: 'Inter', align: 'center' }
+    ]
+  },
+  {
     id: 'acom-flyer-vibrant',
     name: 'Design Vibrant',
     category: 'Marketing & Publicité',
@@ -380,24 +415,53 @@ const FONTS = [
 ];
 
 export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport }) => {
-  const { isAdmin, isManager, profile } = useAuth();
-  const { data: dbTemplates, refresh: refreshTemplates } = useFirebaseData<any>({
-    collectionName: 'design_templates',
+  const { isAdmin, isManager, profile, user } = useAuth();
+  const { data: dbTemplates, refresh: refreshTemplates } = useSupabaseData<any>({
+    tableName: 'design_templates',
     order: { column: 'createdAt', direction: 'desc' },
     realtime: false,
     limit: 50
   });
 
-  const deleteTemplate = async (id: string, e: React.MouseEvent) => {
+  const { data: userDesigns, refresh: refreshUserDesigns } = useSupabaseData<any>({
+    tableName: 'designs',
+    filter: { column: 'ownerId', value: user?.id },
+    skip: !user,
+    realtime: true,
+    limit: 50
+  });
+
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, collection: string } | null>(null);
+
+  const deleteTemplate = async (id: string, e: React.MouseEvent, collectionName: string = 'design_templates') => {
     e.stopPropagation();
-    if (!window.confirm("Supprimer ce modèle ?")) return;
+    setItemToDelete({ id, collection: collectionName });
+  };
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
     
+    const { id, collection: collectionName } = itemToDelete;
+    setItemToDelete(null);
+    
+    const toastId = toast.loading("Suppression...");
     try {
-      const { deleteDoc, doc } = await import('firebase/firestore');
-      await deleteDoc(doc(db, 'design_templates', id));
-      toast.success("Modèle supprimé.");
+      const { error } = await supabase.from(collectionName).delete().eq('id', id);
+      if (error) throw error;
+      
+      // Give Firestore a moment to propagate the deletion
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (collectionName === 'design_templates') {
+        await refreshTemplates(true); // Force refresh from server, bypassing cache
+      } else {
+        await refreshUserDesigns(true); // Force refresh for user designs too
+      }
+      
+      toast.success("Design supprimé.", { id: toastId });
     } catch (error) {
-      toast.error("Erreur lors de la suppression.");
+      console.error("Error deleting design:", error);
+      toast.error("Erreur lors de la suppression.", { id: toastId });
     }
   };
 
@@ -597,7 +661,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   };
 
   const saveDesign = async () => {
-    if (!auth.currentUser) {
+    if (!user) {
       toast.error("Vous devez être connecté pour enregistrer.");
       return;
     }
@@ -608,21 +672,25 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     try {
       const designData = {
         name: designTitle,
-        ownerId: auth.currentUser.uid,
+        owner_id: user.id,
         elements: elements,
-        bgColor: bgColor,
-        updatedAt: serverTimestamp(),
+        bg_color: bgColor,
+        updated_at: new Date().toISOString(),
       };
 
       if (designId) {
-        await updateDoc(doc(db, 'designs', designId), designData);
+        const { error } = await supabase.from('designs').update(designData).eq('id', designId);
+        if (error) throw error;
         toast.success("Design mis à jour !", { id: toastId });
       } else {
-        const docRef = await addDoc(collection(db, 'designs'), {
+        const newId = crypto.randomUUID();
+        const { error } = await supabase.from('designs').insert({
           ...designData,
-          createdAt: serverTimestamp(),
+          id: newId,
+          created_at: new Date().toISOString(),
         });
-        setDesignId(docRef.id);
+        if (error) throw error;
+        setDesignId(newId);
         toast.success("Design enregistré !", { id: toastId });
       }
     } catch (error) {
@@ -789,6 +857,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   }, [zoom, stageSize.width, isMobileSidebarOpen]);
 
   const loadTemplate = async (template: any) => {
+    // Check if this is a variant pointing to a hardcoded template
+    if (template.templateId) {
+      const hardcoded = TEMPLATES.find(t => t.id === template.templateId);
+      if (hardcoded) {
+        // Use the hardcoded template but keep the name/subcategory from the variant if needed
+        template = { ...hardcoded, name: template.name || hardcoded.name, subCategory: template.subCategory || hardcoded.subCategory };
+      }
+    }
+
     const hydrateElements = (elements: CanvasElement[]) => {
       return elements.map(el => {
         if (el.type === 'text') {
@@ -1023,7 +1100,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       
       const selectedCategory = TEMPLATE_CATEGORIES.find(c => c.name === templateCategory);
       
-      await addDoc(collection(db, 'design_templates'), {
+      await supabase.from('design_templates').insert({
         name: templateName,
         category: templateCategory,
         subCategory: templateSubCategory,
@@ -1032,8 +1109,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         promotionPercentage: templatePromotion && templatePromotionPercentage ? Number(templatePromotionPercentage) : 0,
         categoryId: selectedCategory?.categoryId || 'print',
         pages: sanitizedPages,
-        createdAt: serverTimestamp(),
-        isPublic: true
+        created_at: new Date().toISOString(),
+        isPublic: true,
+        user_id: user?.id || 'anonymous'
       });
       
       toast.success("Modèle enregistré avec succès !");
@@ -1057,7 +1135,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   };
 
   const handleSubmitForPrinting = async () => {
-    if (!auth.currentUser && !contactInfo.email) {
+    if (!user && !contactInfo.email) {
       setIsContactModalOpen(true);
       return;
     }
@@ -1067,15 +1145,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       // Capture a preview of the front side
       const dataUrl = stageRef.current.toDataURL();
       
-      await addDoc(collection(db, 'design_requests'), {
-        userId: auth.currentUser?.uid || null,
-        userEmail: auth.currentUser?.email || contactInfo.email,
-        userName: profile?.displayName || auth.currentUser?.displayName || contactInfo.name || 'Client',
-        userPhone: contactInfo.phone || null,
+      await supabase.from('design_requests').insert({
+        user_id: user?.id || null,
+        user_email: user?.email || contactInfo.email,
+        user_name: profile?.displayName || user?.user_metadata?.full_name || contactInfo.name || 'Client',
+        user_phone: contactInfo.phone || null,
         pages: pages,
-        previewUrl: dataUrl,
+        preview_url: dataUrl,
         status: 'pending',
-        createdAt: serverTimestamp(),
+        created_at: new Date().toISOString(),
       });
 
       setIsSuccessModalOpen(true);
@@ -2001,32 +2079,87 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             <div className="space-y-4">
               <h3 className="font-bold text-gray-900">Projets</h3>
               <div className="grid grid-cols-1 gap-3">
-                {dbTemplates.length > 0 ? (
-                  dbTemplates.map((t: any) => {
-                    const { elements: tElements, bgColor: tBgColor } = getTemplateData(t);
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => loadTemplate(t)}
-                        className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-primary transition-all flex items-center space-x-3"
-                      >
-                        <div className="w-12 h-8 rounded bg-white shadow-sm border border-gray-100 overflow-hidden">
-                          <MiniPreview 
-                            elements={tElements} 
-                            bgColor={tBgColor} 
-                            profile={profile}
-                            contextElements={elements}
-                          />
+                {/* User Designs */}
+                {userDesigns.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mes Créations</h4>
+                    {userDesigns.map((t: any) => {
+                      const { elements: tElements, bgColor: tBgColor } = getTemplateData(t);
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => loadTemplate(t)}
+                          className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-primary transition-all flex items-center space-x-3 cursor-pointer group"
+                        >
+                          <div className="w-12 h-8 rounded bg-white shadow-sm border border-gray-100 overflow-hidden">
+                            <MiniPreview 
+                              elements={tElements} 
+                              bgColor={tBgColor} 
+                              profile={profile}
+                              contextElements={elements}
+                            />
+                          </div>
+                          <div className="text-left flex-1 min-w-0">
+                            <p className="text-xs font-bold truncate">{t.name}</p>
+                            <p className="text-[9px] text-gray-400">Design personnel</p>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteTemplate(t.id, e, 'designs');
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
-                        <div className="text-left flex-1 min-w-0">
-                          <p className="text-xs font-bold truncate">{t.name}</p>
-                          <p className="text-[9px] text-primary font-medium truncate">{t.category || 'Carte de visite'}</p>
-                          <p className="text-[8px] text-gray-400">Modifié récemment</p>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Templates */}
+                {dbTemplates.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Modèles & Variantes</h4>
+                    {dbTemplates.map((t: any) => {
+                      const { elements: tElements, bgColor: tBgColor } = getTemplateData(t);
+                      return (
+                        <div
+                          key={t.id}
+                          onClick={() => loadTemplate(t)}
+                          className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-primary transition-all flex items-center space-x-3 cursor-pointer group"
+                        >
+                          <div className="w-12 h-8 rounded bg-white shadow-sm border border-gray-100 overflow-hidden">
+                            <MiniPreview 
+                              elements={tElements} 
+                              bgColor={tBgColor} 
+                              profile={profile}
+                              contextElements={elements}
+                            />
+                          </div>
+                          <div className="text-left flex-1 min-w-0">
+                            <p className="text-xs font-bold truncate">{t.name}</p>
+                            <p className="text-[9px] text-primary font-medium truncate">{t.category || 'Carte de visite'}</p>
+                          </div>
+                          {(isAdmin || isManager || t.userId === user?.id) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteTemplate(t.id, e, 'design_templates');
+                              }}
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
-                      </button>
-                    );
-                  })
-                ) : (
+                      );
+                    })}
+                  </div>
+                )}
+
+                {userDesigns.length === 0 && dbTemplates.length === 0 && (
                   <div className="py-12 text-center">
                     <FolderOpen className="w-12 h-12 text-gray-200 mx-auto mb-3" />
                     <p className="text-xs font-bold text-gray-400">Aucun projet enregistré</p>
@@ -3213,6 +3346,47 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       </AnimatePresence>
 
       <AnimatePresence>
+        {itemToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setItemToDelete(null)}
+            className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-3xl p-8 shadow-2xl text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black mb-2">Confirmer la suppression</h3>
+              <p className="text-sm text-gray-500 mb-8">
+                Voulez-vous vraiment supprimer ce design ? Cette action est irréversible.
+              </p>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setItemToDelete(null)}
+                  className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-200"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {isSvgModalOpen && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -3264,7 +3438,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           setIsDesignModalOpen(false);
         }}
         initialDisplayMode="variants"
-        initialViewStep="products"
+        initialViewStep={currentProductContext ? 'products' : 'categories'}
+        initialSearchQuery={currentProductContext || ''}
       />
     </div>
   );

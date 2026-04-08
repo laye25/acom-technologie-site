@@ -10,19 +10,32 @@ interface MultiVariantConfiguratorProps {
 }
 
 const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ product, initialVariantId, onAddToCart, onPersonalize }) => {
-  const [activeVariantId, setActiveVariantId] = useState<string>(initialVariantId || product.variants[0].id);
+  const [activeVariantId, setActiveVariantId] = useState<string>(initialVariantId || (product.variants && product.variants.length > 0 ? product.variants[0].id : ''));
   
-  // Update activeVariantId if initialVariantId changes
+  // Update activeVariantId if initialVariantId changes or if variants load
   React.useEffect(() => {
     if (initialVariantId) {
       setActiveVariantId(initialVariantId);
+    } else if (!activeVariantId && product.variants && product.variants.length > 0) {
+      setActiveVariantId(product.variants[0].id);
     }
-  }, [initialVariantId]);
+  }, [initialVariantId, product.variants, activeVariantId]);
   
   // Store config per variant: { quantity: number, customizations: { paperType: string, [key: string]: any } }
   const [configs, setConfigs] = useState<Record<string, { quantity: number, customizations: { paperType: string } }>>({});
 
-  const activeVariant = product.variants.find(v => v.id === activeVariantId) || product.variants[0];
+  const activeVariant = useMemo(() => {
+    if (!product.variants || product.variants.length === 0) return null;
+    return product.variants.find(v => v.id === activeVariantId) || product.variants[0];
+  }, [product.variants, activeVariantId]);
+
+  if (!activeVariant) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
   
   // Get current config for active variant, default to quantity 100, paperType 'Standard'
   const currentConfig = configs[activeVariantId] || { quantity: 100, customizations: { paperType: 'Standard' } };

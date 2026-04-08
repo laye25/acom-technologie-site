@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { dbService as db } from '../services/firebaseDbService';
 import { Message, Order, Service } from '../types';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Paperclip, Clock, User, ShieldCheck, MessageSquare, ChevronLeft, Loader2, FileText, Image as ImageIcon } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
@@ -19,52 +19,52 @@ const Chat = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const chatOptions = useMemo(() => {
-    if (!user || !orderId) return { collectionName: 'messages' as CollectionName, skip: true };
+    if (!user || !orderId) return { tableName: 'messages' as TableName, skip: true };
     
     const filters = [{ column: 'orderId', value: orderId }];
     if (!isAdmin && !isManager) {
-      filters.push({ column: 'clientUid', value: user.uid });
+      filters.push({ column: 'clientUid', value: user.id });
     }
     
     return {
-      collectionName: 'messages' as CollectionName,
+      tableName: 'messages' as TableName,
       filters,
       skip: false
     };
   }, [orderId, user, isAdmin, isManager]);
 
   const orderOptions = useMemo(() => {
-    if (!user || !orderId) return { collectionName: 'orders' as CollectionName, skip: true };
+    if (!user || !orderId) return { tableName: 'orders' as TableName, skip: true };
     
     const filters = [{ column: 'id', value: orderId }];
     if (!isAdmin && !isManager) {
-      filters.push({ column: 'userId', value: user.uid });
+      filters.push({ column: 'userId', value: user.id });
     }
     
     return {
-      collectionName: 'orders' as CollectionName,
+      tableName: 'orders' as TableName,
       filters,
       skip: false
     };
   }, [orderId, user, isAdmin, isManager]);
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName
+    tableName: 'services' as TableName
   }), []);
 
-  const { data: messages, loading: messagesLoading, error: messagesError } = useFirebaseData<Message>(chatOptions);
-  const { data: orderData, loading: orderLoading, error: orderError } = useFirebaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirebaseData<Service>(serviceOptions);
+  const { data: messages, loading: messagesLoading, error: messagesError } = useSupabaseData<Message>(chatOptions);
+  const { data: orderData, loading: orderLoading, error: orderError } = useSupabaseData<Order>(orderOptions);
+  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
 
   const order = orderData?.[0] || null;
 
   const userProfileOptions = useMemo(() => ({
-    collectionName: 'users' as CollectionName,
-    filters: order ? [{ column: 'uid', value: order.userId }] : [],
+    tableName: 'users' as TableName,
+    filters: order ? [{ column: 'uid', value: order.user_id || order.userId }] : [],
     skip: !order || !(isAdmin || isManager)
   }), [order, isAdmin, isManager]);
 
-  const { data: userProfiles } = useFirebaseData<UserProfile>(userProfileOptions);
+  const { data: userProfiles } = useSupabaseData<UserProfile>(userProfileOptions);
   const client = userProfiles?.[0] || null;
 
   const allServices = useMemo(() => {
@@ -100,8 +100,15 @@ const Chat = () => {
   const sortedMessages = useMemo(() => {
     if (!messages) return [];
     return [...messages].sort((a, b) => {
-      const timeA = a.createdAt?.toMillis?.() || 0;
-      const timeB = b.createdAt?.toMillis?.() || 0;
+      const getTime = (val: any) => {
+        if (!val) return 0;
+        if (typeof val === 'string') return new Date(val).getTime();
+        if (typeof val.toMillis === 'function') return val.toMillis();
+        if (val instanceof Date) return val.getTime();
+        return 0;
+      };
+      const timeA = getTime(a.createdAt || a.created_at);
+      const timeB = getTime(b.createdAt || b.created_at);
       return timeA - timeB;
     });
   }, [messages]);
@@ -126,7 +133,7 @@ const Chat = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Attempting to send message...', { inputText, orderId, userId: user?.uid });
+    console.log('Attempting to send message...', { inputText, orderId, userId: user?.id });
     if (!inputText.trim() || !user || !orderId || isSending) {
       console.log('Send blocked:', { 
         empty: !inputText.trim(), 
@@ -140,12 +147,12 @@ const Chat = () => {
     setIsSending(true);
     setError(null);
     try {
-      const clientUid = (isAdmin || isManager) ? order?.userId : user.uid;
+      const clientUid = (isAdmin || isManager) ? (order?.user_id || order?.userId) : user.id;
       console.log('Saving message to Firestore...');
       
       const messageId = await db.messages.save({
         orderId: orderId,
-        senderId: user.uid,
+        senderId: user.id,
         senderName: profile?.displayName || user.email?.split('@')[0] || 'Utilisateur',
         text: inputText,
         isAdmin: isAdmin || isManager || false,
@@ -172,7 +179,7 @@ const Chat = () => {
           if (isAdmin || isManager) {
             // Admin sending to Client
             if (client?.email) {
-              await notificationService.notifyNewMessage(order, senderName, order.userId, client.email, inputText);
+              await notificationService.notifyNewMessage(order, senderName, (order.user_id || order.userId), client.email, inputText);
             }
           } else {
             // Client sending to Admin
@@ -299,18 +306,17 @@ const Chat = () => {
           </div>
         ) : (
           sortedMessages.map((msg, i) => {
-            const isMe = msg.senderId === user?.uid;
-            const showDateSeparator = i === 0 || !isSameDay(
-              msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date(),
-              sortedMessages[i-1].createdAt?.toDate ? sortedMessages[i-1].createdAt.toDate() : new Date()
-            );
+            const isMe = msg.senderId === user?.id;
+            const msgDate = msg.createdAt || msg.created_at ? new Date(msg.createdAt?.toDate ? msg.createdAt.toDate() : (msg.createdAt || msg.created_at)) : new Date();
+            const prevMsgDate = i > 0 ? (sortedMessages[i-1].createdAt || sortedMessages[i-1].created_at ? new Date(sortedMessages[i-1].createdAt?.toDate ? sortedMessages[i-1].createdAt.toDate() : (sortedMessages[i-1].createdAt || sortedMessages[i-1].created_at)) : new Date()) : null;
+            const showDateSeparator = i === 0 || (prevMsgDate && !isSameDay(msgDate, prevMsgDate));
 
             return (
               <React.Fragment key={msg.id}>
                 {showDateSeparator && (
                   <div className="flex justify-center my-8">
                     <span className="px-4 py-1 bg-gray-200/50 text-gray-500 text-[10px] font-bold uppercase tracking-widest rounded-full">
-                      {msg.createdAt?.toDate ? format(msg.createdAt.toDate(), 'dd MMMM yyyy', { locale: fr }) : 'Aujourd\'hui'}
+                      {format(msgDate, 'dd MMMM yyyy', { locale: fr })}
                     </span>
                   </div>
                 )}
@@ -344,7 +350,7 @@ const Chat = () => {
                       {/* Message Status/Time Overlay on hover or small */}
                       <div className={`mt-1 text-[9px] flex items-center ${isMe ? 'text-white/70 justify-end' : 'text-gray-400 justify-start'}`}>
                         <Clock className="w-2.5 h-2.5 mr-1" />
-                        {msg.createdAt?.toDate ? format(msg.createdAt.toDate(), 'HH:mm', { locale: fr }) : '...'}
+                        {msg.createdAt || msg.created_at ? format(new Date(msg.createdAt?.toDate ? msg.createdAt.toDate() : (msg.createdAt || msg.created_at)), 'HH:mm', { locale: fr }) : '...'}
                       </div>
                     </div>
                   </div>

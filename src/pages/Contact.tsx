@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Phone, Mail, MapPin, MessageCircle, Send, CheckCircle2 } from 'lucide-react';
 import { dbService as db } from '../services/firebaseDbService';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 
 const Contact = () => {
-  const { data: settingsData } = useFirebaseData<any>({ collectionName: 'settings' as CollectionName });
+  const { data: settingsData } = useSupabaseData<any>({ tableName: 'settings' as TableName });
   const settings = settingsData?.[0];
 
   const [formData, setFormData] = useState({

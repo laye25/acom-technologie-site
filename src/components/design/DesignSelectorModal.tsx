@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, Search, Sparkles, PenTool, Contact2, Monitor, 
@@ -6,7 +6,11 @@ import {
   Heart, Eye, Star, CreditCard, ArrowRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useFirebaseData } from '../../hooks/useFirebase';
+import { useSupabaseData } from '../../hooks/useSupabase';
+import { useAuth } from '../../context/AuthContext';
+import { dbService } from '../../services/firebaseDbService';
+import { supabase } from '../../lib/supabase';
+import { db } from '../../firebase';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
 
@@ -16,6 +20,7 @@ interface DesignSelectorModalProps {
   onSelect?: (item: any) => void;
   initialDisplayMode?: 'products' | 'variants';
   initialViewStep?: ViewStep;
+  initialSearchQuery?: string;
 }
 
 type ViewStep = 'categories' | 'products' | 'variants' | 'configurator';
@@ -103,10 +108,10 @@ interface NavCategory {
 }
 
 export const CATEGORIES: NavCategory[] = [
+  { id: 'saved', name: 'Projets', sub: 'Vos créations enregistrées', icon: FolderOpen, color: 'text-purple-600' },
   { id: 'all', name: 'Tous les modèles', sub: 'Explorez toutes nos créations', icon: Sparkles, color: 'text-gray-600' },
   { id: 'favorites', name: 'Mes Favoris', sub: 'Vos modèles préférés', icon: Star, color: 'text-amber-500' },
   { id: 'categories', name: 'Toutes les catégories', sub: 'Parcourez par thématique', icon: LayoutGrid, color: 'text-blue-600' },
-  { id: 'saved', name: 'Mes Designs', sub: 'Vos créations enregistrées', icon: FolderOpen, color: 'text-purple-600' },
   { 
     id: 'print', 
     name: 'Papeterie & Bureautique', 
@@ -283,7 +288,7 @@ const TemplateCard = ({
 }) => {
   const size = item.size || '';
   const aspectClass = getAspectRatioClass(size);
-  const image = item.coverImage || item.previewImage;
+  const image = item.coverImage || item.previewImage || item.preview;
   
   return (
     <motion.div
@@ -373,9 +378,10 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   onClose, 
   onSelect,
   initialDisplayMode = 'products',
-  initialViewStep = 'categories'
+  initialViewStep = 'products',
+  initialSearchQuery = ''
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [activeCategory, setActiveCategory] = useState('all');
   const [viewStep, setViewStep] = useState<ViewStep>(initialViewStep);
   const [displayMode, setDisplayMode] = useState<'products' | 'variants'>(initialDisplayMode);
@@ -385,8 +391,9 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     if (isOpen) {
       setDisplayMode(initialDisplayMode);
       setViewStep(initialViewStep);
+      setSearchQuery(initialSearchQuery);
     }
-  }, [isOpen, initialDisplayMode, initialViewStep]);
+  }, [isOpen, initialDisplayMode, initialViewStep, initialSearchQuery]);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -397,10 +404,11 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   });
   
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Reset view when category changes
   React.useEffect(() => {
-    if (activeCategory === 'all' || activeCategory === 'categories') {
+    if (activeCategory === 'categories') {
       setViewStep('categories');
     } else {
       setViewStep('products');
@@ -427,42 +435,107 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     };
   }, [isOpen]);
 
-  const { data: dbCategories } = useFirebaseData<any>({
-    collectionName: 'studio_acom_categories' as any
+  const [allProducts, setAllProducts] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [allCategories, setAllCategories] = useState<StudioCategory[]>(CATEGORIES as any);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+
+  // Fetch products and categories
+  const fetchData = useCallback(async () => {
+    setLoadingVariants(true);
+    try {
+      // 1. Fetch Categories
+      const { data: catsData, error: catsError } = await supabase.from('studio_acom_categories').select('*');
+      
+      const systemCats = CATEGORIES.filter(c => ['saved', 'all', 'favorites', 'categories'].includes(c.id));
+      let merged = [...systemCats];
+
+      if (!catsError && catsData && catsData.length > 0) {
+        const dynamicCats = catsData.map((cat: any) => {
+          const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
+          return {
+            ...cat,
+            icon: initial?.icon || Sparkles,
+            color: initial?.color || 'text-gray-600'
+          };
+        });
+        
+        dynamicCats.forEach((cat: any) => {
+          if (!merged.find(c => c.id === cat.id)) {
+            merged.push(cat);
+          }
+        });
+      }
+
+      // ALWAYS ensure INITIAL_CATEGORIES are present as fallbacks
+      INITIAL_CATEGORIES.forEach(cat => {
+        if (!merged.find(c => c.id === cat.id)) {
+          merged.push(cat);
+        }
+      });
+
+      setAllCategories(merged as any);
+
+      // 2. Fetch Products
+      const { data: productsData, error: prodError } = await supabase.from('studio_acom_products').select('*');
+      if (prodError) throw prodError;
+
+      if (productsData) {
+        const productsWithVariants = await Promise.all(
+          productsData.map(async (product: any) => {
+            try {
+              const variants = await dbService.studioAcom.products.getVariants(product.id);
+              const mappedProduct = { 
+                ...product, 
+                variants: variants || [],
+                categoryId: product.category_id || product.categoryId,
+                coverImage: product.cover_image || product.coverImage,
+                userId: product.user_id || product.userId
+              } as Product;
+              return mappedProduct;
+            } catch (err) {
+              console.error(`Error fetching variants for product ${product.id}:`, err);
+              return {
+                ...product,
+                variants: [],
+                categoryId: product.category_id || product.categoryId,
+                coverImage: product.cover_image || product.coverImage,
+                userId: product.user_id || product.userId
+              } as Product;
+            }
+          })
+        );
+        setAllProducts(productsWithVariants);
+      }
+    } catch (error) {
+      console.error('Error fetching data in DesignSelectorModal:', error);
+      // Fallback to initial data if everything fails
+      if (allProducts.length === 0) setAllProducts(INITIAL_PRODUCTS);
+    } finally {
+      setLoadingVariants(false);
+    }
+  }, []);
+
+  // Fetch on mount
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Re-fetch when modal opens to ensure fresh data
+  React.useEffect(() => {
+    if (isOpen) {
+      fetchData();
+    }
+  }, [isOpen, fetchData]);
+
+  const { data: userDesigns } = useSupabaseData<any>({
+    tableName: 'designs',
+    filter: { column: 'ownerId', value: user?.id },
+    skip: !user || activeCategory !== 'saved',
+    realtime: true,
+    limit: 50
   });
 
-  // const { data: dbProducts } = useFirebaseData<any>({
-  //   collectionName: 'studio_acom_products' as any
-  // });
-
-  const categories: StudioCategory[] = useMemo(() => {
-    const systemCats = INITIAL_CATEGORIES.filter(c => ['all', 'favorites', 'categories', 'saved'].includes(c.id));
-    
-    if (!dbCategories || dbCategories.length === 0) return INITIAL_CATEGORIES;
-    
-    const dynamicCats = dbCategories.map((cat: any) => {
-      const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
-      return {
-        ...cat,
-        icon: initial?.icon || Sparkles,
-        color: initial?.color || 'text-gray-600'
-      };
-    });
-
-    // Merge system categories with dynamic ones, avoiding duplicates
-    const merged = [...systemCats];
-    dynamicCats.forEach((cat: any) => {
-      if (!merged.find(c => c.id === cat.id)) {
-        merged.push(cat);
-      }
-    });
-
-    return merged;
-  }, [dbCategories]);
-
-  const allProducts: Product[] = useMemo(() => {
-    return INITIAL_PRODUCTS;
-  }, []);
+  const categories = allCategories;
 
   const selectedProduct = useMemo(() => 
     allProducts.find(p => p.id === selectedProductId) || null
@@ -483,6 +556,9 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   });
 
   const displayedItems = useMemo(() => {
+    if (activeCategory === 'saved') {
+      return userDesigns || [];
+    }
     if (displayMode === 'products') {
       return filteredProducts;
     } else {
@@ -503,6 +579,13 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   };
 
   const handleSelectVariant = (variant: Variant) => {
+    if (onSelect) {
+      const product = allProducts.find(p => p.variants.some(v => v.id === variant.id));
+      onSelect({ ...variant, subCategory: product?.name });
+      onClose();
+      return;
+    }
+    
     const product = allProducts.find(p => p.variants.some(v => v.id === variant.id));
     if (product) {
       setSelectedProductId(product.id);
@@ -693,7 +776,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                     <h2 className="text-2xl font-black text-gray-900 mb-6">
                       {activeCategory === 'all' ? 'Explorer les modèles' : 
                        activeCategory === 'favorites' ? 'Mes Favoris' :
-                       activeCategory === 'saved' ? 'Mes Designs' :
+                       activeCategory === 'saved' ? 'Projets' :
                        categories.find(c => c.id === activeCategory)?.name || 'Modèles'}
                     </h2>
                     
@@ -705,8 +788,8 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                             <TemplateCard 
                               key={item.id}
                               item={item}
-                              onSelect={displayMode === 'products' ? handleSelectProduct : handleSelectVariant}
-                              type={displayMode === 'products' ? 'product' : 'variant'}
+                              onSelect={(activeCategory === 'saved' || displayMode === 'variants') ? handleSelectVariant : handleSelectProduct}
+                              type={(activeCategory === 'saved' || displayMode === 'variants') ? 'variant' : 'product'}
                             />
                           ))}
                         </div>

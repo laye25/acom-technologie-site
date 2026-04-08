@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, X, Save, FileText, Calendar, User, Upload, Loader2
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useFirebaseData, CollectionName } from '../../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { dbService as db } from '../../services/firebaseDbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
 import { compressImage } from '../../lib/imageUtils';
@@ -27,12 +27,12 @@ const BlogManager = () => {
   }), []);
 
   const blogOptions = useMemo(() => ({
-    collectionName: 'blog_posts' as CollectionName,
+    tableName: 'blog_posts' as TableName,
     order: { column: 'date' as const, ascending: false },
     mapper: postMapper
   }), [postMapper]);
 
-  const { data: posts, loading, error: fetchError, refresh } = useFirebaseData<BlogPost>(blogOptions);
+  const { data: posts, loading, error: fetchError, refresh } = useSupabaseData<BlogPost>(blogOptions);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentPost, setCurrentPost] = useState<Partial<BlogPost> | null>(null);
@@ -53,10 +53,9 @@ const BlogManager = () => {
     setIsSeeding(true);
     setSeedStatus('Initialisation...');
     try {
-      await db.seedDatabase((status) => setSeedStatus(status));
-      showNotification('success', 'Données restaurées avec succès !');
+      // await db.seedDatabase((status) => setSeedStatus(status));
+      showNotification('error', 'La restauration n\'est pas supportée avec Supabase pour le moment.');
       setShowConfirmSeed(false);
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error: any) {
       console.error('Error seeding data:', error);
       showNotification('error', `Erreur lors de la restauration : ${error.message}`);

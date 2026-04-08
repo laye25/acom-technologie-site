@@ -1,9 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useFirebaseData, CollectionName } from '../../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { UserProfile } from '../../types';
 import { dbService as db } from '../../services/firebaseDbService';
-import { db as firestoreDb } from '../../firebase';
-import { doc, collection } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, 
@@ -39,11 +37,11 @@ const UserManager = () => {
   });
 
   const userOptions = useMemo(() => ({
-    collectionName: 'users' as CollectionName,
-    order: { column: 'createdAt' as const, ascending: false }
+    tableName: 'users' as TableName,
+    order: { column: 'created_at' as const, ascending: false }
   }), []);
 
-  const { data: users, loading, error, refresh } = useFirebaseData<UserProfile>(userOptions);
+  const { data: users, loading, error, refresh } = useSupabaseData<UserProfile>(userOptions);
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
@@ -60,13 +58,14 @@ const UserManager = () => {
     setIsSubmitting(true);
     
     try {
-      // Note: This only creates the Firestore document. 
+      // Note: This only creates the profile document in Supabase 'users' table.
       // The user will need to use "Forgot Password" to set their password 
       // or sign up with the same email to link the account.
       const userDoc = {
         ...newUser,
-        uid: doc(collection(firestoreDb, 'users')).id, // Generate a temporary UID for the profile
-        photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUser.displayName)}&background=random`
+        id: crypto.randomUUID(), // Generate a temporary ID for the profile
+        photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUser.displayName)}&background=random`,
+        created_at: new Date().toISOString()
       };
       
       await db.users.save(userDoc);
@@ -101,6 +100,12 @@ const UserManager = () => {
       case 'manager': return 'bg-blue-100 text-blue-700';
       default: return 'bg-gray-100 text-gray-700';
     }
+  };
+
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    const d = typeof date === 'string' ? new Date(date) : (date.toDate ? date.toDate() : date);
+    return format(d, 'dd MMM yyyy', { locale: fr });
   };
 
   if (loading) {
@@ -171,7 +176,7 @@ const UserManager = () => {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredUsers.map((u) => (
-                <tr key={u.id || u.uid} className="hover:bg-gray-50/50 transition-colors group">
+                <tr key={u.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden mr-3 shrink-0">
@@ -211,13 +216,13 @@ const UserManager = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center text-xs text-gray-500">
                       <Calendar className="w-3 h-3 mr-1.5" />
-                      {u.createdAt ? format(new Date(u.createdAt.toDate ? u.createdAt.toDate() : u.createdAt), 'dd MMM yyyy', { locale: fr }) : 'N/A'}
+                      {formatDate(u.created_at || u.createdAt)}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
-                        onClick={() => handleDeleteUser((u.id || u.uid)!)}
+                        onClick={() => handleDeleteUser(u.id!)}
                         className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                         title="Supprimer"
                       >

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Notification } from '../types';
 import { dbService as db } from '../services/firebaseDbService';
 import { Bell, CheckCircle, MessageSquare, CreditCard, Clock, X, Info } from 'lucide-react';
@@ -15,18 +15,25 @@ export const NotificationCenter = () => {
   const navigate = useNavigate();
 
   const notificationOptions = useMemo(() => ({
-    collectionName: 'notifications' as CollectionName,
-    filters: user ? [{ column: 'userId', value: user.uid }] : [],
+    tableName: 'notifications' as TableName,
+    filters: user ? [{ column: 'userId', value: user.id }] : [],
     skip: !user
   }), [user]);
 
-  const { data: rawNotifications } = useFirebaseData<Notification>(notificationOptions);
+  const { data: rawNotifications } = useSupabaseData<Notification>(notificationOptions);
 
   const notifications = useMemo(() => {
     if (!rawNotifications) return [];
     return [...rawNotifications].sort((a, b) => {
-      const timeA = a.createdAt?.toMillis?.() || 0;
-      const timeB = b.createdAt?.toMillis?.() || 0;
+      const getTime = (val: any) => {
+        if (!val) return 0;
+        if (typeof val === 'string') return new Date(val).getTime();
+        if (typeof val.toMillis === 'function') return val.toMillis();
+        if (val instanceof Date) return val.getTime();
+        return 0;
+      };
+      const timeA = getTime(a.createdAt || a.created_at);
+      const timeB = getTime(b.createdAt || b.created_at);
       return timeB - timeA;
     });
   }, [rawNotifications]);
@@ -120,7 +127,7 @@ export const NotificationCenter = () => {
                               {notification.title}
                             </p>
                             <span className="text-[9px] text-gray-400 font-bold whitespace-nowrap ml-2">
-                              {notification.createdAt?.toDate ? format(notification.createdAt.toDate(), 'HH:mm', { locale: fr }) : '...'}
+                              {notification.createdAt || notification.created_at ? format(new Date(notification.createdAt?.toDate ? notification.createdAt.toDate() : (notification.createdAt || notification.created_at)), 'HH:mm', { locale: fr }) : '...'}
                             </span>
                           </div>
                           <p className={`text-xs leading-relaxed line-clamp-2 ${

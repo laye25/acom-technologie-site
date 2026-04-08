@@ -33,10 +33,13 @@ export interface PaymentRecord {
 export interface Order {
   id: string;
   userId: string;
+  user_id?: string;
   status: OrderStatus;
   totalPrice: number;
   createdAt: any;
   updatedAt: any;
+  created_at?: any;
+  updated_at?: any;
   serviceId: string;
   serviceName?: string;
   serviceImage?: string;
@@ -96,10 +99,13 @@ export interface Order {
 export interface Message {
   id: string;
   orderId: string;
+  order_id?: string;
   senderId: string;
+  sender_id?: string;
   senderName?: string;
   text: string;
   createdAt: any;
+  created_at?: any;
   fileUrl?: string;
   isAdmin?: boolean;
 }
@@ -119,6 +125,7 @@ export interface UserProfile {
   phone?: string;
   logoUrl?: string;
   createdAt: any;
+  created_at?: any;
 }
 
 export interface CanvasElement {
@@ -165,11 +172,14 @@ export interface Design {
   id: string;
   name: string;
   ownerId: string;
+  user_id?: string;
   elements: CanvasElement[];
   bgColor: string;
   preview?: string;
   createdAt: any;
   updatedAt: any;
+  created_at?: any;
+  updated_at?: any;
 }
 
 export interface Template {
@@ -224,6 +234,7 @@ export interface Notification {
   orderId?: string;
   read: boolean;
   createdAt: any;
+  created_at?: any;
 }
 
 export interface HeroSlide {
@@ -411,6 +422,7 @@ export interface MerchantSale {
   customerName?: string;
   customerPhone?: string;
   createdAt: any;
+  created_at?: any;
   processedBy: string; // userId
 }
 
@@ -423,6 +435,7 @@ export interface MerchantExpense {
   date: any;
   description?: string;
   createdAt: any;
+  created_at?: any;
 }
 
 export interface MerchantSupplier {

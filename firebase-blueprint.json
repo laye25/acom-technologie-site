@@ -51,6 +51,43 @@
         "createdBy": { "type": "string" }
       },
       "required": ["name", "category", "elements"]
+    },
+    "Product": {
+      "title": "Studio ACOM Product",
+      "description": "A product available in Studio ACOM.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "description": { "type": "string" },
+        "coverImage": { "type": "string", "format": "url" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "categoryId"]
+    },
+    "Variant": {
+      "title": "Product Variant",
+      "description": "A specific variant of a product.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "name": { "type": "string" },
+        "size": { "type": "string" },
+        "color": { "type": "string" },
+        "shape": { "type": "string" },
+        "format": { "type": "string", "enum": ["portrait", "landscape"] },
+        "finish": { "type": "string" },
+        "templateId": { "type": "string" },
+        "previewImage": { "type": "string", "format": "url" },
+        "price": { "type": "number" },
+        "minQuantity": { "type": "number" },
+        "maxQuantity": { "type": "number" },
+        "templateSvg": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "productId", "name"]
     }
   },
   "firestore": {
@@ -65,6 +102,14 @@
     "/templates/{templateId}": {
       "schema": "Template",
       "description": "Shared design templates."
+    },
+    "/studio_acom_products/{productId}": {
+      "schema": "Product",
+      "description": "Studio ACOM products."
+    },
+    "/studio_acom_products/{productId}/variants/{variantId}": {
+      "schema": "Variant",
+      "description": "Variants for a specific product."
     }
   }
 }

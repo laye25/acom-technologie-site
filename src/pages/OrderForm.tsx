@@ -98,12 +98,12 @@ const OrderForm = () => {
     setLoading(true);
     try {
       const orderData = {
-        userId: user.uid,
+        userId: user.id,
         serviceId: service.id,
         // Denormalized data for performance (Point 6: Aggregation/Denormalization)
         serviceName: service.name,
         serviceImage: service.image,
-        clientName: fullName || profile?.displayName || user.displayName || 'Client',
+        clientName: fullName || profile?.displayName || user.user_metadata?.full_name || 'Client',
         clientEmail: user.email,
         status: 'pending',
         totalPrice: originalTotal,

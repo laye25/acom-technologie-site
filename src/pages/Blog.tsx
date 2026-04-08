@@ -4,7 +4,7 @@ import { BLOG_POSTS as STATIC_POSTS } from '../constants';
 import { BlogPost } from '../types';
 import { motion } from 'motion/react';
 import { Calendar, User, Clock, ArrowRight, ChevronRight, Bookmark } from 'lucide-react';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 
 const Blog = () => {
   const postMapper = useMemo(() => (p: any) => ({
@@ -20,13 +20,13 @@ const Blog = () => {
   }), []);
 
   const blogOptions = useMemo(() => ({
-    collectionName: 'blog_posts' as CollectionName,
+    tableName: 'blog_posts' as TableName,
     order: { column: 'date' as const, ascending: false },
     mapper: postMapper,
     limit: 20
   }), [postMapper]);
 
-  const { data: dbPosts, loading } = useFirebaseData<BlogPost>(blogOptions);
+  const { data: dbPosts, loading } = useSupabaseData<BlogPost>(blogOptions);
 
   const posts = useMemo(() => {
     if (!loading && dbPosts.length === 0) {

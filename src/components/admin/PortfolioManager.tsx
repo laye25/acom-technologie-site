@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PortfolioItem } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useFirebaseData, CollectionName } from '../../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { dbService as db } from '../../services/firebaseDbService';
 import { compressImage } from '../../lib/imageUtils';
 
@@ -18,12 +18,12 @@ const PortfolioManager = () => {
   }), []);
 
   const portfolioOptions = useMemo(() => ({
-    collectionName: 'portfolio' as CollectionName,
+    tableName: 'portfolio' as TableName,
     order: { column: 'order' as const },
     mapper: projectMapper
   }), [projectMapper]);
 
-  const { data: items, loading, error: fetchError, refresh } = useFirebaseData<PortfolioItem>(portfolioOptions);
+  const { data: items, loading, error: fetchError, refresh } = useSupabaseData<PortfolioItem>(portfolioOptions);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentItem, setCurrentItem] = useState<Partial<PortfolioItem> | null>(null);
@@ -43,10 +43,9 @@ const PortfolioManager = () => {
     setIsSeeding(true);
     setSeedStatus('Initialisation...');
     try {
-      await db.seedDatabase((status) => setSeedStatus(status));
-      showNotification('success', 'Données restaurées avec succès !');
+      // await db.seedDatabase((status) => setSeedStatus(status));
+      showNotification('error', 'La restauration n\'est pas supportée avec Supabase pour le moment.');
       setShowConfirmSeed(false);
-      setTimeout(() => window.location.reload(), 1000);
     } catch (error: any) {
       console.error('Error seeding data:', error);
       showNotification('error', `Erreur lors de la restauration : ${error.message}`);

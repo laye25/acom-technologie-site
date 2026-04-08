@@ -41,7 +41,7 @@ const QuoteRequest = () => {
     setLoading(true);
     try {
       const orderData = {
-        userId: user.uid,
+        userId: user.id,
         serviceId: 'custom',
         status: 'pending',
         totalPrice: 0, // Admin will set this later

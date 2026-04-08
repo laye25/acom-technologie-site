@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { PortfolioItem } from '../types';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { ArrowRight, ExternalLink, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PORTFOLIO_ITEMS } from '../constants';
@@ -16,14 +16,14 @@ const Portfolio = () => {
   }), []);
 
   const portfolioOptions = useMemo(() => ({
-    collectionName: 'portfolio' as CollectionName,
+    tableName: 'portfolio' as TableName,
     order: { column: 'display_order' as const },
     mapper: projectMapper,
     limit: 50
   }), [projectMapper]);
 
-  const { data: dbProjects, loading } = useFirebaseData<PortfolioItem>(portfolioOptions);
-  const { data: settingsData } = useFirebaseData<any>({ collectionName: 'settings' as CollectionName });
+  const { data: dbProjects, loading } = useSupabaseData<PortfolioItem>(portfolioOptions);
+  const { data: settingsData } = useSupabaseData<any>({ tableName: 'settings' as TableName });
   const settings = settingsData?.[0];
 
   const displayProjects = useMemo(() => {

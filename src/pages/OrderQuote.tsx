@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useFirebaseData, CollectionName } from '../hooks/useFirebase';
+import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Order, Service } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { 
@@ -45,20 +45,20 @@ const OrderQuote = () => {
   }, []);
 
   const orderOptions = useMemo(() => ({
-    collectionName: 'orders' as CollectionName,
+    tableName: 'orders' as TableName,
     filters: [
       { column: 'id', value: orderId },
-      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.uid }] : [])
+      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.id }] : [])
     ],
     skip: !user || !orderId
   }), [orderId, user, isAdmin, isManager]);
 
   const serviceOptions = useMemo(() => ({
-    collectionName: 'services' as CollectionName
+    tableName: 'services' as TableName
   }), []);
 
-  const { data: orderData, loading: orderLoading } = useFirebaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirebaseData<Service>(serviceOptions);
+  const { data: orderData, loading: orderLoading } = useSupabaseData<Order>(orderOptions);
+  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
 
   const order = orderData?.[0] || null;
 

@@ -6,23 +6,66 @@ import {
   FolderOpen, Contact2, Megaphone, Building2, ChevronRight
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { useFirebaseData } from '../../hooks/useFirebase';
+import { useAuth } from '../../context/AuthContext';
+import { useSupabaseData } from '../../hooks/useSupabase';
 import { dbService } from '../../services/firebaseDbService';
 import { Category, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
+import { supabase } from '../../lib/supabase';
 
 const StudioAcomManager = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('categories');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data: categories, loading: loadingCats } = useFirebaseData<Category>({
-    collectionName: 'studio_acom_categories' as any
+  const { data: categories, loading: loadingCats, refresh: refreshCats } = useSupabaseData<Category>({
+    tableName: 'studio_acom_categories' as any,
+    realtime: true
   });
 
-  const { data: products, loading: loadingProducts } = useFirebaseData<Product>({
-    collectionName: 'studio_acom_products' as any
+  const { data: productsData, loading: loadingProducts, refresh: refreshProducts } = useSupabaseData<Product>({
+    tableName: 'studio_acom_products' as any,
+    realtime: true
   });
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingVariants, setLoadingVariants] = useState(false);
+
+  // Fetch variants for all products when productsData changes
+  React.useEffect(() => {
+    const fetchAllVariants = async () => {
+      if (!productsData || productsData.length === 0) {
+        setProducts([]);
+        return;
+      }
+
+      setLoadingVariants(true);
+      try {
+        const productsWithVariants = await Promise.all(
+          productsData.map(async (product: any) => {
+            const variants = await dbService.studioAcom.products.getVariants(product.id);
+            // Mapping snake_case vers camelCase pour l'affichage
+            return { 
+              ...product, 
+              variants,
+              categoryId: product.category_id,
+              coverImage: product.cover_image,
+              userId: product.user_id
+            } as Product;
+          })
+        );
+        setProducts(productsWithVariants);
+      } catch (error) {
+        console.error('Error fetching variants:', error);
+        setProducts(productsData); // Fallback to products without variants
+      } finally {
+        setLoadingVariants(false);
+      }
+    };
+
+    fetchAllVariants();
+  }, [productsData]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,35 +81,38 @@ const StudioAcomManager = () => {
       return;
     }
 
+    // Confirmation before saving large modifications
+    if (editingItem?.id && !window.confirm('Voulez-vous vraiment enregistrer ces modifications ?')) {
+      return;
+    }
+
     const loadingToast = toast.loading('Enregistrement en cours...');
     try {
       const dataToSave = { ...editingItem };
+      const variants = dataToSave.variants || [];
       
       // Clean up UI-only properties
       delete dataToSave._tempVariations;
       delete dataToSave.expandedVariant;
+      delete dataToSave.variants;
 
-      // Clean up variants and handle potential NaN values
-      if (dataToSave.variants) {
-        dataToSave.variants = dataToSave.variants.map((v: any) => ({
-          ...v,
-          price: (typeof v.price === 'number' && !isNaN(v.price)) ? v.price : 0,
-          minQuantity: (typeof v.minQuantity === 'number' && !isNaN(v.minQuantity)) ? v.minQuantity : 0,
-          maxQuantity: (typeof v.maxQuantity === 'number' && !isNaN(v.maxQuantity)) ? v.maxQuantity : 0,
-        }));
-      }
-
-      // Remove undefined values (Firestore doesn't accept them)
+      // Remove undefined values
       Object.keys(dataToSave).forEach(key => {
         if (dataToSave[key] === undefined) {
           delete dataToSave[key];
         }
       });
 
+      let savedItem;
       if (activeTab === 'categories') {
-        await dbService.studioAcom.categories.save(dataToSave);
+        savedItem = await dbService.studioAcom.categories.save(dataToSave);
       } else {
-        await dbService.studioAcom.products.save(dataToSave); 
+        // We now let dbService handle the variants saving/syncing
+        savedItem = await dbService.studioAcom.products.save({ 
+          ...dataToSave, 
+          variants, // Pass variants to dbService
+          userId: user?.id 
+        });
       }
       
       toast.success('Enregistré avec succès !', { id: loadingToast });
@@ -78,15 +124,38 @@ const StudioAcomManager = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string): Promise<boolean> => {
+    console.log('handleDelete called for id:', id, 'on tab:', activeTab);
+    if (!window.confirm('Voulez-vous vraiment supprimer cet élément ? Cette action est irréversible.')) {
+      return false;
+    }
+    
+    const loadingToast = toast.loading('Suppression en cours...');
     try {
       if (activeTab === 'categories') {
+        // Check if there are products in this category
+        const { count, error: countError } = await supabase
+          .from('studio_acom_products')
+          .select('*', { count: 'exact', head: true })
+          .eq('category_id', id);
+        
+        if (countError) console.error('Error checking products in category:', countError);
+        
+        if (count && count > 0) {
+          toast.error(`Impossible de supprimer : cette catégorie contient ${count} produits.`, { id: loadingToast });
+          return false;
+        }
+        
         await dbService.studioAcom.categories.delete(id);
       } else {
         await dbService.studioAcom.products.delete(id);
       }
+      toast.success('Supprimé avec succès !', { id: loadingToast });
+      return true;
     } catch (error) {
       console.error('Error deleting item:', error);
+      toast.error('Erreur lors de la suppression : ' + (error instanceof Error ? error.message : 'Erreur inconnue'), { id: loadingToast });
+      return false;
     }
   };
 
@@ -104,18 +173,49 @@ const StudioAcomManager = () => {
       
       for (const cat of defaultCats) {
         console.log(`Importing category: ${cat.name} (${cat.id})...`);
-        const iconName = Object.keys({ Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 }).find(
-          key => ({ Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 } as any)[key] === cat.icon
-        ) || 'LayoutGrid';
         
-        await dbService.studioAcom.categories.save({ ...cat, icon: iconName });
+        // Map the icon object to its name
+        const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
+        const iconName = Object.keys(iconMap).find(key => iconMap[key] === cat.icon) || 'LayoutGrid';
+        
+        console.log(`Resolved icon name: ${iconName}`);
+        try {
+          // Map to snake_case for Supabase
+          await dbService.studioAcom.categories.save({ 
+            id: cat.id,
+            name: cat.name,
+            sub: cat.sub,
+            icon: iconName,
+            color: cat.color,
+            cover_image: cat.coverImage
+          });
+          console.log(`Successfully saved category: ${cat.name}`);
+        } catch (err) {
+          console.error(`Failed to save category ${cat.name}:`, err);
+          throw err;
+        }
       }
 
       // Import Products
       console.log(`Found ${INITIAL_PRODUCTS.length} products to import.`);
       for (const product of INITIAL_PRODUCTS) {
         console.log(`Importing product: ${product.name} (${product.id})...`);
-        await dbService.studioAcom.products.save(product);
+        try {
+          // Map to snake_case for Supabase
+          await dbService.studioAcom.products.save({
+            id: product.id,
+            name: product.name,
+            category_id: product.categoryId,
+            description: product.description,
+            cover_image: product.coverImage,
+            user_id: product.userId,
+            variants: product.variants
+          });
+          console.log(`Successfully saved product: ${product.name}`);
+        } catch (err) {
+          console.error(`Failed to save product ${product.name}:`, err);
+          throw err;
+        }
       }
       
       console.log('Import completed successfully!');
@@ -614,7 +714,7 @@ const StudioAcomManager = () => {
                                   type="button" 
                                   onClick={(e) => { 
                                     e.stopPropagation(); 
-                                    const newVariants = [...editingItem.variants]; 
+                                    const newVariants = [...(editingItem.variants || [])]; 
                                     newVariants.splice(index, 1); 
                                     setEditingItem({ ...editingItem, variants: newVariants }); 
                                   }} 
@@ -792,11 +892,9 @@ const StudioAcomManager = () => {
                   {editingItem?.id && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
-                          handleDelete(editingItem.id);
-                          setIsModalOpen(false);
-                        }
+                      onClick={async () => {
+                        const success = await handleDelete(editingItem.id);
+                        if (success) setIsModalOpen(false);
                       }}
                       className="p-3 text-rose-500 hover:bg-rose-50 rounded-2xl transition-all"
                       title="Supprimer définitivement"

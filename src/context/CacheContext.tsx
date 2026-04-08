@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { collection, query, getDocs, QueryConstraint, where, orderBy, limit, documentId } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../lib/supabase';
 
 interface CacheItem {
   data: any;
@@ -10,7 +9,7 @@ interface CacheItem {
 interface CacheContextType {
   getCachedData: (key: string) => any | null;
   setCachedData: (key: string, data: any) => void;
-  prefetchCollection: (collectionName: string, constraints?: any[]) => Promise<void>;
+  prefetchCollection: (collectionName: string) => Promise<void>;
   clearCache: () => void;
 }
 
@@ -68,15 +67,14 @@ export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return null;
   }, []);
 
-  const prefetchCollection = useCallback(async (collectionName: string, constraints: any[] = []) => {
-    const key = JSON.stringify({ collectionName, constraints });
+  const prefetchCollection = useCallback(async (collectionName: string) => {
+    const key = JSON.stringify({ collectionName });
     if (getCachedData(key) || fetchingRef.current[key]) return;
 
     fetchingRef.current[key] = true;
     try {
-      const q = query(collection(db, collectionName), ...constraints);
-      const snap = await getDocs(q);
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const { data, error } = await supabase.from(collectionName).select('*').limit(50);
+      if (error) throw error;
       setCachedData(key, data);
       console.log(`[Prefetch] Loaded ${collectionName}`);
     } catch (e) {
