@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { isSupabaseConfigured } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, ArrowRight, LogIn, UserPlus } from 'lucide-react';
@@ -29,6 +30,10 @@ const Login = () => {
   });
 
   const handleGoogleSignIn = async () => {
+    if (!isSupabaseConfigured) {
+      setError("La connexion n'est pas possible car les clés Supabase sont manquantes dans l'environnement de déploiement.");
+      return;
+    }
     setGoogleLoading(true);
     setError(null);
     try {
@@ -73,6 +78,12 @@ const Login = () => {
       handleResetPassword(e);
       return;
     }
+
+    if (!isSupabaseConfigured) {
+      setError("La connexion n'est pas possible car les clés Supabase sont manquantes dans l'environnement de déploiement.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);

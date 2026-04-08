@@ -94,6 +94,7 @@ function AppContent() {
   );
 }
 
+// Main Application Component - Acom Technologie
 export default function App() {
   return (
     <ErrorBoundary>

@@ -55,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session ? 'User found' : 'No user');
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user);
@@ -67,7 +68,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session ? 'User found' : 'No user');
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user);
@@ -150,13 +152,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, password: string) => {
+    console.log('Attempting sign in with email:', email);
     const timeoutPromise = new Promise<{error: any}>((_, reject) => 
       setTimeout(() => reject(new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.')), 15000)
     );
     const signInPromise = supabase.auth.signInWithPassword({ email, password });
     
     const { error } = await Promise.race([signInPromise, timeoutPromise]);
-    if (error) throw error;
+    if (error) {
+      console.error('Sign in error:', error);
+      throw error;
+    }
+    console.log('Sign in successful');
   };
 
   const signUpWithEmail = async (email: string, password: string, fullName: string) => {
