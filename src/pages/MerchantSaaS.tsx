@@ -116,7 +116,17 @@ const MerchantSaaS = () => {
     const fetchMerchant = async () => {
       if (!user) return;
       try {
-        const m = await db.merchants.getByOwner(user.id);
+        setLoadingMerchant(true);
+        // Try to get from Dexie first
+        let m = await db.merchants.where('ownerId').equals(user.id).first();
+        
+        // If not found, try to fetch from Supabase and save to Dexie
+        if (!m) {
+          m = await dbService.merchants.getByOwner(user.id);
+          if (m) {
+            await db.merchants.put(m);
+          }
+        }
         setMerchant(m);
       } catch (error) {
         console.error('Error fetching merchant:', error);
