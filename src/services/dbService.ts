@@ -150,7 +150,14 @@ export const dbService = {
     categories: {
       async save(category: any) {
         const id = category.id || crypto.randomUUID();
-        const { error } = await supabase.from('studio_acom_categories').upsert({ ...category, id, updated_at: new Date() });
+        const { coverImage, ...rest } = category;
+        const dataToSave = {
+          ...rest,
+          id,
+          cover_image: coverImage || category.cover_image,
+          updated_at: new Date()
+        };
+        const { error } = await supabase.from('studio_acom_categories').upsert(dataToSave);
         if (error) throw error;
         return id;
       },

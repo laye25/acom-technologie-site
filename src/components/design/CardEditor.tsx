@@ -318,97 +318,7 @@ const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick }
 };
 
 // --- Templates ---
-const TEMPLATES = [
-  {
-    id: 'acom-bc-modern',
-    name: 'Design Moderne',
-    category: 'Papeterie & Bureautique',
-    subCategory: 'Carte de Visite',
-    bgColor: '#ffffff',
-    elements: [
-      { id: 'bg', type: 'shape', x: 0, y: 0, width: 600, height: 350, fill: '#ffffff' },
-      { id: 'accent', type: 'shape', x: 0, y: 0, width: 15, height: 350, fill: '#4c1d95' },
-      { id: 'logo', type: 'image', x: 40, y: 40, width: 80, height: 80, src: 'LOGO_PLACEHOLDER' },
-      { id: 'company', type: 'text', x: 130, y: 65, text: 'STUDIO ACOM', fontSize: 24, fill: '#1f2937', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'name', type: 'text', x: 40, y: 160, text: 'VOTRE NOM', fontSize: 28, fill: '#4c1d95', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'title', type: 'text', x: 40, y: 200, text: 'VOTRE TITRE', fontSize: 14, fill: '#6b7280', fontFamily: 'Inter' },
-      { id: 'line', type: 'shape', x: 40, y: 230, width: 520, height: 1, fill: '#e5e7eb' },
-      { id: 'email', type: 'text', x: 40, y: 250, text: 'votre@email.com', fontSize: 12, fill: '#4b5563', fontFamily: 'Inter' },
-      { id: 'phone', type: 'text', x: 40, y: 275, text: '+33 1 23 45 67 89', fontSize: 12, fill: '#4b5563', fontFamily: 'Inter' },
-      { id: 'web', type: 'text', x: 40, y: 300, text: 'www.studioacom.fr', fontSize: 12, fill: '#4b5563', fontFamily: 'Inter' }
-    ]
-  },
-  {
-    id: 'acom-bc-corporate',
-    name: 'Design Corporate',
-    category: 'Papeterie & Bureautique',
-    subCategory: 'Carte de Visite',
-    bgColor: '#f8fafc',
-    elements: [
-      { id: 'bg', type: 'shape', x: 0, y: 0, width: 600, height: 350, fill: '#f8fafc' },
-      { id: 'header', type: 'shape', x: 0, y: 0, width: 600, height: 80, fill: '#1e293b' },
-      { id: 'logo', type: 'image', x: 40, y: 15, width: 50, height: 50, src: 'LOGO_PLACEHOLDER' },
-      { id: 'company', type: 'text', x: 100, y: 30, text: 'STUDIO ACOM', fontSize: 20, fill: '#ffffff', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'name', type: 'text', x: 40, y: 120, text: 'VOTRE NOM', fontSize: 32, fill: '#1e293b', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'title', type: 'text', x: 40, y: 165, text: 'DIRECTEUR GÉNÉRAL', fontSize: 12, fill: '#64748b', fontWeight: 'bold', fontFamily: 'Inter', letterSpacing: 2 },
-      { id: 'contact-bg', type: 'shape', x: 350, y: 120, width: 210, height: 180, fill: '#ffffff', radius: 12 },
-      { id: 'email', type: 'text', x: 370, y: 150, text: 'contact@votreentreprise.com', fontSize: 10, fill: '#1e293b', fontFamily: 'Inter' },
-      { id: 'phone', type: 'text', x: 370, y: 180, text: '+33 (0)1 23 45 67 89', fontSize: 10, fill: '#1e293b', fontFamily: 'Inter' },
-      { id: 'web', type: 'text', x: 370, y: 210, text: 'www.votreentreprise.fr', fontSize: 10, fill: '#1e293b', fontFamily: 'Inter' }
-    ]
-  },
-  {
-    id: 'acom-bc-creative',
-    name: 'Design Créatif',
-    category: 'Papeterie & Bureautique',
-    subCategory: 'Carte de Visite',
-    bgColor: '#ffffff',
-    elements: [
-      { id: 'bg', type: 'shape', x: 0, y: 0, width: 600, height: 350, fill: '#ffffff' },
-      { id: 'blob1', type: 'circle', x: 550, y: 50, radius: 120, fill: '#f43f5e', opacity: 0.2 },
-      { id: 'blob2', type: 'circle', x: 50, y: 300, radius: 80, fill: '#3b82f6', opacity: 0.2 },
-      { id: 'logo', type: 'image', x: 260, y: 60, width: 80, height: 80, src: 'LOGO_PLACEHOLDER' },
-      { id: 'name', type: 'text', x: 0, y: 160, width: 600, text: 'VOTRE NOM', fontSize: 36, fill: '#0f172a', fontWeight: 'black', fontFamily: 'Inter', align: 'center' },
-      { id: 'title', type: 'text', x: 0, y: 210, width: 600, text: 'DESIGNER CRÉATIF', fontSize: 14, fill: '#f43f5e', fontWeight: 'bold', fontFamily: 'Inter', align: 'center', letterSpacing: 4 },
-      { id: 'socials', type: 'text', x: 0, y: 280, width: 600, text: '@votrepseudo | behance.net/vous', fontSize: 12, fill: '#64748b', fontFamily: 'Inter', align: 'center' }
-    ]
-  },
-  {
-    id: 'acom-flyer-vibrant',
-    name: 'Design Vibrant',
-    category: 'Marketing & Publicité',
-    subCategory: 'Flyer A5',
-    bgColor: '#4c1d95',
-    elements: [
-      { id: 'bg', type: 'shape', x: 0, y: 0, width: 600, height: 350, fill: '#4c1d95' },
-      { id: 'circle1', type: 'circle', x: 400, y: -50, radius: 150, fill: '#6d28d9', opacity: 0.5 },
-      { id: 'circle2', type: 'circle', x: 500, y: 200, radius: 100, fill: '#7c3aed', opacity: 0.3 },
-      { id: 'headline', type: 'text', x: 50, y: 80, text: 'VOTRE ÉVÉNEMENT', fontSize: 48, fill: '#ffffff', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'subline', type: 'text', x: 50, y: 150, text: 'Une expérience inoubliable', fontSize: 24, fill: '#ddd6fe', fontFamily: 'Inter' },
-      { id: 'details', type: 'text', x: 50, y: 220, text: 'Date: 12 Mai 2024 | Lieu: Paris', fontSize: 18, fill: '#ffffff', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'cta-bg', type: 'shape', x: 50, y: 270, width: 200, height: 45, fill: '#ffffff', radius: 8 },
-      { id: 'cta-text', type: 'text', x: 85, y: 282, text: 'RÉSERVER MAINTENANT', fontSize: 14, fill: '#4c1d95', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'logo', type: 'image', x: 480, y: 40, width: 80, height: 80, src: 'LOGO_PLACEHOLDER' }
-    ]
-  },
-  {
-    id: 'acom-letterhead-clean',
-    name: 'Design Clean',
-    category: 'Papeterie & Bureautique',
-    subCategory: 'Papier En-tête A4',
-    bgColor: '#ffffff',
-    elements: [
-      { id: 'bg', type: 'shape', x: 0, y: 0, width: 600, height: 350, fill: '#ffffff' },
-      { id: 'top-bar', type: 'shape', x: 0, y: 0, width: 600, height: 5, fill: '#4c1d95' },
-      { id: 'logo', type: 'image', x: 50, y: 40, width: 60, height: 60, src: 'LOGO_PLACEHOLDER' },
-      { id: 'company', type: 'text', x: 120, y: 55, text: 'STUDIO ACOM', fontSize: 20, fill: '#1f2937', fontWeight: 'bold', fontFamily: 'Inter' },
-      { id: 'address', type: 'text', x: 400, y: 50, text: '123 Avenue des Arts\n75001 Paris, France', fontSize: 10, fill: '#6b7280', align: 'right', fontFamily: 'Inter' },
-      { id: 'line', type: 'shape', x: 50, y: 120, width: 500, height: 1, fill: '#f3f4f6' },
-      { id: 'footer-line', type: 'shape', x: 50, y: 300, width: 500, height: 1, fill: '#f3f4f6' },
-      { id: 'footer-text', type: 'text', x: 50, y: 315, text: 'SIRET: 123 456 789 00012 | TVA: FR 12 345678901', fontSize: 8, fill: '#9ca3af', fontFamily: 'Inter' }
-    ]
-  }
-];
+const TEMPLATES: any[] = [];
 
 const FONTS = [
   'Inter', 'Cormorant Garamond', 'Montserrat', 'Playfair Display', 'Roboto', 'Open Sans', 'Lato'
@@ -482,7 +392,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   };
 
   const [pages, _setPages] = useState<{ elements: CanvasElement[], bgColor: string }[]>([
-    { elements: TEMPLATES[0].elements as CanvasElement[], bgColor: TEMPLATES[0].bgColor },
+    { 
+      elements: (TEMPLATES[0]?.elements || []) as CanvasElement[], 
+      bgColor: TEMPLATES[0]?.bgColor || '#ffffff' 
+    },
     { elements: [], bgColor: '#ffffff' }
   ]);
 

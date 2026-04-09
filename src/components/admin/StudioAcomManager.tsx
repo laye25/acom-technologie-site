@@ -19,10 +19,17 @@ const StudioAcomManager = () => {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data: categories, loading: loadingCats, refresh: refreshCats } = useSupabaseData<Category>({
+  const { data: categoriesData, loading: loadingCats, refresh: refreshCats } = useSupabaseData<Category>({
     tableName: 'studio_acom_categories' as any,
     realtime: true
   });
+
+  const categories = React.useMemo(() => {
+    return (categoriesData || []).map(cat => ({
+      ...cat,
+      coverImage: (cat as any).cover_image || (cat as any).coverImage
+    }));
+  }, [categoriesData]);
 
   const { data: productsData, loading: loadingProducts, refresh: refreshProducts } = useSupabaseData<Product>({
     tableName: 'studio_acom_products' as any,
@@ -106,6 +113,7 @@ const StudioAcomManager = () => {
       let savedItem;
       if (activeTab === 'categories') {
         savedItem = await dbService.studioAcom.categories.save(dataToSave);
+        refreshCats();
       } else {
         // We now let dbService handle the variants saving/syncing
         savedItem = await dbService.studioAcom.products.save({ 
@@ -113,6 +121,7 @@ const StudioAcomManager = () => {
           variants, // Pass variants to dbService
           userId: user?.id 
         });
+        refreshProducts();
       }
       
       toast.success('Enregistré avec succès !', { id: loadingToast });
@@ -147,8 +156,10 @@ const StudioAcomManager = () => {
         }
         
         await dbService.studioAcom.categories.delete(id);
+        refreshCats();
       } else {
         await dbService.studioAcom.products.delete(id);
+        refreshProducts();
       }
       toast.success('Supprimé avec succès !', { id: loadingToast });
       return true;
@@ -223,6 +234,8 @@ const StudioAcomManager = () => {
       }
       
       console.log('Import completed successfully!');
+      refreshCats();
+      refreshProducts();
       setImportSuccess(true);
       setTimeout(() => setImportSuccess(false), 3000);
     } catch (error) {
@@ -312,7 +325,7 @@ const StudioAcomManager = () => {
           </button>
           <button
             onClick={() => {
-              setEditingItem(activeTab === 'categories' ? { name: '', sub: '', color: 'text-gray-600', subs: [] } : { name: '', categoryId: categories[0]?.id || '', description: '', variants: [] });
+              setEditingItem(activeTab === 'categories' ? { name: '', sub: '', color: 'text-gray-600' } : { name: '', categoryId: categories[0]?.id || '', description: '', variants: [] });
               setIsModalOpen(true);
             }}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-all"

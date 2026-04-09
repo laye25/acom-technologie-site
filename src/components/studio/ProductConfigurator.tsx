@@ -98,14 +98,6 @@ const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="aspect-square bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden cursor-pointer hover:border-primary transition-colors">
-                  <img src={`https://picsum.photos/seed/product-${i}/400/400`} className="w-full h-full object-cover opacity-50 hover:opacity-100 transition-opacity" referrerPolicy="no-referrer" />
-                </div>
-              ))}
-            </div>
-
             <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100">
               <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
                 <Info className="w-5 h-5 text-primary" />
@@ -159,21 +151,6 @@ const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     <span>{q}</span>
                     <span className="text-[9px] opacity-60">{(variant.price * q / 100).toFixed(0)}€</span>
                   </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Smart Recommendations */}
-            <div className="pt-10 border-t border-gray-100">
-              <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Produits recommandés</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {[1, 2].map(i => (
-                  <div key={i} className="group cursor-pointer">
-                    <div className="aspect-video bg-gray-50 rounded-2xl overflow-hidden mb-2 border border-gray-100 group-hover:border-primary transition-colors">
-                      <img src={`https://picsum.photos/seed/rec-${i}/400/200`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                    <p className="text-xs font-black text-gray-900 group-hover:text-primary transition-colors">Produit Complémentaire {i}</p>
-                  </div>
                 ))}
               </div>
             </div>
