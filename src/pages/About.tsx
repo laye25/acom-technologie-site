@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Users, Target, Award, Rocket, CheckCircle2, MapPin, Phone, Mail, Loader2 } from 'lucide-react';
 import { Translate } from '../context/LanguageContext';
 import { dbService as db } from '../services/dbService';
+import OptimizedImage from '../components/OptimizedImage';
 
 const About = () => {
   const [settings, setSettings] = useState<any>(null);
@@ -139,11 +140,11 @@ const About = () => {
             </div>
             <div className="relative">
               <div className="aspect-square rounded-[3rem] overflow-hidden shadow-2xl">
-                <img 
+                <OptimizedImage 
                   src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800" 
                   alt="Team working" 
+                  width={800}
                   className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
                 />
               </div>
               <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-primary rounded-full blur-3xl opacity-20 -z-10" />

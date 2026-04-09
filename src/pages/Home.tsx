@@ -9,6 +9,7 @@ import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Link } from 'react-router-dom';
 import { Translate, useTranslation } from '../context/LanguageContext';
 import { dbService as db } from '../services/dbService';
+import OptimizedImage from '../components/OptimizedImage';
 
 const iconMap: { [key: string]: any } = {
   Briefcase, Users, Award, Star, CheckCircle2, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code
@@ -511,11 +512,11 @@ const Home = () => {
               className="relative"
             >
               <div className="aspect-square rounded-[3rem] overflow-hidden shadow-2xl">
-                <img
+                <OptimizedImage
                   src={whyUs.image}
                   alt="Notre équipe"
+                  width={1200}
                   className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
                 />
               </div>
               <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-primary rounded-[3rem] -z-10 blur-3xl opacity-20" />

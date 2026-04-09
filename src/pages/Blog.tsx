@@ -5,6 +5,7 @@ import { BlogPost } from '../types';
 import { motion } from 'motion/react';
 import { Calendar, User, Clock, ArrowRight, ChevronRight, Bookmark } from 'lucide-react';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import OptimizedImage from '../components/OptimizedImage';
 
 const Blog = () => {
   const postMapper = useMemo(() => (p: any) => ({
@@ -95,15 +96,11 @@ const Blog = () => {
                     to={`/blog/${post.id}`} 
                     className="relative aspect-[4/3] rounded-[2.5rem] overflow-hidden bg-gray-100 mb-4 block shadow-sm group-hover:shadow-2xl group-hover:shadow-primary/10 transition-all duration-500"
                   >
-                    <img 
+                    <OptimizedImage 
                       src={post.image} 
                       alt={post.title} 
+                      width={800}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = `https://picsum.photos/seed/${post.id}/800/600`;
-                      }}
                     />
                     <div className="absolute top-6 right-6">
                       <div className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-ink opacity-0 group-hover:opacity-100 transition-opacity duration-300">

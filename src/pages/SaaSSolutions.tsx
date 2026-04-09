@@ -12,6 +12,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import OptimizedImage from '../components/OptimizedImage';
 
 const solutions = [
   {
@@ -78,11 +79,11 @@ const SaaSSolutions = () => {
       {/* Hero Banner Section */}
       <section className="relative min-h-[80vh] flex items-center overflow-hidden bg-ink pt-40 pb-24">
         <div className="absolute inset-0 z-0">
-          <img 
+          <OptimizedImage 
             src="https://picsum.photos/seed/saas-banner/1920/1080" 
             alt="SaaS Solutions Banner" 
+            width={1920}
             className="w-full h-full object-cover opacity-60"
-            referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-ink/90 via-ink/40 to-ink/20" />
         </div>
@@ -131,11 +132,11 @@ const SaaSSolutions = () => {
               className="group bg-white rounded-[2.5rem] overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 border border-gray-100 flex flex-col"
             >
               <div className="relative h-48 overflow-hidden">
-                <img 
+                <OptimizedImage 
                   src={solution.image} 
                   alt={solution.title}
+                  width={600}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className={`absolute top-4 left-4 w-12 h-12 ${solution.color} rounded-xl flex items-center justify-center text-white shadow-lg`}>

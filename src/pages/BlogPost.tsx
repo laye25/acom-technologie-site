@@ -5,6 +5,7 @@ import { BLOG_POSTS as STATIC_POSTS } from '../constants';
 import { BlogPost as BlogPostType } from '../types';
 import { motion } from 'motion/react';
 import { Calendar, User, Clock, ArrowLeft, Share2 } from 'lucide-react';
+import OptimizedImage from '../components/OptimizedImage';
 
 const BlogPost = () => {
   const { postId } = useParams();
@@ -115,11 +116,11 @@ const BlogPost = () => {
         </div>
 
         <div className="aspect-video rounded-3xl overflow-hidden mb-12 shadow-lg">
-          <img 
+          <OptimizedImage 
             src={post.image} 
             alt={post.title} 
+            width={1200}
             className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
           />
         </div>
 
@@ -139,11 +140,11 @@ const BlogPost = () => {
                   className="group"
                 >
                   <div className="aspect-video rounded-2xl overflow-hidden mb-4">
-                    <img 
+                    <OptimizedImage 
                       src={related.image} 
                       alt={related.title} 
+                      width={600}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      referrerPolicy="no-referrer"
                     />
                   </div>
                   <h4 className="font-bold text-gray-900 group-hover:text-primary transition-colors">
