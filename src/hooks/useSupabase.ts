@@ -102,8 +102,8 @@ export function useSupabaseData<T>({
       if (whereClauses && whereClauses.length > 0) {
         whereClauses.forEach(w => {
           let [column, operator, value] = w;
-          if (column === 'createdAt') column = 'created_at';
-          if (column === 'updatedAt') column = 'updated_at';
+          // Convert camelCase to snake_case
+          column = column.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
           
           if (operator === '==') query = query.eq(column, value);
           else if (operator === '!=') query = query.neq(column, value);
@@ -116,23 +116,17 @@ export function useSupabaseData<T>({
         });
       } else if (filters && filters.length > 0) {
         filters.forEach(f => {
-          let col = f.column;
-          if (col === 'createdAt') col = 'created_at';
-          if (col === 'updatedAt') col = 'updated_at';
+          const col = f.column.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
           query = query.eq(col, f.value);
         });
       } else if (filter) {
-        let col = filter.column;
-        if (col === 'createdAt') col = 'created_at';
-        if (col === 'updatedAt') col = 'updated_at';
+        const col = filter.column.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
         query = query.eq(col, filter.value);
       }
 
       if (order) {
         const ascending = order.ascending ?? (order.direction === 'asc');
-        let orderColumn = order.column;
-        if (orderColumn === 'createdAt') orderColumn = 'created_at';
-        if (orderColumn === 'updatedAt') orderColumn = 'updated_at';
+        const orderColumn = order.column.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
         query = query.order(orderColumn, { ascending });
       }
 

@@ -13,7 +13,7 @@ import {
   Calculator, Receipt, CreditCard, Smartphone, Banknote,
   Clock, CheckCircle, TrendingDown, ArrowRight, FileText, Truck,
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
-  Briefcase, ClipboardList, UserPlus, Building2, Check, Zap
+  Briefcase, ClipboardList, UserPlus, Building2, Check, Zap, Minus
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -209,26 +209,32 @@ const MerchantSaaS = () => {
     <div className="min-h-screen bg-gray-50 pt-24 pb-12">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-              <Store className="w-6 h-6 text-primary" />
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+          <div className="flex items-center space-x-6">
+            <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner">
+              <Store className="w-8 h-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{merchant.name}</h1>
-              <p className="text-sm text-gray-500">
-                {merchant.type === 'entreprise' ? 'Tableau de bord entreprise' :
-                 merchant.type === 'chantier' ? 'Tableau de bord chantier / BTP' :
-                 merchant.type === 'transport' ? 'Tableau de bord flotte / transport' :
-                 merchant.type === 'rh' ? 'Tableau de bord RH' :
-                 merchant.type === 'scolaire' ? 'Tableau de bord établissement scolaire' :
-                 merchant.type === 'medical' ? 'Tableau de bord établissement médical' :
-                 'Tableau de bord commerçant'}
-              </p>
+              <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
+              <div className="flex items-center mt-1.5">
+                <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">
+                  {merchant.type === 'entreprise' ? 'Management Entreprise' :
+                   merchant.type === 'chantier' ? 'Management BTP / Chantier' :
+                   merchant.type === 'transport' ? 'Management Flotte' :
+                   merchant.type === 'rh' ? 'Management RH' :
+                   merchant.type === 'scolaire' ? 'Management Scolaire' :
+                   merchant.type === 'medical' ? 'Management Médical' :
+                   'Management Commerce'}
+                </span>
+                <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
+                <span className="text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em]">
+                  Plan {merchant.plan}
+                </span>
+              </div>
             </div>
           </div>
           
-          <div className="flex bg-white p-1 rounded-2xl border border-black/5 shadow-sm overflow-x-auto scrollbar-hide">
+          <div className="flex bg-white p-1.5 rounded-[1.5rem] border border-black/5 shadow-sm overflow-x-auto scrollbar-hide">
             {tabs.map(tab => (
               <TabButton 
                 key={tab.id}
@@ -269,11 +275,13 @@ const MerchantSaaS = () => {
 const TabButton = ({ active, onClick, icon: Icon, label }: any) => (
   <button
     onClick={onClick}
-    className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${
-      active ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-500 hover:bg-gray-50'
+    className={`flex items-center space-x-2.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+      active 
+        ? 'bg-ink text-white shadow-xl shadow-ink/20 scale-105' 
+        : 'text-gray-400 hover:text-ink hover:bg-gray-50'
     }`}
   >
-    <Icon className="w-4 h-4" />
+    <Icon className={`w-4 h-4 ${active ? 'text-primary' : ''}`} />
     <span>{label}</span>
   </button>
 );
@@ -328,72 +336,96 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
       const id = await db.merchants.save(merchantData);
       onComplete({ ...merchantData, id } as Merchant);
       toast.success(`Votre ${label} a été créée !`);
-    } catch (error) {
-      toast.error('Erreur lors de la création.');
+    } catch (error: any) {
+      console.error('Erreur lors de la création du marchand:', error);
+      
+      // Check for missing table error from Supabase
+      if (error.message?.includes("Could not find the table 'public.merchants'")) {
+        toast.error("Base de données non configurée. Veuillez exécuter le script SQL dans votre console Supabase.");
+      } else {
+        toast.error(`Erreur lors de la création: ${error.message || 'Erreur inconnue'}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
       <motion.div 
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-8 rounded-3xl shadow-xl max-w-md w-full border border-black/5"
+        className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-lg w-full border border-black/5 relative overflow-hidden"
       >
-        <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <Store className="w-8 h-8 text-primary" />
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-ink to-primary opacity-20"></div>
+        
+        <div className="w-20 h-20 bg-primary/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 border border-primary/10 shadow-inner">
+          <Store className="w-10 h-10 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold text-center mb-2">Bienvenue sur Acom SaaS</h2>
-        <p className="text-gray-500 text-center mb-8">
-          Configurez {label} pour commencer à gérer votre activité.
+        
+        <h2 className="text-3xl font-black text-center text-ink mb-2 tracking-tight">Acom SaaS</h2>
+        <p className="text-gray-400 text-center mb-10 text-sm font-medium">
+          Configurez <span className="text-ink font-bold">{label}</span> pour commencer à gérer votre activité avec précision.
         </p>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Nom de {label}</label>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Nom de {label}</label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-100 focus:ring-2 focus:ring-primary/20 outline-none"
+              className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink placeholder:text-gray-300"
               placeholder={placeholder}
             />
           </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Devise</label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-100 focus:ring-2 focus:ring-primary/20 outline-none"
-            >
-              <option value="FCFA">FCFA</option>
-              <option value="EUR">EUR (€)</option>
-              <option value="USD">USD ($)</option>
-            </select>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Devise</label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink appearance-none bg-white"
+              >
+                <option value="FCFA">FCFA</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="USD">USD ($)</option>
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Forfait</label>
+              <select
+                value={plan}
+                onChange={(e) => setPlan(e.target.value as MerchantPlan)}
+                className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink appearance-none bg-white"
+              >
+                <option value="FREE">FREE</option>
+                <option value="BASIC">BASIC</option>
+                <option value="STANDARD">STANDARD</option>
+                <option value="PREMIUM">PREMIUM</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Forfait</label>
-            <select
-              value={plan}
-              onChange={(e) => setPlan(e.target.value as MerchantPlan)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-100 focus:ring-2 focus:ring-primary/20 outline-none"
+
+          <div className="pt-4">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-5 bg-ink text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-ink/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 group"
             >
-              <option value="FREE">FREE (0 FCFA/mois)</option>
-              <option value="BASIC">BASIC (10 000 FCFA/mois)</option>
-              <option value="STANDARD">STANDARD (25 000 FCFA/mois)</option>
-              <option value="PREMIUM">PREMIUM (45 000 FCFA/mois)</option>
-            </select>
+              {loading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <span>Lancer mon activité</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : `Créer ${label}`}
-          </button>
         </form>
       </motion.div>
     </div>
@@ -548,21 +580,45 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const productOptions = useMemo(() => ({
     tableName: 'merchant_products' as TableName,
-    where: [['merchantId', '==', merchant.id]]
+    where: [['merchantId', '==', merchant.id]],
+    mapper: (data: any) => ({
+      ...data,
+      merchantId: data.merchant_id,
+      costPrice: data.cost_price,
+      stockQuantity: data.stock_quantity,
+      minStockLevel: data.min_stock_level,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    })
   }), [merchant.id]);
 
   const saleOptions = useMemo(() => ({
     tableName: 'merchant_sales' as TableName,
     where: [['merchantId', '==', merchant.id]],
     order: { column: 'createdAt' as const, direction: 'desc' as const },
-    limit: 500
+    limit: 500,
+    mapper: (data: any) => ({
+      ...data,
+      merchantId: data.merchant_id,
+      totalAmount: data.total_amount,
+      paymentMethod: data.payment_method,
+      customerName: data.customer_name,
+      customerPhone: data.customer_phone,
+      processedBy: data.processed_by,
+      createdAt: data.created_at
+    })
   }), [merchant.id]);
 
   const expenseOptions = useMemo(() => ({
     tableName: 'merchant_expenses' as TableName,
     where: [['merchantId', '==', merchant.id]],
     order: { column: 'createdAt' as const, direction: 'desc' as const },
-    limit: 500
+    limit: 500,
+    mapper: (data: any) => ({
+      ...data,
+      merchantId: data.merchant_id,
+      createdAt: data.created_at
+    })
   }), [merchant.id]);
 
   const { data: products } = useSupabaseData<MerchantProduct>(productOptions);
@@ -956,27 +1012,35 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Recent Transactions */}
-        <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold text-gray-900">Transactions Récentes</h3>
-            <button className="text-sm font-bold text-primary hover:underline flex items-center">
-              Voir tout <ArrowRight className="w-4 h-4 ml-1" />
+        <div className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h3 className="text-2xl font-black text-ink">Flux Financiers</h3>
+              <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Dernières opérations</p>
+            </div>
+            <button className="p-3 hover:bg-gray-50 rounded-2xl transition-all border border-black/5 group">
+              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-primary transition-colors" />
             </button>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-5">
             {recentTransactions.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">Aucune transaction enregistrée</p>
+              <div className="py-16 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                  <ArrowUpRight className="w-8 h-8 text-gray-200" />
+                </div>
+                <p className="text-gray-400 text-sm font-medium">Aucune transaction enregistrée</p>
+              </div>
             ) : (
               recentTransactions.map((tx: any) => (
-                <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      tx.type === 'sale' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                <div key={tx.id} className="flex items-center justify-between p-5 hover:bg-gray-50/50 rounded-[1.5rem] transition-all border border-transparent hover:border-gray-100 group">
+                  <div className="flex items-center space-x-5">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 ${
+                      tx.type === 'sale' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
                     }`}>
-                      {tx.type === 'sale' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                      {tx.type === 'sale' ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
                     </div>
                     <div>
-                      <p className="font-bold text-sm text-gray-900">
+                      <p className="font-black text-ink text-base leading-tight">
                         {tx.type === 'sale' ? (tx.customerName || (
                           merchant.type === 'scolaire' ? 'Paiement Frais' :
                           merchant.type === 'medical' ? 'Consultation' :
@@ -987,16 +1051,17 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
                           'Vente POS'
                         )) : tx.title}
                       </p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest mt-1">
                         {format(new Date(tx.date), 'dd MMMM yyyy', { locale: fr })}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`font-black text-sm ${tx.type === 'sale' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {tx.type === 'sale' ? '+' : '-'}{tx.type === 'sale' ? tx.totalAmount.toLocaleString() : tx.amount.toLocaleString()} {merchant.currency}
+                    <p className={`font-mono font-black text-base ${tx.type === 'sale' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {tx.type === 'sale' ? '+' : '-'}{tx.type === 'sale' ? tx.totalAmount.toLocaleString() : tx.amount.toLocaleString()} 
+                      <span className="text-[10px] ml-1 opacity-60">{merchant.currency}</span>
                     </p>
-                    <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">
+                    <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">
                       {tx.paymentMethod || tx.category || 'Général'}
                     </p>
                   </div>
@@ -1007,31 +1072,39 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
         </div>
 
         {/* Dynamic Alerts / Quick View */}
-        <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
+        <div className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
           {merchant.type === 'scolaire' ? (
             <>
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-gray-900">Dernières Inscriptions</h3>
-                <span className="px-3 py-1 bg-emerald-100 text-emerald-600 text-xs font-bold rounded-full">
-                  {students.length} élèves
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h3 className="text-2xl font-black text-ink">Dernières Inscriptions</h3>
+                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Suivi des effectifs scolaires</p>
+                </div>
+                <span className="px-4 py-1.5 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full border border-emerald-100 uppercase tracking-widest">
+                  {students.length.toString().padStart(3, '0')} ÉLÈVES
                 </span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {students.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">Aucun élève inscrit</p>
+                  <div className="py-16 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <GraduationCap className="w-8 h-8 text-gray-200" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium">Aucun élève inscrit</p>
+                  </div>
                 ) : (
                   students.slice(0, 5).map((student: any) => (
-                    <div key={student.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <GraduationCap className="w-6 h-6 text-primary" />
+                    <div key={student.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                          <GraduationCap className="w-7 h-7 text-primary" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-900">{student.name}</p>
-                          <p className="text-xs text-gray-500">Classe: {student.class}</p>
+                          <p className="font-black text-ink text-base leading-tight">{student.name}</p>
+                          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Classe: {student.class}</p>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-gray-400">{student.enrollmentDate}</span>
+                      <span className="text-[10px] font-mono font-black text-gray-400 uppercase">{student.enrollmentDate}</span>
                     </div>
                   ))
                 )}
@@ -1039,28 +1112,36 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
             </>
           ) : merchant.type === 'medical' ? (
             <>
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-gray-900">Prochains Rendez-vous</h3>
-                <span className="px-3 py-1 bg-blue-100 text-blue-600 text-xs font-bold rounded-full">
-                  {appointments.length} RDV
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h3 className="text-2xl font-black text-ink">Prochains Rendez-vous</h3>
+                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Planification des consultations</p>
+                </div>
+                <span className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black rounded-full border border-rose-100 uppercase tracking-widest">
+                  {appointments.length.toString().padStart(3, '0')} RDV
                 </span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {appointments.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">Aucun rendez-vous prévu</p>
+                  <div className="py-16 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <Calendar className="w-8 h-8 text-gray-200" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium">Aucun rendez-vous prévu</p>
+                  </div>
                 ) : (
                   appointments.slice(0, 5).map((apt: any) => (
-                    <div key={apt.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <Calendar className="w-6 h-6 text-rose-500" />
+                    <div key={apt.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                          <Calendar className="w-7 h-7 text-rose-500" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-900">{apt.patientName}</p>
-                          <p className="text-xs text-gray-500">{apt.time} - {apt.reason}</p>
+                          <p className="font-black text-ink text-base leading-tight">{apt.patientName}</p>
+                          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{apt.time} - {apt.reason}</p>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-gray-400">{apt.date}</span>
+                      <span className="text-[10px] font-mono font-black text-gray-400 uppercase">{apt.date}</span>
                     </div>
                   ))
                 )}
@@ -1068,29 +1149,44 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
             </>
           ) : merchant.type === 'chantier' ? (
             <>
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-gray-900">État des Projets</h3>
-                <span className="px-3 py-1 bg-amber-100 text-amber-600 text-xs font-bold rounded-full">
-                  {projects.length} projets
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h3 className="text-2xl font-black text-ink">État des Projets</h3>
+                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Suivi de l'avancement BTP</p>
+                </div>
+                <span className="px-4 py-1.5 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full border border-amber-100 uppercase tracking-widest">
+                  {projects.length.toString().padStart(2, '0')} PROJETS
                 </span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {projects.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">Aucun projet en cours</p>
+                  <div className="py-16 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <HardHat className="w-8 h-8 text-gray-200" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium">Aucun projet en cours</p>
+                  </div>
                 ) : (
                   projects.slice(0, 5).map((project: any) => (
-                    <div key={project.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <HardHat className="w-6 h-6 text-amber-600" />
+                    <div key={project.id} className="flex flex-col p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center space-x-5">
+                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5">
+                            <HardHat className="w-6 h-6 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="font-black text-ink text-base leading-tight">{project.name}</p>
+                            <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Budget: {project.budget.toLocaleString()} {merchant.currency}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-bold text-sm text-gray-900">{project.name}</p>
-                          <p className="text-xs text-gray-500">Avancement: {project.progress}%</p>
-                        </div>
+                        <span className="text-xs font-mono font-black text-amber-600">{project.progress}%</span>
                       </div>
-                      <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-amber-500" style={{ width: `${project.progress}%` }} />
+                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${project.progress}%` }}
+                          className="h-full bg-amber-500" 
+                        />
                       </div>
                     </div>
                   ))
@@ -1099,31 +1195,39 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
             </>
           ) : merchant.type === 'transport' ? (
             <>
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-gray-900">État de la Flotte</h3>
-                <span className="px-3 py-1 bg-blue-100 text-blue-600 text-xs font-bold rounded-full">
-                  {vehicles.length} véhicules
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h3 className="text-2xl font-black text-ink">État de la Flotte</h3>
+                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Disponibilité des véhicules</p>
+                </div>
+                <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 uppercase tracking-widest">
+                  {vehicles.length.toString().padStart(2, '0')} VÉHICULES
                 </span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {vehicles.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">Aucun véhicule enregistré</p>
+                  <div className="py-16 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <Car className="w-8 h-8 text-gray-200" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium">Aucun véhicule enregistré</p>
+                  </div>
                 ) : (
                   vehicles.slice(0, 5).map((vehicle: any) => (
-                    <div key={vehicle.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <Car className="w-6 h-6 text-blue-600" />
+                    <div key={vehicle.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                          <Car className="w-7 h-7 text-blue-600" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-900">{vehicle.model}</p>
-                          <p className="text-xs text-gray-500">{vehicle.plateNumber}</p>
+                          <p className="font-black text-ink text-base leading-tight">{vehicle.model}</p>
+                          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{vehicle.plateNumber}</p>
                         </div>
                       </div>
-                      <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                        vehicle.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                        vehicle.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
                       }`}>
-                        {vehicle.status}
+                        {vehicle.status === 'active' ? 'Disponible' : 'Indisponible'}
                       </span>
                     </div>
                   ))
@@ -1132,28 +1236,36 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
             </>
           ) : merchant.type === 'rh' ? (
             <>
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-gray-900">Derniers Recrutements</h3>
-                <span className="px-3 py-1 bg-indigo-100 text-indigo-600 text-xs font-bold rounded-full">
-                  {employees.length} employés
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h3 className="text-2xl font-black text-ink">Derniers Recrutements</h3>
+                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Gestion du capital humain</p>
+                </div>
+                <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full border border-indigo-100 uppercase tracking-widest">
+                  {employees.length.toString().padStart(2, '0')} EMPLOYÉS
                 </span>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {employees.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">Aucun employé enregistré</p>
+                  <div className="py-16 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                      <Users className="w-8 h-8 text-gray-200" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-medium">Aucun employé enregistré</p>
+                  </div>
                 ) : (
                   employees.slice(0, 5).map((emp: any) => (
-                    <div key={emp.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <User className="w-6 h-6 text-indigo-600" />
+                    <div key={emp.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                          <User className="w-7 h-7 text-indigo-600" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-900">{emp.name}</p>
-                          <p className="text-xs text-gray-500">{emp.position}</p>
+                          <p className="font-black text-ink text-base leading-tight">{emp.firstName} {emp.lastName}</p>
+                          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{emp.position}</p>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-gray-400">{emp.joinDate}</span>
+                      <span className="text-[10px] font-mono font-black text-gray-400 uppercase">{emp.hireDate}</span>
                     </div>
                   ))
                 )}
@@ -1162,30 +1274,38 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
           ) : merchant.type === 'entreprise' ? (
             <>
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-gray-900">Interventions Récentes</h3>
-                <span className="px-3 py-1 bg-blue-100 text-blue-600 text-xs font-bold rounded-full">
-                  {interventions.length} interventions
+                <div>
+                  <h3 className="text-xl font-black text-ink">Interventions Récentes</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Suivi des prestations de service</p>
+                </div>
+                <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 shadow-sm">
+                  {interventions.length.toString().padStart(3, '0')} ACTES
                 </span>
               </div>
               <div className="space-y-4">
                 {interventions.length === 0 ? (
-                  <p className="text-gray-400 text-center py-8">Aucune intervention enregistrée</p>
+                  <div className="py-16 flex flex-col items-center justify-center text-center bg-gray-50/30 rounded-[2rem] border border-dashed border-gray-200">
+                    <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-black/5">
+                      <Wrench className="w-10 h-10 text-gray-200" />
+                    </div>
+                    <p className="text-gray-400 text-sm font-black uppercase tracking-widest">Aucune intervention</p>
+                  </div>
                 ) : (
                   interventions.slice(0, 5).map((inter: any) => (
-                    <div key={inter.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <Wrench className="w-6 h-6 text-blue-600" />
+                    <div key={inter.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-black/5 hover:shadow-xl transition-all group relative overflow-hidden">
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100 group-hover:scale-110 transition-transform">
+                          <Wrench className="w-7 h-7 text-blue-600" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-900">{inter.customerName}</p>
-                          <p className="text-xs text-gray-500">{inter.serviceType}</p>
+                          <p className="font-black text-base text-ink leading-tight">{inter.customerName}</p>
+                          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-0.5">{inter.serviceType}</p>
                         </div>
                       </div>
-                      <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                        inter.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                        inter.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                       }`}>
-                        {inter.status}
+                        {inter.status === 'completed' ? 'TERMINÉ' : 'EN COURS'}
                       </span>
                     </div>
                   ))
@@ -1195,39 +1315,48 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
           ) : (
             <>
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-bold text-gray-900">Alertes Stock</h3>
-                <span className="px-3 py-1 bg-amber-100 text-amber-600 text-xs font-bold rounded-full">
-                  {stats.lowStockCount} alertes
+                <div>
+                  <h3 className="text-xl font-black text-ink">Alertes Stock</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Niveaux critiques détectés</p>
+                </div>
+                <span className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black rounded-full border border-rose-100 shadow-sm">
+                  {stats.lowStockCount.toString().padStart(2, '0')} ALERTES
                 </span>
               </div>
               <div className="space-y-4">
                 {products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-4">
-                      <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  <div className="flex flex-col items-center justify-center py-16 text-center bg-emerald-50/30 rounded-[2rem] border border-dashed border-emerald-200">
+                    <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100">
+                      <CheckCircle className="w-10 h-10 text-emerald-500" />
                     </div>
-                    <p className="text-emerald-600 font-bold">Tout est en stock !</p>
-                    <p className="text-sm text-gray-400 mt-1">Vos niveaux de stock sont optimaux.</p>
+                    <p className="text-emerald-600 font-black uppercase tracking-widest">Tout est en stock !</p>
+                    <p className="text-xs text-emerald-500/60 mt-2 font-mono font-bold">Niveaux optimaux</p>
                   </div>
                 ) : (
                   products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).map((product) => (
-                    <div key={product.id} className="flex items-center justify-between p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <Package className="w-6 h-6 text-amber-600" />
+                    <div key={product.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-rose-100 hover:shadow-xl transition-all group relative overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 w-1 bg-rose-500"></div>
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100 group-hover:scale-110 transition-transform">
+                          <Package className="w-7 h-7 text-rose-500" />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-900">{product.name}</p>
-                          <p className="text-xs text-amber-600 font-bold">
-                            Stock actuel: {product.stockQuantity} (Min: {product.minStockLevel || 5})
-                          </p>
+                          <p className="font-black text-base text-ink leading-tight">{product.name}</p>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className="text-[10px] font-mono text-rose-600 font-black uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded-md">
+                              STOCK: {product.stockQuantity}
+                            </span>
+                            <span className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
+                              MIN: {product.minStockLevel || 5}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-black text-amber-600 bg-white px-3 py-1 rounded-full border border-amber-200 shadow-sm mb-2">
+                        <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 shadow-sm mb-3 uppercase tracking-[0.2em]">
                           CRITIQUE
                         </span>
-                        <button className="text-xs font-bold text-primary hover:underline">Réapprovisionner</button>
+                        <button className="text-[10px] font-black text-primary hover:text-primary-hover uppercase tracking-[0.2em] transition-colors">Réapprovisionner</button>
                       </div>
                     </div>
                   ))
@@ -1256,18 +1385,19 @@ const AccountingRow = ({ label, value, currency, icon: Icon, color }: any) => (
 );
 
 const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, description }: any) => (
-  <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group">
-    <div className={`w-14 h-14 ${bgColor} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-      <Icon className={`w-7 h-7 ${color}`} />
+  <div className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+    <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform"></div>
+    <div className={`w-16 h-16 ${bgColor} rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform relative z-10 border border-black/5`}>
+      <Icon className={`w-8 h-8 ${color}`} />
     </div>
-    <p className="text-sm font-bold text-gray-400 mb-1 uppercase tracking-widest">{title}</p>
-    <div className="flex items-baseline space-x-1">
-      <p className="text-3xl font-black text-gray-900">
+    <p className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-[0.2em] relative z-10">{title}</p>
+    <div className="flex items-baseline space-x-2 relative z-10">
+      <p className="text-4xl font-black text-ink tracking-tighter">
         {typeof value === 'number' ? value.toLocaleString() : value}
       </p>
-      {currency && <span className="text-sm font-bold text-gray-400">{currency}</span>}
+      {currency && <span className="text-sm font-black text-gray-400 uppercase tracking-widest">{currency}</span>}
     </div>
-    {description && <p className="text-xs text-gray-400 mt-2 font-medium">{description}</p>}
+    {description && <p className="text-[10px] text-gray-400 mt-4 font-mono font-bold uppercase tracking-widest relative z-10">{description}</p>}
   </div>
 );
 
@@ -1283,7 +1413,16 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
 
   const productOptions = useMemo(() => ({
     tableName: 'merchant_products' as TableName,
-    where: [['merchantId', '==', merchant.id]]
+    where: [['merchantId', '==', merchant.id]],
+    mapper: (data: any) => ({
+      ...data,
+      merchantId: data.merchant_id,
+      costPrice: data.cost_price,
+      stockQuantity: data.stock_quantity,
+      minStockLevel: data.min_stock_level,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    })
   }), [merchant.id]);
 
   const { data: products, loading } = useSupabaseData<MerchantProduct>(productOptions);
@@ -1292,7 +1431,17 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
     tableName: 'stock_movements' as TableName,
     where: [['merchantId', '==', merchant.id]],
     order: { column: 'createdAt' as const, direction: 'desc' as const },
-    limit: 20
+    limit: 20,
+    mapper: (data: any) => ({
+      ...data,
+      merchantId: data.merchant_id,
+      productId: data.product_id,
+      previousQuantity: data.previous_quantity,
+      newQuantity: data.new_quantity,
+      referenceId: data.reference_id,
+      performedBy: data.performed_by,
+      createdAt: data.created_at
+    })
   }), [merchant.id]);
 
   const { data: movements } = useSupabaseData<any>(movementOptions);
@@ -1375,68 +1524,95 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
             className="w-full pl-10 pr-4 py-3 bg-white border border-black/5 rounded-2xl text-sm focus:ring-2 focus:ring-primary/20 shadow-sm"
           />
         </div>
-        <button
-          onClick={() => {
-            setCurrentProduct({ name: '', price: 0, stockQuantity: 0, category: 'Général', minStockLevel: 5 });
-            setIsEditing(true);
-          }}
-          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nouveau produit</span>
-        </button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="hidden md:flex items-center px-4 py-2 bg-white border border-black/5 rounded-xl shadow-sm">
+            <div className="flex flex-col">
+              <span className="text-[8px] font-mono text-gray-400 uppercase tracking-widest">Total Valeur</span>
+              <span className="text-xs font-mono font-bold text-ink">
+                {products.reduce((acc, p) => acc + (p.price * p.stockQuantity), 0).toLocaleString()} {merchant.currency}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setCurrentProduct({ name: '', price: 0, stockQuantity: 0, category: 'Général', minStockLevel: 5 });
+              setIsEditing(true);
+            }}
+            className="flex-1 sm:flex-none flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nouveau produit</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-4">Produit</th>
-                  <th className="px-6 py-4">SKU</th>
-                  <th className="px-6 py-4">Prix</th>
-                  <th className="px-6 py-4">Stock</th>
-                  <th className="px-6 py-4">Catégorie</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Produit / SKU</th>
+                  <th className="px-8 py-5">Prix Unitaire</th>
+                  <th className="px-8 py-5">Niveau Stock</th>
+                  <th className="px-8 py-5">Catégorie</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center overflow-hidden">
-                          {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-gray-300" />}
+                  <tr key={product.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-110 transition-transform shadow-inner">
+                          {product.image ? (
+                            <img src={product.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Package className="w-7 h-7 text-gray-200" />
+                          )}
                         </div>
-                        <span className="font-bold text-gray-900">{product.name}</span>
+                        <div className="flex flex-col">
+                          <span className="font-black text-ink text-sm leading-tight tracking-tight">{product.name}</span>
+                          <span className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">
+                            {product.sku || 'SANS SKU'} • ID: {product.id?.substring(0, 8)}
+                          </span>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 font-mono">{product.sku || '-'}</td>
-                    <td className="px-6 py-4 font-bold text-gray-900">{product.price.toLocaleString()} {merchant.currency}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
-                          product.stockQuantity <= (product.minStockLevel || 5) ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                    <td className="px-8 py-5">
+                      <p className="font-mono font-black text-ink text-sm">
+                        {product.price.toLocaleString()} <span className="text-[10px] opacity-60">{merchant.currency}</span>
+                      </p>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-4">
+                        <div className={`px-4 py-1.5 rounded-full text-[10px] font-mono font-black border tracking-widest ${
+                          product.stockQuantity <= (product.minStockLevel || 5) 
+                            ? 'bg-rose-50 text-rose-600 border-rose-100' 
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-100'
                         }`}>
-                          {product.stockQuantity}
-                        </span>
+                          {product.stockQuantity.toString().padStart(2, '0')} UNITÉS
+                        </div>
                         <button 
                           onClick={() => { setCurrentProduct(product); setIsRestocking(true); }}
-                          className="p-1 hover:bg-primary/10 text-primary rounded-md"
+                          className="p-2.5 hover:bg-primary/10 text-primary rounded-xl transition-all shadow-sm border border-transparent hover:border-primary/20"
                           title="Réapprovisionner"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">{product.category}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => { setCurrentProduct(product); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => setDeleteConfirm(product.id)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                    <td className="px-8 py-5">
+                      <span className="px-3 py-1 bg-gray-50 text-gray-400 text-[9px] font-black rounded-full uppercase tracking-widest border border-gray-100">
+                        {product.category}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={() => { setCurrentProduct(product); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => setDeleteConfirm(product.id)} className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-200"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -1449,48 +1625,61 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
 
       {/* Stock Movements History */}
       {!loading && movements.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-gray-900 flex items-center">
-            <Clock className="w-5 h-5 mr-2 text-primary" />
-            Mouvements de stock récents
-          </h3>
-          <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3">Produit</th>
-                  <th className="px-6 py-3">Type</th>
-                  <th className="px-6 py-3">Quantité</th>
-                  <th className="px-6 py-3">Raison</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {movements.map((m: any) => {
-                  const product = products.find(p => p.id === m.productId);
-                  return (
-                    <tr key={m.id} className="text-xs">
-                      <td className="px-6 py-3 text-gray-500">
-                        {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd/MM HH:mm') : '-'}
-                      </td>
-                      <td className="px-6 py-3 font-bold text-gray-900">{product?.name || 'Produit supprimé'}</td>
-                      <td className="px-6 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          m.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 
-                          m.type === 'sale' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-600'
-                        }`}>
-                          {m.type === 'in' ? 'Entrée' : m.type === 'sale' ? 'Vente' : m.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 font-bold">
-                        {m.type === 'in' ? '+' : '-'}{m.quantity}
-                      </td>
-                      <td className="px-6 py-3 text-gray-500">{m.reason}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black text-ink flex items-center">
+              <Clock className="w-6 h-6 mr-3 text-primary" />
+              Historique des flux
+            </h3>
+            <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">Derniers 20 mouvements</span>
+          </div>
+          <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                    <th className="px-8 py-5">Date & Heure</th>
+                    <th className="px-8 py-5">Produit</th>
+                    <th className="px-8 py-5">Type de flux</th>
+                    <th className="px-8 py-5 text-right">Quantité</th>
+                    <th className="px-8 py-5">Raison / Note</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {movements.map((m: any) => {
+                    const product = products.find(p => p.id === m.productId);
+                    return (
+                      <tr key={m.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-8 py-5">
+                          <span className="text-[11px] font-mono font-black text-ink uppercase">
+                            {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd/MM HH:mm') : '-'}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className="text-sm font-black text-ink">{product?.name || 'Produit supprimé'}</span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                            m.type === 'in' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                            m.type === 'sale' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-500 border-gray-200'
+                          }`}>
+                            {m.type === 'in' ? 'ENTRÉE' : m.type === 'sale' ? 'VENTE' : m.type.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <span className={`font-mono font-black text-sm ${m.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {m.type === 'in' ? '+' : '-'}{m.quantity}
+                          </span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className="text-[11px] font-medium text-gray-500">{m.reason}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -1500,34 +1689,56 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
         {isRestocking && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">Réapprovisionner</h3>
-                <button onClick={() => setIsRestocking(false)} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5" /></button>
-              </div>
-              <p className="text-sm text-gray-500 mb-6">Produit: <span className="font-bold text-gray-900">{currentProduct?.name}</span></p>
-              <form onSubmit={handleRestock} className="space-y-4">
+              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Quantité à ajouter</label>
-                  <input type="number" required min="1" value={restockData.quantity || ''} onChange={e => setRestockData({...restockData, quantity: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <h3 className="text-xl font-bold text-ink">Réapprovisionner</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Mise à jour des stocks</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Coût total d'achat (Optionnel)</label>
-                  <p className="text-[10px] text-gray-400 mb-1">Si renseigné, une dépense sera créée automatiquement.</p>
-                  <input type="number" min="0" value={restockData.cost || ''} onChange={e => setRestockData({...restockData, cost: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Raison / Note</label>
-                  <input type="text" value={restockData.reason} onChange={e => setRestockData({...restockData, reason: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                </div>
-                <button type="submit" disabled={saving} className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all disabled:opacity-50">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Confirmer l\'ajout'}
+                <button onClick={() => setIsRestocking(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                  <X className="w-5 h-5 text-gray-400" />
                 </button>
-              </form>
+              </div>
+
+              <div className="p-8 space-y-6">
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/5">
+                    <Package className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Produit sélectionné</p>
+                    <p className="font-bold text-ink">{currentProduct?.name}</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleRestock} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Quantité à ajouter</label>
+                      <input type="number" required min="1" value={restockData.quantity || ''} onChange={e => setRestockData({...restockData, quantity: Number(e.target.value)})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Coût d'achat ({merchant.currency})</label>
+                      <input type="number" min="0" value={restockData.cost || ''} onChange={e => setRestockData({...restockData, cost: Number(e.target.value)})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Motif / Note</label>
+                    <input type="text" value={restockData.reason} onChange={e => setRestockData({...restockData, reason: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-medium" placeholder="ex: Arrivage fournisseur..." />
+                  </div>
+                  
+                  <div className="flex space-x-3 pt-4">
+                    <button type="button" onClick={() => setIsRestocking(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
+                    <button type="submit" disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20">
+                      {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Confirmer l\'ajout'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </motion.div>
           </div>
         )}
@@ -1538,46 +1749,124 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
         {isEditing && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 className="text-xl font-bold">{currentProduct?.id ? 'Modifier le produit' : 'Nouveau produit'}</h3>
-                <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5" /></button>
+              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h3 className="text-xl font-bold text-ink">Détails du Produit</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Configuration technique de l'article</p>
+                </div>
+                <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
               </div>
-              <form onSubmit={handleSave} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Nom du produit</label>
-                    <input type="text" required value={currentProduct?.name || ''} onChange={e => setCurrentProduct({...currentProduct, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+
+              <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom du produit</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={currentProduct?.name || ''} 
+                        onChange={e => setCurrentProduct({...currentProduct!, name: e.target.value})} 
+                        className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" 
+                        placeholder="ex: Laptop Pro 15"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">SKU / Code interne</label>
+                      <input 
+                        type="text" 
+                        value={currentProduct?.sku || ''} 
+                        onChange={e => setCurrentProduct({...currentProduct!, sku: e.target.value})} 
+                        className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono text-sm" 
+                        placeholder="ex: LP-15-2024"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Prix de vente</label>
-                    <input type="number" required value={currentProduct?.price || ''} onChange={e => setCurrentProduct({...currentProduct, price: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Prix d'achat (Optionnel)</label>
-                    <input type="number" value={currentProduct?.costPrice || ''} onChange={e => setCurrentProduct({...currentProduct, costPrice: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Stock actuel</label>
-                    <input type="number" required value={currentProduct?.stockQuantity || ''} onChange={e => setCurrentProduct({...currentProduct, stockQuantity: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Alerte stock bas</label>
-                    <input type="number" value={currentProduct?.minStockLevel || ''} onChange={e => setCurrentProduct({...currentProduct, minStockLevel: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-1">Catégorie</label>
-                    <input type="text" value={currentProduct?.category || ''} onChange={e => setCurrentProduct({...currentProduct, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">URL de l'image</label>
+                      <div className="flex gap-3">
+                        <input 
+                          type="text" 
+                          value={currentProduct?.image || ''} 
+                          onChange={e => setCurrentProduct({...currentProduct!, image: e.target.value})} 
+                          className="flex-1 px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-xs" 
+                          placeholder="https://..."
+                        />
+                        {currentProduct?.image && (
+                          <div className="w-12 h-12 rounded-xl border border-black/5 overflow-hidden bg-gray-100 flex-shrink-0">
+                            <img src={currentProduct.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
+                      <select 
+                        value={currentProduct?.category || 'Général'} 
+                        onChange={e => setCurrentProduct({...currentProduct!, category: e.target.value})} 
+                        className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
+                      >
+                        <option value="Général">Général</option>
+                        <option value="Électronique">Électronique</option>
+                        <option value="Mobilier">Mobilier</option>
+                        <option value="Fournitures">Fournitures</option>
+                        <option value="Services">Services</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all disabled:opacity-50">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed border-gray-100">
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix de vente</label>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        required 
+                        value={currentProduct?.price || ''} 
+                        onChange={e => setCurrentProduct({...currentProduct!, price: Number(e.target.value)})} 
+                        className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Stock actuel</label>
+                    <input 
+                      type="number" 
+                      required 
+                      value={currentProduct?.stockQuantity || ''} 
+                      onChange={e => setCurrentProduct({...currentProduct!, stockQuantity: Number(e.target.value)})} 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Seuil d'alerte</label>
+                    <input 
+                      type="number" 
+                      required 
+                      value={currentProduct?.minStockLevel || ''} 
+                      onChange={e => setCurrentProduct({...currentProduct!, minStockLevel: Number(e.target.value)})} 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                    />
+                  </div>
+                </div>
               </form>
+
+              <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+                <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le produit'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -1701,14 +1990,14 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
       className="flex flex-col lg:flex-row gap-8"
     >
       <div className="flex-1 space-y-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="relative group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
-            placeholder="Rechercher un produit..."
+            placeholder="Rechercher un produit par nom ou SKU..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white border border-black/5 rounded-2xl text-sm focus:ring-2 focus:ring-primary/20 shadow-sm"
+            className="w-full pl-12 pr-4 py-4 bg-white border border-black/5 rounded-[1.5rem] text-sm focus:ring-4 focus:ring-primary/10 shadow-sm outline-none transition-all"
           />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1716,54 +2005,107 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
             <button
               key={product.id}
               onClick={() => addToCart(product)}
-              className="bg-white p-4 rounded-2xl border border-black/5 shadow-sm hover:shadow-md hover:border-primary/20 transition-all text-left group"
+              className="bg-white p-4 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all text-left group relative overflow-hidden"
             >
-              <div className="w-full aspect-square bg-gray-50 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
-                {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-gray-300" />}
+              <div className="w-full aspect-square bg-gray-50 rounded-2xl mb-3 flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-105 transition-transform">
+                {product.image ? (
+                  <img src={product.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <Package className="w-8 h-8 text-gray-200" />
+                )}
               </div>
-              <h4 className="font-bold text-sm text-gray-900 truncate">{product.name}</h4>
-              <p className="text-xs text-primary font-bold">{product.price.toLocaleString()} {merchant.currency}</p>
-              <p className="text-[10px] text-gray-400 mt-1">Stock: {product.stockQuantity}</p>
+              <h4 className="font-bold text-sm text-gray-900 truncate leading-tight">{product.name}</h4>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-sm text-primary font-black">{product.price.toLocaleString()} <span className="text-[10px] opacity-60 font-mono">{merchant.currency}</span></p>
+                <div className="px-2 py-0.5 bg-gray-50 rounded-lg border border-gray-100">
+                  <p className="text-[9px] font-mono font-bold text-gray-400">STOCK: {product.stockQuantity}</p>
+                </div>
+              </div>
+              
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg">
+                  <Plus className="w-4 h-4" />
+                </div>
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="w-full lg:w-96">
-        <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-lg sticky top-32">
-          <h3 className="text-lg font-bold mb-6 flex items-center"><ShoppingCart className="w-5 h-5 mr-2 text-primary" /> Panier</h3>
-          <div className="space-y-4 mb-8 max-h-[300px] overflow-y-auto pr-2">
+      <div className="w-full lg:w-[400px]">
+        <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-xl sticky top-32">
+          <div className="flex items-center justify-between mb-8">
+            <h3 className="text-xl font-bold text-ink flex items-center">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mr-3">
+                <ShoppingCart className="w-5 h-5 text-primary" />
+              </div>
+              Panier
+            </h3>
+            <span className="px-3 py-1 bg-gray-50 text-gray-400 text-[10px] font-black rounded-full border border-gray-100">
+              {cart.length.toString().padStart(2, '0')} ARTICLES
+            </span>
+          </div>
+
+          <div className="space-y-4 mb-8 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
             {cart.length === 0 ? (
-              <p className="text-gray-400 text-center py-8 text-sm">Panier vide</p>
+              <div className="flex flex-col items-center justify-center py-16 text-center opacity-40">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                  <ShoppingCart className="w-8 h-8" />
+                </div>
+                <p className="text-sm font-bold uppercase tracking-widest">Panier vide</p>
+              </div>
             ) : (
               cart.map((item) => (
-                <div key={item.productId} className="flex items-center justify-between group">
+                <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl border border-gray-100 group">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
-                    <p className="text-xs text-gray-400">{item.quantity} x {item.price.toLocaleString()}</p>
+                    <p className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
+                      {item.quantity} x {item.price.toLocaleString()} {merchant.currency}
+                    </p>
                   </div>
-                  <button onClick={() => removeFromCart(item.productId)} className="p-1.5 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-black text-ink">{(item.price * item.quantity).toLocaleString()}</p>
+                    <button onClick={() => removeFromCart(item.productId)} className="p-2 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="space-y-4 border-t border-gray-100 pt-6">
-            <div className="space-y-2">
-              <input type="text" placeholder="Nom client" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm" />
-              <input type="tel" placeholder="Téléphone client" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm" />
+          <div className="space-y-6 border-t border-gray-100 pt-8">
+            <div className="space-y-3">
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                <input type="text" placeholder="Nom du client (optionnel)" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
+              </div>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                <input type="tel" placeholder="Téléphone client" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
+              </div>
             </div>
+
             <div className="grid grid-cols-3 gap-2">
-              <PaymentMethodBtn active={paymentMethod === 'cash'} onClick={() => setPaymentMethod('cash')} label="Espèces" />
-              <PaymentMethodBtn active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} label="Carte" />
-              <PaymentMethodBtn active={paymentMethod === 'mobile_money'} onClick={() => setPaymentMethod('mobile_money')} label="Mobile" />
+              <PaymentMethodBtn active={paymentMethod === 'cash'} onClick={() => setPaymentMethod('cash')} label="ESPÈCES" />
+              <PaymentMethodBtn active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} label="CARTE" />
+              <PaymentMethodBtn active={paymentMethod === 'mobile_money'} onClick={() => setPaymentMethod('mobile_money')} label="MOBILE" />
             </div>
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-gray-500 font-medium">Total</span>
-              <span className="text-2xl font-bold text-gray-900">{total.toLocaleString()} {merchant.currency}</span>
+
+            <div className="flex items-center justify-between pt-4 border-t border-dashed border-gray-100">
+              <span className="text-gray-400 text-[10px] font-mono font-black uppercase tracking-widest">Total à payer</span>
+              <div className="text-right">
+                <span className="text-3xl font-black text-ink">{total.toLocaleString()}</span>
+                <span className="text-xs font-mono font-bold text-gray-400 ml-1 uppercase">{merchant.currency}</span>
+              </div>
             </div>
-            <button onClick={handleCheckout} disabled={cart.length === 0 || isSubmitting} className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all disabled:opacity-50">
-              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Valider la vente'}
+
+            <button 
+              onClick={handleCheckout} 
+              disabled={cart.length === 0 || isSubmitting} 
+              className="w-full py-5 bg-primary text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] hover:bg-primary-hover transition-all disabled:opacity-50 shadow-xl shadow-primary/20 active:scale-[0.98]"
+            >
+              {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Valider la vente'}
             </button>
           </div>
         </div>
@@ -1812,7 +2154,16 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
 };
 
 const PaymentMethodBtn = ({ active, onClick, label }: any) => (
-  <button onClick={onClick} className={`py-2 rounded-xl text-[10px] font-bold border transition-all ${active ? 'bg-primary border-primary text-white' : 'bg-white border-gray-100 text-gray-500'}`}>{label}</button>
+  <button 
+    onClick={onClick} 
+    className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+      active 
+        ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20 scale-105' 
+        : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
+    }`}
+  >
+    {label}
+  </button>
 );
 
 // --- Merchant Audit Log ---
@@ -1839,52 +2190,74 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
       exit={{ opacity: 0, x: -20 }}
       className="space-y-6"
     >
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Journal d'Audit des Stocks</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Journal d'Audit</h2>
+          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Traçabilité complète des flux de stock</p>
+        </div>
+        <div className="flex items-center space-x-2 px-4 py-2 bg-white border border-black/5 rounded-xl shadow-sm">
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+          <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">Temps Réel</span>
+        </div>
       </div>
 
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Produit</th>
-                  <th className="px-6 py-4">Type</th>
-                  <th className="px-6 py-4">Quantité</th>
-                  <th className="px-6 py-4">Stock Précédent</th>
-                  <th className="px-6 py-4">Nouveau Stock</th>
-                  <th className="px-6 py-4">Raison</th>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Horodatage</th>
+                  <th className="px-8 py-5">Produit</th>
+                  <th className="px-8 py-5">Type de Flux</th>
+                  <th className="px-8 py-5">Quantité</th>
+                  <th className="px-8 py-5">Delta Stock</th>
+                  <th className="px-8 py-5">Motif / Raison</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {movements.map((m: any) => {
                   const product = products.find(p => p.id === m.productId);
                   return (
-                    <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd/MM/yyyy HH:mm') : '-'}
+                    <tr key={m.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="px-8 py-5">
+                        <p className="text-[11px] font-mono font-bold text-gray-400">
+                          {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd.MM.yyyy') : '--'}
+                        </p>
+                        <p className="text-[10px] font-mono text-gray-300">
+                          {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'HH:mm:ss') : '--'}
+                        </p>
                       </td>
-                      <td className="px-6 py-4 font-bold text-gray-900 text-sm">
-                        {product?.name || 'Produit supprimé'}
+                      <td className="px-8 py-5">
+                        <p className="font-bold text-gray-900 text-sm leading-tight">{product?.name || 'Produit supprimé'}</p>
+                        <p className="text-[10px] font-mono text-gray-400 uppercase tracking-tighter mt-0.5">ID: {m.productId.slice(0, 8)}</p>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                          m.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 
-                          m.type === 'sale' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-600'
+                      <td className="px-8 py-5">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                          m.type === 'in' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                          m.type === 'sale' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-600 border-gray-100'
                         }`}>
-                          {m.type === 'in' ? 'Réapprovisionnement' : m.type === 'sale' ? 'Vente' : m.type}
+                          {m.type === 'in' ? 'ENTRÉE' : m.type === 'sale' ? 'VENTE' : m.type}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-bold text-sm">
-                        {m.type === 'in' ? '+' : '-'}{m.quantity}
+                      <td className="px-8 py-5">
+                        <div className={`flex items-center font-mono font-black text-sm ${m.type === 'in' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {m.type === 'in' ? <Plus className="w-3 h-3 mr-1" /> : <Minus className="w-3 h-3 mr-1" />}
+                          {m.quantity}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{m.previousQuantity}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900">{m.newQuantity}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{m.reason}</td>
+                      <td className="px-8 py-5">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[11px] font-mono text-gray-400">{m.previousQuantity}</span>
+                          <ArrowRight className="w-3 h-3 text-gray-300" />
+                          <span className="text-[11px] font-mono font-black text-ink">{m.newQuantity}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <p className="text-xs text-gray-500 italic leading-relaxed max-w-xs">{m.reason || 'Aucune raison spécifiée'}</p>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1938,64 +2311,117 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
       exit={{ opacity: 0, x: -20 }}
       className="space-y-6"
     >
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl font-bold">Comptabilité & Dépenses</h3>
-        <button onClick={() => setIsAddingExpense(true)} className="flex items-center space-x-2 px-6 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Comptabilité</h2>
+          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des flux financiers & dépenses</p>
+        </div>
+        <button 
+          onClick={() => setIsAddingExpense(true)} 
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 hover:scale-105"
+        >
           <Plus className="w-4 h-4" />
           <span>Nouvelle dépense</span>
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-              <th className="px-6 py-4">Titre</th>
-              <th className="px-6 py-4">Catégorie</th>
-              <th className="px-6 py-4">Date</th>
-              <th className="px-6 py-4 text-right">Montant</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {expenses.map((expense) => (
-              <tr key={expense.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 font-bold text-gray-900">{expense.title}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{expense.category}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{new Date(expense.createdAt?.seconds * 1000).toLocaleDateString()}</td>
-                <td className="px-6 py-4 text-right font-bold text-red-600">-{expense.amount.toLocaleString()} {merchant.currency}</td>
+      <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                <th className="px-8 py-5">Désignation</th>
+                <th className="px-8 py-5">Catégorie</th>
+                <th className="px-8 py-5">Date d'émission</th>
+                <th className="px-8 py-5 text-right">Montant</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {expenses.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-8 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                        <Receipt className="w-6 h-6 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-medium">Aucune dépense enregistrée</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                expenses.map((expense) => (
+                  <tr key={expense.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <p className="font-black text-ink text-sm leading-tight">{expense.title}</p>
+                      <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">REF: {expense.id.slice(0, 8)}</p>
+                    </td>
+                    <td className="px-8 py-5">
+                      <span className="px-3 py-1 bg-gray-100 rounded-full text-[9px] font-black uppercase tracking-widest text-gray-500 border border-gray-200">
+                        {expense.category}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5">
+                      <p className="text-[11px] font-mono font-black text-ink uppercase">
+                        {expense.createdAt?.seconds ? format(new Date(expense.createdAt.seconds * 1000), 'dd/MM/yyyy') : '-'}
+                      </p>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <p className="text-sm font-black text-rose-600 font-mono">
+                        -{expense.amount.toLocaleString()} <span className="text-[10px] opacity-60">{merchant.currency}</span>
+                      </p>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {isAddingExpense && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Nouvelle dépense</h3>
-            <form onSubmit={handleSaveExpense} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Titre</label>
-                <input type="text" required value={newExpense.title} onChange={e => setNewExpense({...newExpense, title: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Montant</label>
-                <input type="number" required value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Catégorie</label>
-                <input type="text" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsAddingExpense(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
+      <AnimatePresence>
+        {isAddingExpense && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h3 className="text-xl font-bold text-ink">Nouvelle dépense</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Enregistrement comptable</p>
+                </div>
+                <button onClick={() => setIsAddingExpense(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                  <X className="w-5 h-5 text-gray-400" />
                 </button>
               </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
+
+              <form onSubmit={handleSaveExpense} className="p-8 space-y-6">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Désignation / Titre</label>
+                  <input type="text" required value={newExpense.title} onChange={e => setNewExpense({...newExpense, title: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-bold" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Montant ({merchant.currency})</label>
+                    <input type="number" required value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-mono font-bold" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
+                    <input type="text" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-bold" />
+                  </div>
+                </div>
+                <div className="flex space-x-3 pt-4">
+                  <button type="button" onClick={() => setIsAddingExpense(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
+                  <button type="submit" disabled={saving} className="flex-[2] py-4 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">
+                    {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer la dépense'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -2017,65 +2443,90 @@ const MerchantSalesHistory = ({ merchant }: { merchant: Merchant }) => {
       exit={{ opacity: 0, x: -20 }}
       className="space-y-6"
     >
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Historique des Ventes</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Historique des Ventes</h2>
+          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Registre complet des transactions POS</p>
+        </div>
+        <div className="flex items-center space-x-2 px-4 py-2 bg-white border border-black/5 rounded-xl shadow-sm">
+          <Receipt className="w-4 h-4 text-primary" />
+          <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">{sales.length.toString().padStart(3, '0')} Ventes</span>
+        </div>
       </div>
 
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Client</th>
-                  <th className="px-6 py-4">Articles</th>
-                  <th className="px-6 py-4">Paiement</th>
-                  <th className="px-6 py-4 text-right">Total</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Date & Heure</th>
+                  <th className="px-8 py-5">Client / Contact</th>
+                  <th className="px-8 py-5">Détail Articles</th>
+                  <th className="px-8 py-5">Mode Paiement</th>
+                  <th className="px-8 py-5 text-right">Total TTC</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {sales.map((sale) => (
-                  <tr key={sale.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {sale.createdAt?.seconds ? format(new Date(sale.createdAt.seconds * 1000), 'dd/MM/yyyy HH:mm') : '-'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-gray-900 text-sm">{sale.customerName || 'Client POS'}</p>
-                      {sale.customerPhone && <p className="text-xs text-gray-400">{sale.customerPhone}</p>}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      <div className="flex flex-wrap gap-1">
-                        {sale.items.map((item, idx) => (
-                          <span key={idx} className="px-2 py-0.5 bg-gray-50 rounded text-[10px] text-gray-600">
-                            {item.quantity}x {item.name}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase text-gray-500">
-                        {sale.paymentMethod === 'cash' ? 'Espèces' : 
-                         sale.paymentMethod === 'card' ? 'Carte' : 'Mobile'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right font-bold text-gray-900">
-                      {sale.totalAmount.toLocaleString()} {merchant.currency}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => generateReceiptPDF(merchant, sale)}
-                        className="p-2 hover:bg-primary/10 text-primary rounded-lg transition-colors"
-                        title="Réimprimer la facture"
-                      >
-                        <Receipt className="w-4 h-4" />
-                      </button>
-                    </td>
+                {sales.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-8 py-12 text-center text-gray-400 italic text-sm">Aucune vente enregistrée</td>
                   </tr>
-                ))}
+                ) : (
+                  sales.map((sale) => (
+                    <tr key={sale.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="px-8 py-5">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-mono font-black text-ink uppercase">
+                            {sale.createdAt?.seconds ? format(new Date(sale.createdAt.seconds * 1000), 'dd/MM/yyyy') : '-'}
+                          </span>
+                          <span className="text-[10px] font-mono font-black text-gray-400 uppercase mt-1">
+                            {sale.createdAt?.seconds ? format(new Date(sale.createdAt.seconds * 1000), 'HH:mm') : '-'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <p className="font-black text-ink text-sm leading-tight">{sale.customerName || 'Client de passage'}</p>
+                        <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">ID: {sale.id.slice(0, 8)}</p>
+                      </td>
+                      <td className="px-8 py-5">
+                        <div className="flex flex-wrap gap-1.5">
+                          {sale.items.map((item, idx) => (
+                            <span key={idx} className="px-2 py-0.5 bg-gray-50 rounded-lg text-[9px] font-bold text-gray-500 border border-gray-100">
+                              {item.quantity}x {item.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                          sale.paymentMethod === 'cash' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                          sale.paymentMethod === 'card' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                        }`}>
+                          {sale.paymentMethod === 'cash' ? 'ESPÈCES' : 
+                           sale.paymentMethod === 'card' ? 'CARTE' : 'MOBILE'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                        <p className="text-sm font-black text-ink">
+                          {sale.totalAmount.toLocaleString()} <span className="text-[10px] opacity-60 font-mono">{merchant.currency}</span>
+                        </p>
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                        <button 
+                          onClick={() => generateReceiptPDF(merchant, sale)}
+                          className="p-3 hover:bg-primary/10 text-primary rounded-xl transition-all shadow-sm hover:shadow-md border border-transparent hover:border-primary/20"
+                          title="Réimprimer la facture"
+                        >
+                          <Receipt className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -2093,7 +2544,14 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
 
   const supplierOptions = useMemo(() => ({
     tableName: 'merchant_suppliers' as TableName,
-    where: [['merchantId', '==', merchant.id]]
+    where: [['merchantId', '==', merchant.id]],
+    mapper: (data: any) => ({
+      ...data,
+      merchantId: data.merchant_id,
+      contactName: data.contact_name,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    })
   }), [merchant.id]);
 
   const { data: suppliers, loading } = useSupabaseData<MerchantSupplier>(supplierOptions);
@@ -2134,16 +2592,19 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
       exit={{ opacity: 0, x: -20 }}
       className="space-y-6"
     >
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Fournisseurs</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-ink tracking-tight">Partenaires Logistiques</h2>
+          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Fournisseurs actifs: {suppliers.length.toString().padStart(2, '0')}</p>
+        </div>
         <button
           onClick={() => {
             setCurrentSupplier({ name: '', contactName: '', email: '', phone: '', category: 'Général' });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-3 px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-primary-hover transition-all shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-5 h-5" />
           <span>Nouveau fournisseur</span>
         </button>
       </div>
@@ -2153,30 +2614,38 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {suppliers.map((supplier) => (
-            <div key={supplier.id} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                  <Truck className="w-6 h-6 text-primary" />
+            <div key={supplier.id} className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+              <div className="flex justify-between items-start mb-6">
+                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 group-hover:scale-110 transition-transform">
+                  <Truck className="w-7 h-7 text-primary" />
                 </div>
-                <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => { setCurrentSupplier(supplier); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg"><Edit2 className="w-4 h-4" /></button>
-                  <button onClick={() => handleDelete(supplier.id)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-all">
+                  <button onClick={() => { setCurrentSupplier(supplier); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl border border-transparent hover:border-primary/20 transition-all shadow-sm"><Edit2 className="w-4 h-4" /></button>
+                  <button onClick={() => handleDelete(supplier.id)} className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl border border-transparent hover:border-rose-200 transition-all shadow-sm"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{supplier.name}</h3>
-              <p className="text-sm text-gray-500 mb-4">{supplier.category}</p>
-              <div className="space-y-2">
-                <div className="flex items-center text-sm text-gray-600">
-                  <User className="w-4 h-4 mr-2 opacity-40" />
-                  {supplier.contactName || 'N/A'}
+              
+              <h3 className="text-xl font-black text-ink mb-1 leading-tight">{supplier.name}</h3>
+              <p className="text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mb-6">{supplier.category}</p>
+              
+              <div className="space-y-4 pt-6 border-t border-dashed border-gray-100">
+                <div className="flex items-center text-xs text-gray-600">
+                  <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center mr-4 border border-black/5">
+                    <User className="w-3.5 h-3.5 opacity-40 text-primary" />
+                  </div>
+                  <span className="font-black text-ink">{supplier.contactName || '---'}</span>
                 </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Phone className="w-4 h-4 mr-2 opacity-40" />
-                  {supplier.phone || 'N/A'}
+                <div className="flex items-center text-xs text-gray-600">
+                  <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center mr-4 border border-black/5">
+                    <Phone className="w-3.5 h-3.5 opacity-40 text-primary" />
+                  </div>
+                  <span className="font-mono font-bold">{supplier.phone || '---'}</span>
                 </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Mail className="w-4 h-4 mr-2 opacity-40" />
-                  {supplier.email || 'N/A'}
+                <div className="flex items-center text-xs text-gray-600">
+                  <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center mr-4 border border-black/5">
+                    <Mail className="w-3.5 h-3.5 opacity-40 text-primary" />
+                  </div>
+                  <span className="truncate font-medium text-gray-500">{supplier.email || '---'}</span>
                 </div>
               </div>
             </div>
@@ -2188,42 +2657,51 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
         {isEditing && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-8"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-bold">{currentSupplier?.id ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}</h3>
-                <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-6 h-6" /></button>
+              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h3 className="text-xl font-bold text-ink">{currentSupplier?.id ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des partenaires logistiques</p>
+                </div>
+                <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
               </div>
-              <form onSubmit={handleSave} className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Nom de l'entreprise</label>
-                    <input type="text" required value={currentSupplier?.name || ''} onChange={e => setCurrentSupplier({...currentSupplier, name: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+
+              <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom de l'entreprise</label>
+                    <input type="text" required value={currentSupplier?.name || ''} onChange={e => setCurrentSupplier({...currentSupplier, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Personne de contact</label>
-                    <input type="text" value={currentSupplier?.contactName || ''} onChange={e => setCurrentSupplier({...currentSupplier, contactName: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Personne de contact</label>
+                    <input type="text" value={currentSupplier?.contactName || ''} onChange={e => setCurrentSupplier({...currentSupplier, contactName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Téléphone</label>
-                    <input type="tel" value={currentSupplier?.phone || ''} onChange={e => setCurrentSupplier({...currentSupplier, phone: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Téléphone</label>
+                    <input type="tel" value={currentSupplier?.phone || ''} onChange={e => setCurrentSupplier({...currentSupplier, phone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Email</label>
-                    <input type="email" value={currentSupplier?.email || ''} onChange={e => setCurrentSupplier({...currentSupplier, email: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Email</label>
+                    <input type="email" value={currentSupplier?.email || ''} onChange={e => setCurrentSupplier({...currentSupplier, email: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30" />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Catégorie</label>
-                    <input type="text" value={currentSupplier?.category || ''} onChange={e => setCurrentSupplier({...currentSupplier, category: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
+                    <input type="text" value={currentSupplier?.category || ''} onChange={e => setCurrentSupplier({...currentSupplier, category: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                   </div>
                 </div>
-                <button type="submit" disabled={saving} className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all disabled:opacity-50">
-                  {saving ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Enregistrer le fournisseur'}
-                </button>
               </form>
+
+              <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+                <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                  {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le fournisseur'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -2264,73 +2742,91 @@ const MerchantSettings = ({
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="max-w-2xl mx-auto"
+      className="max-w-4xl mx-auto"
     >
-      <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
-        <h3 className="text-xl font-bold mb-8">Réglages de la boutique</h3>
+      <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h3 className="text-2xl font-black text-ink">Réglages Business</h3>
+            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Configuration de l'identité commerciale</p>
+          </div>
+          <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center border border-black/5">
+            <Settings className="w-7 h-7 text-gray-300" />
+          </div>
+        </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                <Store className="w-5 h-5 text-primary" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                <Store className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Type de SaaS</p>
-                <p className="font-bold text-gray-900 capitalize">{merchant.type}</p>
+                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Type de SaaS</p>
+                <p className="font-black text-ink capitalize text-lg">{merchant.type}</p>
               </div>
             </div>
-            <div className="flex items-center text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full border border-amber-100">
-              <AlertCircle className="w-3 h-3 mr-1" />
+            <div className="flex items-center text-[9px] font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 uppercase tracking-widest">
+              <AlertCircle className="w-3 h-3 mr-1.5" />
               Fixe
             </div>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                <Zap className="w-5 h-5 text-primary" />
+          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                <Zap className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Forfait</p>
-                <p className="font-bold text-gray-900">{merchant.plan || 'FREE'}</p>
+                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Forfait Actuel</p>
+                <p className="font-black text-ink text-lg">{merchant.plan || 'FREE'}</p>
               </div>
             </div>
             <button 
               onClick={() => setActiveTab('dashboard')}
-              className="text-[10px] font-bold text-primary hover:underline bg-primary/5 px-2 py-1 rounded-full"
+              className="text-[9px] font-black text-primary hover:bg-primary hover:text-white transition-all bg-primary/10 px-4 py-2 rounded-full uppercase tracking-widest"
             >
               Améliorer
             </button>
           </div>
         </div>
 
-        <form onSubmit={handleSave} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Nom de la boutique</label>
-              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+        <form onSubmit={handleSave} className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Nom de l'établissement / Boutique</label>
+              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold text-lg" />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Téléphone</label>
-              <input type="tel" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Téléphone Professionnel</label>
+              <input type="tel" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-mono font-bold" />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
-              <input type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Email de Contact</label>
+              <input type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold" />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Adresse</label>
-              <input type="text" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Adresse Physique</label>
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
+                <input type="text" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full pl-12 pr-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-medium" />
+              </div>
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-bold text-gray-700 mb-1">Description</label>
-              <textarea rows={3} value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 rounded-2xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 resize-none" />
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Description / Slogan</label>
+              <textarea rows={4} value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 resize-none font-medium leading-relaxed" placeholder="Décrivez votre activité en quelques mots..." />
             </div>
           </div>
-          <button type="submit" disabled={saving} className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all flex items-center justify-center">
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Save className="w-5 h-5 mr-2" /> Enregistrer les modifications</>}
-          </button>
+          
+          <div className="pt-6 border-t border-gray-100">
+            <button 
+              type="submit" 
+              disabled={saving} 
+              className="w-full py-5 bg-ink text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] hover:bg-black transition-all flex items-center justify-center shadow-2xl shadow-black/20 active:scale-[0.98]"
+            >
+              {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-5 h-5 mr-3" /> Enregistrer les modifications</>}
+            </button>
+          </div>
         </form>
       </div>
     </motion.div>
@@ -2372,14 +2868,17 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion des Interventions</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Gestion des Interventions</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Total: {interventions.length.toString().padStart(3, '0')}</p>
+        </div>
         <button 
           onClick={() => {
             setCurrentIntervention({ customerName: '', serviceType: '', status: 'pending', date: new Date().toISOString().split('T')[0], price: 0 });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" />
           <span>Nouvelle Intervention</span>
@@ -2389,82 +2888,129 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                <th className="px-6 py-4">Client</th>
-                <th className="px-6 py-4">Service</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Statut</th>
-                <th className="px-6 py-4 text-right">Prix</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {interventions.map((item: any) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-4 font-bold text-gray-900">{item.customerName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{item.serviceType}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{item.date}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                      item.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 
-                      item.status === 'in-progress' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
-                    }`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold">{item.price.toLocaleString()} {merchant.currency}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => { setCurrentIntervention(item); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4" /></button>
-                  </td>
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Client / Prestation</th>
+                  <th className="px-8 py-5">Date</th>
+                  <th className="px-8 py-5">Statut</th>
+                  <th className="px-8 py-5 text-right">Montant TTC</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {interventions.map((item: any) => (
+                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 group-hover:scale-110 transition-transform">
+                          <Wrench className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-black text-ink text-sm leading-tight">{item.customerName}</span>
+                          <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">{item.serviceType}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <p className="text-[11px] font-mono font-black text-ink uppercase">{item.date}</p>
+                    </td>
+                    <td className="px-8 py-5">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                        item.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                        item.status === 'in-progress' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                      }`}>
+                        {item.status === 'pending' ? 'EN ATTENTE' : item.status === 'in-progress' ? 'EN COURS' : 'TERMINÉ'}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <p className="font-mono font-black text-ink text-sm">
+                        {item.price.toLocaleString()} <span className="text-[10px] opacity-60 font-mono">{merchant.currency}</span>
+                      </p>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button onClick={() => { setCurrentIntervention(item); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20"><Edit2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {isEditing && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Détails de l'Intervention</h3>
-            <form onSubmit={handleSave} className="space-y-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nom du Client</label>
-                <input type="text" required value={currentIntervention.customerName} onChange={e => setCurrentIntervention({...currentIntervention, customerName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                <h3 className="text-xl font-bold text-ink">Détails de l'Intervention</h3>
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Configuration technique du service</p>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Type de Service</label>
-                <input type="text" required value={currentIntervention.serviceType} onChange={e => setCurrentIntervention({...currentIntervention, serviceType: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Date</label>
-                  <input type="date" required value={currentIntervention.date} onChange={e => setCurrentIntervention({...currentIntervention, date: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom du Client</label>
+                  <input type="text" required value={currentIntervention.customerName} onChange={e => setCurrentIntervention({...currentIntervention, customerName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Prix</label>
-                  <input type="number" required value={currentIntervention.price} onChange={e => setCurrentIntervention({...currentIntervention, price: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Type de Service</label>
+                  <input type="text" required value={currentIntervention.serviceType} onChange={e => setCurrentIntervention({...currentIntervention, serviceType: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Statut</label>
-                <select value={currentIntervention.status} onChange={e => setCurrentIntervention({...currentIntervention, status: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20">
-                  <option value="pending">En attente</option>
-                  <option value="in-progress">En cours</option>
-                  <option value="completed">Terminé</option>
-                  <option value="cancelled">Annulé</option>
-                </select>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Date d'intervention</label>
+                  <input type="date" required value={currentIntervention.date} onChange={e => setCurrentIntervention({...currentIntervention, date: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Montant de la prestation</label>
+                  <div className="relative">
+                    <input type="number" required value={currentIntervention.price} onChange={e => setCurrentIntervention({...currentIntervention, price: Number(e.target.value)})} className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Statut de l'intervention</label>
+                <div className="flex flex-wrap gap-3">
+                  {['pending', 'in-progress', 'completed', 'cancelled'].map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setCurrentIntervention({...currentIntervention, status})}
+                      className={`flex-1 min-w-[120px] py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                        currentIntervention.status === status 
+                          ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                          : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      {status === 'pending' ? 'En attente' : status === 'in-progress' ? 'En cours' : status === 'completed' ? 'Terminé' : 'Annulé'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </form>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer l\'intervention'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
@@ -2519,14 +3065,17 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion des Chantiers</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Gestion des Chantiers</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Projets actifs: {projects.length.toString().padStart(2, '0')}</p>
+        </div>
         <button 
           onClick={() => {
             setCurrentProject({ name: '', location: '', status: 'planned', budget: 0, startDate: '', endDate: '' });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" />
           <span>Nouveau Projet</span>
@@ -2536,28 +3085,41 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {projects.map((project: any) => (
-            <div key={project.id} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group/card">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                  <HardHat className="w-6 h-6 text-primary" />
+            <div key={project.id} className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-2xl transition-all group/card relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover/card:scale-110 transition-transform"></div>
+              
+              <div className="flex justify-between items-start mb-8 relative z-10">
+                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 group-hover/card:scale-110 transition-transform">
+                  <HardHat className="w-8 h-8 text-primary" />
                 </div>
-                <div className="flex items-center space-x-2 transition-opacity">
-                  <button onClick={() => { setCurrentProject(project); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg"><Edit2 className="w-4 h-4" /></button>
-                  <div onClick={() => setDeleteConfirm(project.id)} className="p-2 cursor-pointer hover:bg-red-50 text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></div>
+                <div className="flex items-center space-x-2 opacity-0 group-hover/card:opacity-100 transition-all">
+                  <button onClick={() => { setCurrentProject(project); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl border border-transparent hover:border-primary/20 transition-all shadow-sm"><Edit2 className="w-4 h-4" /></button>
+                  <button onClick={() => setDeleteConfirm(project.id)} className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl border border-transparent hover:border-rose-200 transition-all shadow-sm"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{project.name}</h3>
-              <p className="text-sm text-gray-500 mb-4 flex items-center"><MapPin className="w-3 h-3 mr-1" /> {project.location}</p>
-              <div className="flex justify-between items-center pt-4 border-t border-gray-50">
-                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                  project.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 
-                  project.status === 'active' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-600'
+              
+              <h3 className="text-2xl font-black text-ink mb-2 leading-tight relative z-10 tracking-tight">{project.name}</h3>
+              <div className="flex items-center text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mb-8 relative z-10">
+                <MapPin className="w-3.5 h-3.5 mr-2 text-primary" /> 
+                {project.location}
+              </div>
+              
+              <div className="flex justify-between items-center pt-8 border-t border-dashed border-gray-100 relative z-10">
+                <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                  project.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                  project.status === 'active' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-200'
                 }`}>
-                  {project.status}
+                  {project.status === 'planned' ? 'PLANIFIÉ' : project.status === 'active' ? 'EN COURS' : project.status === 'on-hold' ? 'EN PAUSE' : 'TERMINÉ'}
                 </span>
-                <span className="font-bold text-sm">{project.budget.toLocaleString()} {merchant.currency}</span>
+                <div className="text-right">
+                  <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Budget</p>
+                  <p className="font-black text-xl text-ink tracking-tighter">
+                    {project.budget.toLocaleString()} 
+                    <span className="text-[10px] text-gray-400 font-mono ml-1 uppercase">{merchant.currency}</span>
+                  </p>
+                </div>
               </div>
             </div>
           ))}
@@ -2566,25 +3128,44 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
 
       {isEditing && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Détails du Projet</h3>
-            <form onSubmit={handleSave} className="space-y-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nom du Projet</label>
-                <input type="text" required value={currentProject.name} onChange={e => setCurrentProject({...currentProject, name: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                <h3 className="text-xl font-bold text-ink">Détails du Projet</h3>
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion de chantier BTP</p>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Localisation</label>
-                <input type="text" required value={currentProject.location} onChange={e => setCurrentProject({...currentProject, location: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Budget</label>
-                  <input type="number" required value={currentProject.budget} onChange={e => setCurrentProject({...currentProject, budget: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom du Projet</label>
+                  <input type="text" required value={currentProject.name} onChange={e => setCurrentProject({...currentProject, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Statut</label>
-                  <select value={currentProject.status} onChange={e => setCurrentProject({...currentProject, status: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Localisation</label>
+                  <input type="text" required value={currentProject.location} onChange={e => setCurrentProject({...currentProject, location: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Budget Prévisionnel</label>
+                  <div className="relative">
+                    <input type="number" required value={currentProject.budget} onChange={e => setCurrentProject({...currentProject, budget: Number(e.target.value)})} className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Statut du Projet</label>
+                  <select value={currentProject.status} onChange={e => setCurrentProject({...currentProject, status: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold">
                     <option value="planned">Planifié</option>
                     <option value="active">En cours</option>
                     <option value="on-hold">En pause</option>
@@ -2592,13 +3173,14 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
                   </select>
                 </div>
               </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
-              </div>
             </form>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le projet'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
@@ -2664,14 +3246,17 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion de la Flotte</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Gestion de la Flotte</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Véhicules: {vehicles.length.toString().padStart(2, '0')}</p>
+        </div>
         <button 
           onClick={() => {
             setCurrentVehicle({ plateNumber: '', model: '', type: 'car', status: 'active', lastMaintenance: '' });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" />
           <span>Nouveau Véhicule</span>
@@ -2681,50 +3266,90 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {vehicles.map((v: any) => (
-            <div key={v.id} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                  <Car className="w-6 h-6 text-primary" />
-                </div>
-                <button onClick={() => { setCurrentVehicle(v); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4" /></button>
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{v.model}</h3>
-              <p className="text-sm font-mono text-gray-500 mb-4">{v.plateNumber}</p>
-              <div className="flex justify-between items-center pt-4 border-t border-gray-50">
-                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                  v.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 
-                  v.status === 'maintenance' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'
-                }`}>
-                  {v.status}
-                </span>
-                <span className="text-xs text-gray-400">Type: {v.type}</span>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Véhicule / Plaque</th>
+                  <th className="px-8 py-5">Modèle / Type</th>
+                  <th className="px-8 py-5">Dernier Entretien</th>
+                  <th className="px-8 py-5">Statut</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {vehicles.map((v: any) => (
+                  <tr key={v.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="font-mono font-black text-ink bg-gray-50 px-4 py-2 rounded-xl border border-gray-200 inline-block w-fit text-sm shadow-sm tracking-widest">
+                          {v.plateNumber}
+                        </span>
+                        <span className="text-[9px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-2">ID: {v.id?.substring(0, 8)}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-ink leading-tight">{v.model}</span>
+                        <span className="text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mt-1">{v.type}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <p className="text-[11px] font-mono font-black text-gray-400 uppercase">{v.lastMaintenance || '---'}</p>
+                    </td>
+                    <td className="px-8 py-5">
+                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                        v.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                        v.status === 'maintenance' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-rose-600 border-rose-100'
+                      }`}>
+                        {v.status === 'active' ? 'DISPONIBLE' : v.status === 'maintenance' ? 'MAINTENANCE' : 'INACTIF'}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button onClick={() => { setCurrentVehicle(v); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20"><Edit2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {isEditing && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Détails du Véhicule</h3>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div>
+                <h3 className="text-xl font-bold text-ink">Fiche Véhicule</h3>
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion de la flotte logistique</p>
+              </div>
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Plaque d'immatriculation</label>
-                  <input type="text" required value={currentVehicle.plateNumber} onChange={e => setCurrentVehicle({...currentVehicle, plateNumber: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Immatriculation</label>
+                  <input type="text" required value={currentVehicle.plateNumber} onChange={e => setCurrentVehicle({...currentVehicle, plateNumber: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" placeholder="AA-000-AA" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Modèle</label>
-                  <input type="text" required value={currentVehicle.model} onChange={e => setCurrentVehicle({...currentVehicle, model: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Modèle / Marque</label>
+                  <input type="text" required value={currentVehicle.model} onChange={e => setCurrentVehicle({...currentVehicle, model: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Type</label>
-                  <select value={currentVehicle.type} onChange={e => setCurrentVehicle({...currentVehicle, type: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Type de véhicule</label>
+                  <select value={currentVehicle.type} onChange={e => setCurrentVehicle({...currentVehicle, type: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold">
                     <option value="car">Voiture</option>
                     <option value="truck">Camion</option>
                     <option value="van">Van</option>
@@ -2732,21 +3357,38 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Statut</label>
-                  <select value={currentVehicle.status} onChange={e => setCurrentVehicle({...currentVehicle, status: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20">
-                    <option value="active">Actif</option>
-                    <option value="maintenance">En maintenance</option>
-                    <option value="inactive">Inactif</option>
-                  </select>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Date du dernier entretien</label>
+                  <input type="date" required value={currentVehicle.lastMaintenance} onChange={e => setCurrentVehicle({...currentVehicle, lastMaintenance: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono" />
                 </div>
               </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Statut opérationnel</label>
+                <div className="flex gap-4">
+                  {['active', 'maintenance', 'inactive'].map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setCurrentVehicle({...currentVehicle, status})}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                        currentVehicle.status === status 
+                          ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                          : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      {status === 'active' ? 'Actif' : status === 'maintenance' ? 'Maintenance' : 'Inactif'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </form>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le véhicule'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
@@ -2787,14 +3429,17 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion du Personnel</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Gestion du Personnel</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Effectif total: {employees.length.toString().padStart(2, '0')}</p>
+        </div>
         <button 
           onClick={() => {
-            setCurrentEmployee({ firstName: '', lastName: '', position: '', department: '', salary: 0, hireDate: new Date().toISOString().split('T')[0] });
+            setCurrentEmployee({ firstName: '', lastName: '', position: '', department: '', salary: 0, hireDate: new Date().toISOString().split('T')[0], status: 'active', email: '', phone: '' });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" />
           <span>Nouvel Employé</span>
@@ -2804,79 +3449,166 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                <th className="px-6 py-4">Employé</th>
-                <th className="px-6 py-4">Poste</th>
-                <th className="px-6 py-4">Département</th>
-                <th className="px-6 py-4">Date d'embauche</th>
-                <th className="px-6 py-4 text-right">Salaire</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {employees.map((emp: any) => (
-                <tr key={emp.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-primary font-bold">
-                        {emp.firstName[0]}{emp.lastName[0]}
-                      </div>
-                      <span className="font-bold text-gray-900">{emp.firstName} {emp.lastName}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{emp.position}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{emp.department}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{emp.hireDate}</td>
-                  <td className="px-6 py-4 text-right font-bold">{emp.salary.toLocaleString()} {merchant.currency}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => { setCurrentEmployee(emp); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4" /></button>
-                  </td>
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Collaborateur</th>
+                  <th className="px-8 py-5">Poste / Dept</th>
+                  <th className="px-8 py-5">Contact</th>
+                  <th className="px-8 py-5">Embauche</th>
+                  <th className="px-8 py-5 text-right">Salaire Mensuel</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {employees.map((emp: any) => (
+                  <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-5">
+                        <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary font-black text-sm border border-primary/10 group-hover:scale-110 transition-transform">
+                          {emp.firstName[0]}{emp.lastName[0]}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-black text-ink text-base leading-tight">{emp.firstName} {emp.lastName}</span>
+                          <span className={`text-[9px] font-black uppercase tracking-[0.2em] mt-1 ${emp.status === 'active' ? 'text-emerald-500' : 'text-gray-400'}`}>
+                            {emp.status === 'active' ? 'EN POSTE' : emp.status === 'on_leave' ? 'EN CONGÉ' : 'SORTI'}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-ink leading-tight">{emp.position}</span>
+                        <span className="text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mt-1">{emp.department}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col space-y-1.5">
+                        <span className="flex items-center text-[10px] font-black text-ink tracking-tight"><Mail className="w-3 h-3 mr-2 opacity-40 text-primary" /> {emp.email || '---'}</span>
+                        <span className="flex items-center text-[10px] font-black text-ink tracking-tight"><Phone className="w-3 h-3 mr-2 opacity-40 text-primary" /> {emp.phone || '---'}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <p className="text-[11px] font-mono font-black text-gray-400 uppercase">{emp.hireDate}</p>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <p className="font-mono font-black text-ink text-sm">
+                        {emp.salary.toLocaleString()} <span className="text-[10px] opacity-60 font-mono">{merchant.currency}</span>
+                      </p>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button onClick={() => { setCurrentEmployee(emp); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20"><Edit2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {isEditing && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Détails de l'Employé</h3>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Prénom</label>
-                  <input type="text" required value={currentEmployee.firstName} onChange={e => setCurrentEmployee({...currentEmployee, firstName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nom</label>
-                  <input type="text" required value={currentEmployee.lastName} onChange={e => setCurrentEmployee({...currentEmployee, lastName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-                </div>
-              </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Poste</label>
-                <input type="text" required value={currentEmployee.position} onChange={e => setCurrentEmployee({...currentEmployee, position: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                <h3 className="text-xl font-bold text-ink">Fiche Collaborateur</h3>
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des ressources humaines</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Salaire</label>
-                  <input type="number" required value={currentEmployee.salary} onChange={e => setCurrentEmployee({...currentEmployee, salary: Number(e.target.value)})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prénom</label>
+                  <input type="text" required value={currentEmployee.firstName} onChange={e => setCurrentEmployee({...currentEmployee, firstName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Date d'embauche</label>
-                  <input type="date" required value={currentEmployee.hireDate} onChange={e => setCurrentEmployee({...currentEmployee, hireDate: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom</label>
+                  <input type="text" required value={currentEmployee.lastName} onChange={e => setCurrentEmployee({...currentEmployee, lastName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
               </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Email Professionnel</label>
+                  <input type="email" value={currentEmployee.email} onChange={e => setCurrentEmployee({...currentEmployee, email: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30" placeholder="email@entreprise.com" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Téléphone</label>
+                  <input type="text" value={currentEmployee.phone} onChange={e => setCurrentEmployee({...currentEmployee, phone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30" placeholder="+221 ..." />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Poste / Fonction</label>
+                  <input type="text" required value={currentEmployee.position} onChange={e => setCurrentEmployee({...currentEmployee, position: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Département</label>
+                  <select value={currentEmployee.department} onChange={e => setCurrentEmployee({...currentEmployee, department: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold">
+                    <option value="">Sélectionner...</option>
+                    <option value="Direction">Direction</option>
+                    <option value="Ventes">Ventes</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Technique">Technique</option>
+                    <option value="RH">RH</option>
+                    <option value="Finance">Finance</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Salaire Mensuel</label>
+                  <div className="relative">
+                    <input type="number" required value={currentEmployee.salary} onChange={e => setCurrentEmployee({...currentEmployee, salary: Number(e.target.value)})} className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Date d'embauche</label>
+                  <input type="date" required value={currentEmployee.hireDate} onChange={e => setCurrentEmployee({...currentEmployee, hireDate: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Statut</label>
+                <div className="flex gap-4">
+                  {['active', 'on_leave', 'terminated'].map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setCurrentEmployee({...currentEmployee, status})}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                        currentEmployee.status === status 
+                          ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                          : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      {status === 'active' ? 'Actif' : status === 'on_leave' ? 'Congé' : 'Sorti'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </form>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le collaborateur'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
@@ -2917,14 +3649,17 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion des Étudiants</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Gestion des Étudiants</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Effectif: {students.length.toString().padStart(3, '0')}</p>
+        </div>
         <button 
           onClick={() => {
-            setCurrentStudent({ firstName: '', lastName: '', grade: '', parentContact: '', status: 'active' });
+            setCurrentStudent({ firstName: '', lastName: '', grade: '', parentContact: '', status: 'active', email: '', phone: '', address: '', birthDate: '' });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" />
           <span>Nouvel Étudiant</span>
@@ -2934,77 +3669,128 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                <th className="px-6 py-4">Étudiant</th>
-                <th className="px-6 py-4">Classe / Niveau</th>
-                <th className="px-6 py-4">Contact Parent</th>
-                <th className="px-6 py-4">Statut</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {students.map((s: any) => (
-                <tr key={s.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-primary font-bold">
-                        {s.firstName[0]}{s.lastName[0]}
-                      </div>
-                      <span className="font-bold text-gray-900">{s.firstName} {s.lastName}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{s.grade}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{s.parentContact}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                      s.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-600'
-                    }`}>
-                      {s.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => { setCurrentStudent(s); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4" /></button>
-                  </td>
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Étudiant</th>
+                  <th className="px-8 py-5">Classe / Niveau</th>
+                  <th className="px-8 py-5">Contact Parent</th>
+                  <th className="px-8 py-5">Statut</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {students.map((s: any) => (
+                  <tr key={s.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black text-sm border border-blue-100 group-hover:scale-110 transition-transform">
+                          {s.firstName[0]}{s.lastName[0]}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-900 text-sm leading-tight">{s.firstName} {s.lastName}</span>
+                          <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">MAT: {s.id?.substring(0, 8)}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[9px] font-black rounded-full uppercase tracking-widest border border-gray-200">
+                        {s.grade}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center text-[10px] font-black text-ink">
+                        <Phone className="w-3 h-3 mr-2 opacity-40 text-primary" /> 
+                        {s.parentContact || '---'}
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                        s.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-400 border-gray-200'
+                      }`}>
+                        {s.status === 'active' ? 'INSCRIT' : 'INACTIF'}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button onClick={() => { setCurrentStudent(s); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20"><Edit2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {isEditing && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Détails de l'Étudiant</h3>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div>
+                <h3 className="text-xl font-bold text-ink">Détails de l'Étudiant</h3>
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Dossier académique</p>
+              </div>
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Prénom</label>
-                  <input type="text" required value={currentStudent.firstName} onChange={e => setCurrentStudent({...currentStudent, firstName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prénom</label>
+                  <input type="text" required value={currentStudent.firstName} onChange={e => setCurrentStudent({...currentStudent, firstName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nom</label>
-                  <input type="text" required value={currentStudent.lastName} onChange={e => setCurrentStudent({...currentStudent, lastName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom</label>
+                  <input type="text" required value={currentStudent.lastName} onChange={e => setCurrentStudent({...currentStudent, lastName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Classe / Niveau</label>
-                <input type="text" required value={currentStudent.grade} onChange={e => setCurrentStudent({...currentStudent, grade: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Classe / Niveau</label>
+                  <input type="text" required value={currentStudent.grade} onChange={e => setCurrentStudent({...currentStudent, grade: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" placeholder="ex: Terminale S" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Contact Parent</label>
+                  <input type="text" required value={currentStudent.parentContact} onChange={e => setCurrentStudent({...currentStudent, parentContact: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" placeholder="+221 ..." />
+                </div>
               </div>
+
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Contact Parent</label>
-                <input type="text" required value={currentStudent.parentContact} onChange={e => setCurrentStudent({...currentStudent, parentContact: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Statut d'inscription</label>
+                <div className="flex gap-4">
+                  {['active', 'inactive'].map((status) => (
+                    <button
+                      key={status}
+                      type="button"
+                      onClick={() => setCurrentStudent({...currentStudent, status})}
+                      className={`flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest border transition-all ${
+                        currentStudent.status === status 
+                          ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                          : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      {status === 'active' ? 'Inscrit' : 'Inactif'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </form>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer l\'étudiant'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
@@ -3045,14 +3831,17 @@ const MedicalManager = ({ merchant }: { merchant: Merchant }) => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion des Patients</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Gestion des Patients</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Dossiers actifs: {patients.length.toString().padStart(3, '0')}</p>
+        </div>
         <button 
           onClick={() => {
-            setCurrentPatient({ firstName: '', lastName: '', dateOfBirth: '', gender: 'M', bloodType: '', phone: '' });
+            setCurrentPatient({ firstName: '', lastName: '', dateOfBirth: '', gender: 'M', bloodType: '', phone: '', email: '', address: '', allergies: '', medicalHistory: '' });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" />
           <span>Nouveau Patient</span>
@@ -3062,86 +3851,146 @@ const MedicalManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                <th className="px-6 py-4">Patient</th>
-                <th className="px-6 py-4">Date de Naissance</th>
-                <th className="px-6 py-4">Sexe</th>
-                <th className="px-6 py-4">Groupe Sanguin</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {patients.map((p: any) => (
-                <tr key={p.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-primary font-bold">
-                        {p.firstName[0]}{p.lastName[0]}
-                      </div>
-                      <span className="font-bold text-gray-900">{p.firstName} {p.lastName}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{p.dateOfBirth}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{p.gender}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{p.bloodType}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => { setCurrentPatient(p); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4" /></button>
-                  </td>
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Patient</th>
+                  <th className="px-8 py-5">Infos Vitales</th>
+                  <th className="px-8 py-5">Contact</th>
+                  <th className="px-8 py-5">Dernière Visite</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {patients.map((p: any) => (
+                  <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-600 font-black text-sm border border-rose-100 group-hover:scale-110 transition-transform">
+                          {p.firstName[0]}{p.lastName[0]}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-900 text-sm leading-tight">{p.firstName} {p.lastName}</span>
+                          <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">REF: {p.id?.substring(0, 8)}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-black text-ink uppercase tracking-tighter">{p.gender === 'M' ? 'MASCULIN' : 'FÉMININ'}</span>
+                          <span className="text-[10px] font-mono text-gray-400 font-bold">{p.dateOfBirth || '---'}</span>
+                        </div>
+                        {p.bloodType && (
+                          <span className="px-2.5 py-1 bg-rose-600 text-white text-[10px] font-black rounded-lg shadow-sm shadow-rose-200">
+                            {p.bloodType}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col space-y-1">
+                        <span className="flex items-center text-[10px] font-black text-ink"><Phone className="w-3 h-3 mr-1.5 opacity-40 text-primary" /> {p.phone || '---'}</span>
+                        <span className="flex items-center text-[10px] font-medium text-gray-500"><Mail className="w-3 h-3 mr-1.5 opacity-40" /> {p.email || '---'}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <p className="text-[11px] font-mono font-bold text-gray-400">
+                        {p.updatedAt ? format(new Date(p.updatedAt), 'dd/MM/yyyy') : '---'}
+                      </p>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button onClick={() => { setCurrentPatient(p); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20"><Edit2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {isEditing && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Détails du Patient</h3>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div>
+                <h3 className="text-xl font-bold text-ink">Dossier Médical Patient</h3>
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Confidentialité & Suivi médical</p>
+              </div>
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Prénom</label>
-                  <input type="text" required value={currentPatient.firstName} onChange={e => setCurrentPatient({...currentPatient, firstName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prénom</label>
+                  <input type="text" required value={currentPatient.firstName} onChange={e => setCurrentPatient({...currentPatient, firstName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Nom</label>
-                  <input type="text" required value={currentPatient.lastName} onChange={e => setCurrentPatient({...currentPatient, lastName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom</label>
+                  <input type="text" required value={currentPatient.lastName} onChange={e => setCurrentPatient({...currentPatient, lastName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Date de Naissance</label>
-                  <input type="date" required value={currentPatient.dateOfBirth} onChange={e => setCurrentPatient({...currentPatient, dateOfBirth: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+
+              <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-1">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Date de Naissance</label>
+                  <input type="date" required value={currentPatient.dateOfBirth} onChange={e => setCurrentPatient({...currentPatient, dateOfBirth: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Sexe</label>
-                  <select value={currentPatient.gender} onChange={e => setCurrentPatient({...currentPatient, gender: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Sexe</label>
+                  <select value={currentPatient.gender} onChange={e => setCurrentPatient({...currentPatient, gender: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold">
                     <option value="M">Masculin</option>
                     <option value="F">Féminin</option>
+                    <option value="O">Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Groupe Sanguin</label>
+                  <select value={currentPatient.bloodType} onChange={e => setCurrentPatient({...currentPatient, bloodType: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold">
+                    <option value="">Inconnu</option>
+                    {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Groupe Sanguin</label>
-                  <input type="text" value={currentPatient.bloodType} onChange={e => setCurrentPatient({...currentPatient, bloodType: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Téléphone</label>
+                  <input type="text" required value={currentPatient.phone} onChange={e => setCurrentPatient({...currentPatient, phone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Téléphone</label>
-                  <input type="text" required value={currentPatient.phone} onChange={e => setCurrentPatient({...currentPatient, phone: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Email</label>
+                  <input type="email" value={currentPatient.email} onChange={e => setCurrentPatient({...currentPatient, email: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30" />
                 </div>
               </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Allergies connues</label>
+                <textarea value={currentPatient.allergies} onChange={e => setCurrentPatient({...currentPatient, allergies: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-rose-50/30 text-rose-700 text-sm min-h-[60px]" placeholder="Liste des allergies..." />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Antécédents Médicaux</label>
+                <textarea value={currentPatient.medicalHistory} onChange={e => setCurrentPatient({...currentPatient, medicalHistory: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-sm min-h-[100px]" placeholder="Historique des pathologies, chirurgies..." />
               </div>
             </form>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le dossier'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
@@ -3182,14 +4031,17 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion des Rendez-vous</h2>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-ink">Gestion des Rendez-vous</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Total: {appointments.length.toString().padStart(3, '0')}</p>
+        </div>
         <button 
           onClick={() => {
             setCurrentAppointment({ patientName: '', doctorName: '', date: new Date().toISOString().split('T')[0], time: '09:00', status: 'scheduled', type: 'consultation' });
             setIsEditing(true);
           }}
-          className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20"
+          className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Plus className="w-4 h-4" />
           <span>Nouveau Rendez-vous</span>
@@ -3199,74 +4051,114 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                <th className="px-6 py-4">Patient / Client</th>
-                <th className="px-6 py-4">Praticien / Ressource</th>
-                <th className="px-6 py-4">Date & Heure</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Statut</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {appointments.map((app: any) => (
-                <tr key={app.id} className="hover:bg-gray-50 transition-colors group">
-                  <td className="px-6 py-4 font-bold text-gray-900">{app.patientName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{app.doctorName}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{app.date} à {app.time}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{app.type}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
-                      app.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 
-                      app.status === 'scheduled' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'
-                    }`}>
-                      {app.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => { setCurrentAppointment(app); setIsEditing(true); }} className="p-2 hover:bg-primary/10 text-primary rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4" /></button>
-                  </td>
+        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                  <th className="px-8 py-5">Patient / Client</th>
+                  <th className="px-8 py-5">Praticien / Ressource</th>
+                  <th className="px-8 py-5">Date & Heure</th>
+                  <th className="px-8 py-5">Type</th>
+                  <th className="px-8 py-5">Statut</th>
+                  <th className="px-8 py-5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {appointments.map((app: any) => (
+                  <tr key={app.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="font-black text-ink text-sm leading-tight">{app.patientName}</span>
+                        <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">ID: {app.id?.substring(0, 8)}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center text-[10px] font-black text-primary border border-primary/10">
+                          {app.doctorName?.[0]}
+                        </div>
+                        <span className="text-sm font-black text-ink">{app.doctorName}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-mono font-black text-ink uppercase">{app.date}</span>
+                        <span className="text-[10px] text-gray-400 font-mono font-bold mt-0.5">à {app.time}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[9px] font-black rounded-full uppercase tracking-widest border border-gray-200">
+                        {app.type}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                        app.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                        app.status === 'scheduled' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-rose-50 text-rose-600 border-rose-100'
+                      }`}>
+                        {app.status === 'scheduled' ? 'PROGRAMMÉ' : app.status === 'completed' ? 'TERMINÉ' : 'ANNULÉ'}
+                      </span>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button onClick={() => { setCurrentAppointment(app); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20"><Edit2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {isEditing && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold mb-6">Détails du Rendez-vous</h3>
-            <form onSubmit={handleSave} className="space-y-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Nom du Patient / Client</label>
-                <input type="text" required value={currentAppointment.patientName} onChange={e => setCurrentAppointment({...currentAppointment, patientName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                <h3 className="text-xl font-bold text-ink">Détails du Rendez-vous</h3>
+                <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Planification & Ressources</p>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Praticien / Ressource</label>
-                <input type="text" required value={currentAppointment.doctorName} onChange={e => setCurrentAppointment({...currentAppointment, doctorName: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Date</label>
-                  <input type="date" required value={currentAppointment.date} onChange={e => setCurrentAppointment({...currentAppointment, date: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom du Patient / Client</label>
+                  <input type="text" required value={currentAppointment.patientName} onChange={e => setCurrentAppointment({...currentAppointment, patientName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Heure</label>
-                  <input type="time" required value={currentAppointment.time} onChange={e => setCurrentAppointment({...currentAppointment, time: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Praticien / Ressource</label>
+                  <input type="text" required value={currentAppointment.doctorName} onChange={e => setCurrentAppointment({...currentAppointment, doctorName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Type</label>
-                  <input type="text" required value={currentAppointment.type} onChange={e => setCurrentAppointment({...currentAppointment, type: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Date du rendez-vous</label>
+                  <input type="date" required value={currentAppointment.date} onChange={e => setCurrentAppointment({...currentAppointment, date: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Statut</label>
-                  <select value={currentAppointment.status} onChange={e => setCurrentAppointment({...currentAppointment, status: e.target.value})} className="w-full px-4 py-2 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Heure</label>
+                  <input type="time" required value={currentAppointment.time} onChange={e => setCurrentAppointment({...currentAppointment, time: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Type de prestation</label>
+                  <input type="text" required value={currentAppointment.type} onChange={e => setCurrentAppointment({...currentAppointment, type: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" placeholder="ex: Consultation" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Statut</label>
+                  <select value={currentAppointment.status} onChange={e => setCurrentAppointment({...currentAppointment, status: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold">
                     <option value="scheduled">Programmé</option>
                     <option value="completed">Terminé</option>
                     <option value="cancelled">Annulé</option>
@@ -3274,13 +4166,14 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
                   </select>
                 </div>
               </div>
-              <div className="flex space-x-3 pt-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-3 border border-gray-200 rounded-xl font-bold text-gray-600">Annuler</button>
-                <button type="submit" disabled={saving} className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all">
-                  {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer'}
-                </button>
-              </div>
             </form>
+
+            <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le rendez-vous'}
+              </button>
+            </div>
           </motion.div>
         </div>
       )}

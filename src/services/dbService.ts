@@ -259,11 +259,26 @@ export const dbService = {
     async getByOwner(ownerId: string) {
       const { data, error } = await supabase.from('merchants').select('*').eq('owner_id', ownerId).maybeSingle();
       if (error) throw error;
-      return data;
+      if (!data) return null;
+      
+      return {
+        ...data,
+        ownerId: data.owner_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
     },
     async save(merchant: any) {
       const id = merchant.id || crypto.randomUUID();
-      const { error } = await supabase.from('merchants').upsert({ ...merchant, id, updated_at: new Date() });
+      const { ownerId, createdAt, updatedAt, ...rest } = merchant;
+      const dataToSave = {
+        ...rest,
+        id,
+        owner_id: ownerId || merchant.owner_id,
+        created_at: createdAt || merchant.created_at || new Date(),
+        updated_at: new Date()
+      };
+      const { error } = await supabase.from('merchants').upsert(dataToSave);
       if (error) throw error;
       return id;
     }
@@ -271,7 +286,18 @@ export const dbService = {
   merchantProducts: {
     async save(product: any) {
       const id = product.id || crypto.randomUUID();
-      const { error } = await supabase.from('merchant_products').upsert({ ...product, id, updated_at: new Date() });
+      const { merchantId, costPrice, stockQuantity, minStockLevel, createdAt, updatedAt, ...rest } = product;
+      const dataToSave = {
+        ...rest,
+        id,
+        merchant_id: merchantId || product.merchant_id,
+        cost_price: costPrice || product.cost_price,
+        stock_quantity: stockQuantity || product.stock_quantity,
+        min_stock_level: minStockLevel || product.min_stock_level,
+        created_at: createdAt || product.created_at || new Date(),
+        updated_at: new Date()
+      };
+      const { error } = await supabase.from('merchant_products').upsert(dataToSave);
       if (error) throw error;
       return id;
     },
@@ -283,7 +309,19 @@ export const dbService = {
   merchantSales: {
     async save(sale: any) {
       const id = sale.id || crypto.randomUUID();
-      const { error } = await supabase.from('merchant_sales').insert({ ...sale, id, created_at: new Date() });
+      const { merchantId, totalAmount, paymentMethod, customerName, customerPhone, processedBy, createdAt, ...rest } = sale;
+      const dataToSave = {
+        ...rest,
+        id,
+        merchant_id: merchantId || sale.merchant_id,
+        total_amount: totalAmount || sale.total_amount,
+        payment_method: paymentMethod || sale.payment_method,
+        customer_name: customerName || sale.customer_name,
+        customer_phone: customerPhone || sale.customer_phone,
+        processed_by: processedBy || sale.processed_by,
+        created_at: createdAt || sale.created_at || new Date()
+      };
+      const { error } = await supabase.from('merchant_sales').insert(dataToSave);
       if (error) throw error;
 
       // Update stock levels
@@ -296,7 +334,7 @@ export const dbService = {
           // Record movement
           await supabase.from('stock_movements').insert({
             id: crypto.randomUUID(),
-            merchant_id: sale.merchantId,
+            merchant_id: dataToSave.merchant_id,
             product_id: item.productId,
             type: 'sale',
             quantity: item.quantity,
@@ -304,7 +342,7 @@ export const dbService = {
             new_quantity: newStock,
             reason: `Vente POS #${id.slice(-6)}`,
             reference_id: id,
-            performed_by: sale.processedBy,
+            performed_by: dataToSave.processed_by,
             created_at: new Date()
           });
         }
@@ -315,7 +353,14 @@ export const dbService = {
   merchantExpenses: {
     async save(expense: any) {
       const id = expense.id || crypto.randomUUID();
-      const { error } = await supabase.from('merchant_expenses').upsert({ ...expense, id, created_at: new Date() });
+      const { merchantId, createdAt, ...rest } = expense;
+      const dataToSave = {
+        ...rest,
+        id,
+        merchant_id: merchantId || expense.merchant_id,
+        created_at: createdAt || expense.created_at || new Date()
+      };
+      const { error } = await supabase.from('merchant_expenses').upsert(dataToSave);
       if (error) throw error;
       return id;
     },
@@ -327,7 +372,16 @@ export const dbService = {
   merchantSuppliers: {
     async save(supplier: any) {
       const id = supplier.id || crypto.randomUUID();
-      const { error } = await supabase.from('merchant_suppliers').upsert({ ...supplier, id, updated_at: new Date() });
+      const { merchantId, contactName, createdAt, updatedAt, ...rest } = supplier;
+      const dataToSave = {
+        ...rest,
+        id,
+        merchant_id: merchantId || supplier.merchant_id,
+        contact_name: contactName || supplier.contact_name,
+        created_at: createdAt || supplier.created_at || new Date(),
+        updated_at: new Date()
+      };
+      const { error } = await supabase.from('merchant_suppliers').upsert(dataToSave);
       if (error) throw error;
       return id;
     },
