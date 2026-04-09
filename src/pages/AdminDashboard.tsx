@@ -397,15 +397,25 @@ const AdminDashboard = () => {
         setExpenses(e as Expense[]);
         setSettingsData(st);
 
-        // Sync in background
+        // Sync in background (séquentiel pour lisser la charge IO)
         if (user?.id) {
-          await Promise.all([
-            syncService.syncOrders(user.id),
-            syncService.syncServices(user.id),
-            syncService.syncUsers(user.id),
-            syncService.syncExpenses(user.id),
-            syncService.syncSettings(user.id)
-          ]);
+          const syncTasks = [
+            () => syncService.syncOrders(user.id),
+            () => syncService.syncServices(user.id),
+            () => syncService.syncUsers(user.id),
+            () => syncService.syncExpenses(user.id),
+            () => syncService.syncSettings(user.id)
+          ];
+
+          for (const task of syncTasks) {
+            try {
+              await task();
+              // Petit délai pour laisser le disque respirer
+              await new Promise(resolve => setTimeout(resolve, 500)); 
+            } catch (e) {
+              console.error("Sync task failed", e);
+            }
+          }
           
           // Refresh from Dexie
           const [o2, s2, u2, e2, st2] = await Promise.all([

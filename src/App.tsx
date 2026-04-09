@@ -7,6 +7,7 @@ import { CacheProvider } from './context/CacheContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ErrorBoundary from './components/ErrorBoundary';
+import { NetworkStatusIndicator } from './components/NetworkStatusIndicator';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import OrderForm from './pages/OrderForm';
@@ -90,6 +91,7 @@ function AppContent() {
       
       {!isEditor && <Footer />}
       {!isEditor && <AIAssistant />}
+      <NetworkStatusIndicator />
     </div>
   );
 }

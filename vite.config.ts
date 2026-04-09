@@ -16,10 +16,13 @@ export default defineConfig(({mode}) => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
         manifest: {
-          name: 'Acom Technologie',
-          short_name: 'Acom',
-          description: 'Application Acom Technologie',
+          name: 'Acom SaaS Management',
+          short_name: 'AcomSaaS',
+          description: 'Solution de gestion SaaS par Acom Technologie',
           theme_color: '#ffffff',
+          start_url: '/merchant/saas',
+          scope: '/merchant/saas',
+          display: 'standalone',
           icons: [
             {
               src: 'pwa-192x192.png',

@@ -27,6 +27,7 @@ import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { InstallButton } from '../components/InstallButton';
 
 const generateReceiptPDF = (merchant: Merchant, sale: any) => {
   const doc = new jsPDF({
@@ -245,7 +246,8 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          <div className="flex bg-white p-1.5 rounded-[1.5rem] border border-black/5 shadow-sm overflow-x-auto scrollbar-hide">
+          <div className="flex bg-white p-1.5 rounded-[1.5rem] border border-black/5 shadow-sm overflow-x-auto scrollbar-hide items-center gap-2">
+            <InstallButton />
             {tabs.map(tab => (
               <TabButton 
                 key={tab.id}
