@@ -405,6 +405,84 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // 1. Fetch Categories with Real-time
+  const { data: dbCategories, loading: loadingCats } = useSupabaseData<StudioCategory>({
+    tableName: 'studio_acom_categories',
+    realtime: true,
+    mapper: (cat: any) => {
+      const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
+      const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
+      return {
+        ...cat,
+        icon: iconMap[cat.icon] || initial?.icon || Sparkles,
+        color: cat.color || initial?.color || 'text-gray-600',
+        coverImage: cat.cover_image || cat.coverImage
+      };
+    }
+  });
+
+  // 2. Fetch Products with Real-time
+  const { data: dbProducts, loading: loadingProds } = useSupabaseData<Product>({
+    tableName: 'studio_acom_products',
+    realtime: true,
+    mapper: (prod: any) => ({
+      ...prod,
+      categoryId: prod.category_id || prod.categoryId,
+      coverImage: prod.cover_image || prod.coverImage,
+      userId: prod.user_id || prod.userId
+    })
+  });
+
+  // 3. Fetch Variants with Real-time
+  const { data: dbVariants } = useSupabaseData<Variant>({
+    tableName: 'variants',
+    realtime: true,
+    mapper: (v: any) => ({
+      ...v,
+      productId: v.product_id,
+      templateId: v.template_id,
+      previewImage: v.preview_image,
+      minQuantity: v.min_quantity,
+      maxQuantity: v.max_quantity,
+      templateSvg: v.template_svg
+    })
+  });
+
+  // Merge Products and Variants
+  const allProducts = useMemo(() => {
+    return dbProducts.map(p => ({
+      ...p,
+      variants: dbVariants.filter(v => v.productId === p.id)
+    }));
+  }, [dbProducts, dbVariants]);
+
+  // Merge Categories (System + DB)
+  const allCategories = useMemo(() => {
+    const systemCats = CATEGORIES.filter(c => ['saved', 'all', 'favorites', 'categories'].includes(c.id));
+    let merged = [...systemCats];
+
+    if (dbCategories && dbCategories.length > 0) {
+      dbCategories.forEach((cat: any) => {
+        if (!merged.find(c => c.id === cat.id)) {
+          merged.push(cat);
+        }
+      });
+    } else if (!loadingCats) {
+      // Only use INITIAL_CATEGORIES if DB is empty and we are not loading
+      INITIAL_CATEGORIES.forEach(cat => {
+        if (!merged.find(c => c.id === cat.id)) {
+          merged.push(cat);
+        }
+      });
+    }
+
+    return merged;
+  }, [dbCategories, loadingCats]);
+
+  // Use the merged data
+  const categories = allCategories;
+  const loadingVariants = loadingCats || loadingProds;
+
   // Reset view when category changes
   React.useEffect(() => {
     if (activeCategory === 'categories') {
@@ -434,97 +512,6 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     };
   }, [isOpen]);
 
-  const [allProducts, setAllProducts] = useState<Product[]>(INITIAL_PRODUCTS);
-  const [allCategories, setAllCategories] = useState<StudioCategory[]>(CATEGORIES as any);
-  const [loadingVariants, setLoadingVariants] = useState(false);
-
-  // Fetch products and categories
-  const fetchData = useCallback(async () => {
-    setLoadingVariants(true);
-    try {
-      // 1. Fetch Categories
-      const { data: catsData, error: catsError } = await supabase.from('studio_acom_categories').select('*');
-      
-      const systemCats = CATEGORIES.filter(c => ['saved', 'all', 'favorites', 'categories'].includes(c.id));
-      let merged = [...systemCats];
-
-      if (!catsError && catsData && catsData.length > 0) {
-        const dynamicCats = catsData.map((cat: any) => {
-          const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
-          return {
-            ...cat,
-            icon: initial?.icon || Sparkles,
-            color: initial?.color || 'text-gray-600',
-            coverImage: cat.cover_image || cat.coverImage
-          };
-        });
-        
-        dynamicCats.forEach((cat: any) => {
-          if (!merged.find(c => c.id === cat.id)) {
-            merged.push(cat);
-          }
-        });
-      }
-
-      // ALWAYS ensure INITIAL_CATEGORIES are present as fallbacks
-      INITIAL_CATEGORIES.forEach(cat => {
-        if (!merged.find(c => c.id === cat.id)) {
-          merged.push(cat);
-        }
-      });
-
-      setAllCategories(merged as any);
-
-      // 2. Fetch Products
-      const { data: productsData, error: prodError } = await supabase.from('studio_acom_products').select('*');
-      if (prodError) throw prodError;
-
-      if (productsData) {
-        const productsWithVariants = await Promise.all(
-          productsData.map(async (product: any) => {
-            try {
-              const variants = await dbService.studioAcom.products.getVariants(product.id);
-              const mappedProduct = { 
-                ...product, 
-                variants: variants || [],
-                categoryId: product.category_id || product.categoryId,
-                coverImage: product.cover_image || product.coverImage,
-                userId: product.user_id || product.userId
-              } as Product;
-              return mappedProduct;
-            } catch (err) {
-              console.error(`Error fetching variants for product ${product.id}:`, err);
-              return {
-                ...product,
-                variants: [],
-                categoryId: product.category_id || product.categoryId,
-                coverImage: product.cover_image || product.coverImage,
-                userId: product.user_id || product.userId
-              } as Product;
-            }
-          })
-        );
-        setAllProducts(productsWithVariants);
-      }
-    } catch (error) {
-      console.error('Error fetching data in DesignSelectorModal:', error);
-    } finally {
-      setLoadingVariants(false);
-    }
-  }, []);
-
-  // Fetch on mount
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Re-fetch when modal opens to ensure fresh data
-  React.useEffect(() => {
-    if (isOpen) {
-      fetchData();
-    }
-  }, [isOpen, fetchData]);
-
   const { data: userDesigns } = useSupabaseData<any>({
     tableName: 'designs',
     filter: { column: 'ownerId', value: user?.id },
@@ -532,8 +519,6 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     realtime: true,
     limit: 50
   });
-
-  const categories = allCategories;
 
   const selectedProduct = useMemo(() => 
     allProducts.find(p => p.id === selectedProductId) || null
