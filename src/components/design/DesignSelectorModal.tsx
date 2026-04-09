@@ -454,7 +454,8 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
           return {
             ...cat,
             icon: initial?.icon || Sparkles,
-            color: initial?.color || 'text-gray-600'
+            color: initial?.color || 'text-gray-600',
+            coverImage: cat.cover_image || cat.coverImage
           };
         });
         
