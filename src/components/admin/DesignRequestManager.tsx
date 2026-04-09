@@ -7,6 +7,7 @@ import { fr } from 'date-fns/locale';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { OptimizedImage } from '../OptimizedImage';
 
 interface DesignRequest {
   id: string;
@@ -80,9 +81,10 @@ const DesignRequestManager = () => {
               className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden group hover:shadow-xl hover:shadow-primary/5 transition-all"
             >
               <div className="aspect-[1.7/1] bg-gray-100 relative overflow-hidden">
-                <img 
+                <OptimizedImage 
                   src={request.previewUrl} 
                   alt="Preview" 
+                  width={600}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute top-4 right-4">

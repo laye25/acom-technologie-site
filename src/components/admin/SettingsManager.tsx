@@ -3,6 +3,7 @@ import { dbService as db } from '../../services/dbService';
 import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ConfirmModal } from './ConfirmModal';
+import { OptimizedImage } from '../OptimizedImage';
 import { SiteSettings, StatItem, WhyUsPoint, WhyUsSection, CTASection, HeroSlide, FooterSettings, PageSection, FAQItem, AboutContent } from '../../types';
 import { compressImage, compressBase64Image } from '../../lib/imageUtils';
 
@@ -998,7 +999,7 @@ const SettingsManager = () => {
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Image de fond</label>
                   <div className="relative aspect-video rounded-2xl overflow-hidden bg-gray-100 border-2 border-dashed border-gray-200 group-hover:border-primary/20 transition-all">
                     {slide.image ? (
-                      <img src={slide.image} alt="" className="w-full h-full object-cover" />
+                      <OptimizedImage src={slide.image} alt="" width={400} className="w-full h-full object-cover" />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                         <ImageIcon className="w-8 h-8" />
@@ -1417,7 +1418,7 @@ const SettingsManager = () => {
                       <div className="flex items-center space-x-4">
                         <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 group">
                           {settings.whyUsSection?.image ? (
-                            <img src={settings.whyUsSection.image} alt="Preview" className="w-full h-full object-cover" />
+                            <OptimizedImage src={settings.whyUsSection.image} alt="Preview" width={400} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-300">
                               <ImageIcon className="w-8 h-8" />

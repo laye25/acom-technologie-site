@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Product, Variant } from '../../constants/studioAcom';
 import { ChevronRight, Box, ShoppingCart, Hash, Info, PenTool } from 'lucide-react';
+import { OptimizedImage } from '../OptimizedImage';
 
 interface MultiVariantConfiguratorProps {
   product: Product;
@@ -118,7 +119,12 @@ const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ pro
             <div className="space-y-6 lg:space-y-8">
               <div className="aspect-[4/3] bg-gray-50 rounded-2xl lg:rounded-[3rem] overflow-hidden border border-gray-100 relative shadow-inner">
                 {activeVariant.previewImage ? (
-                  <img src={activeVariant.previewImage} alt={activeVariant.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <OptimizedImage 
+                    src={activeVariant.previewImage} 
+                    alt={activeVariant.name} 
+                    width={800}
+                    className="w-full h-full object-cover" 
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300"><Box className="w-20 h-20 opacity-20" /></div>
                 )}

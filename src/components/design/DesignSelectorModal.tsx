@@ -948,11 +948,11 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                     <div className={`w-full h-full max-w-2xl max-h-full flex items-center justify-center`}>
                       <div className={`w-full shadow-2xl rounded-2xl md:rounded-3xl overflow-hidden bg-white ${getAspectRatioClass(previewTemplate.size)}`}>
                         {previewTemplate.coverImage ? (
-                          <img 
+                          <OptimizedImage 
                             src={previewTemplate.coverImage} 
                             alt={previewTemplate.name} 
+                            width={800}
                             className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
                           />
                         ) : previewTemplate.design ? (
                           <MiniPreview 

@@ -5,6 +5,7 @@ import {
   Maximize2, Palette, Layers, Box, Hash, PenTool
 } from 'lucide-react';
 import { Product, Variant } from '../../constants/studioAcom';
+import { OptimizedImage } from '../OptimizedImage';
 
 interface ProductConfiguratorProps {
   product: Product;
@@ -79,11 +80,11 @@ const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
           <div className="space-y-8">
             <div className="aspect-[4/3] bg-gray-50 rounded-[3rem] overflow-hidden border border-gray-100 relative group shadow-inner">
               {variant.previewImage ? (
-                <img 
+                <OptimizedImage 
                   src={variant.previewImage} 
                   alt={variant.name} 
+                  width={800}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-300">

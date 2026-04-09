@@ -22,6 +22,7 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
+import { OptimizedImage } from '../OptimizedImage';
 
 const UserManager = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,7 +182,7 @@ const UserManager = () => {
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden mr-3 shrink-0">
                         {u.photoURL ? (
-                          <img src={u.photoURL} alt={u.displayName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <OptimizedImage src={u.photoURL} alt={u.displayName || 'User'} width={100} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400">
                             <User className="w-5 h-5" />

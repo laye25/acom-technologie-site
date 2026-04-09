@@ -16,6 +16,7 @@ import { generateDesign } from '../../lib/gemini';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
+import { OptimizedImage } from '../OptimizedImage';
 import { CanvasElement, Design, Template } from '../../types';
 
 interface CardEditorProps {
@@ -167,7 +168,7 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
           <div key={el.id} style={style}>
             {el.type === 'text' && hydratedText}
             {el.type === 'image' && hydratedSrc && (
-              <img src={hydratedSrc} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+              <OptimizedImage src={hydratedSrc} alt="Preview" width={1200} className="w-full h-full object-contain" />
             )}
             {(el.type === 'path' || el.type === 'ellipse') && (
               <svg viewBox="0 0 600 350" className="w-full h-full overflow-visible">
@@ -1791,7 +1792,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                 <div className="bg-gray-100 rounded-lg overflow-hidden border border-gray-200 group-hover:border-primary transition-all relative shadow-sm">
                   <div className="aspect-[4/3] w-full relative">
                     {t.preview ? (
-                      <img src={t.preview} className="w-full h-full object-cover" />
+                      <OptimizedImage src={t.preview} alt={t.name} width={200} className="w-full h-full object-cover" />
                     ) : (
                       <div className="absolute inset-0">
                         <MiniPreview 

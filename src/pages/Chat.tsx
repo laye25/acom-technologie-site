@@ -9,6 +9,7 @@ import { Send, Paperclip, Clock, User, ShieldCheck, MessageSquare, ChevronLeft, 
 import { format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { SERVICES as STATIC_SERVICES } from '../constants';
+import { OptimizedImage } from '../components/OptimizedImage';
 import { notificationService } from '../services/notificationService';
 import { UserProfile } from '../types';
 
@@ -262,7 +263,7 @@ const Chat = () => {
           </button>
           <div className="w-10 h-10 md:w-12 md:h-12 bg-primary-light rounded-2xl flex items-center justify-center shrink-0">
             {service?.image ? (
-              <img src={service.image} alt="" className="w-full h-full object-cover rounded-2xl" referrerPolicy="no-referrer" />
+              <OptimizedImage src={service.image} alt="" width={100} className="w-full h-full object-cover rounded-2xl" />
             ) : (
               <MessageSquare className="w-5 h-5 md:w-6 md:h-6 text-primary" />
             )}

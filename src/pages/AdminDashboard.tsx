@@ -372,11 +372,63 @@ const AdminDashboard = () => {
     limit: 20
   }), [hasAccess]);
 
-  const { data: orders, loading: ordersLoading, error: ordersError } = useSupabaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
-  const { data: users } = useSupabaseData<UserProfile>(userOptions);
-  const { data: expenses } = useSupabaseData<Expense>(expenseOptions);
-  const { data: settingsData } = useSupabaseData<any>(settingsOptions);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [dynamicServices, setDynamicServices] = useState<Service[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [settingsData, setSettingsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        // Load from Dexie
+        const [o, s, u, e, st] = await Promise.all([
+          db.orders.toArray(),
+          db.services.toArray(),
+          db.users.toArray(),
+          db.expenses.toArray(),
+          db.settings.toArray()
+        ]);
+        setOrders(o as Order[]);
+        setDynamicServices(s as Service[]);
+        setUsers(u as UserProfile[]);
+        setExpenses(e as Expense[]);
+        setSettingsData(st);
+
+        // Sync in background
+        if (user?.id) {
+          await Promise.all([
+            syncService.syncOrders(user.id),
+            syncService.syncServices(user.id),
+            syncService.syncUsers(user.id),
+            syncService.syncExpenses(user.id),
+            syncService.syncSettings(user.id)
+          ]);
+          
+          // Refresh from Dexie
+          const [o2, s2, u2, e2, st2] = await Promise.all([
+            db.orders.toArray(),
+            db.services.toArray(),
+            db.users.toArray(),
+            db.expenses.toArray(),
+            db.settings.toArray()
+          ]);
+          setOrders(o2 as Order[]);
+          setDynamicServices(s2 as Service[]);
+          setUsers(u2 as UserProfile[]);
+          setExpenses(e2 as Expense[]);
+          setSettingsData(st2);
+        }
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user?.id]);
   
   // Point 6: Aggregation - Fetch global stats
   const globalStats = settingsData?.find((s: any) => s.id === 'stats') || {};

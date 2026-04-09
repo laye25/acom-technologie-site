@@ -12,70 +12,88 @@ import { dbService } from '../../services/dbService';
 import { Category, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { supabase } from '../../lib/supabase';
 import { OptimizedImage } from '../OptimizedImage';
-
-// Helper to optimize Supabase Storage images
+import { db } from '../../db/db';
+import { syncService } from '../../services/syncService';
 
 const StudioAcomManager = () => {
+  console.log('StudioAcomManager rendering');
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('categories');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data: categoriesData, loading: loadingCats, refresh: refreshCats } = useSupabaseData<Category>({
-    tableName: 'studio_acom_categories' as any,
-    realtime: true
-  });
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCats, setLoadingCats] = useState(true);
 
-  const categories = React.useMemo(() => {
-    return (categoriesData || []).map(cat => ({
-      ...cat,
-      coverImage: (cat as any).cover_image || (cat as any).coverImage
-    }));
-  }, [categoriesData]);
+  const refreshCats = async () => {
+    const cats = await db.categories.toArray();
+    setCategories(cats);
+  };
 
-  const { data: productsData, loading: loadingProducts, refresh: refreshProducts } = useSupabaseData<Product>({
-    tableName: 'studio_acom_products' as any,
-    realtime: true
-  });
-
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loadingVariants, setLoadingVariants] = useState(false);
-
-  // Fetch variants for all products when productsData changes
+  // Charger les catégories depuis Dexie au montage
   React.useEffect(() => {
-    const fetchAllVariants = async () => {
-      if (!productsData || productsData.length === 0) {
-        setProducts([]);
-        return;
-      }
-
-      setLoadingVariants(true);
+    const loadCategories = async () => {
+      setLoadingCats(true);
       try {
-        const productsWithVariants = await Promise.all(
-          productsData.map(async (product: any) => {
-            const variants = await dbService.studioAcom.products.getVariants(product.id);
-            // Mapping snake_case vers camelCase pour l'affichage
-            return { 
-              ...product, 
-              variants,
-              categoryId: product.category_id,
-              coverImage: product.cover_image,
-              userId: product.user_id
-            } as Product;
-          })
-        );
-        setProducts(productsWithVariants);
+        const localCats = await db.categories.toArray();
+        setCategories(localCats);
+        
+        // Synchroniser avec Supabase en arrière-plan
+        await syncService.syncCategories(user?.id || '');
+        
+        // Recharger depuis Dexie après synchronisation
+        const updatedCats = await db.categories.toArray();
+        setCategories(updatedCats);
       } catch (error) {
-        console.error('Error fetching variants:', error);
-        setProducts(productsData); // Fallback to products without variants
+        console.error('Error loading categories:', error);
       } finally {
-        setLoadingVariants(false);
+        setLoadingCats(false);
       }
     };
+    loadCategories();
+  }, [user?.id]);
 
-    fetchAllVariants();
-  }, [productsData]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
+  const refreshProducts = async () => {
+    const products = await db.products.toArray();
+    setProducts(products);
+  };
+
+  // Charger les produits depuis Dexie au montage
+  React.useEffect(() => {
+    const loadProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const localProducts = await db.products.toArray();
+        setProducts(localProducts.map(p => ({
+          ...p,
+          categoryId: p.merchantId, // Mapping correct
+          coverImage: p.image || '',
+          variants: [] // Variants are handled separately
+        })) as Product[]);
+        
+        // Synchroniser avec Supabase en arrière-plan
+        await syncService.syncProducts(user?.id || '');
+        
+        // Recharger depuis Dexie après synchronisation
+        const updatedProducts = await db.products.toArray();
+        setProducts(updatedProducts.map(p => ({
+          ...p,
+          categoryId: p.merchantId,
+          coverImage: p.image || '',
+          variants: []
+        })) as Product[]);
+      } catch (error) {
+        console.error('Error loading products:', error);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    loadProducts();
+  }, [user?.id]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,15 +133,17 @@ const StudioAcomManager = () => {
 
       let savedItem;
       if (activeTab === 'categories') {
-        savedItem = await dbService.studioAcom.categories.save(dataToSave);
+        // 1. Sauvegarder localement dans Dexie
+        await db.categories.put(dataToSave);
+        // 2. Synchroniser en arrière-plan
+        syncService.syncCategories(user?.id || '');
         refreshCats();
       } else {
-        // We now let dbService handle the variants saving/syncing
-        savedItem = await dbService.studioAcom.products.save({ 
-          ...dataToSave, 
-          variants, // Pass variants to dbService
-          userId: user?.id 
-        });
+        // 1. Sauvegarder localement dans Dexie
+        await db.products.put({ ...dataToSave, variants, userId: user?.id });
+        // 2. Synchroniser en arrière-plan
+        syncService.syncProducts(user?.id || '');
+        
         refreshProducts();
       }
       
@@ -350,10 +370,9 @@ const StudioAcomManager = () => {
             >
               <div className="aspect-video bg-gray-50 rounded-xl mb-4 overflow-hidden relative group/image">
                 {item.coverImage ? (
-                  <OptimizedImage 
+                  <img 
                     src={item.coverImage} 
                     alt={item.name} 
-                    width={600}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-110" 
                   />
                 ) : (
@@ -722,7 +741,12 @@ const StudioAcomManager = () => {
                               <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
                                   {v.previewImage ? (
-                                    <img src={v.previewImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                    <OptimizedImage 
+                                      src={v.previewImage} 
+                                      alt={v.name}
+                                      width={100}
+                                      className="w-full h-full object-cover" 
+                                    />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center text-gray-300">
                                       <ImageIcon className="w-5 h-5" />
@@ -792,7 +816,12 @@ const StudioAcomManager = () => {
                                       <div className="w-24 h-24 bg-gray-50 rounded-2xl border border-dashed border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0 relative group">
                                         {v.previewImage ? (
                                           <>
-                                            <img src={v.previewImage} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                            <OptimizedImage 
+                                              src={v.previewImage} 
+                                              alt={v.name}
+                                              width={200}
+                                              className="w-full h-full object-cover" 
+                                            />
                                             <button 
                                               type="button"
                                               onClick={() => {

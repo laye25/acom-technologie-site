@@ -97,7 +97,10 @@ export const getOptimizedUrl = (url: string, width: number = 800, quality: numbe
   
   // Handle Supabase Storage URLs
   if (url.includes('supabase.co/storage/v1/object/public/')) {
-    return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&resize=contain&quality=${quality}`;
+    // Only use transformation if quality is set to something other than default or if explicitly needed
+    // For now, let's use the standard public URL to ensure display, 
+    // as /render/ requires specific project settings.
+    return url;
   }
   
   // Handle Unsplash URLs

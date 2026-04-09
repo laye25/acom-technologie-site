@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Service } from '../types';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { SERVICES as STATIC_SERVICES } from '../constants';
+import { OptimizedImage } from '../components/OptimizedImage';
 import { motion } from 'motion/react';
 import { ShoppingBag, Plus, Minus, Trash2, CheckCircle, Loader2, Search, Calculator, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -228,7 +229,7 @@ const POS = () => {
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
                       {service.image ? (
-                        <img src={service.image} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <OptimizedImage src={service.image} alt={service.name} width={100} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-300">
                           <ShoppingBag className="w-6 h-6" />

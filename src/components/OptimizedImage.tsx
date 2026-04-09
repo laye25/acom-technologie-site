@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
 import { ImageIcon } from 'lucide-react';
 import { getOptimizedUrl } from '../lib/imageUtils';
 
-interface OptimizedImageProps extends HTMLMotionProps<"img"> {
+interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
   alt: string;
   width?: number;
@@ -38,17 +37,11 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   return (
     <div className={`relative overflow-hidden bg-gray-100 ${containerClassName} ${className.includes('h-') ? '' : 'h-full'} ${className.includes('w-') ? '' : 'w-full'}`}>
-      <AnimatePresence>
-        {!isLoaded && !error && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10"
-          >
-            <div className="w-full h-full animate-pulse bg-gray-200" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {!isLoaded && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+          <div className="w-full h-full bg-gray-200" />
+        </div>
+      )}
 
       {error ? (
         <div className={`flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${fallbackClassName || 'h-full'}`}>
@@ -56,19 +49,16 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
           <span className="text-[10px] mt-2 font-mono uppercase tracking-tighter opacity-50">Image non disponible</span>
         </div>
       ) : (
-        <motion.img
+        <img
           src={optimizedSrc}
           alt={alt}
-          initial={{ opacity: 0, scale: 1.05 }}
-          animate={{ 
-            opacity: isLoaded ? 1 : 0,
-            scale: isLoaded ? 1 : 1.05
-          }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
           onLoad={() => setIsLoaded(true)}
-          onError={() => setError(true)}
-          className={`w-full h-full object-cover ${className}`}
-          loading={priority ? 'eager' : 'lazy'}
+          onError={(e) => {
+            console.error(`Failed to load image: ${optimizedSrc}`, e);
+            setError(true);
+          }}
+          className={`w-full h-full object-cover ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 ${className}`}
+          loading="eager"
           referrerPolicy="no-referrer"
           {...props}
         />
