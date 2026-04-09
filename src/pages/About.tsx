@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { Users, Target, Award, Rocket, CheckCircle2, MapPin, Phone, Mail, Loader2 } from 'lucide-react';
 import { Translate } from '../context/LanguageContext';
 import { dbService as db } from '../services/dbService';
-import OptimizedImage from '../components/OptimizedImage';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const About = () => {
   const [settings, setSettings] = useState<any>(null);

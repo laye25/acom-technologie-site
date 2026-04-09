@@ -12,6 +12,7 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { NotificationCenter } from '../components/NotificationCenter';
 import { getOrderDiscountedTotal } from '../lib/promotions';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const Dashboard = () => {
   const { user, profile, loading: authLoading, resetPassword, signOut, isManager, isAdmin } = useAuth();
@@ -254,11 +255,11 @@ const Dashboard = () => {
                     <div className="flex items-start sm:items-center space-x-4 sm:space-x-6">
                       <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0">
                         {service?.image ? (
-                          <img 
+                          <OptimizedImage 
                             src={service.image} 
                             alt="" 
+                            width={200}
                             className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -408,7 +409,7 @@ const Dashboard = () => {
                 >
                   <div className="aspect-[600/350] bg-gray-50 relative overflow-hidden">
                     {design.preview ? (
-                      <img src={design.preview} alt={design.name} className="w-full h-full object-cover" />
+                      <OptimizedImage src={design.preview} alt={design.name} width={600} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-300">
                         <Palette className="w-12 h-12" />
@@ -521,7 +522,7 @@ const Dashboard = () => {
             <div className="flex flex-col items-center text-center mb-10">
               <div className="w-24 h-24 bg-primary-light rounded-3xl flex items-center justify-center mb-6 shadow-inner">
                 {user?.user_metadata?.avatar_url || profile?.photoURL ? (
-                  <img src={user?.user_metadata?.avatar_url || profile?.photoURL} alt="" className="w-full h-full object-cover rounded-3xl" referrerPolicy="no-referrer" />
+                  <OptimizedImage src={user?.user_metadata?.avatar_url || profile?.photoURL} alt="" width={200} className="w-full h-full object-cover rounded-3xl" />
                 ) : (
                   <User className="w-12 h-12 text-primary" />
                 )}

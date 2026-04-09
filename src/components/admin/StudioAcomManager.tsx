@@ -11,8 +11,7 @@ import { useSupabaseData } from '../../hooks/useSupabase';
 import { dbService } from '../../services/dbService';
 import { Category, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { supabase } from '../../lib/supabase';
-
-import OptimizedImage from '../OptimizedImage';
+import { OptimizedImage } from '../OptimizedImage';
 
 // Helper to optimize Supabase Storage images
 

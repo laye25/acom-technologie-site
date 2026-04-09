@@ -20,6 +20,7 @@ import { SERVICES as STATIC_SERVICES } from '../constants';
 import { isPromotionActive, getDiscountedPrice } from '../lib/promotions';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const ServiceDetails = () => {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -139,18 +140,14 @@ const ServiceDetails = () => {
           {/* Left Column: Visuals */}
           <div className="lg:col-span-7 space-y-8">
             <div className="relative aspect-[16/10] rounded-[3rem] overflow-hidden bg-gray-100 shadow-2xl">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={selectedImage}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  src={selectedImage}
-                  alt={service.name}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </AnimatePresence>
+              <OptimizedImage
+                key={selectedImage || service.image}
+                src={selectedImage || service.image}
+                alt={service.name}
+                width={1200}
+                priority={true}
+                className="w-full h-full object-cover"
+              />
               
               {promoActive && (
                 <div className="absolute top-8 right-8">
@@ -173,11 +170,11 @@ const ServiceDetails = () => {
                       selectedImage === img ? 'border-primary scale-105 shadow-xl' : 'border-transparent opacity-60 hover:opacity-100'
                     }`}
                   >
-                    <img
+                    <OptimizedImage
                       src={img}
                       alt={`${service.name} - ${idx + 1}`}
+                      width={200}
                       className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
                     />
                   </button>
                 ))}

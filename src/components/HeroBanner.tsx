@@ -4,7 +4,7 @@ import { ArrowRight, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megap
 import { Link } from 'react-router-dom';
 import { dbService as db } from '../services/dbService';
 import { Translate, useTranslation } from '../context/LanguageContext';
-import OptimizedImage from './OptimizedImage';
+import { OptimizedImage } from './OptimizedImage';
 
 const iconMap: { [key: string]: any } = {
   Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code
@@ -100,7 +100,6 @@ const HeroBanner = () => {
               src={currentSlide.image}
               alt=""
               width={1200}
-              priority={true}
               className="w-full h-full object-cover opacity-30 mix-blend-luminosity"
             />
           </motion.div>
@@ -178,9 +177,7 @@ const HeroBanner = () => {
                     src={currentSlide.image} 
                     alt="" 
                     width={800}
-                    objectFit="contain"
-                    priority={true}
-                    className="w-full h-full transition-transform duration-700 group-hover:scale-105"
+                    className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-ink/40 via-transparent to-transparent opacity-60 pointer-events-none" />
                   

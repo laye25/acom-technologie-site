@@ -5,7 +5,7 @@ import { BLOG_POSTS as STATIC_POSTS } from '../constants';
 import { BlogPost as BlogPostType } from '../types';
 import { motion } from 'motion/react';
 import { Calendar, User, Clock, ArrowLeft, Share2 } from 'lucide-react';
-import OptimizedImage from '../components/OptimizedImage';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const BlogPost = () => {
   const { postId } = useParams();

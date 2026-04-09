@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { dbService } from '../../services/dbService';
 import { supabase } from '../../lib/supabase';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
-import OptimizedImage from '../OptimizedImage';
+import { OptimizedImage } from '../OptimizedImage';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
 
 interface DesignSelectorModalProps {

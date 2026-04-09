@@ -5,7 +5,7 @@ import { BlogPost } from '../types';
 import { motion } from 'motion/react';
 import { Calendar, User, Clock, ArrowRight, ChevronRight, Bookmark } from 'lucide-react';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
-import OptimizedImage from '../components/OptimizedImage';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const Blog = () => {
   const postMapper = useMemo(() => (p: any) => ({

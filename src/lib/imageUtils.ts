@@ -88,3 +88,35 @@ export const compressBase64Image = (base64: string, maxWidth = 1200, maxHeight =
     img.onerror = (err) => reject(err);
   });
 };
+
+/**
+ * Helper to optimize Supabase Storage images using their built-in image transformation
+ */
+export const getOptimizedUrl = (url: string, width: number = 800, quality: number = 80) => {
+  if (!url) return url;
+  
+  // Handle Supabase Storage URLs
+  if (url.includes('supabase.co/storage/v1/object/public/')) {
+    return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&resize=contain&quality=${quality}`;
+  }
+  
+  // Handle Unsplash URLs
+  if (url.includes('unsplash.com')) {
+    const baseUrl = url.split('?')[0];
+    return `${baseUrl}?auto=format&fit=crop&q=${quality}&w=${width}`;
+  }
+
+  // Handle Picsum URLs
+  if (url.includes('picsum.photos')) {
+    // Picsum format is often https://picsum.photos/seed/xxx/width/height
+    // We can try to replace the width/height if it matches the pattern
+    const parts = url.split('/');
+    if (parts.length >= 5 && !isNaN(Number(parts[parts.length - 2]))) {
+      parts[parts.length - 2] = width.toString();
+      parts[parts.length - 1] = Math.round(width * 0.6).toString(); // Maintain some aspect ratio
+      return parts.join('/');
+    }
+  }
+
+  return url;
+};

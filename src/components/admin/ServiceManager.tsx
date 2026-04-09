@@ -5,20 +5,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { dbService as db } from '../../services/dbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
-import { compressImage } from '../../lib/imageUtils';
+import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
+import { OptimizedImage } from '../OptimizedImage';
 
 import { ConfirmModal } from './ConfirmModal';
 
 import { SEOAnalyzer } from './SEOAnalyzer';
-
-// Helper to optimize Supabase Storage images
-const getOptimizedUrl = (url: string, width: number = 400) => {
-  if (!url) return url;
-  if (url.includes('supabase.co/storage/v1/object/public/')) {
-    return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&resize=contain&quality=80`;
-  }
-  return url;
-};
 
 const ServiceManager = () => {
   const serviceMapper = useMemo(() => (s: any) => ({
@@ -312,13 +304,11 @@ const ServiceManager = () => {
           <div key={service.id} className="bg-white p-4 border border-black/5 shadow-sm group relative">
             <div className="relative h-40 mb-4 overflow-hidden bg-gray-100">
               {service.image ? (
-                <img 
-                  src={getOptimizedUrl(service.image, 400)} 
+                <OptimizedImage 
+                  src={service.image} 
                   alt={service.name} 
+                  width={400}
                   className="w-full h-full object-contain" 
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                  decoding="async"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -565,7 +555,7 @@ const ServiceManager = () => {
                   <div className="space-y-3">
                     {currentService?.image && (
                       <div className="relative h-32 w-full rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                        <img src={currentService.image} alt="Preview" className="w-full h-full object-cover" />
+                        <OptimizedImage src={currentService.image} alt="Preview" width={600} className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => setCurrentService(prev => prev ? { ...prev, image: '' } : null)}
@@ -616,9 +606,9 @@ const ServiceManager = () => {
                   <div className="space-y-3">
                     {currentService?.additionalImages && currentService.additionalImages.length > 0 && (
                       <div className="grid grid-cols-4 gap-2">
-                        {currentService.additionalImages.map((img, idx) => (
+                        {currentService.additionalImages.map((imgUrl, idx) => (
                           <div key={idx} className="relative h-20 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 group">
-                            <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                            <OptimizedImage src={imgUrl} alt={`Gallery ${idx}`} width={200} className="w-full h-full object-cover" />
                             <button
                               type="button"
                               onClick={() => removeAdditionalImage(idx)}

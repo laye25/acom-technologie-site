@@ -5,7 +5,7 @@ import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { ArrowRight, ExternalLink, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PORTFOLIO_ITEMS } from '../constants';
-import OptimizedImage from '../components/OptimizedImage';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const Portfolio = () => {
   const projectMapper = useMemo(() => (p: any) => ({

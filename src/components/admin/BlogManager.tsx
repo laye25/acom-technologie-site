@@ -7,7 +7,8 @@ import { fr } from 'date-fns/locale';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { dbService as db } from '../../services/dbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
-import { compressImage } from '../../lib/imageUtils';
+import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
+import { OptimizedImage } from '../OptimizedImage';
 
 import { ConfirmModal } from './ConfirmModal';
 
@@ -236,7 +237,7 @@ const BlogManager = () => {
           <div key={post.id} className="bg-white p-4 rounded-2xl border border-black/5 shadow-sm group relative">
             <div className="relative h-40 mb-4 rounded-xl overflow-hidden bg-gray-100">
               {post.image ? (
-                <img src={post.image} alt={post.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <OptimizedImage src={post.image} alt={post.title} width={500} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                   <FileText className="w-8 h-8" />
@@ -439,7 +440,7 @@ const BlogManager = () => {
                     <div className="space-y-3">
                       {currentPost?.image && (
                         <div className="relative h-40 w-full rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                          <img src={currentPost.image} alt="Preview" className="w-full h-full object-cover" />
+                          <OptimizedImage src={currentPost.image} alt="Preview" width={800} className="w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => setCurrentPost(prev => prev ? { ...prev, image: '' } : null)}

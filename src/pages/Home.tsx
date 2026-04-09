@@ -9,7 +9,7 @@ import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { Link } from 'react-router-dom';
 import { Translate, useTranslation } from '../context/LanguageContext';
 import { dbService as db } from '../services/dbService';
-import OptimizedImage from '../components/OptimizedImage';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const iconMap: { [key: string]: any } = {
   Briefcase, Users, Award, Star, CheckCircle2, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code

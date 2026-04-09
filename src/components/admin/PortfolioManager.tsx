@@ -4,18 +4,10 @@ import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Data
 import { motion, AnimatePresence } from 'motion/react';
 import { useSupabaseData, TableName } from '../../hooks/useSupabase';
 import { dbService as db } from '../../services/dbService';
-import { compressImage } from '../../lib/imageUtils';
+import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
+import { OptimizedImage } from '../OptimizedImage';
 
 import { ConfirmModal } from './ConfirmModal';
-
-// Helper to optimize Supabase Storage images
-const getOptimizedUrl = (url: string, width: number = 400) => {
-  if (!url) return url;
-  if (url.includes('supabase.co/storage/v1/object/public/')) {
-    return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&resize=contain&quality=80`;
-  }
-  return url;
-};
 
 const PortfolioManager = () => {
   const projectMapper = useMemo(() => (item: any) => ({
@@ -203,13 +195,11 @@ const PortfolioManager = () => {
           <div key={item.id} className="bg-white p-4 rounded-2xl border border-black/5 shadow-sm group relative">
             <div className="relative h-48 mb-4 rounded-xl overflow-hidden bg-gray-100">
               {item.image ? (
-                <img 
-                  src={getOptimizedUrl(item.image, 400)} 
+                <OptimizedImage 
+                  src={item.image} 
                   alt={item.title} 
+                  width={400}
                   className="w-full h-full object-cover" 
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                  decoding="async"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -347,7 +337,7 @@ const PortfolioManager = () => {
                   <div className="space-y-3">
                     {currentItem?.image && (
                       <div className="relative h-48 w-full rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                        <img src={currentItem.image} alt="Preview" className="w-full h-full object-cover" />
+                        <OptimizedImage src={currentItem.image} alt="Preview" width={600} className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => setCurrentItem(prev => prev ? { ...prev, image: '' } : null)}

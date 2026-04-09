@@ -26,6 +26,7 @@ import {
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import { OptimizedImage } from '../components/OptimizedImage';
 
 const generateReceiptPDF = (merchant: Merchant, sale: any) => {
   const doc = new jsPDF({
@@ -1568,7 +1569,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
                       <div className="flex items-center space-x-5">
                         <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-110 transition-transform shadow-inner">
                           {product.image ? (
-                            <img src={product.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <OptimizedImage src={product.image} alt={product.name} width={150} className="w-full h-full object-cover" />
                           ) : (
                             <Package className="w-7 h-7 text-gray-200" />
                           )}
@@ -1802,7 +1803,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
                         />
                         {currentProduct?.image && (
                           <div className="w-12 h-12 rounded-xl border border-black/5 overflow-hidden bg-gray-100 flex-shrink-0">
-                            <img src={currentProduct.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <OptimizedImage src={currentProduct.image} alt={currentProduct.name} width={100} className="w-full h-full object-cover" />
                           </div>
                         )}
                       </div>
@@ -2009,7 +2010,7 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
             >
               <div className="w-full aspect-square bg-gray-50 rounded-2xl mb-3 flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-105 transition-transform">
                 {product.image ? (
-                  <img src={product.image} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <OptimizedImage src={product.image} alt={product.name} width={300} className="w-full h-full object-cover" />
                 ) : (
                   <Package className="w-8 h-8 text-gray-200" />
                 )}

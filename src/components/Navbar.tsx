@@ -7,6 +7,7 @@ import { dbService } from '../services/dbService';
 import { LayoutDashboard, LogOut, Menu, X, ShoppingBag, MessageSquare, User, ChevronRight, Calculator, Store, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import DesignSelectorModal from './design/DesignSelectorModal';
+import { OptimizedImage } from './OptimizedImage';
 
 
 const Navbar = () => {
@@ -185,11 +186,11 @@ const Navbar = () => {
                 ))}
                 <div className={`w-px h-4 mx-1 ${useWhiteText ? 'bg-white/20' : 'bg-gray-200'}`} />
                 <Link to="/profile" className="flex items-center pr-2 group">
-                  <img
+                  <OptimizedImage
                     src={profile?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.displayName || user?.email?.split('@')[0] || 'User')}&background=7c3aed&color=fff`}
                     alt="Profile"
+                    width={100}
                     className="w-8 h-8 rounded-full border-2 border-white shadow-sm group-hover:scale-110 transition-transform"
-                    referrerPolicy="no-referrer"
                   />
                 </Link>
                 <button
@@ -277,11 +278,11 @@ const Navbar = () => {
               {user && (
                 <div className="pt-4 border-t border-gray-100 space-y-3">
                   <div className="flex items-center space-x-3 mb-4 p-3 bg-gray-50 rounded-2xl">
-                    <img
+                    <OptimizedImage
                       src={profile?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.displayName || user?.email?.split('@')[0] || 'User')}&background=7c3aed&color=fff`}
                       alt="Profile"
+                      width={100}
                       className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
-                      referrerPolicy="no-referrer"
                     />
                     <div>
                       <p className="text-sm font-bold text-gray-900">{profile?.displayName || 'Utilisateur'}</p>

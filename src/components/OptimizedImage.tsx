@@ -1,95 +1,43 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Loader2, ImageOff } from 'lucide-react';
+import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
+import { ImageIcon } from 'lucide-react';
+import { getOptimizedUrl } from '../lib/imageUtils';
 
-interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+interface OptimizedImageProps extends HTMLMotionProps<"img"> {
   src: string;
   alt: string;
   width?: number;
-  height?: number;
+  quality?: number;
   className?: string;
-  fallbackSrc?: string;
+  containerClassName?: string;
+  fallbackClassName?: string;
   priority?: boolean;
-  objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
 }
 
-/**
- * Optimized Image Component
- * Handles Supabase image transformation, lazy loading, and fallbacks.
- */
-const OptimizedImage: React.FC<OptimizedImageProps> = ({
-  src,
-  alt,
-  width,
-  height,
-  className = '',
-  fallbackSrc,
+export const OptimizedImage: React.FC<OptimizedImageProps> = ({ 
+  src, 
+  alt, 
+  width = 800,
+  quality = 80,
+  className = '', 
+  containerClassName = '',
+  fallbackClassName = '',
   priority = false,
-  objectFit = 'cover',
-  ...props
+  ...props 
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState<string>('');
 
-  // Helper to optimize Supabase Storage images
-  const getOptimizedUrl = (url: string, targetWidth?: number) => {
-    if (!url) return '';
-    
-    // If it's already a data URL or a blob, don't touch it
-    if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  const optimizedSrc = getOptimizedUrl(src, width, quality);
 
-    // Supabase Storage Optimization
-    if (url.includes('supabase.co/storage/v1/object/public/')) {
-      // Note: Image transformation is a paid feature. 
-      // We use a strategy that tries transformation but can fallback.
-      const baseUrl = url.replace('/object/public/', '/render/image/public/');
-      const params = new URLSearchParams();
-      if (targetWidth) params.append('width', targetWidth.toString());
-      params.append('quality', '80');
-      params.append('format', 'webp'); // WebP is much smaller
-      
-      return `${baseUrl}?${params.toString()}`;
-    }
-
-    return url;
-  };
-
+  // Reset state when src changes
   useEffect(() => {
-    if (!src) {
-      setError(true);
-      return;
-    }
-
-    setError(false);
     setIsLoaded(false);
-    
-    // Initial attempt with optimization
-    setCurrentSrc(getOptimizedUrl(src, width));
-  }, [src, width]);
-
-  const handleLoad = () => {
-    setIsLoaded(true);
-  };
-
-  const handleError = () => {
-    // If the optimized URL failed, try the original URL
-    if (currentSrc.includes('/render/image/public/')) {
-      console.warn('Supabase image transformation failed, falling back to original URL');
-      setCurrentSrc(src);
-    } else if (fallbackSrc && currentSrc !== fallbackSrc) {
-      // If original failed, try provided fallback
-      setCurrentSrc(fallbackSrc);
-    } else if (!currentSrc.includes('picsum.photos')) {
-      // Last resort: Picsum placeholder
-      setCurrentSrc(`https://picsum.photos/seed/${encodeURIComponent(alt)}/${width || 800}/${height || 600}`);
-    } else {
-      setError(true);
-    }
-  };
+    setError(false);
+  }, [src]);
 
   return (
-    <div className={`relative overflow-hidden bg-gray-100/50 ${className}`} style={{ width, height }}>
+    <div className={`relative overflow-hidden bg-gray-100 ${containerClassName} ${className.includes('h-') ? '' : 'h-full'} ${className.includes('w-') ? '' : 'w-full'}`}>
       <AnimatePresence>
         {!isLoaded && !error && (
           <motion.div
@@ -97,37 +45,34 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
             exit={{ opacity: 0 }}
             className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10"
           >
-            <Loader2 className="w-6 h-6 text-primary/20 animate-spin" />
-          </motion.div>
-        )}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 text-gray-300 z-10"
-          >
-            <ImageOff className="w-8 h-8 mb-2" />
-            <span className="text-[10px] uppercase font-bold tracking-widest">Image indisponible</span>
+            <div className="w-full h-full animate-pulse bg-gray-200" />
           </motion.div>
         )}
       </AnimatePresence>
 
-      <img
-        src={currentSrc}
-        alt={alt}
-        onLoad={handleLoad}
-        onError={handleError}
-        loading={priority ? 'eager' : 'lazy'}
-        decoding="async"
-        referrerPolicy="no-referrer"
-        className={`w-full h-full transition-all duration-700 ${
-          isLoaded ? 'opacity-100 scale-100 blur-0' : 'opacity-0 scale-105 blur-lg'
-        }`}
-        style={{ objectFit }}
-        {...props}
-      />
+      {error ? (
+        <div className={`flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${fallbackClassName || 'h-full'}`}>
+          <ImageIcon className="w-1/3 h-1/3 opacity-20" />
+          <span className="text-[10px] mt-2 font-mono uppercase tracking-tighter opacity-50">Image non disponible</span>
+        </div>
+      ) : (
+        <motion.img
+          src={optimizedSrc}
+          alt={alt}
+          initial={{ opacity: 0, scale: 1.05 }}
+          animate={{ 
+            opacity: isLoaded ? 1 : 0,
+            scale: isLoaded ? 1 : 1.05
+          }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          onLoad={() => setIsLoaded(true)}
+          onError={() => setError(true)}
+          className={`w-full h-full object-cover ${className}`}
+          loading={priority ? 'eager' : 'lazy'}
+          referrerPolicy="no-referrer"
+          {...props}
+        />
+      )}
     </div>
   );
 };
-
-export default OptimizedImage;
