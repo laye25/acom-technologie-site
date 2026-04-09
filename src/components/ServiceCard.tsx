@@ -7,6 +7,7 @@ import { isPromotionActive, getDiscountedPrice } from '../lib/promotions';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Translate, useTranslation } from '../context/LanguageContext';
+import OptimizedImage from './OptimizedImage';
 
 interface ServiceCardProps {
   service: Service;
@@ -23,15 +24,12 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
         className="group bg-white border border-black/5 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 overflow-hidden flex flex-col h-full"
       >
         <Link to={`/service/${service.id}`} className="block aspect-[4/3] relative overflow-hidden">
-          <img
+          <OptimizedImage
             src={service.image}
             alt={service.name}
-            className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110"
-            referrerPolicy="no-referrer"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = `https://picsum.photos/seed/${service.id}/800/600`;
-            }}
+            width={600}
+            objectFit="contain"
+            className="w-full h-full transition-transform duration-700 group-hover:scale-110"
           />
           <div className="absolute top-6 right-6">
             <span className="px-4 py-1.5 bg-white text-primary text-[10px] font-bold uppercase tracking-[0.2em] shadow-xl border border-white/20 w-fit">

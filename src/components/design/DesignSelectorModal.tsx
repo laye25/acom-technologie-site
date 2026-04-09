@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { dbService } from '../../services/dbService';
 import { supabase } from '../../lib/supabase';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
+import OptimizedImage from '../OptimizedImage';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
 
 interface DesignSelectorModalProps {
@@ -82,7 +83,7 @@ const MiniPreview = ({ elements, bgColor }: { elements: any[], bgColor: string }
           <div key={el.id} style={style}>
             {el.type === 'text' && el.text}
             {el.type === 'image' && el.src && (
-              <img src={el.src} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+              <OptimizedImage src={el.src} alt="Design element" className="w-full h-full object-contain" />
             )}
             {el.type === 'path' && (
               <svg viewBox="0 0 600 350" className="w-full h-full overflow-visible">
@@ -221,6 +222,15 @@ const CATEGORY_COLORS = [
 
 const getCategoryColor = (index: number) => CATEGORY_COLORS[index % CATEGORY_COLORS.length];
 
+// Helper to optimize Supabase Storage images
+const getOptimizedUrl = (url: string, width: number = 400) => {
+  if (!url) return url;
+  if (url.includes('supabase.co/storage/v1/object/public/')) {
+    return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&resize=contain&quality=80`;
+  }
+  return url;
+};
+
 const CategoryBanner = ({ category, onClick }: { category: NavCategory, onClick: () => void }) => {
   return (
     <motion.div
@@ -230,11 +240,11 @@ const CategoryBanner = ({ category, onClick }: { category: NavCategory, onClick:
       className="relative h-48 rounded-3xl overflow-hidden cursor-pointer group shadow-lg"
     >
       {category.coverImage ? (
-        <img 
+        <OptimizedImage 
           src={category.coverImage} 
           alt={category.name}
+          width={800}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-          referrerPolicy="no-referrer"
         />
       ) : (
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
@@ -258,6 +268,24 @@ const CategoryBanner = ({ category, onClick }: { category: NavCategory, onClick:
     </motion.div>
   );
 };
+
+const CategorySkeleton = () => (
+  <div className="h-48 rounded-3xl bg-gray-100 animate-pulse flex flex-col justify-end p-6 space-y-3">
+    <div className="flex items-center space-x-3">
+      <div className="w-10 h-10 rounded-xl bg-gray-200" />
+      <div className="h-6 w-32 bg-gray-200 rounded-lg" />
+    </div>
+    <div className="h-4 w-full bg-gray-200 rounded-lg" />
+  </div>
+);
+
+const TemplateSkeleton = ({ aspectClass }: { aspectClass: string }) => (
+  <div className="w-full animate-pulse">
+    <div className={`w-full ${aspectClass} bg-gray-100 rounded-2xl mb-4`} />
+    <div className="h-4 w-3/4 bg-gray-100 rounded-lg mb-2" />
+    <div className="h-3 w-1/2 bg-gray-50 rounded-lg" />
+  </div>
+);
 
 const getAspectRatioClass = (size: string) => {
   const s = size.toLowerCase();
@@ -296,11 +324,11 @@ const TemplateCard = ({
     >
       <div className={`w-full ${aspectClass} bg-[#f3f4f6] rounded-2xl overflow-hidden mb-4 relative flex items-center justify-center transition-all group-hover:shadow-2xl group-hover:shadow-primary/10 border border-gray-100`}>
         {image ? (
-          <img 
+          <OptimizedImage 
             src={image} 
             alt={item.name} 
+            width={600}
             className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -405,47 +433,60 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Memoize mappers to prevent infinite re-fetching
+  const categoryMapper = useCallback((cat: any) => {
+    const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
+    const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
+    return {
+      ...cat,
+      icon: iconMap[cat.icon] || initial?.icon || Sparkles,
+      color: cat.color || initial?.color || 'text-gray-600',
+      coverImage: cat.cover_image || cat.coverImage
+    };
+  }, []);
+
+  const productMapper = useCallback((prod: any) => ({
+    ...prod,
+    categoryId: prod.category_id || prod.categoryId,
+    coverImage: prod.cover_image || prod.coverImage,
+    userId: prod.user_id || prod.userId
+  }), []);
+
+  const variantMapper = useCallback((v: any) => ({
+    ...v,
+    productId: v.product_id,
+    templateId: v.template_id,
+    previewImage: v.preview_image,
+    minQuantity: v.min_quantity,
+    maxQuantity: v.max_quantity,
+    templateSvg: v.template_svg
+  }), []);
+
   // 1. Fetch Categories with Real-time
   const { data: dbCategories, loading: loadingCats } = useSupabaseData<StudioCategory>({
     tableName: 'studio_acom_categories',
     realtime: true,
-    mapper: (cat: any) => {
-      const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
-      const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
-      return {
-        ...cat,
-        icon: iconMap[cat.icon] || initial?.icon || Sparkles,
-        color: cat.color || initial?.color || 'text-gray-600',
-        coverImage: cat.cover_image || cat.coverImage
-      };
-    }
+    mapper: categoryMapper,
+    skip: !isOpen,
+    limit: 100
   });
 
   // 2. Fetch Products with Real-time
   const { data: dbProducts, loading: loadingProds } = useSupabaseData<Product>({
     tableName: 'studio_acom_products',
     realtime: true,
-    mapper: (prod: any) => ({
-      ...prod,
-      categoryId: prod.category_id || prod.categoryId,
-      coverImage: prod.cover_image || prod.coverImage,
-      userId: prod.user_id || prod.userId
-    })
+    mapper: productMapper,
+    skip: !isOpen,
+    limit: 500
   });
 
   // 3. Fetch Variants with Real-time
   const { data: dbVariants } = useSupabaseData<Variant>({
     tableName: 'variants',
     realtime: true,
-    mapper: (v: any) => ({
-      ...v,
-      productId: v.product_id,
-      templateId: v.template_id,
-      previewImage: v.preview_image,
-      minQuantity: v.min_quantity,
-      maxQuantity: v.max_quantity,
-      templateSvg: v.template_svg
-    })
+    mapper: variantMapper,
+    skip: !isOpen,
+    limit: 1000
   });
 
   // Merge Products and Variants
@@ -515,7 +556,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const { data: userDesigns } = useSupabaseData<any>({
     tableName: 'designs',
     filter: { column: 'ownerId', value: user?.id },
-    skip: !user || activeCategory !== 'saved',
+    skip: !isOpen || !user || activeCategory !== 'saved',
     realtime: true,
     limit: 50
   });
@@ -527,6 +568,9 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const selectedVariant = useMemo(() => 
     selectedProduct?.variants.find(v => v.id === selectedVariantId) || null
   , [selectedProduct, selectedVariantId]);
+
+  // Helper to optimize Supabase Storage images
+  // (Moved to top level)
 
   const filteredProducts = allProducts.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -751,16 +795,20 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                   <div className="p-8">
                     <h2 className="text-2xl font-black text-gray-900 mb-6">Toutes les catégories</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {categories.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id)).map((cat) => (
-                        <CategoryBanner 
-                          key={cat.id}
-                          category={cat}
-                          onClick={() => {
-                            setActiveCategory(cat.id);
-                            setViewStep('products');
-                          }}
-                        />
-                      ))}
+                      {loadingVariants && categories.length <= 4 ? (
+                        [1, 2, 3, 4, 5, 6].map(i => <CategorySkeleton key={i} />)
+                      ) : (
+                        categories.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id)).map((cat) => (
+                          <CategoryBanner 
+                            key={cat.id}
+                            category={cat}
+                            onClick={() => {
+                              setActiveCategory(cat.id);
+                              setViewStep('products');
+                            }}
+                          />
+                        ))
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -774,7 +822,11 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                     
                     {/* Si on a une recherche ou si on est dans une catégorie spécifique, on affiche la grille plate */}
                     {(searchQuery || activeCategory !== 'all') ? (
-                      displayedItems.length > 0 ? (
+                      loadingVariants && displayedItems.length === 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <TemplateSkeleton key={i} aspectClass="aspect-[3.5/2]" />)}
+                        </div>
+                      ) : displayedItems.length > 0 ? (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
                           {displayedItems.map((item) => (
                             <TemplateCard 
@@ -797,7 +849,18 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                     ) : (
                       /* Vue par défaut (Toutes les catégories) : on affiche par sections de catégories */
                       <div className="space-y-16 pb-20">
-                        {allProducts.length === 0 ? (
+                        {loadingVariants && allProducts.length === 0 ? (
+                          <div className="space-y-16">
+                            {[1, 2].map(section => (
+                              <div key={section}>
+                                <div className="h-8 w-48 bg-gray-100 animate-pulse rounded-lg mb-8" />
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                  {[1, 2, 3, 4].map(i => <TemplateSkeleton key={i} aspectClass="aspect-[3.5/2]" />)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : allProducts.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-32 bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
                             <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl mb-6">
                               <Sparkles className="w-10 h-10 text-primary/30" />

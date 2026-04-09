@@ -12,6 +12,10 @@ import { dbService } from '../../services/dbService';
 import { Category, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { supabase } from '../../lib/supabase';
 
+import OptimizedImage from '../OptimizedImage';
+
+// Helper to optimize Supabase Storage images
+
 const StudioAcomManager = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('categories');
@@ -347,7 +351,12 @@ const StudioAcomManager = () => {
             >
               <div className="aspect-video bg-gray-50 rounded-xl mb-4 overflow-hidden relative group/image">
                 {item.coverImage ? (
-                  <img src={item.coverImage} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-110" referrerPolicy="no-referrer" />
+                  <OptimizedImage 
+                    src={item.coverImage} 
+                    alt={item.name} 
+                    width={600}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-110" 
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300">
                     <ImageIcon className="w-12 h-12" />
@@ -535,11 +544,11 @@ const StudioAcomManager = () => {
                       <div className="relative group aspect-video bg-gray-50 rounded-3xl overflow-hidden border-2 border-dashed border-gray-200 hover:border-purple-300 transition-all">
                         {editingItem?.coverImage ? (
                           <>
-                            <img 
+                            <OptimizedImage 
                               src={editingItem.coverImage} 
                               alt="Preview" 
+                              width={800}
                               className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
                             />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <button 
@@ -620,11 +629,11 @@ const StudioAcomManager = () => {
                         <div className="relative group aspect-video bg-gray-50 rounded-3xl overflow-hidden border-2 border-dashed border-gray-200 hover:border-purple-300 transition-all">
                           {editingItem?.coverImage ? (
                             <>
-                              <img 
+                              <OptimizedImage 
                                 src={editingItem.coverImage} 
                                 alt="Preview" 
+                                width={800}
                                 className="w-full h-full object-cover"
-                                referrerPolicy="no-referrer"
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <button 

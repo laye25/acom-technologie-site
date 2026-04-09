@@ -25,11 +25,9 @@ async function startServer() {
       const { to, subject, html } = req.body;
       
       if (!process.env.RESEND_API_KEY) {
-        console.warn("RESEND_API_KEY not configured. Skipping email sending.");
         return res.json({ success: true, message: "Email simulation (API key missing)" });
       }
 
-      console.log(`Attempting to send email to ${to} from service-technique@acomtechnologie.com`);
       const resend = new Resend(process.env.RESEND_API_KEY);
       const { data, error } = await resend.emails.send({
         from: "Acom Technologie <service-technique@acomtechnologie.com>",
@@ -39,11 +37,9 @@ async function startServer() {
       });
 
       if (error) {
-        console.error("Resend API error details:", JSON.stringify(error, null, 2));
         return res.status(500).json({ error: error.message, details: error });
       }
 
-      console.log("Email sent successfully via Resend:", data?.id);
       res.json({ success: true, data });
     } catch (error: any) {
       console.error("Email error:", error);
@@ -69,8 +65,6 @@ async function startServer() {
       
       // Calculate amount in the smallest unit (cents for most, full amount for zero-decimal)
       const stripeAmount = isZeroDecimal ? Math.round(amount) : Math.round(amount * 100);
-
-      console.log(`Creating PaymentIntent: ${amount} ${currency} -> ${stripeAmount} units`);
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: stripeAmount,
@@ -116,7 +110,6 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    console.log("RESEND_API_KEY is", process.env.RESEND_API_KEY ? "configured" : "MISSING");
   });
 }
 

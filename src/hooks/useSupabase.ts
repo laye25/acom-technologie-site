@@ -79,17 +79,24 @@ export function useSupabaseData<T>({
   const fetchData = useCallback(async (forceRefresh = false) => {
     if (skip) return;
     
-    if (!forceRefresh && !realtime) {
+    if (!forceRefresh) {
       const cached = getCachedData(cacheKey);
       if (cached) {
         setData(cached);
-        setLoading(false);
-        return;
+        if (!realtime) {
+          setLoading(false);
+          return;
+        }
       }
     }
 
+    const hasCache = !!getCachedData(cacheKey);
+
     try {
-      setLoading(true);
+      // Only show loading if we don't have cache or it's a forced refresh
+      if (!hasCache || forceRefresh) {
+        setLoading(true);
+      }
       let query: any = supabase.from(tableName).select('*');
 
       if (whereClauses && whereClauses.length > 0) {
@@ -137,7 +144,15 @@ export function useSupabaseData<T>({
       
       if (err) {
         console.error(`Supabase error fetching ${tableName}:`, err);
-        throw err;
+        // Create a more descriptive error for the UI
+        const enhancedError = new Error(JSON.stringify({
+          message: err.message,
+          details: err.details,
+          hint: err.hint,
+          code: err.code,
+          tableName
+        }));
+        throw enhancedError;
       }
 
       const mappedResult = result.map(item => mapper(item));

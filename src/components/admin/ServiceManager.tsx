@@ -11,6 +11,15 @@ import { ConfirmModal } from './ConfirmModal';
 
 import { SEOAnalyzer } from './SEOAnalyzer';
 
+// Helper to optimize Supabase Storage images
+const getOptimizedUrl = (url: string, width: number = 400) => {
+  if (!url) return url;
+  if (url.includes('supabase.co/storage/v1/object/public/')) {
+    return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&resize=contain&quality=80`;
+  }
+  return url;
+};
+
 const ServiceManager = () => {
   const serviceMapper = useMemo(() => (s: any) => ({
     id: s.id,
@@ -303,7 +312,14 @@ const ServiceManager = () => {
           <div key={service.id} className="bg-white p-4 border border-black/5 shadow-sm group relative">
             <div className="relative h-40 mb-4 overflow-hidden bg-gray-100">
               {service.image ? (
-                <img src={service.image} alt={service.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                <img 
+                  src={getOptimizedUrl(service.image, 400)} 
+                  alt={service.name} 
+                  className="w-full h-full object-contain" 
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
                   <ImageIcon className="w-8 h-8" />

@@ -26,6 +26,8 @@ import { notificationService } from '../services/notificationService';
 
 type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom';
 
+import { isSupabaseConfigured } from '../lib/supabase';
+
 const AdminDashboard = () => {
   const { user, isAdmin, isManager, isSuperAdmin, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
@@ -903,20 +905,44 @@ const AdminDashboard = () => {
   };
 
   // Early returns must happen AFTER all hooks are defined
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+        <div className="bg-amber-50 border border-amber-100 rounded-3xl p-12 inline-block max-w-lg">
+          <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Configuration requise</h2>
+          <p className="text-gray-600 mb-8">
+            Supabase n'est pas encore configuré. Veuillez ajouter <strong>VITE_SUPABASE_URL</strong> et <strong>VITE_SUPABASE_ANON_KEY</strong> dans les paramètres de l'application.
+          </p>
+          <Link 
+            to="/"
+            className="px-8 py-3 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all inline-block"
+          >
+            Retour à l'accueil
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (authLoading) return <div className="min-h-screen flex items-center justify-center font-medium text-gray-500">Vérification des accès...</div>;
   if (!hasAccess) return <div className="p-20 text-center font-bold text-red-500">Accès refusé</div>;
 
   if (ordersError) {
-    let errorMessage = "Nous n'avons pas pu récupérer les données du tableau de bord. Cela peut être dû à un problème de connexion ou de permissions.";
+    let errorMessage = "Nous n'avons pas pu récupérer les données du tableau de bord.";
     let errorDetails = "";
+    let errorHint = "";
     
     try {
       const parsedError = JSON.parse(ordersError.message);
-      if (parsedError.error) {
-        errorDetails = parsedError.error;
-        if (errorDetails.includes('insufficient permissions')) {
-          errorMessage = "Permissions insuffisantes. Veuillez contacter l'administrateur pour vérifier vos droits d'accès.";
+      if (parsedError.message) {
+        errorDetails = parsedError.message;
+        if (errorDetails.includes('insufficient permissions') || parsedError.code === '42501') {
+          errorMessage = "Permissions insuffisantes (RLS). Veuillez vérifier vos politiques de sécurité sur Supabase.";
+        } else if (errorDetails.includes('relation') && errorDetails.includes('does not exist')) {
+          errorMessage = `La table '${parsedError.tableName}' n'existe pas. Avez-vous exécuté le script SQL ?`;
         }
+        errorHint = parsedError.hint || "";
       }
     } catch (e) {
       errorDetails = ordersError.message;
@@ -927,20 +953,30 @@ const AdminDashboard = () => {
         <div className="bg-red-50 border border-red-100 rounded-3xl p-12 inline-block max-w-lg">
           <TrendingUp className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Erreur de chargement</h2>
-          <p className="text-gray-600 mb-2">
+          <p className="text-gray-600 mb-4">
             {errorMessage}
           </p>
           {errorDetails && (
-            <p className="text-xs text-red-500 mb-8 font-mono break-all max-w-md mx-auto">
-              {errorDetails}
-            </p>
+            <div className="text-left bg-white/50 p-4 rounded-xl border border-red-100 mb-6">
+              <p className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-1">Détails techniques</p>
+              <p className="text-xs text-red-600 font-mono break-all">{errorDetails}</p>
+              {errorHint && <p className="text-[10px] text-amber-600 mt-2 font-medium italic">Astuce : {errorHint}</p>}
+            </div>
           )}
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-8 py-3 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all"
-          >
-            Réessayer
-          </button>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-8 py-3 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
+            >
+              Réessayer
+            </button>
+            <Link 
+              to="/"
+              className="text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Retour à l'accueil
+            </Link>
+          </div>
         </div>
       </div>
     );

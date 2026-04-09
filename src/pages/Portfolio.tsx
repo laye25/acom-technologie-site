@@ -5,6 +5,7 @@ import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { ArrowRight, ExternalLink, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PORTFOLIO_ITEMS } from '../constants';
+import OptimizedImage from '../components/OptimizedImage';
 
 const Portfolio = () => {
   const projectMapper = useMemo(() => (p: any) => ({
@@ -106,15 +107,11 @@ const Portfolio = () => {
                   className={`group relative ${i % 2 === 1 ? 'md:mt-16' : ''}`}
                 >
                   <div className="relative aspect-[4/5] rounded-[3rem] overflow-hidden bg-gray-100 shadow-2xl transition-transform duration-700 group-hover:scale-[0.98]">
-                    <img 
+                    <OptimizedImage 
                       src={project.image} 
                       alt={project.title} 
+                      width={800}
                       className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = `https://picsum.photos/seed/${project.id}/800/600`;
-                      }}
                     />
                     <div className="absolute inset-0 bg-ink/20 group-hover:bg-ink/40 transition-colors duration-500" />
                     

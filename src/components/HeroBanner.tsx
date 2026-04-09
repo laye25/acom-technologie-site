@@ -4,6 +4,7 @@ import { ArrowRight, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megap
 import { Link } from 'react-router-dom';
 import { dbService as db } from '../services/dbService';
 import { Translate, useTranslation } from '../context/LanguageContext';
+import OptimizedImage from './OptimizedImage';
 
 const iconMap: { [key: string]: any } = {
   Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code
@@ -95,15 +96,12 @@ const HeroBanner = () => {
             transition={{ duration: 10, ease: "linear" }}
             className="absolute inset-0 z-0"
           >
-            <img
+            <OptimizedImage
               src={currentSlide.image}
               alt=""
+              width={1200}
+              priority={true}
               className="w-full h-full object-cover opacity-30 mix-blend-luminosity"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.src = `https://picsum.photos/seed/hero-${current}/1200/800`;
-              }}
             />
           </motion.div>
 
@@ -176,15 +174,13 @@ const HeroBanner = () => {
                 className="hidden lg:block relative ml-auto"
               >
                 <div className="relative z-10 w-[380px] xl:w-[420px] aspect-[4/5] rounded-[3rem] overflow-hidden shadow-2xl border border-white/10 bg-white/5 group flex items-center justify-center">
-                  <img 
+                  <OptimizedImage 
                     src={currentSlide.image} 
                     alt="" 
-                    className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = `https://picsum.photos/seed/hero-${current}/1200/800`;
-                    }}
+                    width={800}
+                    objectFit="contain"
+                    priority={true}
+                    className="w-full h-full transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-ink/40 via-transparent to-transparent opacity-60 pointer-events-none" />
                   
