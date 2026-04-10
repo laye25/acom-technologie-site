@@ -28,6 +28,9 @@ import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { InstallButton } from '../components/InstallButton';
+import { NetworkStatusIndicator } from '../components/NetworkStatusIndicator';
+import { useAuth } from '../context/AuthContext';
+import { LogOut } from 'lucide-react';
 
 const generateReceiptPDF = (merchant: Merchant, sale: any) => {
   const doc = new jsPDF({
@@ -107,7 +110,7 @@ const generateReceiptPDF = (merchant: Merchant, sale: any) => {
 };
 
 const MerchantSaaS = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [loadingMerchant, setLoadingMerchant] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -221,33 +224,47 @@ const MerchantSaaS = () => {
     <div className="min-h-screen bg-gray-50 pt-24 pb-12">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
-          <div className="flex items-center space-x-6">
-            <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner">
-              <Store className="w-8 h-8 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
-              <div className="flex items-center mt-1.5">
-                <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">
-                  {merchant.type === 'entreprise' ? 'Management Entreprise' :
-                   merchant.type === 'chantier' ? 'Management BTP / Chantier' :
-                   merchant.type === 'transport' ? 'Management Flotte' :
-                   merchant.type === 'rh' ? 'Management RH' :
-                   merchant.type === 'scolaire' ? 'Management Scolaire' :
-                   merchant.type === 'medical' ? 'Management Médical' :
-                   'Management Commerce'}
-                </span>
-                <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
-                <span className="text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em]">
-                  Plan {merchant.plan}
-                </span>
+        <div className="flex flex-col mb-12 gap-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center space-x-6">
+              <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner">
+                <Store className="w-8 h-8 text-primary" />
               </div>
+              <div>
+                <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
+                <div className="flex items-center mt-1.5">
+                  <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">
+                    {merchant.type === 'entreprise' ? 'Management Entreprise' :
+                     merchant.type === 'chantier' ? 'Management BTP / Chantier' :
+                     merchant.type === 'transport' ? 'Management Flotte' :
+                     merchant.type === 'rh' ? 'Management RH' :
+                     merchant.type === 'scolaire' ? 'Management Scolaire' :
+                     merchant.type === 'medical' ? 'Management Médical' :
+                     'Management Commerce'}
+                  </span>
+                  <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
+                  <span className="text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em]">
+                    Plan {merchant.plan}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <NetworkStatusIndicator position="inline" />
+              <InstallButton />
+              <button
+                onClick={() => signOut()}
+                className="flex items-center space-x-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-100 transition-all"
+                title="Se déconnecter"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden md:inline">Déconnexion</span>
+              </button>
             </div>
           </div>
           
-          <div className="flex bg-white p-1.5 rounded-[1.5rem] border border-black/5 shadow-sm overflow-x-auto scrollbar-hide items-center gap-2">
-            <InstallButton />
+          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-black/5 shadow-sm items-center gap-2">
             {tabs.map(tab => (
               <TabButton 
                 key={tab.id}
@@ -280,6 +297,17 @@ const MerchantSaaS = () => {
           {activeTab === 'patients' && <MedicalManager key="patients" merchant={merchant} />}
           {activeTab === 'appointments' && <AppointmentManager key="appointments" merchant={merchant} />}
         </AnimatePresence>
+
+        {/* SaaS Footer */}
+        <div className="mt-12 pt-8 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500 font-medium">
+          <p>© {new Date().getFullYear()} Acom Technologie. Tous droits réservés.</p>
+          <a 
+            href="mailto:contact.abdoulayendiaye@gmail.com" 
+            className="hover:text-primary transition-colors mt-2 md:mt-0 flex items-center gap-1.5"
+          >
+            Support technique
+          </a>
+        </div>
       </div>
     </div>
   );

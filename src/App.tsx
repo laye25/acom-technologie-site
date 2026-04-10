@@ -51,14 +51,25 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
 function AppContent() {
   const location = useLocation();
   const isEditor = location.pathname === '/design-editor';
+  
+  // Détection du sous-domaine SaaS (ou simulation via ?mode=saas)
+  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+
+  // Pour le SaaS, on cache le header et le footer pour faire plus "Application"
+  const hideNavbar = isEditor || isSaaSDomain;
+  const hideFooter = isEditor || isSaaSDomain;
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 selection:bg-primary-light selection:text-primary">
       <Toaster position="top-center" reverseOrder={false} />
-      {!isEditor && <Navbar />}
+      {!hideNavbar && <Navbar />}
       <main key={location.key} className={isEditor ? 'h-screen' : ''}>
         <Routes>
-          <Route path="/" element={<Home />} />
+          {isSaaSDomain ? (
+            <Route path="/" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
+          ) : (
+            <Route path="/" element={<Home />} />
+          )}
           <Route path="/login" element={<Login />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/contact" element={<Contact />} />
@@ -89,9 +100,9 @@ function AppContent() {
         </Routes>
       </main>
       
-      {!isEditor && <Footer />}
+      {!hideFooter && <Footer />}
       {!isEditor && <AIAssistant />}
-      <NetworkStatusIndicator />
+      {!isSaaSDomain && <NetworkStatusIndicator position="bottom-right" />}
     </div>
   );
 }

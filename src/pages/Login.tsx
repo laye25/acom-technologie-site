@@ -13,7 +13,12 @@ const Login = () => {
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+      if (isSaaSDomain) {
+        navigate('/');
+      } else {
+        navigate('/dashboard');
+      }
     }
   }, [user, navigate]);
 
@@ -38,7 +43,8 @@ const Login = () => {
     setError(null);
     try {
       await signInWithGoogle();
-      navigate('/dashboard');
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+      navigate(isSaaSDomain ? '/' : '/dashboard');
     } catch (error: any) {
       console.error('Google Auth error:', error);
       if (error.code === 'auth/popup-closed-by-user') {
@@ -89,14 +95,15 @@ const Login = () => {
     setSuccess(null);
 
     try {
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
       if (isLogin) {
         await signInWithEmail(formData.email, formData.password);
-        navigate('/dashboard');
+        navigate(isSaaSDomain ? '/' : '/dashboard');
       } else {
         await signUpWithEmail(formData.email, formData.password, formData.fullName);
         setSuccess('Compte créé avec succès !');
         // Navigate to dashboard immediately after signup since Firebase auto-logs in
-        setTimeout(() => navigate('/dashboard'), 1500);
+        setTimeout(() => navigate(isSaaSDomain ? '/' : '/dashboard'), 1500);
       }
     } catch (error: any) {
       console.error('Auth error:', error);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const InstallButton = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -14,7 +15,7 @@ export const InstallButton = () => {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     // Vérifier si déjà installé
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
       setIsInstalled(true);
     }
 
@@ -24,7 +25,13 @@ export const InstallButton = () => {
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      toast('Pour installer l\'application, utilisez le menu de votre navigateur et sélectionnez "Ajouter à l\'écran d\'accueil".', {
+        icon: '📱',
+        duration: 5000,
+      });
+      return;
+    }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
@@ -32,15 +39,16 @@ export const InstallButton = () => {
     }
   };
 
-  if (isInstalled || !deferredPrompt) return null;
+  if (isInstalled) return null;
 
   return (
     <button
       onClick={handleInstall}
       className="flex items-center space-x-2 px-4 py-2.5 bg-primary text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
+      title="Installer l'application"
     >
       <Download className="w-4 h-4" />
-      <span>Installer l'app</span>
+      <span className="hidden md:inline">Installer l'app</span>
     </button>
   );
 };
