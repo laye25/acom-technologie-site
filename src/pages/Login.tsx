@@ -27,6 +27,24 @@ const Login = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState('Acom Technologie');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { dbService } = await import('../services/dbService');
+        const data = await dbService.settings.get('global');
+        if (data) {
+          if (data.brandName) setBrandName(data.brandName);
+          if (data.logoUrl) setLogoUrl(data.logoUrl);
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -125,9 +143,13 @@ const Login = () => {
         className="max-w-md w-full bg-white rounded-3xl border border-black/5 shadow-xl p-8 md:p-10"
       >
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <span className="text-3xl font-bold text-primary">A</span>
-          </div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-16 h-16 object-contain mx-auto mb-6" />
+          ) : (
+            <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <span className="text-3xl font-bold text-primary">{brandName[0].toUpperCase()}</span>
+            </div>
+          )}
           <h1 className="text-3xl font-bold text-gray-900">
             {isResetting 
               ? 'Réinitialiser' 

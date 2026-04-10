@@ -240,7 +240,7 @@ const SettingsManager = () => {
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<number | null>(null);
+  const [uploading, setUploading] = useState<number | string | null>(null);
   const [uploadingWhyUs, setUploadingWhyUs] = useState(false);
   const [customColors, setCustomColors] = useState<{ [key: number]: { from: string, to: string } }>({
     0: { from: '#8e008e', to: '#ff00ff' }
@@ -791,6 +791,64 @@ const SettingsManager = () => {
                 />
               </div>
 
+              {/* Logo Upload */}
+              <div className="mb-8">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Logo de l'entreprise</label>
+                <div className="flex items-start gap-6">
+                  <div className="w-24 h-24 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden bg-gray-50 relative group">
+                    {settings.logoUrl ? (
+                      <>
+                        <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setSettings({ ...settings, logoUrl: '' })}
+                            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <ImageIcon className="w-8 h-8 text-gray-300" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <label className="inline-flex items-center px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors">
+                        <ImageIcon className="w-4 h-4 mr-2" />
+                        {uploading === 'logo' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Uploader une image'}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setUploading('logo');
+                            try {
+                              const compressed = await compressImage(file, 800, 800, 0.8);
+                              setSettings({ ...settings, logoUrl: compressed });
+                            } catch (error) {
+                              console.error('Error uploading logo:', error);
+                            } finally {
+                              setUploading(null);
+                            }
+                          }}
+                        />
+                      </label>
+                      <p className="text-xs text-gray-400 mt-2">Format recommandé : PNG transparent, max 1Mo.</p>
+                    </div>
+                    <input
+                      type="text"
+                      value={settings.logoUrl || ''}
+                      onChange={(e) => setSettings({ ...settings, logoUrl: e.target.value })}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none transition-all text-sm"
+                      placeholder="Ou coller une URL d'image..."
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Preset Primary Colors */}
               <div className="grid grid-cols-5 gap-3 mb-8">
                 {PRESET_PRIMARY_COLORS.map((color) => (
@@ -1018,7 +1076,7 @@ const SettingsManager = () => {
                     </div>
                   </div>
                   <input
-                    type="url"
+                    type="text"
                     value={slide.image}
                     onChange={e => {
                       const newSlides = [...settings.heroSlides];

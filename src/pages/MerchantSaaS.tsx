@@ -29,7 +29,6 @@ import { jsPDF } from 'jspdf';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { InstallButton } from '../components/InstallButton';
 import { NetworkStatusIndicator } from '../components/NetworkStatusIndicator';
-import { useAuth } from '../context/AuthContext';
 import { LogOut } from 'lucide-react';
 
 const generateReceiptPDF = (merchant: Merchant, sale: any) => {

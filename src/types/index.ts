@@ -353,6 +353,7 @@ export interface ContactSection {
 
 export interface SiteSettings {
   brandName?: string;
+  logoUrl?: string;
   heroSlides: HeroSlide[];
   footer: FooterSettings;
   primaryColor?: string;
@@ -387,6 +388,13 @@ export interface Merchant {
   currency: string;
   createdAt: any;
   updatedAt: any;
+}
+
+export interface Category {
+  id: string;
+  merchantId: string;
+  name: string;
+  description?: string;
 }
 
 export interface MerchantProduct {

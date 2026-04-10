@@ -369,7 +369,7 @@ const PortfolioManager = () => {
                       
                       <div className="flex-1">
                         <input
-                          type="url"
+                          type="text"
                           value={currentItem?.image || ''}
                           onChange={e => setCurrentItem({ ...currentItem, image: e.target.value })}
                           className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none text-sm"

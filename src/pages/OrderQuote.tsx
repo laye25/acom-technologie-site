@@ -173,9 +173,13 @@ const OrderQuote = () => {
         <div className="p-6 sm:p-12 md:p-16 bg-gray-900 text-white flex flex-col md:flex-row justify-between items-start gap-12">
           <div>
             <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-2xl flex items-center justify-center">
-                <span className="text-xl sm:text-2xl font-black text-white">{(settings?.brandName || 'Acom')[0]}</span>
-              </div>
+              {settings?.logoUrl ? (
+                <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
+              ) : (
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-2xl flex items-center justify-center">
+                  <span className="text-xl sm:text-2xl font-black text-white">{(settings?.brandName || 'Acom')[0]}</span>
+                </div>
+              )}
               <span className="text-xl sm:text-2xl font-black tracking-tighter uppercase">{settings?.brandName || 'Acom Technologie'}</span>
             </div>
             <div className="space-y-2 text-white/60 text-xs sm:text-sm">

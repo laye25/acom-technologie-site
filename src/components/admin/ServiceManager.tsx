@@ -587,7 +587,7 @@ const ServiceManager = () => {
                       
                       <div className="flex-1">
                         <input
-                          type="url"
+                          type="text"
                           value={currentService?.image || ''}
                           onChange={e => setCurrentService(prev => prev ? { ...prev, image: e.target.value } : null)}
                           className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none text-sm"
@@ -643,7 +643,7 @@ const ServiceManager = () => {
                       
                       <div className="flex-1">
                         <input
-                          type="url"
+                          type="text"
                           onKeyDown={e => {
                             if (e.key === 'Enter') {
                               e.preventDefault();

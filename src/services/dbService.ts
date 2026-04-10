@@ -76,20 +76,51 @@ export const dbService = {
     }
   },
   settings: {
-    async save(id: string, data: any) {
-      const { error } = await supabase.from('settings').upsert({ id, data, updated_at: new Date() });
-      if (error) throw error;
+    async save(id: string, settingsData: any) {
+      try {
+        // Try with 'data' column first (as per schema)
+        const { error } = await supabase.from('settings').upsert({ 
+          id, 
+          data: settingsData, 
+          updated_at: new Date() 
+        });
+        
+        // If that fails with "column data does not exist", try spreading the properties
+        if (error && (error.message.includes('column "data"') || error.code === '42703')) {
+          const { error: error2 } = await supabase.from('settings').upsert({ 
+            id, 
+            ...settingsData, 
+            updated_at: new Date() 
+          });
+          if (error2) throw error2;
+          return;
+        }
+        
+        if (error) throw error;
+      } catch (error) {
+        console.error('Error saving settings:', error);
+        throw error;
+      }
     },
     async get(id: string) {
-      const { data, error } = await supabase.from('settings').select('data').eq('id', id).single();
-      if (error) return null;
-      return data.data;
+      try {
+        const { data, error } = await supabase.from('settings').select('*').eq('id', id).single();
+        if (error) return null;
+        // If it has a 'data' property and it's an object, return that, otherwise return the whole object
+        return (data.data && typeof data.data === 'object') ? data.data : data;
+      } catch (error) {
+        console.error('Error getting settings:', error);
+        return null;
+      }
     },
     onSnapshot(id: string, callback: (data: any) => void) {
       const channel = supabase
         .channel(`public:settings:id=eq.${id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `id=eq.${id}` }, (payload: any) => {
-          callback(payload.new?.data);
+          const newData = payload.new;
+          if (newData) {
+            callback((newData.data && typeof newData.data === 'object') ? newData.data : newData);
+          }
         })
         .subscribe();
       

@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbService as db } from '../services/dbService';
-import { Order, OrderStatus, UserProfile, Service, Expense } from '../types';
+import { dbService } from '../services/dbService';
+import { db } from '../db/db';
+import { syncService } from '../services/syncService';
+import { Order, OrderStatus, UserProfile, Service, Expense, SiteSettings } from '../types';
 import { useSupabaseData, TableName } from '../hooks/useSupabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette } from 'lucide-react';
@@ -51,7 +53,7 @@ const AdminDashboard = () => {
         transactionId: 'MANUAL_ADMIN_' + Date.now()
       };
 
-      await db.orders.save({
+      await dbService.orders.save({
         id: order.id,
         paid: true,
         depositPaid: true,
@@ -86,7 +88,7 @@ const AdminDashboard = () => {
         transactionId: 'MANUAL_BALANCE_ADMIN_' + Date.now()
       };
 
-      await db.orders.save({
+      await dbService.orders.save({
         id: order.id,
         paid: true,
         balancePaid: true,
@@ -378,10 +380,12 @@ const AdminDashboard = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [settingsData, setSettingsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
+      setError(null);
       try {
         // Load from Dexie
         const [o, s, u, e, st] = await Promise.all([
@@ -394,7 +398,10 @@ const AdminDashboard = () => {
         setOrders(o as Order[]);
         setDynamicServices(s as Service[]);
         setUsers(u as UserProfile[]);
-        setExpenses(e as Expense[]);
+        setExpenses((e as any[]).map(exp => ({
+          ...exp,
+          updatedAt: exp.updatedAt || exp.created_at || exp.createdAt || new Date()
+        })) as Expense[]);
         setSettingsData(st);
 
         // Sync in background (séquentiel pour lisser la charge IO)
@@ -428,11 +435,15 @@ const AdminDashboard = () => {
           setOrders(o2 as Order[]);
           setDynamicServices(s2 as Service[]);
           setUsers(u2 as UserProfile[]);
-          setExpenses(e2 as Expense[]);
+          setExpenses((e2 as any[]).map(exp => ({
+            ...exp,
+            updatedAt: exp.updatedAt || exp.created_at || exp.createdAt || new Date()
+          })) as Expense[]);
           setSettingsData(st2);
         }
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
+      } catch (err: any) {
+        console.error('Error loading dashboard data:', err);
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -942,7 +953,7 @@ const AdminDashboard = () => {
       const order = orders.find(o => o.id === orderId);
       if (!order) return;
 
-      await db.orders.save({
+      await dbService.orders.save({
         id: orderId,
         status: newStatus,
         updatedAt: new Date().toISOString()
@@ -990,13 +1001,13 @@ const AdminDashboard = () => {
   if (authLoading) return <div className="min-h-screen flex items-center justify-center font-medium text-gray-500">Vérification des accès...</div>;
   if (!hasAccess) return <div className="p-20 text-center font-bold text-red-500">Accès refusé</div>;
 
-  if (ordersError) {
+  if (error) {
     let errorMessage = "Nous n'avons pas pu récupérer les données du tableau de bord.";
     let errorDetails = "";
     let errorHint = "";
     
     try {
-      const parsedError = JSON.parse(ordersError.message);
+      const parsedError = JSON.parse(error.message);
       if (parsedError.message) {
         errorDetails = parsedError.message;
         if (errorDetails.includes('insufficient permissions') || parsedError.code === '42501') {
@@ -1007,7 +1018,7 @@ const AdminDashboard = () => {
         errorHint = parsedError.hint || "";
       }
     } catch (e) {
-      errorDetails = ordersError.message;
+      errorDetails = error.message;
     }
 
     return (
@@ -1107,7 +1118,7 @@ const AdminDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            {ordersLoading ? (
+            {loading ? (
               <div className="p-20 text-center">
                 <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
                 <p className="text-gray-500 font-medium">Chargement des commandes...</p>
@@ -1595,7 +1606,7 @@ const AdminDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            {ordersLoading ? (
+            {loading ? (
               <div className="p-20 text-center">
                 <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
                 <p className="text-gray-500 font-medium">Chargement des commandes...</p>

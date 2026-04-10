@@ -150,12 +150,24 @@ export const syncService = {
   async syncSettings(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
+      // Settings might be global or per-merchant. 
+      // The schema doesn't have merchant_id for settings yet, so we fetch all or by ID.
       const { data: remoteSettings, error } = await supabase
         .from('settings')
-        .select('*')
-        .eq('merchant_id', merchantId);
+        .select('*');
+      
       if (error) throw error;
-      if (remoteSettings) await db.settings.bulkPut(remoteSettings);
+      
+      if (remoteSettings) {
+        // Map data if it's wrapped in a 'data' column
+        const mappedSettings = remoteSettings.map(s => {
+          if (s.data && typeof s.data === 'object') {
+            return { ...s.data, id: s.id };
+          }
+          return s;
+        });
+        await db.settings.bulkPut(mappedSettings);
+      }
     } catch (error) {
       console.error('Sync settings failed:', error);
     }

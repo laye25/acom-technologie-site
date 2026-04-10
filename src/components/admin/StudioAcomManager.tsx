@@ -9,11 +9,12 @@ import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useSupabaseData } from '../../hooks/useSupabase';
 import { dbService } from '../../services/dbService';
-import { Category, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
+import { Category as StudioCategory, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { supabase } from '../../lib/supabase';
 import { OptimizedImage } from '../OptimizedImage';
 import { db } from '../../db/db';
 import { syncService } from '../../services/syncService';
+import { Category as MerchantCategory } from '../../types';
 
 const StudioAcomManager = () => {
   console.log('StudioAcomManager rendering');
@@ -23,12 +24,17 @@ const StudioAcomManager = () => {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<StudioCategory[]>([]);
   const [loadingCats, setLoadingCats] = useState(true);
 
   const refreshCats = async () => {
     const cats = await db.categories.toArray();
-    setCategories(cats);
+    setCategories(cats.map(c => ({
+      ...c,
+      sub: (c as any).sub || '',
+      icon: (c as any).icon || FolderOpen,
+      color: (c as any).color || 'text-primary'
+    })) as StudioCategory[]);
   };
 
   // Charger les catégories depuis Dexie au montage
@@ -37,14 +43,24 @@ const StudioAcomManager = () => {
       setLoadingCats(true);
       try {
         const localCats = await db.categories.toArray();
-        setCategories(localCats);
+        setCategories(localCats.map(c => ({
+          ...c,
+          sub: (c as any).sub || '',
+          icon: (c as any).icon || FolderOpen,
+          color: (c as any).color || 'text-primary'
+        })) as StudioCategory[]);
         
         // Synchroniser avec Supabase en arrière-plan
         await syncService.syncCategories(user?.id || '');
         
         // Recharger depuis Dexie après synchronisation
         const updatedCats = await db.categories.toArray();
-        setCategories(updatedCats);
+        setCategories(updatedCats.map(c => ({
+          ...c,
+          sub: (c as any).sub || '',
+          icon: (c as any).icon || FolderOpen,
+          color: (c as any).color || 'text-primary'
+        })) as StudioCategory[]);
       } catch (error) {
         console.error('Error loading categories:', error);
       } finally {
@@ -59,7 +75,12 @@ const StudioAcomManager = () => {
 
   const refreshProducts = async () => {
     const products = await db.products.toArray();
-    setProducts(products);
+    setProducts(products.map(p => ({
+      ...p,
+      categoryId: p.merchantId,
+      coverImage: p.image || '',
+      variants: []
+    })) as Product[]);
   };
 
   // Charger les produits depuis Dexie au montage
@@ -592,7 +613,7 @@ const StudioAcomManager = () => {
                         )}
                       </div>
                       <input
-                        type="url"
+                        type="text"
                         placeholder="Ou collez une URL d'image ici..."
                         value={editingItem?.coverImage || ''}
                         onChange={(e) => setEditingItem({ ...editingItem, coverImage: e.target.value })}
@@ -677,7 +698,7 @@ const StudioAcomManager = () => {
                           )}
                         </div>
                         <input
-                          type="url"
+                          type="text"
                           placeholder="Ou URL de l'image..."
                           value={editingItem?.coverImage || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, coverImage: e.target.value })}
@@ -853,7 +874,7 @@ const StudioAcomManager = () => {
                                         )}
                                       </div>
                                       <div className="flex-1 space-y-2">
-                                        <input type="url" value={v.previewImage || ''} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].previewImage = e.target.value; setEditingItem({ ...editingItem, variants: newVariants }); }} placeholder="URL de l'image" className="w-full px-4 py-2 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none font-bold text-xs transition-all" />
+                                        <input type="text" value={v.previewImage || ''} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].previewImage = e.target.value; setEditingItem({ ...editingItem, variants: newVariants }); }} placeholder="URL de l'image" className="w-full px-4 py-2 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none font-bold text-xs transition-all" />
                                         <p className="text-[10px] text-gray-400 font-bold italic">Image miniature pour ce modèle spécifique.</p>
                                       </div>
                                     </div>

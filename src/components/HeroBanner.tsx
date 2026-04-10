@@ -39,6 +39,7 @@ const HeroBanner = () => {
   const [current, setCurrent] = useState(0);
   const [slides, setSlides] = useState(DEFAULT_SLIDES);
   const [brandName, setBrandName] = useState('Acom Technologie');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -55,6 +56,9 @@ const HeroBanner = () => {
           }
           if (data.brandName) {
             setBrandName(data.brandName);
+          }
+          if (data.logoUrl) {
+            setLogoUrl(data.logoUrl);
           }
         }
       } catch (error) {
@@ -119,7 +123,11 @@ const HeroBanner = () => {
                   transition={{ delay: 0.2 }}
                   className="flex items-center space-x-3 mb-6"
                 >
-                  <div className="w-12 h-px bg-primary" />
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain" />
+                  ) : (
+                    <div className="w-12 h-px bg-primary" />
+                  )}
                   <span className="text-xs font-mono text-primary uppercase tracking-[0.4em] font-bold">{brandName}</span>
                 </motion.div>
 

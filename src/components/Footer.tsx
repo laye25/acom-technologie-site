@@ -10,6 +10,7 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
   const [settings, setSettings] = useState<any>(null);
   const [brandName, setBrandName] = useState('Acom Technologie');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -20,6 +21,9 @@ const Footer = () => {
           setSettings(data.footer);
           if (data.brandName) {
             setBrandName(data.brandName);
+          }
+          if (data.logoUrl) {
+            setLogoUrl(data.logoUrl);
           }
         }
       } catch (error) {
@@ -86,15 +90,33 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
           {/* Brand Column */}
           <div className="space-y-6">
-            <Link to="/" className="flex items-center">
-              <span className="text-2xl font-bold text-primary tracking-tighter">
-                {brandName.split(' ')[0].toUpperCase()}
-              </span>
-              {brandName.split(' ').length > 1 && (
-                <span className="ml-1 text-xs font-mono text-gray-400 uppercase tracking-widest">
-                  {brandName.split(' ').slice(1).join(' ')}
-                </span>
+            <Link to="/" className="flex items-center space-x-3">
+              {logoUrl ? (
+                <img 
+                  src={logoUrl} 
+                  alt="Logo" 
+                  className="w-8 h-8 object-contain"
+                />
+              ) : (
+                <img 
+                  src="/logo.svg" 
+                  alt="Logo" 
+                  className="w-8 h-8 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
               )}
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-primary tracking-tighter leading-none">
+                  {brandName.split(' ')[0].toUpperCase()}
+                </span>
+                {brandName.split(' ').length > 1 && (
+                  <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest leading-none mt-1">
+                    {brandName.split(' ').slice(1).join(' ')}
+                  </span>
+                )}
+              </div>
             </Link>
             <p className="text-gray-500 text-sm leading-relaxed">
               <Translate>{settings?.description || `Votre partenaire digital de confiance au Sénégal. Nous transformons vos idées en solutions numériques performantes et innovantes.`}</Translate>

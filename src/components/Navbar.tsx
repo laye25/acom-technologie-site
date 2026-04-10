@@ -17,6 +17,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [brandName, setBrandName] = useState('Acom Technologie');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [hasMerchantAccount, setHasMerchantAccount] = useState(false);
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
   const location = useLocation();
@@ -42,11 +43,12 @@ const Navbar = () => {
     const fetchSettings = async () => {
       try {
         const data = await dbService.settings.get('global');
-        if (data && data.brandName) {
-          setBrandName(data.brandName);
+        if (data) {
+          if (data.brandName) setBrandName(data.brandName);
+          if (data.logoUrl) setLogoUrl(data.logoUrl);
         }
       } catch (error) {
-        console.error('Error fetching brand name:', error);
+        console.error('Error fetching settings:', error);
       }
     };
     fetchSettings();
@@ -110,11 +112,32 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-6 md:px-12">
         <div className="flex justify-between items-center">
           {/* Logo */}
-          <Link to="/" className="group flex items-center space-x-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-logo text-2xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform relative overflow-hidden">
-              <span className="relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">{brandName.charAt(0).toUpperCase()}</span>
-              <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent" />
-            </div>
+          <Link to="/" className="group flex items-center space-x-3">
+            {logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="w-10 h-10 object-contain group-hover:scale-110 transition-transform"
+              />
+            ) : (
+              <>
+                <img 
+                  src="/logo.svg" 
+                  alt="Logo" 
+                  className="w-10 h-10 object-contain group-hover:scale-110 transition-transform"
+                  onError={(e) => {
+                    // Fallback to text if image fails to load
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const fallback = document.getElementById('logo-fallback');
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div id="logo-fallback" className="hidden w-10 h-10 bg-primary rounded-xl items-center justify-center text-white font-logo text-2xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform relative overflow-hidden">
+                  <span className="relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">{brandName.charAt(0).toUpperCase()}</span>
+                  <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent" />
+                </div>
+              </>
+            )}
             <div className="flex flex-col">
               <span className={`text-xl font-display font-bold tracking-tight leading-none transition-colors ${useWhiteText ? 'text-white' : 'text-ink'}`}>
                 {brandName.split(' ')[0].toUpperCase()}
