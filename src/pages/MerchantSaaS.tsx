@@ -121,16 +121,8 @@ const MerchantSaaS = () => {
       if (!user) return;
       try {
         setLoadingMerchant(true);
-        // Try to get from Dexie first
-        let m = await db.merchants.where('ownerId').equals(user.id).first();
-        
-        // If not found, try to fetch from Supabase and save to Dexie
-        if (!m) {
-          m = await dbService.merchants.getByOwner(user.id);
-          if (m) {
-            await db.merchants.put(m);
-          }
-        }
+        // Fetch from Supabase
+        const m = await db.merchants.getByOwner(user.id);
         setMerchant(m);
       } catch (error) {
         console.error('Error fetching merchant:', error);
@@ -354,7 +346,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
       case 'medical':
         return { label: "l'établissement médical", placeholder: "ex: Clinique du Parc" };
       default:
-        return { label: "la boutique", placeholder: "ex: Ma Boutique Tech" };
+        return { label: "votre organisation", placeholder: "ex: Mon Entreprise / Établissement" };
     }
   };
 
@@ -498,7 +490,7 @@ const PlanUpgradeModal = ({
       id: 'BASIC',
       name: 'BASIC',
       price: '10 000',
-      description: 'Pour les petites boutiques',
+      description: 'Pour les petites structures',
       features: ['Ventes illimitées', '3 utilisateurs', 'Facturation PDF'],
       color: 'bg-blue-50 text-blue-600'
     },
@@ -507,8 +499,8 @@ const PlanUpgradeModal = ({
       name: 'STANDARD',
       price: '25 000',
       recommended: true,
-      description: 'Pour les commerces en croissance',
-      features: ['Multi-boutiques', 'Analytique avancée', 'Support prioritaire'],
+      description: 'Pour les structures en croissance',
+      features: ['Multi-établissements', 'Analytique avancée', 'Support prioritaire'],
       color: 'bg-primary/10 text-primary'
     },
     {
@@ -516,7 +508,7 @@ const PlanUpgradeModal = ({
       name: 'PREMIUM',
       price: '45 000',
       description: 'La solution complète',
-      features: ['Boutiques illimitées', 'API personnalisée', 'Account Manager'],
+      features: ['Établissements illimités', 'API personnalisée', 'Account Manager'],
       color: 'bg-purple-50 text-purple-600'
     }
   ];
@@ -2835,7 +2827,7 @@ const MerchantSettings = ({
         <form onSubmit={handleSave} className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Nom de l'établissement / Boutique</label>
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Nom de l'organisation</label>
               <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold text-lg" />
             </div>
             <div>
