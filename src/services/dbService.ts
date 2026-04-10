@@ -257,15 +257,16 @@ export const dbService = {
   },
   merchants: {
     async getByOwner(ownerId: string) {
-      const { data, error } = await supabase.from('merchants').select('*').eq('owner_id', ownerId).maybeSingle();
+      const { data, error } = await supabase.from('merchants').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(1);
       if (error) throw error;
-      if (!data) return null;
+      if (!data || data.length === 0) return null;
       
+      const merchant = data[0];
       return {
-        ...data,
-        ownerId: data.owner_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at
+        ...merchant,
+        ownerId: merchant.owner_id,
+        createdAt: merchant.created_at,
+        updatedAt: merchant.updated_at
       };
     },
     async save(merchant: any) {
