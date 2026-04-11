@@ -47,49 +47,78 @@ const AdminDashboard = () => {
   const handleFixImages = async () => {
     setShowFixConfirm(false);
     setIsFixingImages(true);
-    const toastId = toast.loading('Migration des images en cours...');
+    const toastId = toast.loading('Synchronisation et migration des images...');
 
     try {
       const { storageService } = await import('../services/storageService');
+      
+      // Force sync before fixing to ensure Dexie is up to date
+      if (user?.id) {
+        toast.loading('Synchronisation des données...', { id: toastId });
+        await Promise.all([
+          syncService.syncServices(user.id),
+          syncService.syncCategories(user.id),
+          syncService.syncProducts(user.id)
+        ]);
+      }
+
+      // 1. Fetch all data
+      const services = await db.services.toArray();
+      const categories = await db.categories.toArray() as any[];
+      const products = await db.products.toArray() as any[];
+
       let fixedCount = 0;
+      toast.loading(`Vérification de ${services.length} services, ${categories.length} catégories et ${products.length} produits...`, { id: toastId });
 
       // 1. Fix Services
-      const services = await db.services.toArray();
+      console.log(`Checking ${services.length} services for base64 images...`);
       for (const service of services) {
-        if (service.image && service.image.startsWith('data:')) {
+        const img = service.image || (service as any).cover_image;
+        if (img && typeof img === 'string' && img.startsWith('data:')) {
           try {
-            const url = await storageService.uploadFile('services', `main/${service.id}.jpg`, service.image);
+            const url = await storageService.uploadFile('services', `main/${service.id}.jpg`, img);
             await dbService.services.save({ ...service, image: url });
+            await db.services.update(service.id, { image: url });
             fixedCount++;
           } catch (e) { console.error('Error fixing service image:', e); }
         }
       }
 
       // 2. Fix Studio ACOM Categories
-      const categories = await db.categories.toArray() as any[];
+      console.log(`Checking ${categories.length} categories for base64 images...`);
       for (const cat of categories) {
-        if (cat.coverImage && cat.coverImage.startsWith('data:')) {
+        const img = cat.coverImage || cat.cover_image;
+        if (img && typeof img === 'string' && img.startsWith('data:')) {
           try {
-            const url = await storageService.uploadFile('studio-acom', `categories/${cat.id}.jpg`, cat.coverImage);
-            await dbService.studioAcom.categories.save({ ...cat, coverImage: url });
+            const url = await storageService.uploadFile('studio-acom', `categories/${cat.id}.jpg`, img);
+            const updatedCat = { ...cat, coverImage: url, cover_image: url };
+            await dbService.studioAcom.categories.save(updatedCat);
+            await db.categories.put(updatedCat);
             fixedCount++;
           } catch (e) { console.error('Error fixing category image:', e); }
         }
       }
 
       // 3. Fix Studio ACOM Products
-      const products = await db.products.toArray() as any[];
+      console.log(`Checking ${products.length} products for base64 images...`);
       for (const prod of products) {
-        if (prod.coverImage && prod.coverImage.startsWith('data:')) {
+        const img = prod.coverImage || prod.cover_image || prod.image;
+        if (img && typeof img === 'string' && img.startsWith('data:')) {
           try {
-            const url = await storageService.uploadFile('studio-acom', `products/${prod.id}.jpg`, prod.coverImage);
-            await dbService.studioAcom.products.save({ ...prod, coverImage: url });
+            const url = await storageService.uploadFile('studio-acom', `products/${prod.id}.jpg`, img);
+            const updatedProd = { ...prod, coverImage: url, cover_image: url, image: url };
+            await dbService.studioAcom.products.save(updatedProd);
+            await db.products.put(updatedProd);
             fixedCount++;
           } catch (e) { console.error('Error fixing product image:', e); }
         }
       }
 
-      toast.success(`${fixedCount} images ont été migrées avec succès !`, { id: toastId });
+      if (fixedCount > 0) {
+        toast.success(`${fixedCount} images ont été migrées avec succès !`, { id: toastId });
+      } else {
+        toast.success(`Toutes les images sont déjà optimisées (0 migration nécessaire).`, { id: toastId });
+      }
     } catch (error: any) {
       console.error('Error fixing images:', error);
       toast.error(`Erreur lors de la migration : ${error.message}`, { id: toastId });
@@ -468,7 +497,9 @@ const AdminDashboard = () => {
             () => syncService.syncServices(user.id),
             () => syncService.syncUsers(user.id),
             () => syncService.syncExpenses(user.id),
-            () => syncService.syncSettings(user.id)
+            () => syncService.syncSettings(user.id),
+            () => syncService.syncCategories(user.id),
+            () => syncService.syncProducts(user.id)
           ];
 
           for (const task of syncTasks) {
@@ -1167,6 +1198,16 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      <ConfirmModal
+        isOpen={showFixConfirm}
+        title="Réparer les images"
+        message="Cette opération va migrer toutes les images encodées en base64 vers Supabase Storage. Cela peut prendre quelques minutes."
+        confirmLabel={isFixingImages ? "Migration..." : "Démarrer la migration"}
+        onConfirm={handleFixImages}
+        onCancel={() => setShowFixConfirm(false)}
+        type="warning"
+      />
+
       <AnimatePresence mode="wait">
         {activeTab === 'overview' && (
           <motion.div
@@ -1208,7 +1249,11 @@ const AdminDashboard = () => {
                         Cet outil les déplace vers Supabase Storage pour une meilleure performance.
                       </p>
                       <button
-                        onClick={() => setShowFixConfirm(true)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowFixConfirm(true);
+                        }}
                         disabled={isFixingImages}
                         className="w-full py-3 bg-white text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary hover:text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                       >
@@ -1252,17 +1297,6 @@ const AdminDashboard = () => {
 
               {/* AI Insights Section */}
                 <PlatformAIInsights orders={orders} services={allServices} expenses={expenses} />
-
-                <ConfirmModal
-                  isOpen={showFixConfirm}
-                  title="Migration des Images"
-                  message="Cette opération va migrer toutes les images stockées localement (base64) vers Supabase Storage. Cela peut prendre quelques minutes. Continuer ?"
-                  confirmLabel="Démarrer la migration"
-                  cancelLabel="Annuler"
-                  onConfirm={handleFixImages}
-                  onCancel={() => setShowFixConfirm(false)}
-                  type="info"
-                />
 
                 {/* Level 1: Global KPIs */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">

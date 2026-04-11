@@ -429,13 +429,18 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
 
   // Memoize mappers to prevent infinite re-fetching
   const categoryMapper = useCallback((cat: any) => {
-    const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
+    const initial = INITIAL_CATEGORIES.find(c => 
+      c.id === cat.id || 
+      c.name.toLowerCase() === cat.name?.toLowerCase() ||
+      cat.name?.toLowerCase().includes(c.name.toLowerCase()) ||
+      c.name.toLowerCase().includes(cat.name?.toLowerCase())
+    );
     const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
     return {
       ...cat,
       icon: iconMap[cat.icon] || initial?.icon || Sparkles,
       color: cat.color || initial?.color || 'text-gray-600',
-      coverImage: cat.cover_image || cat.coverImage
+      coverImage: cat.cover_image || cat.coverImage || initial?.coverImage
     };
   }, []);
 
@@ -491,28 +496,60 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     }));
   }, [dbProducts, dbVariants]);
 
-  // Merge Categories (System + DB)
+  // Merge Categories (System + DB + Initial)
   const allCategories = useMemo(() => {
     const systemCats = CATEGORIES.filter(c => ['saved', 'all', 'favorites', 'categories'].includes(c.id));
     let merged = [...systemCats];
 
+    // 1. Add DB Categories (already mapped by useSupabaseData)
     if (dbCategories && dbCategories.length > 0) {
       dbCategories.forEach((cat: any) => {
-        if (!merged.find(c => c.id === cat.id)) {
+        // Check if already merged by ID OR by Name (to avoid duplicates)
+        const existing = merged.find(c => 
+          c.id === cat.id || 
+          (c.name.toLowerCase() === cat.name?.toLowerCase() && !['all', 'favorites', 'categories', 'saved'].includes(c.id))
+        );
+        
+        if (!existing) {
           merged.push(cat);
-        }
-      });
-    } else if (!loadingCats) {
-      // Only use INITIAL_CATEGORIES if DB is empty and we are not loading
-      INITIAL_CATEGORIES.forEach(cat => {
-        if (!merged.find(c => c.id === cat.id)) {
-          merged.push(cat);
+        } else {
+          // Update existing with DB data if it has more info (like coverImage)
+          if (cat.coverImage && !existing.coverImage) {
+            existing.coverImage = cat.coverImage;
+          }
         }
       });
     }
 
+    // 2. Add Initial Categories if they are not already in merged
+    INITIAL_CATEGORIES.forEach(cat => {
+      const existing = merged.find(c => 
+        c.id === cat.id || 
+        c.name.toLowerCase() === cat.name?.toLowerCase() ||
+        cat.name.toLowerCase().includes(c.name.toLowerCase()) ||
+        c.name.toLowerCase().includes(cat.name.toLowerCase())
+      );
+      
+      if (!existing) {
+        merged.push(cat);
+      } else {
+        // Ensure fallback image is applied if missing or invalid
+        const hasValidImage = existing.coverImage && 
+                             typeof existing.coverImage === 'string' && 
+                             existing.coverImage.length > 10;
+                             
+        if (!hasValidImage) {
+          existing.coverImage = cat.coverImage;
+        }
+        
+        // Also ensure icon and color are set if missing
+        if (!existing.icon) existing.icon = cat.icon;
+        if (!existing.color) existing.color = cat.color;
+      }
+    });
+
     return merged;
-  }, [dbCategories, loadingCats]);
+  }, [dbCategories]);
 
   // Use the merged data
   const categories = allCategories;

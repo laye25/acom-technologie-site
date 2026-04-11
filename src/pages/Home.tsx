@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import ServiceCard from '../components/ServiceCard';
 import HeroBanner from '../components/HeroBanner';
+import Hero from '../components/Hero';
 import { Service, ServiceCategory, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ArrowRight, CheckCircle2, Star, Users, Briefcase, Award, Filter, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, Package, FileText, BarChart3, Construction, Hospital, Truck, GraduationCap, Settings } from 'lucide-react';
@@ -159,107 +160,11 @@ const Home = () => {
         </div>
       </section>
 
+      <Hero />
+
       {/* Services Section - Editorial (Recipe 11) */}
       <section id="services" className="py-20 lg:py-32 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid lg:grid-cols-2 gap-16 items-center mb-12">
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="space-y-8 order-2 lg:order-1"
-            >
-              <div className="inline-flex items-center space-x-3 px-4 py-2 bg-primary/10 rounded-full">
-                <Palette className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">{expertise.badge}</span>
-              </div>
-              
-              <h2 className="text-4xl md:text-6xl font-display font-bold text-ink leading-[1.1] tracking-tighter">
-                <Translate>{expertise.title}</Translate> <Translate>{expertise.subtitle1}</Translate> <br />
-                <span className="text-primary italic"><Translate>{expertise.subtitle2}</Translate></span>
-              </h2>
-              
-              <p className="text-gray-500 text-lg font-light leading-relaxed max-w-md">
-                <Translate>{expertise.description}</Translate>
-              </p>
-
-              <div className="pt-4">
-                <Link
-                  to="/design-editor?select=true"
-                  className="inline-flex items-center space-x-3 px-8 py-4 bg-ink text-white rounded-2xl font-bold hover:bg-primary transition-all group"
-                >
-                  <span>Créer et commander</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative order-1 lg:order-2 mb-8 lg:mb-0"
-            >
-              {/* Stylized Creative Studio Mockup */}
-              <div className="relative bg-gray-50 rounded-[2.5rem] shadow-2xl border border-gray-100 p-4 md:p-8 aspect-[4/3] overflow-hidden group">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 rounded-full bg-primary/40" />
-                    <div className="w-3 h-3 rounded-full bg-primary/20" />
-                    <div className="w-3 h-3 rounded-full bg-primary/10" />
-                  </div>
-                  <div className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">Acom Studio v2.0</div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-6">
-                    <div className="p-6 bg-white rounded-3xl shadow-sm border border-gray-100 transform -rotate-2 group-hover:rotate-0 transition-transform duration-500">
-                      <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
-                        <Palette className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="h-2 w-20 bg-gray-100 rounded-full mb-2" />
-                      <div className="h-2 w-12 bg-gray-50 rounded-full" />
-                    </div>
-                    <div className="p-6 bg-white rounded-3xl shadow-sm border border-gray-100 transform rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                      <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center mb-4">
-                        <Layout className="w-5 h-5 text-indigo-500" />
-                      </div>
-                      <div className="h-2 w-16 bg-gray-100 rounded-full mb-2" />
-                      <div className="h-2 w-24 bg-gray-50 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="pt-12 space-y-6">
-                    <div className="p-6 bg-white rounded-3xl shadow-sm border border-gray-100 transform rotate-2 group-hover:rotate-0 transition-transform duration-500">
-                      <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-4">
-                        <Code className="w-5 h-5 text-emerald-500" />
-                      </div>
-                      <div className="h-2 w-24 bg-gray-100 rounded-full mb-2" />
-                      <div className="h-2 w-16 bg-gray-50 rounded-full" />
-                    </div>
-                    <div className="p-6 bg-white rounded-3xl shadow-sm border border-gray-100 transform -rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                      <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center mb-4">
-                        <Package className="w-5 h-5 text-amber-500" />
-                      </div>
-                      <div className="h-2 w-12 bg-gray-100 rounded-full mb-2" />
-                      <div className="h-2 w-20 bg-gray-50 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Floating Elements */}
-                <motion.div 
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-primary/5 rounded-full blur-3xl" 
-                />
-              </div>
-
-              {/* Decorative background elements */}
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl -z-10" />
-              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-3xl -z-10" />
-            </motion.div>
-          </div>
-
           {/* Exploration Section - Categories & Search */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}

@@ -33,11 +33,12 @@ const StudioAcomManager = () => {
 
   const refreshCats = async () => {
     const cats = await db.categories.toArray();
-    setCategories(cats.map(c => ({
+    setCategories(cats.map((c: any) => ({
       ...c,
-      sub: (c as any).sub || '',
-      icon: (c as any).icon || FolderOpen,
-      color: (c as any).color || 'text-primary'
+      coverImage: c.coverImage || c.cover_image || '',
+      sub: c.sub || '',
+      icon: c.icon || FolderOpen,
+      color: c.color || 'text-primary'
     })) as StudioCategory[]);
   };
 
@@ -47,11 +48,12 @@ const StudioAcomManager = () => {
       setLoadingCats(true);
       try {
         const localCats = await db.categories.toArray();
-        setCategories(localCats.map(c => ({
+        setCategories(localCats.map((c: any) => ({
           ...c,
-          sub: (c as any).sub || '',
-          icon: (c as any).icon || FolderOpen,
-          color: (c as any).color || 'text-primary'
+          coverImage: c.coverImage || c.cover_image || '',
+          sub: c.sub || '',
+          icon: c.icon || FolderOpen,
+          color: c.color || 'text-primary'
         })) as StudioCategory[]);
         
         // Synchroniser avec Supabase en arrière-plan
@@ -59,11 +61,12 @@ const StudioAcomManager = () => {
         
         // Recharger depuis Dexie après synchronisation
         const updatedCats = await db.categories.toArray();
-        setCategories(updatedCats.map(c => ({
+        setCategories(updatedCats.map((c: any) => ({
           ...c,
-          sub: (c as any).sub || '',
-          icon: (c as any).icon || FolderOpen,
-          color: (c as any).color || 'text-primary'
+          coverImage: c.coverImage || c.cover_image || '',
+          sub: c.sub || '',
+          icon: c.icon || FolderOpen,
+          color: c.color || 'text-primary'
         })) as StudioCategory[]);
       } catch (error) {
         console.error('Error loading categories:', error);
@@ -79,10 +82,10 @@ const StudioAcomManager = () => {
 
   const refreshProducts = async () => {
     const products = await db.products.toArray();
-    setProducts(products.map(p => ({
+    setProducts(products.map((p: any) => ({
       ...p,
-      categoryId: p.merchantId,
-      coverImage: p.image || '',
+      categoryId: p.categoryId || p.category_id,
+      coverImage: p.image || p.coverImage || '',
       variants: []
     })) as Product[]);
   };
@@ -93,10 +96,10 @@ const StudioAcomManager = () => {
       setLoadingProducts(true);
       try {
         const localProducts = await db.products.toArray();
-        setProducts(localProducts.map(p => ({
+        setProducts(localProducts.map((p: any) => ({
           ...p,
-          categoryId: p.merchantId, // Mapping correct
-          coverImage: p.image || '',
+          categoryId: p.categoryId || p.category_id, // Mapping correct
+          coverImage: p.image || p.coverImage || '',
           variants: [] // Variants are handled separately
         })) as Product[]);
         
@@ -105,10 +108,10 @@ const StudioAcomManager = () => {
         
         // Recharger depuis Dexie après synchronisation
         const updatedProducts = await db.products.toArray();
-        setProducts(updatedProducts.map(p => ({
+        setProducts(updatedProducts.map((p: any) => ({
           ...p,
-          categoryId: p.merchantId,
-          coverImage: p.image || '',
+          categoryId: p.categoryId || p.category_id,
+          coverImage: p.image || p.coverImage || '',
           variants: []
         })) as Product[]);
       } catch (error) {
@@ -229,20 +232,36 @@ const StudioAcomManager = () => {
       const defaultCats = INITIAL_CATEGORIES.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id));
       
       for (const cat of defaultCats) {
+        // Check if category with same name already exists to avoid duplicates
+        const existing = categories.find(c => 
+          c.id === cat.id || 
+          c.name.toLowerCase() === cat.name.toLowerCase()
+        );
+        
+        if (existing) continue;
+
         // Map the icon object to its name
         const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
         const iconName = Object.keys(iconMap).find(key => iconMap[key] === cat.icon) || 'LayoutGrid';
         
         try {
           // Map to snake_case for Supabase
-          await dbService.studioAcom.categories.save({ 
+          const catData = { 
             id: cat.id,
             name: cat.name,
             sub: cat.sub,
             icon: iconName,
             color: cat.color,
             cover_image: cat.coverImage
-          });
+          };
+          
+          await dbService.studioAcom.categories.save(catData);
+          
+          // Also save to Dexie for immediate UI update
+          await db.categories.put({
+            ...catData,
+            coverImage: cat.coverImage
+          } as any);
         } catch (err) {
           console.error(`Failed to save category ${cat.name}:`, err);
           throw err;
