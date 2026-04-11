@@ -41,6 +41,7 @@ const Dashboard = () => {
   const [ordersError, setOrdersError] = React.useState<any>(null);
 
   React.useEffect(() => {
+    console.log('Dashboard useEffect - user:', user);
     if (!user) {
       setLoading(false);
       return;
@@ -48,6 +49,11 @@ const Dashboard = () => {
 
     let q = query(collection(db, 'orders'), limit(50));
     if (!(isManager || isAdmin)) {
+      if (!user?.id) {
+        console.warn('Dashboard: user.id is undefined');
+        return;
+      }
+      console.log('Dashboard: querying orders for user:', user.id);
       q = query(collection(db, 'orders'), where('user_id', '==', user.id), limit(50));
     } else {
       q = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50));

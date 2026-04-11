@@ -25,5 +25,9 @@ service cloud.firestore {
     match /designs/{designId} {
       allow read, write: if isOwner(resource.data.user_id) || isOwner(request.resource.data.user_id);
     }
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isOwner(resource.data.user_id) || isAdmin());
+      allow write: if false; // Admin only
+    }
   }
 }

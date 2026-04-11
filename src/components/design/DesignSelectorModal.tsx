@@ -574,7 +574,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const [userDesigns, setUserDesigns] = useState<any[]>([]);
 
   React.useEffect(() => {
-    if (!isOpen || !user || activeCategory !== 'saved') return;
+    if (!isOpen || !user?.id || activeCategory !== 'saved') return;
 
     const q = query(
       collection(db, 'designs'),
