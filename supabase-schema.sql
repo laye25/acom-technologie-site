@@ -232,13 +232,61 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Services
+CREATE TABLE IF NOT EXISTS services (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  short_description TEXT,
+  description TEXT,
+  price NUMERIC,
+  category TEXT,
+  image TEXT,
+  image_url TEXT,
+  features JSONB,
+  promotion JSONB,
+  merchant_id TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- RLS Policies (Simplified - Enable RLS and allow all for now, but should be hardened)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public users are viewable by everyone." ON users FOR SELECT USING (true);
 CREATE POLICY "Users can insert their own profile." ON users FOR INSERT WITH CHECK (auth.uid()::text = uid);
 CREATE POLICY "Users can update own profile." ON users FOR UPDATE USING (auth.uid()::text = uid);
 
--- Repeat for other tables as needed...
--- For a quick start, you can disable RLS or add "allow all" policies.
--- ALTER TABLE studio_acom_categories DISABLE ROW LEVEL SECURITY;
--- ...
+-- Studio ACOM RLS
+ALTER TABLE studio_acom_categories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Categories are viewable by everyone" ON studio_acom_categories FOR SELECT USING (true);
+CREATE POLICY "Admins can manage categories" ON studio_acom_categories FOR ALL USING (auth.role() = 'authenticated');
+
+ALTER TABLE studio_acom_products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Products are viewable by everyone" ON studio_acom_products FOR SELECT USING (true);
+CREATE POLICY "Admins can manage products" ON studio_acom_products FOR ALL USING (auth.role() = 'authenticated');
+
+ALTER TABLE variants ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Variants are viewable by everyone" ON variants FOR SELECT USING (true);
+CREATE POLICY "Admins can manage variants" ON variants FOR ALL USING (auth.role() = 'authenticated');
+
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Services are viewable by everyone" ON services FOR SELECT USING (true);
+CREATE POLICY "Admins can manage services" ON services FOR ALL USING (auth.role() = 'authenticated');
+
+-- Storage Policies (To be run in Supabase SQL Editor)
+/*
+-- Create buckets
+INSERT INTO storage.buckets (id, name, public) VALUES ('services', 'services', true) ON CONFLICT DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('studio-acom', 'studio-acom', true) ON CONFLICT DO NOTHING;
+
+-- Allow public access to read
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id IN ('services', 'studio-acom') );
+
+-- Allow authenticated users to upload
+CREATE POLICY "Authenticated users can upload" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id IN ('services', 'studio-acom') AND auth.role() = 'authenticated'
+);
+
+-- Allow authenticated users to delete
+CREATE POLICY "Authenticated users can delete" ON storage.objects FOR DELETE USING (
+  bucket_id IN ('services', 'studio-acom') AND auth.role() = 'authenticated'
+);
+*/

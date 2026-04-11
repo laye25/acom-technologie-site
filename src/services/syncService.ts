@@ -10,20 +10,30 @@ export const syncService = {
     if (!(await this.isOnline())) return;
 
     try {
-      const localCats = await db.categories.where('merchantId').equals(merchantId).toArray();
+      // Studio ACOM categories are global for now, so we sync all
+      const localCats = await db.categories.toArray();
       for (const cat of localCats) {
-        await supabase.from('studio_acom_categories').upsert(cat);
+        // Map to snake_case for Supabase
+        const { coverImage, ...rest } = cat as any;
+        await supabase.from('studio_acom_categories').upsert({
+          ...rest,
+          cover_image: coverImage || (cat as any).cover_image
+        });
       }
 
       const { data: remoteCats, error } = await supabase
         .from('studio_acom_categories')
-        .select('*')
-        .eq('merchant_id', merchantId);
+        .select('*');
 
       if (error) throw error;
 
       if (remoteCats) {
-        await db.categories.bulkPut(remoteCats);
+        // Map back to camelCase for Dexie
+        const mappedCats = remoteCats.map(c => ({
+          ...c,
+          coverImage: c.cover_image
+        }));
+        await db.categories.bulkPut(mappedCats);
       }
     } catch (error) {
       console.error('Sync categories failed:', error);
@@ -34,25 +44,33 @@ export const syncService = {
     if (!(await this.isOnline())) return;
 
     try {
-      // 1. Push local changes to Supabase
-      const localProducts = await db.products.where('merchantId').equals(merchantId).toArray();
+      // Studio ACOM products are also global for now
+      const localProducts = await db.products.toArray();
       for (const product of localProducts) {
-        await supabase.from('merchant_products').upsert(product);
+        const { coverImage, categoryId, ...rest } = product as any;
+        await supabase.from('studio_acom_products').upsert({
+          ...rest,
+          category_id: categoryId || (product as any).category_id,
+          cover_image: coverImage || (product as any).cover_image
+        });
       }
 
-      // 2. Fetch remote changes and update local
       const { data: remoteProducts, error } = await supabase
-        .from('merchant_products')
-        .select('*')
-        .eq('merchant_id', merchantId);
+        .from('studio_acom_products')
+        .select('*');
 
       if (error) throw error;
 
       if (remoteProducts) {
-        await db.products.bulkPut(remoteProducts);
+        const mappedProducts = remoteProducts.map(p => ({
+          ...p,
+          categoryId: p.category_id,
+          coverImage: p.cover_image
+        }));
+        await db.products.bulkPut(mappedProducts);
       }
     } catch (error) {
-      console.error('Sync failed:', error);
+      console.error('Sync products failed:', error);
     }
   },
 

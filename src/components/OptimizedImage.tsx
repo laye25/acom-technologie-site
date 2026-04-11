@@ -54,7 +54,12 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
           alt={alt}
           onLoad={() => setIsLoaded(true)}
           onError={(e) => {
-            console.error(`Failed to load image: ${optimizedSrc}`, e);
+            console.error(`Failed to load image: ${optimizedSrc}`, {
+              originalSrc: src,
+              error: e,
+              isSupabase: src.includes('supabase.co'),
+              isBase64: src.startsWith('data:')
+            });
             setError(true);
           }}
           className={`w-full h-full object-cover ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 ${className}`}

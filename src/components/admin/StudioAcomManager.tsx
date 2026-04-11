@@ -12,17 +12,21 @@ import { dbService } from '../../services/dbService';
 import { Category as StudioCategory, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { supabase } from '../../lib/supabase';
 import { OptimizedImage } from '../OptimizedImage';
+import { ConfirmModal } from './ConfirmModal';
 import { db } from '../../db/db';
 import { syncService } from '../../services/syncService';
 import { Category as MerchantCategory } from '../../types';
 
+import { storageService } from '../../services/storageService';
+
 const StudioAcomManager = () => {
-  console.log('StudioAcomManager rendering');
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'categories' | 'products'>('categories');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   const [categories, setCategories] = useState<StudioCategory[]>([]);
   const [loadingCats, setLoadingCats] = useState(true);
@@ -118,7 +122,6 @@ const StudioAcomManager = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('handleSave called with item:', editingItem);
     
     if (!editingItem?.name) {
       toast.error('Le nom est requis');
@@ -130,11 +133,12 @@ const StudioAcomManager = () => {
       return;
     }
 
-    // Confirmation before saving large modifications
-    if (editingItem?.id && !window.confirm('Voulez-vous vraiment enregistrer ces modifications ?')) {
+    if (editingItem?.id && !showSaveConfirm) {
+      setShowSaveConfirm(true);
       return;
     }
 
+    setShowSaveConfirm(false);
     const loadingToast = toast.loading('Enregistrement en cours...');
     try {
       const dataToSave = { ...editingItem };
@@ -152,7 +156,6 @@ const StudioAcomManager = () => {
         }
       });
 
-      let savedItem;
       if (activeTab === 'categories') {
         // 1. Sauvegarder localement dans Dexie
         await db.categories.put(dataToSave);
@@ -178,11 +181,12 @@ const StudioAcomManager = () => {
   };
 
   const handleDelete = async (id: string): Promise<boolean> => {
-    console.log('handleDelete called for id:', id, 'on tab:', activeTab);
-    if (!window.confirm('Voulez-vous vraiment supprimer cet élément ? Cette action est irréversible.')) {
+    if (!showDeleteConfirm) {
+      setShowDeleteConfirm(id);
       return false;
     }
     
+    setShowDeleteConfirm(null);
     const loadingToast = toast.loading('Suppression en cours...');
     try {
       if (activeTab === 'categories') {
@@ -221,19 +225,14 @@ const StudioAcomManager = () => {
     setIsImporting(true);
     setImportSuccess(false);
     try {
-      console.log('Starting import of default data...');
       // Import Categories
       const defaultCats = INITIAL_CATEGORIES.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id));
-      console.log(`Found ${defaultCats.length} categories to import.`);
       
       for (const cat of defaultCats) {
-        console.log(`Importing category: ${cat.name} (${cat.id})...`);
-        
         // Map the icon object to its name
         const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
         const iconName = Object.keys(iconMap).find(key => iconMap[key] === cat.icon) || 'LayoutGrid';
         
-        console.log(`Resolved icon name: ${iconName}`);
         try {
           // Map to snake_case for Supabase
           await dbService.studioAcom.categories.save({ 
@@ -244,7 +243,6 @@ const StudioAcomManager = () => {
             color: cat.color,
             cover_image: cat.coverImage
           });
-          console.log(`Successfully saved category: ${cat.name}`);
         } catch (err) {
           console.error(`Failed to save category ${cat.name}:`, err);
           throw err;
@@ -253,9 +251,7 @@ const StudioAcomManager = () => {
 
       // Import Products
       if (INITIAL_PRODUCTS.length > 0) {
-        console.log(`Found ${INITIAL_PRODUCTS.length} products to import.`);
         for (const product of INITIAL_PRODUCTS) {
-          console.log(`Importing product: ${product.name} (${product.id})...`);
           try {
             // Map to snake_case for Supabase
             await dbService.studioAcom.products.save({
@@ -267,35 +263,48 @@ const StudioAcomManager = () => {
               user_id: product.userId,
               variants: product.variants
             });
-            console.log(`Successfully saved product: ${product.name}`);
           } catch (err) {
             console.error(`Failed to save product ${product.name}:`, err);
             throw err;
           }
         }
-      } else {
-        console.log('No default products found to import.');
       }
       
-      console.log('Import completed successfully!');
       refreshCats();
       refreshProducts();
       setImportSuccess(true);
       setTimeout(() => setImportSuccess(false), 3000);
     } catch (error) {
       console.error('Error importing defaults:', error);
-      alert('Erreur lors de l\'importation : ' + (error instanceof Error ? error.message : 'Erreur inconnue'));
+      toast.error('Erreur lors de l\'importation : ' + (error instanceof Error ? error.message : 'Erreur inconnue'));
     } finally {
       setIsImporting(false);
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, subPath: string = 'general') => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    const loadingToast = toast.loading('Téléchargement de l\'image...');
+    try {
+      // Create a unique path for the image
+      const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const bucket = 'studio-acom';
+      const path = `${activeTab}/${subPath}/${fileName}`;
+
+      const publicUrl = await storageService.uploadFile(bucket, path, file);
+      
+      setEditingItem({ ...editingItem, [field]: publicUrl });
+      toast.success('Image téléchargée !', { id: loadingToast });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      
+      // Fallback to base64 if storage fails (e.g. bucket not created yet)
       const reader = new FileReader();
       reader.onloadend = () => {
         setEditingItem({ ...editingItem, [field]: reader.result as string });
+        toast.error('Échec du téléchargement vers Supabase Storage. L\'image est enregistrée localement (base64).', { id: loadingToast });
       };
       reader.readAsDataURL(file);
     }
@@ -858,14 +867,29 @@ const StudioAcomManager = () => {
                                         ) : (
                                           <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100/50 transition-colors">
                                             <Plus className="w-6 h-6 text-gray-300" />
-                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                            <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                                               const file = e.target.files?.[0];
-                                              if (file) {
+                                              if (!file) return;
+
+                                              const loadingToast = toast.loading('Téléchargement...');
+                                              try {
+                                                const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+                                                const bucket = 'studio-acom';
+                                                const path = `variants/${fileName}`;
+                                                const publicUrl = await storageService.uploadFile(bucket, path, file);
+                                                
+                                                const newVariants = [...editingItem.variants];
+                                                newVariants[index].previewImage = publicUrl;
+                                                setEditingItem({ ...editingItem, variants: newVariants });
+                                                toast.success('Image téléchargée !', { id: loadingToast });
+                                              } catch (error) {
+                                                console.error('Error uploading variant image:', error);
                                                 const reader = new FileReader();
                                                 reader.onloadend = () => {
                                                   const newVariants = [...editingItem.variants];
                                                   newVariants[index].previewImage = reader.result as string;
                                                   setEditingItem({ ...editingItem, variants: newVariants });
+                                                  toast.error('Enregistré localement (base64)', { id: loadingToast });
                                                 };
                                                 reader.readAsDataURL(file);
                                               }
@@ -990,6 +1014,28 @@ const StudioAcomManager = () => {
           </motion.div>
         </div>
       )}
+      {/* Confirmations */}
+      <ConfirmModal
+        isOpen={!!showDeleteConfirm}
+        title="Confirmer la suppression"
+        message="Voulez-vous vraiment supprimer cet élément ? Cette action est irréversible."
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        onConfirm={() => showDeleteConfirm && handleDelete(showDeleteConfirm)}
+        onCancel={() => setShowDeleteConfirm(null)}
+        type="danger"
+      />
+
+      <ConfirmModal
+        isOpen={showSaveConfirm}
+        title="Confirmer les modifications"
+        message="Voulez-vous vraiment enregistrer ces modifications ?"
+        confirmLabel="Enregistrer"
+        cancelLabel="Annuler"
+        onConfirm={() => handleSave({ preventDefault: () => {} } as any)}
+        onCancel={() => setShowSaveConfirm(false)}
+        type="info"
+      />
     </div>
   );
 };

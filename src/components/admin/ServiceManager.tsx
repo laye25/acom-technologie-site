@@ -95,12 +95,27 @@ const ServiceManager = () => {
     setUploadError(null);
 
     try {
-      const compressedBase64 = await compressImage(file, 1200, 800, 0.7);
-      setCurrentService(prev => prev ? { ...prev, image: compressedBase64 } : null);
+      // Use storageService to upload to Supabase Storage
+      const { storageService } = await import('../../services/storageService');
+      const publicUrl = await storageService.uploadFile(
+        'services',
+        `main/${crypto.randomUUID()}-${file.name}`,
+        file
+      );
+      
+      setCurrentService(prev => prev ? { ...prev, image: publicUrl } : null);
       setUploading(false);
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      setUploadError(`Erreur lors du chargement : ${error.message}`);
+      
+      // Fallback to base64 if storage upload fails (e.g. bucket doesn't exist)
+      try {
+        const compressedBase64 = await compressImage(file, 1200, 800, 0.7);
+        setCurrentService(prev => prev ? { ...prev, image: compressedBase64 } : null);
+        setUploadError('Note: Image sauvegardée localement (Bucket "services" non trouvé)');
+      } catch (compressError) {
+        setUploadError(`Erreur lors du chargement : ${error.message}`);
+      }
       setUploading(false);
     }
   };
@@ -113,19 +128,30 @@ const ServiceManager = () => {
     setUploadError(null);
 
     try {
+      const { storageService } = await import('../../services/storageService');
       const newImages: string[] = [];
       const fileArray = Array.from(files);
 
       for (const file of fileArray) {
         if (file.size > 5 * 1024 * 1024) continue;
 
-        const reader = new FileReader();
-        const promise = new Promise<string>((resolve) => {
-          reader.onloadend = () => resolve(reader.result as string);
-        });
-        reader.readAsDataURL(file);
-        const base64 = await promise;
-        newImages.push(base64);
+        try {
+          const publicUrl = await storageService.uploadFile(
+            'services',
+            `gallery/${crypto.randomUUID()}-${file.name}`,
+            file
+          );
+          newImages.push(publicUrl);
+        } catch (uploadError) {
+          // Fallback to base64 for gallery images too
+          const reader = new FileReader();
+          const promise = new Promise<string>((resolve) => {
+            reader.onloadend = () => resolve(reader.result as string);
+          });
+          reader.readAsDataURL(file);
+          const base64 = await promise;
+          newImages.push(base64);
+        }
       }
 
       setCurrentService(prev => prev ? { 

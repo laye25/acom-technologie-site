@@ -23,6 +23,7 @@ import DesignRequestManager from '../components/admin/DesignRequestManager';
 import { ExpenseManager } from '../components/admin/ExpenseManager';
 import StudioAcomManager from '../components/admin/StudioAcomManager';
 import { PlatformAIInsights } from '../components/admin/PlatformAIInsights';
+import { ConfirmModal } from '../components/admin/ConfirmModal';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { notificationService } from '../services/notificationService';
 
@@ -40,6 +41,62 @@ const AdminDashboard = () => {
   const [selectedOrderForSummary, setSelectedOrderForSummary] = useState<Order | null>(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
+  const [isFixingImages, setIsFixingImages] = useState(false);
+  const [showFixConfirm, setShowFixConfirm] = useState(false);
+
+  const handleFixImages = async () => {
+    setShowFixConfirm(false);
+    setIsFixingImages(true);
+    const toastId = toast.loading('Migration des images en cours...');
+
+    try {
+      const { storageService } = await import('../services/storageService');
+      let fixedCount = 0;
+
+      // 1. Fix Services
+      const services = await db.services.toArray();
+      for (const service of services) {
+        if (service.image && service.image.startsWith('data:')) {
+          try {
+            const url = await storageService.uploadFile('services', `main/${service.id}.jpg`, service.image);
+            await dbService.services.save({ ...service, image: url });
+            fixedCount++;
+          } catch (e) { console.error('Error fixing service image:', e); }
+        }
+      }
+
+      // 2. Fix Studio ACOM Categories
+      const categories = await db.categories.toArray() as any[];
+      for (const cat of categories) {
+        if (cat.coverImage && cat.coverImage.startsWith('data:')) {
+          try {
+            const url = await storageService.uploadFile('studio-acom', `categories/${cat.id}.jpg`, cat.coverImage);
+            await dbService.studioAcom.categories.save({ ...cat, coverImage: url });
+            fixedCount++;
+          } catch (e) { console.error('Error fixing category image:', e); }
+        }
+      }
+
+      // 3. Fix Studio ACOM Products
+      const products = await db.products.toArray() as any[];
+      for (const prod of products) {
+        if (prod.coverImage && prod.coverImage.startsWith('data:')) {
+          try {
+            const url = await storageService.uploadFile('studio-acom', `products/${prod.id}.jpg`, prod.coverImage);
+            await dbService.studioAcom.products.save({ ...prod, coverImage: url });
+            fixedCount++;
+          } catch (e) { console.error('Error fixing product image:', e); }
+        }
+      }
+
+      toast.success(`${fixedCount} images ont été migrées avec succès !`, { id: toastId });
+    } catch (error: any) {
+      console.error('Error fixing images:', error);
+      toast.error(`Erreur lors de la migration : ${error.message}`, { id: toastId });
+    } finally {
+      setIsFixingImages(false);
+    }
+  };
 
   const handleMarkAsPaid = async (order: Order) => {
     setIsProcessingPayment(order.id);
@@ -1125,8 +1182,87 @@ const AdminDashboard = () => {
               </div>
             ) : (
               <>
-                {/* AI Insights Section */}
+                {/* Maintenance & Tools */}
+              {(isSuperAdmin || isManager) && (
+                <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-xl font-display font-bold text-gray-900">Maintenance & Outils</h3>
+                      <p className="text-sm text-gray-500 mt-1">Gérez l'intégrité des données et les ressources</p>
+                    </div>
+                    <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center">
+                      <Settings className="w-6 h-6 text-amber-600" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                          <Database className="w-5 h-5 text-primary" />
+                        </div>
+                      </div>
+                      <h4 className="font-bold text-gray-900 mb-2">Migration des Images</h4>
+                      <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                        Si les images ne s'affichent pas pour les clients, elles sont probablement stockées en base64. 
+                        Cet outil les déplace vers Supabase Storage pour une meilleure performance.
+                      </p>
+                      <button
+                        onClick={() => setShowFixConfirm(true)}
+                        disabled={isFixingImages}
+                        className="w-full py-3 bg-white text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary hover:text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isFixingImages ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Migration...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-4 h-4" />
+                            Réparer les images
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                          <Settings className="w-5 h-5 text-indigo-600" />
+                        </div>
+                      </div>
+                      <h4 className="font-bold text-gray-900 mb-2">Configuration Storage</h4>
+                      <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                        Assurez-vous que les buckets "services" et "studio-acom" sont créés et configurés en mode PUBLIC dans votre console Supabase.
+                      </p>
+                      <a
+                        href="https://supabase.com/dashboard/project/_/storage/buckets"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 bg-white text-indigo-600 border border-indigo-100 rounded-xl text-sm font-bold hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Console Supabase
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Insights Section */}
                 <PlatformAIInsights orders={orders} services={allServices} expenses={expenses} />
+
+                <ConfirmModal
+                  isOpen={showFixConfirm}
+                  title="Migration des Images"
+                  message="Cette opération va migrer toutes les images stockées localement (base64) vers Supabase Storage. Cela peut prendre quelques minutes. Continuer ?"
+                  confirmLabel="Démarrer la migration"
+                  cancelLabel="Annuler"
+                  onConfirm={handleFixImages}
+                  onCancel={() => setShowFixConfirm(false)}
+                  type="info"
+                />
 
                 {/* Level 1: Global KPIs */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">

@@ -223,13 +223,7 @@ const CATEGORY_COLORS = [
 const getCategoryColor = (index: number) => CATEGORY_COLORS[index % CATEGORY_COLORS.length];
 
 // Helper to optimize Supabase Storage images
-const getOptimizedUrl = (url: string, width: number = 400) => {
-  if (!url) return url;
-  if (url.includes('supabase.co/storage/v1/object/public/')) {
-    return url.replace('/object/public/', `/render/image/public/`) + `?width=${width}&resize=contain&quality=80`;
-  }
-  return url;
-};
+// (Moved to top level)
 
 const CategoryBanner = ({ category, onClick }: { category: NavCategory, onClick: () => void }) => {
   return (
