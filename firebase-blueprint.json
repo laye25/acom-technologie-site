@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "StudioCategory": {
+      "title": "StudioCategory",
+      "description": "Category for design products",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "icon": { "type": "string" },
+        "color": { "type": "string" },
+        "coverImage": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Design product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "categoryId": { "type": "string" }
+      },
+      "required": ["id", "name", "categoryId"]
+    },
+    "Variant": {
+      "title": "Variant",
+      "description": "Product variant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "productId", "name"]
+    },
+    "Design": {
+      "title": "Design",
+      "description": "User design",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["id", "user_id", "name"]
+    }
+  },
+  "firestore": {
+    "/studio_acom_categories/{categoryId}": {
+      "schema": "StudioCategory",
+      "description": "Categories collection"
+    },
+    "/studio_acom_products/{productId}": {
+      "schema": "Product",
+      "description": "Products collection"
+    },
+    "/variants/{variantId}": {
+      "schema": "Variant",
+      "description": "Variants collection"
+    },
+    "/designs/{designId}": {
+      "schema": "Design",
+      "description": "Designs collection"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { db } from '../firebase';
+import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
 import { Order, Service, UserProfile, OrderStatus, Design } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion } from 'motion/react';
@@ -35,37 +36,59 @@ const Dashboard = () => {
     return { column: 'user_id', value: user.id };
   }, [user, isManager, isAdmin]);
   
-  const dashboardOptions = useMemo(() => ({
-    tableName: 'orders' as TableName,
-    filter: filter as any,
-    skip: !user,
-    order: (isManager || isAdmin) ? { column: 'created_at', ascending: false } : undefined,
-    limit: 50
-  }), [filter, user, isManager, isAdmin]);
+  const [rawOrders, setRawOrders] = React.useState<Order[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [ordersError, setOrdersError] = React.useState<any>(null);
 
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName,
-    limit: 50
-  }), []);
+  React.useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-  const userOptions = useMemo(() => ({
-    tableName: 'users' as TableName,
-    skip: !(isManager || isAdmin),
-    limit: 50
-  }), [isManager, isAdmin]);
+    let q = query(collection(db, 'orders'), limit(50));
+    if (!(isManager || isAdmin)) {
+      q = query(collection(db, 'orders'), where('user_id', '==', user.id), limit(50));
+    } else {
+      q = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50));
+    }
 
-  const designOptions = useMemo(() => ({
-    tableName: 'designs' as TableName,
-    filter: { column: 'user_id', value: user?.id },
-    skip: !user,
-    realtime: true,
-    limit: 50
-  }), [user]);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      setRawOrders(data);
+      setLoading(false);
+    }, (error) => {
+      setOrdersError(error);
+      setLoading(false);
+    });
 
-  const { data: rawOrders, loading, error: ordersError } = useSupabaseData<Order>(dashboardOptions);
-  const { data: users } = useSupabaseData<UserProfile>(userOptions);
-  const { data: userDesigns, loading: designsLoading } = useSupabaseData<Design>(designOptions);
-  
+    return () => unsubscribe();
+  }, [user, isManager, isAdmin]);
+
+  const [dynamicServices, setDynamicServices] = React.useState<Service[]>([]);
+  const [servicesLoading, setServicesLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const q = query(collection(db, 'services'), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+      setDynamicServices(data);
+      setServicesLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const allServices = useMemo(() => {
+    const combined = [...STATIC_SERVICES];
+    dynamicServices.forEach(ds => {
+      if (!combined.find(s => s.id === ds.id)) {
+        combined.push(ds);
+      }
+    });
+    return combined;
+  }, [dynamicServices]);
+
   const orders = useMemo(() => {
     if (!rawOrders || rawOrders.length === 0) return [];
     return [...rawOrders].sort((a, b) => {
@@ -82,17 +105,30 @@ const Dashboard = () => {
       return timeB - timeA;
     });
   }, [rawOrders]);
-  const { data: dynamicServices, loading: servicesLoading } = useSupabaseData<Service>(serviceOptions);
 
-  const allServices = useMemo(() => {
-    const combined = [...STATIC_SERVICES];
-    dynamicServices.forEach(ds => {
-      if (!combined.find(s => s.id === ds.id)) {
-        combined.push(ds);
-      }
+  const [users, setUsers] = React.useState<UserProfile[]>([]);
+  React.useEffect(() => {
+    if (!(isManager || isAdmin)) return;
+    const q = query(collection(db, 'users'), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+      setUsers(data);
     });
-    return combined;
-  }, [dynamicServices]);
+    return () => unsubscribe();
+  }, [isManager, isAdmin]);
+
+  const [userDesigns, setUserDesigns] = React.useState<Design[]>([]);
+  const [designsLoading, setDesignsLoading] = React.useState(true);
+  React.useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'designs'), where('user_id', '==', user.id), limit(50));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Design));
+      setUserDesigns(data);
+      setDesignsLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   const getStatusLabel = (status: string, clientAccepted?: boolean, type?: string) => {
     switch (status) {

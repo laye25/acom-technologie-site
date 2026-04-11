@@ -6,10 +6,9 @@ import {
   Heart, Eye, Star, CreditCard, ArrowRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useSupabaseData } from '../../hooks/useSupabase';
 import { useAuth } from '../../context/AuthContext';
-import { dbService } from '../../services/dbService';
-import { supabase } from '../../lib/supabase';
+import { db, auth } from '../../firebase';
+import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
 import { OptimizedImage } from '../OptimizedImage';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
@@ -415,14 +414,25 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
       setSearchQuery(initialSearchQuery);
     }
   }, [isOpen, initialDisplayMode, initialViewStep, initialSearchQuery]);
-  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(() => localStorage.getItem('lastProductId'));
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => localStorage.getItem('lastVariantId'));
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<any | null>(null);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('acom_favorites');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Persist selectedProductId and selectedVariantId to localStorage
+  React.useEffect(() => {
+    if (selectedProductId) localStorage.setItem('lastProductId', selectedProductId);
+    else localStorage.removeItem('lastProductId');
+  }, [selectedProductId]);
+
+  React.useEffect(() => {
+    if (selectedVariantId) localStorage.setItem('lastVariantId', selectedVariantId);
+    else localStorage.removeItem('lastVariantId');
+  }, [selectedVariantId]);
   
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -462,31 +472,53 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   }), []);
 
   // 1. Fetch Categories with Real-time
-  const { data: dbCategories, loading: loadingCats } = useSupabaseData<StudioCategory>({
-    tableName: 'studio_acom_categories',
-    realtime: true,
-    mapper: categoryMapper,
-    skip: !isOpen,
-    limit: 100
-  });
+  const [dbCategories, setDbCategories] = useState<StudioCategory[]>([]);
+  const [loadingCats, setLoadingCats] = useState(true);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const q = query(collection(db, 'studio_acom_categories'), limit(100));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => categoryMapper({ id: doc.id, ...doc.data() }));
+      setDbCategories(data);
+      setLoadingCats(false);
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, categoryMapper]);
 
   // 2. Fetch Products with Real-time
-  const { data: dbProducts, loading: loadingProds } = useSupabaseData<Product>({
-    tableName: 'studio_acom_products',
-    realtime: true,
-    mapper: productMapper,
-    skip: !isOpen,
-    limit: 500
-  });
+  const [dbProducts, setDbProducts] = useState<Product[]>([]);
+  const [loadingProds, setLoadingProds] = useState(true);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const q = query(collection(db, 'studio_acom_products'), limit(500));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => productMapper({ id: doc.id, ...doc.data() }));
+      setDbProducts(data);
+      setLoadingProds(false);
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, productMapper]);
 
   // 3. Fetch Variants with Real-time
-  const { data: dbVariants } = useSupabaseData<Variant>({
-    tableName: 'variants',
-    realtime: true,
-    mapper: variantMapper,
-    skip: !isOpen,
-    limit: 1000
-  });
+  const [dbVariants, setDbVariants] = useState<Variant[]>([]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const q = query(collection(db, 'variants'), limit(1000));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => variantMapper({ id: doc.id, ...doc.data() }));
+      setDbVariants(data);
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, variantMapper]);
 
   // Merge Products and Variants
   const allProducts = useMemo(() => {
@@ -496,58 +528,13 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     }));
   }, [dbProducts, dbVariants]);
 
-  // Merge Categories (System + DB + Initial)
+  // Merge Categories (System + DB)
   const allCategories = useMemo(() => {
     const systemCats = CATEGORIES.filter(c => ['saved', 'all', 'favorites', 'categories'].includes(c.id));
-    let merged = [...systemCats];
-
-    // 1. Add DB Categories (already mapped by useSupabaseData)
-    if (dbCategories && dbCategories.length > 0) {
-      dbCategories.forEach((cat: any) => {
-        // Check if already merged by ID OR by Name (to avoid duplicates)
-        const existing = merged.find(c => 
-          c.id === cat.id || 
-          (c.name.toLowerCase() === cat.name?.toLowerCase() && !['all', 'favorites', 'categories', 'saved'].includes(c.id))
-        );
-        
-        if (!existing) {
-          merged.push(cat);
-        } else {
-          // Update existing with DB data if it has more info (like coverImage)
-          if (cat.coverImage && !existing.coverImage) {
-            existing.coverImage = cat.coverImage;
-          }
-        }
-      });
-    }
-
-    // 2. Add Initial Categories if they are not already in merged
-    INITIAL_CATEGORIES.forEach(cat => {
-      const existing = merged.find(c => 
-        c.id === cat.id || 
-        c.name.toLowerCase() === cat.name?.toLowerCase() ||
-        cat.name.toLowerCase().includes(c.name.toLowerCase()) ||
-        c.name.toLowerCase().includes(cat.name.toLowerCase())
-      );
-      
-      if (!existing) {
-        merged.push(cat);
-      } else {
-        // Ensure fallback image is applied if missing or invalid
-        const hasValidImage = existing.coverImage && 
-                             typeof existing.coverImage === 'string' && 
-                             existing.coverImage.length > 10;
-                             
-        if (!hasValidImage) {
-          existing.coverImage = cat.coverImage;
-        }
-        
-        // Also ensure icon and color are set if missing
-        if (!existing.icon) existing.icon = cat.icon;
-        if (!existing.color) existing.color = cat.color;
-      }
-    });
-
+    
+    // Start with system categories and add DB categories
+    const merged = [...systemCats, ...dbCategories];
+    
     return merged;
   }, [dbCategories]);
 
@@ -584,13 +571,23 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     };
   }, [isOpen]);
 
-  const { data: userDesigns } = useSupabaseData<any>({
-    tableName: 'designs',
-    filter: { column: 'ownerId', value: user?.id },
-    skip: !isOpen || !user || activeCategory !== 'saved',
-    realtime: true,
-    limit: 50
-  });
+  const [userDesigns, setUserDesigns] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (!isOpen || !user || activeCategory !== 'saved') return;
+
+    const q = query(
+      collection(db, 'designs'),
+      where('user_id', '==', user.id),
+      limit(50)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUserDesigns(data);
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, user, activeCategory]);
 
   const selectedProduct = useMemo(() => 
     allProducts.find(p => p.id === selectedProductId) || null
@@ -826,7 +823,8 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                   <div className="p-8">
                     <h2 className="text-2xl font-black text-gray-900 mb-6">Toutes les catégories</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {loadingVariants && categories.length <= 4 ? (
+                      {/* Afficher les catégories même si le chargement est en cours, tant qu'on a au moins les catégories système */}
+                      {categories.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id)).length === 0 && loadingVariants ? (
                         [1, 2, 3, 4, 5, 6].map(i => <CategorySkeleton key={i} />)
                       ) : (
                         categories.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id)).map((cat) => (

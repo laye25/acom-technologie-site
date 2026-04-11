@@ -1,7 +1,17 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { auth, db } from '../firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut as firebaseSignOut, 
+  sendPasswordResetEmail, 
+  onAuthStateChanged,
+  User
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { UserProfile } from '../types';
-import { User } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
@@ -53,70 +63,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session ? 'User found' : 'No user');
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user);
-      } else {
-        setLoading(false);
-      }
-    }).catch(err => {
-      console.error('Error getting session:', err);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session ? 'User found' : 'No user');
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        await fetchProfile(currentUser);
       } else {
         setProfile(null);
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   const fetchProfile = async (currentUser: User) => {
     try {
-      const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout fetching profile')), 10000)
-      );
-      const profilePromise = supabase
-        .from('users')
-        .select('*')
-        .eq('id', currentUser.id)
-        .single();
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
 
-      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (data) {
+      if (userDoc.exists()) {
+        const data = userDoc.data();
         const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
         const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
         const expectedRole = isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client');
         
-        if (data.role !== expectedRole) {
-          const updatePromise = supabase
-            .from('users')
-            .update({ role: expectedRole })
-            .eq('id', currentUser.id);
-          await Promise.race([updatePromise, timeoutPromise]);
-        }
-
         setProfile({
-          uid: data.id,
-          email: data.email,
-          displayName: data.display_name,
-          photoURL: data.photo_url,
-          role: expectedRole,
-          createdAt: new Date(data.created_at)
+          uid: currentUser.uid,
+          email: currentUser.email || '',
+          displayName: data.display_name || currentUser.displayName || 'Utilisateur',
+          photoURL: data.photo_url || currentUser.photoURL || '',
+          role: data.role || expectedRole,
+          createdAt: data.created_at?.toDate() || new Date()
         });
       } else {
         // Create profile if it doesn't exist
@@ -124,23 +101,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
         
         const newProfile: UserProfile = {
-          uid: currentUser.id,
+          uid: currentUser.uid,
           email: currentUser.email || '',
-          displayName: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'Utilisateur',
-          photoURL: currentUser.user_metadata?.avatar_url || '',
+          displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
+          photoURL: currentUser.photoURL || '',
           role: isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client'),
           createdAt: new Date()
         };
 
-        const insertPromise = supabase.from('users').insert({
-          id: newProfile.uid,
+        await setDoc(userDocRef, {
           email: newProfile.email,
           display_name: newProfile.displayName,
           photo_url: newProfile.photoURL,
           role: newProfile.role,
           created_at: newProfile.createdAt
         });
-        await Promise.race([insertPromise, timeoutPromise]);
         
         setProfile(newProfile);
       }
@@ -152,44 +127,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    console.log('Attempting sign in with email:', email);
-    const timeoutPromise = new Promise<{error: any}>((_, reject) => 
-      setTimeout(() => reject(new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.')), 15000)
-    );
-    const signInPromise = supabase.auth.signInWithPassword({ email, password });
-    
-    const { error } = await Promise.race([signInPromise, timeoutPromise]);
-    if (error) {
-      console.error('Sign in error:', error);
-      throw error;
-    }
-    console.log('Sign in successful');
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
   const signUpWithEmail = async (email: string, password: string, fullName: string) => {
-    const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => 
-      setTimeout(() => reject(new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.')), 15000)
-    );
-    const signUpPromise = supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName
-        }
-      }
-    });
-
-    const { data: { user: newUser }, error } = await Promise.race([signUpPromise, timeoutPromise]);
-    
-    if (error) throw error;
-    if (!newUser) return;
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const newUser = userCredential.user;
 
     const isAdminEmail = email && ADMIN_EMAILS.includes(email);
     const isManagerEmail = email && MANAGER_EMAILS.includes(email);
 
     const newProfile: UserProfile = {
-      uid: newUser.id,
+      uid: newUser.uid,
       email: email,
       displayName: fullName,
       photoURL: '',
@@ -197,8 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date()
     };
 
-    await supabase.from('users').insert({
-      id: newProfile.uid,
+    await setDoc(doc(db, 'users', newUser.uid), {
       email: newProfile.email,
       display_name: newProfile.displayName,
       photo_url: newProfile.photoURL,
@@ -210,23 +158,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      if (error.code === 'auth/popup-blocked') {
+        alert('Veuillez autoriser les popups pour vous connecter avec Google.');
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        console.log('Popup closed by user');
+      } else {
+        alert('Erreur lors de la connexion avec Google : ' + error.message);
       }
-    });
-    if (error) throw error;
+      throw error;
+    }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    await firebaseSignOut(auth);
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) throw error;
+    await sendPasswordResetEmail(auth, email);
   };
 
   const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email);

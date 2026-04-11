@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
 import { ai, getGeminiModel } from '../lib/gemini';
-import { useSupabaseData } from '../hooks/useSupabase';
+import { db } from '../firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { Service } from '../types';
 import { Link } from 'react-router-dom';
 
@@ -21,10 +22,16 @@ const AIAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: services } = useSupabaseData<Service>({
-    tableName: 'services',
-    order: { column: 'name' }
-  });
+  const [services, setServices] = useState<Service[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'services'), orderBy('name'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+      setServices(data);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
