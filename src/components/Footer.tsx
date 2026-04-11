@@ -94,29 +94,31 @@ const Footer = () => {
               {logoUrl ? (
                 <img 
                   src={logoUrl} 
-                  alt="Logo" 
-                  className="w-8 h-8 object-contain"
+                  alt={brandName} 
+                  className="h-12 sm:h-14 w-auto object-contain rounded-xl overflow-hidden"
                 />
               ) : (
-                <img 
-                  src="/logo.svg" 
-                  alt="Logo" 
-                  className="w-8 h-8 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                <>
+                  <img 
+                    src="/logo.svg" 
+                    alt="Logo" 
+                    className="w-8 h-8 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-2xl font-bold text-primary tracking-tighter leading-none">
+                      {brandName.split(' ')[0].toUpperCase()}
+                    </span>
+                    {brandName.split(' ').length > 1 && (
+                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest leading-none mt-1">
+                        {brandName.split(' ').slice(1).join(' ')}
+                      </span>
+                    )}
+                  </div>
+                </>
               )}
-              <div className="flex flex-col">
-                <span className="text-2xl font-bold text-primary tracking-tighter leading-none">
-                  {brandName.split(' ')[0].toUpperCase()}
-                </span>
-                {brandName.split(' ').length > 1 && (
-                  <span className="text-[10px] font-mono text-gray-400 uppercase tracking-widest leading-none mt-1">
-                    {brandName.split(' ').slice(1).join(' ')}
-                  </span>
-                )}
-              </div>
             </Link>
             <p className="text-gray-500 text-sm leading-relaxed">
               <Translate>{settings?.description || `Votre partenaire digital de confiance au Sénégal. Nous transformons vos idées en solutions numériques performantes et innovantes.`}</Translate>

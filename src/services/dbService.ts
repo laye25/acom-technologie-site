@@ -78,25 +78,44 @@ export const dbService = {
   settings: {
     async save(id: string, settingsData: any) {
       try {
-        // Try with 'data' column first (as per schema)
-        const { error } = await supabase.from('settings').upsert({ 
+        // First attempt: use 'data' column (standard based on the SQL script provided)
+        const { error: dataError } = await supabase.from('settings').upsert({ 
           id, 
           data: settingsData, 
           updated_at: new Date() 
         });
         
-        // If that fails with "column data does not exist", try spreading the properties
-        if (error && (error.message.includes('column "data"') || error.code === '42703')) {
-          const { error: error2 } = await supabase.from('settings').upsert({ 
-            id, 
-            ...settingsData, 
-            updated_at: new Date() 
-          });
-          if (error2) throw error2;
-          return;
+        if (!dataError) return; // Success!
+
+        // Second attempt: try spreading (for legacy or custom schemas)
+        const { error: spreadError } = await supabase.from('settings').upsert({ 
+          id, 
+          ...settingsData, 
+          updated_at: new Date() 
+        });
+
+        if (!spreadError) return; // Success!
+
+        // If both failed, log details and throw a descriptive error
+        console.error('Settings Save Failed:', { dataError, spreadError });
+        
+        let errorMessage = `Impossible de sauvegarder les réglages. `;
+        
+        if (dataError.message.includes('column "data" does not exist') || dataError.code === '42703') {
+          errorMessage += "La colonne 'data' est manquante dans la table 'settings'. ";
+        } else {
+          errorMessage += `Erreur (data): ${dataError.message}. `;
         }
         
-        if (error) throw error;
+        if (spreadError.message.includes('column') || spreadError.code === '42703') {
+          errorMessage += "Certaines colonnes spécifiques sont également manquantes. ";
+        } else {
+          errorMessage += `Erreur (spread): ${spreadError.message}. `;
+        }
+
+        errorMessage += "Veuillez vous assurer d'avoir exécuté le script SQL dans Supabase pour créer la table 'settings' avec une colonne 'data' de type JSONB.";
+        
+        throw new Error(errorMessage);
       } catch (error) {
         console.error('Error saving settings:', error);
         throw error;
@@ -106,8 +125,15 @@ export const dbService = {
       try {
         const { data, error } = await supabase.from('settings').select('*').eq('id', id).single();
         if (error) return null;
-        // If it has a 'data' property and it's an object, return that, otherwise return the whole object
-        return (data.data && typeof data.data === 'object') ? data.data : data;
+        
+        // Try common JSON columns
+        if (data.data && typeof data.data === 'object') return data.data;
+        if (data.settings && typeof data.settings === 'object') return data.settings;
+        if (data.content && typeof data.content === 'object') return data.content;
+        if (data.value && typeof data.value === 'object') return data.value;
+        
+        // Otherwise return the whole object (it might be spread)
+        return data;
       } catch (error) {
         console.error('Error getting settings:', error);
         return null;

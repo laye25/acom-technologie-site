@@ -144,7 +144,7 @@ const Login = () => {
       >
         <div className="text-center mb-10">
           {logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="w-16 h-16 object-contain mx-auto mb-6" />
+            <img src={logoUrl} alt="Logo" className="w-20 h-20 object-contain mx-auto mb-6 rounded-2xl overflow-hidden shadow-sm" />
           ) : (
             <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-6">
               <span className="text-3xl font-bold text-primary">{brandName[0].toUpperCase()}</span>

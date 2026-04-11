@@ -123,11 +123,7 @@ const HeroBanner = () => {
                   transition={{ delay: 0.2 }}
                   className="flex items-center space-x-3 mb-6"
                 >
-                  {logoUrl ? (
-                    <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain" />
-                  ) : (
-                    <div className="w-12 h-px bg-primary" />
-                  )}
+                  <div className="w-12 h-px bg-primary" />
                   <span className="text-xs font-mono text-primary uppercase tracking-[0.4em] font-bold">{brandName}</span>
                 </motion.div>
 

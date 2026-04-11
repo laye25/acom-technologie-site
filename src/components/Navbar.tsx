@@ -116,8 +116,8 @@ const Navbar = () => {
             {logoUrl ? (
               <img 
                 src={logoUrl} 
-                alt="Logo" 
-                className="w-10 h-10 object-contain group-hover:scale-110 transition-transform"
+                alt={brandName} 
+                className={`h-12 sm:h-14 w-auto object-contain rounded-xl overflow-hidden group-hover:scale-105 transition-transform ${useWhiteText ? 'mix-blend-screen' : ''}`}
               />
             ) : (
               <>
@@ -136,18 +136,18 @@ const Navbar = () => {
                   <span className="relative z-10 drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">{brandName.charAt(0).toUpperCase()}</span>
                   <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent" />
                 </div>
+                <div className="flex flex-col">
+                  <span className={`text-xl font-display font-bold tracking-tight leading-none transition-colors ${useWhiteText ? 'text-white' : 'text-ink'}`}>
+                    {brandName.split(' ')[0].toUpperCase()}
+                  </span>
+                  {brandName.split(' ').length > 1 && (
+                    <span className={`text-[10px] font-mono uppercase tracking-[0.2em] leading-none mt-1 transition-colors ${useWhiteText ? 'text-white/60' : 'text-gray-400'}`}>
+                      {brandName.split(' ').slice(1).join(' ')}
+                    </span>
+                  )}
+                </div>
               </>
             )}
-            <div className="flex flex-col">
-              <span className={`text-xl font-display font-bold tracking-tight leading-none transition-colors ${useWhiteText ? 'text-white' : 'text-ink'}`}>
-                {brandName.split(' ')[0].toUpperCase()}
-              </span>
-              {brandName.split(' ').length > 1 && (
-                <span className={`text-[10px] font-mono uppercase tracking-[0.2em] leading-none mt-1 transition-colors ${useWhiteText ? 'text-white/60' : 'text-gray-400'}`}>
-                  {brandName.split(' ').slice(1).join(' ')}
-                </span>
-              )}
-            </div>
           </Link>
 
           {/* Desktop Nav */}

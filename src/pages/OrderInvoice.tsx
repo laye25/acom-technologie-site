@@ -205,7 +205,7 @@ const OrderInvoice = () => {
           <div>
             <div className="flex items-center gap-3 mb-8">
               {settings?.logoUrl ? (
-                <img src={settings.logoUrl} alt="Logo" className="w-10 h-10 sm:w-12 sm:h-12 object-contain" />
+                <img src={settings.logoUrl} alt="Logo" className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-xl overflow-hidden shadow-sm" />
               ) : (
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-2xl flex items-center justify-center">
                   <span className="text-xl sm:text-2xl font-black text-white">{(settings?.brandName || 'Acom')[0]}</span>
