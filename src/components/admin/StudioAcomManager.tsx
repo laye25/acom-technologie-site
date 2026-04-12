@@ -7,17 +7,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { useSupabaseData } from '../../hooks/useSupabase';
+import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { dbService } from '../../services/dbService';
 import { Category as StudioCategory, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
-import { supabase } from '../../lib/supabase';
+import { firestoreService } from '../../services/firestoreService';
+import { where } from 'firebase/firestore';
 import { OptimizedImage } from '../OptimizedImage';
 import { ConfirmModal } from './ConfirmModal';
-import { db } from '../../db/db';
-import { syncService } from '../../services/syncService';
-import { Category as MerchantCategory } from '../../types';
-
 import { storageService } from '../../services/storageService';
+import { useStudioAcom } from '../../hooks/useStudioAcom';
 
 const StudioAcomManager = () => {
   const { user } = useAuth();
@@ -28,100 +26,10 @@ const StudioAcomManager = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
-  const [categories, setCategories] = useState<StudioCategory[]>([]);
-  const [loadingCats, setLoadingCats] = useState(true);
+  const { categories, products, loading } = useStudioAcom(true);
 
-  const refreshCats = async () => {
-    const cats = await db.categories.toArray();
-    setCategories(cats.map((c: any) => ({
-      ...c,
-      coverImage: c.coverImage || c.cover_image || '',
-      sub: c.sub || '',
-      icon: c.icon || FolderOpen,
-      color: c.color || 'text-primary'
-    })) as StudioCategory[]);
-  };
-
-  // Charger les catégories depuis Dexie au montage
-  React.useEffect(() => {
-    const loadCategories = async () => {
-      setLoadingCats(true);
-      try {
-        const localCats = await db.categories.toArray();
-        setCategories(localCats.map((c: any) => ({
-          ...c,
-          coverImage: c.coverImage || c.cover_image || '',
-          sub: c.sub || '',
-          icon: c.icon || FolderOpen,
-          color: c.color || 'text-primary'
-        })) as StudioCategory[]);
-        
-        // Synchroniser avec Supabase en arrière-plan
-        await syncService.syncCategories(user?.id || '');
-        
-        // Recharger depuis Dexie après synchronisation
-        const updatedCats = await db.categories.toArray();
-        setCategories(updatedCats.map((c: any) => ({
-          ...c,
-          coverImage: c.coverImage || c.cover_image || '',
-          sub: c.sub || '',
-          icon: c.icon || FolderOpen,
-          color: c.color || 'text-primary'
-        })) as StudioCategory[]);
-      } catch (error) {
-        console.error('Error loading categories:', error);
-      } finally {
-        setLoadingCats(false);
-      }
-    };
-    loadCategories();
-  }, [user?.id]);
-
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-
-  const refreshProducts = async () => {
-    const products = await db.products.toArray();
-    setProducts(products.map((p: any) => ({
-      ...p,
-      categoryId: p.categoryId || p.category_id,
-      coverImage: p.image || p.coverImage || '',
-      variants: []
-    })) as Product[]);
-  };
-
-  // Charger les produits depuis Dexie au montage
-  React.useEffect(() => {
-    const loadProducts = async () => {
-      setLoadingProducts(true);
-      try {
-        const localProducts = await db.products.toArray();
-        setProducts(localProducts.map((p: any) => ({
-          ...p,
-          categoryId: p.categoryId || p.category_id, // Mapping correct
-          coverImage: p.image || p.coverImage || '',
-          variants: [] // Variants are handled separately
-        })) as Product[]);
-        
-        // Synchroniser avec Supabase en arrière-plan
-        await syncService.syncProducts(user?.id || '');
-        
-        // Recharger depuis Dexie après synchronisation
-        const updatedProducts = await db.products.toArray();
-        setProducts(updatedProducts.map((p: any) => ({
-          ...p,
-          categoryId: p.categoryId || p.category_id,
-          coverImage: p.image || p.coverImage || '',
-          variants: []
-        })) as Product[]);
-      } catch (error) {
-        console.error('Error loading products:', error);
-      } finally {
-        setLoadingProducts(false);
-      }
-    };
-    loadProducts();
-  }, [user?.id]);
+  const loadingCats = loading;
+  const loadingProducts = loading;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,34 +52,10 @@ const StudioAcomManager = () => {
     setShowSaveConfirm(false);
     const loadingToast = toast.loading('Enregistrement en cours...');
     try {
-      const dataToSave = { ...editingItem };
-      const variants = dataToSave.variants || [];
-      
-      // Clean up UI-only properties
-      delete dataToSave._tempVariations;
-      delete dataToSave.expandedVariant;
-      delete dataToSave.variants;
-
-      // Remove undefined values
-      Object.keys(dataToSave).forEach(key => {
-        if (dataToSave[key] === undefined) {
-          delete dataToSave[key];
-        }
-      });
-
       if (activeTab === 'categories') {
-        // 1. Sauvegarder localement dans Dexie
-        await db.categories.put(dataToSave);
-        // 2. Synchroniser en arrière-plan
-        syncService.syncCategories(user?.id || '');
-        refreshCats();
+        await dbService.studioAcom.categories.save(editingItem);
       } else {
-        // 1. Sauvegarder localement dans Dexie
-        await db.products.put({ ...dataToSave, variants, userId: user?.id });
-        // 2. Synchroniser en arrière-plan
-        syncService.syncProducts(user?.id || '');
-        
-        refreshProducts();
+        await dbService.studioAcom.products.save({ ...editingItem, userId: user?.uid });
       }
       
       toast.success('Enregistré avec succès !', { id: loadingToast });
@@ -194,12 +78,9 @@ const StudioAcomManager = () => {
     try {
       if (activeTab === 'categories') {
         // Check if there are products in this category
-        const { count, error: countError } = await supabase
-          .from('studio_acom_products')
-          .select('*', { count: 'exact', head: true })
-          .eq('category_id', id);
+        const productsInCat = products.filter(p => p.categoryId === id);
         
-        if (countError) console.error('Error checking products in category:', countError);
+        const count = productsInCat.length;
         
         if (count && count > 0) {
           toast.error(`Impossible de supprimer : cette catégorie contient ${count} produits.`, { id: loadingToast });
@@ -207,10 +88,8 @@ const StudioAcomManager = () => {
         }
         
         await dbService.studioAcom.categories.delete(id);
-        refreshCats();
       } else {
         await dbService.studioAcom.products.delete(id);
-        refreshProducts();
       }
       toast.success('Supprimé avec succès !', { id: loadingToast });
       return true;
@@ -245,23 +124,17 @@ const StudioAcomManager = () => {
         const iconName = Object.keys(iconMap).find(key => iconMap[key] === cat.icon) || 'LayoutGrid';
         
         try {
-          // Map to snake_case for Supabase
+          // Map to snake_case for Firestore
           const catData = { 
             id: cat.id,
             name: cat.name,
             sub: cat.sub,
             icon: iconName,
             color: cat.color,
-            cover_image: cat.coverImage
+            coverImage: cat.coverImage
           };
           
           await dbService.studioAcom.categories.save(catData);
-          
-          // Also save to Dexie for immediate UI update
-          await db.categories.put({
-            ...catData,
-            coverImage: cat.coverImage
-          } as any);
         } catch (err) {
           console.error(`Failed to save category ${cat.name}:`, err);
           throw err;
@@ -272,14 +145,13 @@ const StudioAcomManager = () => {
       if (INITIAL_PRODUCTS.length > 0) {
         for (const product of INITIAL_PRODUCTS) {
           try {
-            // Map to snake_case for Supabase
             await dbService.studioAcom.products.save({
               id: product.id,
               name: product.name,
-              category_id: product.categoryId,
+              categoryId: product.categoryId,
               description: product.description,
-              cover_image: product.coverImage,
-              user_id: product.userId,
+              coverImage: product.coverImage,
+              userId: product.userId,
               variants: product.variants
             });
           } catch (err) {
@@ -289,8 +161,6 @@ const StudioAcomManager = () => {
         }
       }
       
-      refreshCats();
-      refreshProducts();
       setImportSuccess(true);
       setTimeout(() => setImportSuccess(false), 3000);
     } catch (error) {
@@ -433,8 +303,20 @@ const StudioAcomManager = () => {
                 {/* Overlay for quick actions */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center gap-3">
                   <button
-                    onClick={() => {
-                      setEditingItem(item);
+                    onClick={async () => {
+                      const itemWithVariants = { ...item };
+                      if (activeTab === 'products') {
+                        const variants = await dbService.studioAcom.products.getVariants(item.id);
+                        itemWithVariants.variants = variants.map((v: any) => ({
+                          ...v,
+                          templateId: v.template_id || v.templateId,
+                          previewImage: v.preview_image || v.previewImage,
+                          minQuantity: v.min_quantity || v.minQuantity,
+                          maxQuantity: v.max_quantity || v.maxQuantity,
+                          templateSvg: v.template_svg || v.templateSvg
+                        }));
+                      }
+                      setEditingItem(itemWithVariants);
                       setIsModalOpen(true);
                     }}
                     className="p-3 bg-white text-gray-900 rounded-full hover:bg-primary hover:text-white transition-all transform translate-y-4 group-hover/image:translate-y-0 duration-300"
@@ -485,8 +367,20 @@ const StudioAcomManager = () => {
                 </div>
                 
                 <button
-                  onClick={() => {
-                    setEditingItem(item);
+                  onClick={async () => {
+                    const itemWithVariants = { ...item };
+                    if (activeTab === 'products') {
+                      const variants = await dbService.studioAcom.products.getVariants(item.id);
+                      itemWithVariants.variants = variants.map((v: any) => ({
+                        ...v,
+                        templateId: v.template_id || v.templateId,
+                        previewImage: v.preview_image || v.previewImage,
+                        minQuantity: v.min_quantity || v.minQuantity,
+                        maxQuantity: v.max_quantity || v.maxQuantity,
+                        templateSvg: v.template_svg || v.templateSvg
+                      }));
+                    }
+                    setEditingItem(itemWithVariants);
                     setIsModalOpen(true);
                   }}
                   className="p-2 text-gray-400 hover:text-primary transition-colors"

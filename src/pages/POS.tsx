@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbService } from '../services/dbService';
-import { supabase } from '../lib/supabase';
+import { firestoreService } from '../services/firestoreService';
 import { Service } from '../types';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { motion } from 'motion/react';
@@ -40,7 +40,7 @@ const POS = () => {
     limit: 100
   }), []);
 
-  const { data: dynamicServices, loading: servicesLoading } = useSupabaseData<Service>(serviceOptions);
+  const { data: dynamicServices, loading: servicesLoading } = useFirestoreData<Service>(serviceOptions);
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];
@@ -120,7 +120,7 @@ const POS = () => {
         const amountPaid = isDeposit ? finalItemTotal * 0.5 : finalItemTotal;
 
         return {
-          user_id: user?.id || 'pos-customer',
+          user_id: user?.uid || 'pos-customer',
           service_id: item.serviceId,
           status: isDeposit ? 'confirmed' : 'completed',
           total_price: itemTotal,
@@ -154,8 +154,7 @@ const POS = () => {
         };
       });
       
-      const { error } = await supabase.from('orders').insert(ordersToInsert);
-      if (error) throw error;
+      await firestoreService.add('orders', ordersToInsert);
 
       setCart([]);
       setCustomerName('');

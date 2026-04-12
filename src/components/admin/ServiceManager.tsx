@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Service } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useSupabaseData, TableName } from '../../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
 import { dbService as db } from '../../services/dbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
@@ -38,7 +38,7 @@ const ServiceManager = () => {
     mapper: serviceMapper
   }), [serviceMapper]);
 
-  const { data: services, loading, error: fetchError, refresh } = useSupabaseData<Service>(serviceOptions);
+  const { data: services, loading, error: fetchError, refresh } = useFirestoreData<Service>(serviceOptions);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentService, setCurrentService] = useState<Partial<Service> | null>(null);

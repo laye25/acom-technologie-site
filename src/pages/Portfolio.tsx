@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { PortfolioItem } from '../types';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { ArrowRight, ExternalLink, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PORTFOLIO_ITEMS } from '../constants';
@@ -23,8 +23,8 @@ const Portfolio = () => {
     limit: 50
   }), [projectMapper]);
 
-  const { data: dbProjects, loading } = useSupabaseData<PortfolioItem>(portfolioOptions);
-  const { data: settingsData } = useSupabaseData<any>({ tableName: 'settings' as TableName });
+  const { data: dbProjects, loading } = useFirestoreData<PortfolioItem>(portfolioOptions);
+  const { data: settingsData } = useFirestoreData<any>({ tableName: 'settings' as TableName });
   const settings = settingsData?.[0];
 
   const displayProjects = useMemo(() => {

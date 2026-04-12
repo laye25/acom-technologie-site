@@ -11,9 +11,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
-import { useSupabaseData } from '../../hooks/useSupabase';
+import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { generateDesign } from '../../lib/gemini';
-import { supabase } from '../../lib/supabase';
+import { firestoreService } from '../../services/firestoreService';
 import { useAuth } from '../../context/AuthContext';
 import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
 import { OptimizedImage } from '../OptimizedImage';
@@ -327,16 +327,16 @@ const FONTS = [
 
 export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport, autoOpenSelector }) => {
   const { isAdmin, isManager, profile, user } = useAuth();
-  const { data: dbTemplates, loading: loadingTemplates, refresh: refreshTemplates } = useSupabaseData<any>({
+  const { data: dbTemplates, loading: loadingTemplates, refresh: refreshTemplates } = useFirestoreData<any>({
     tableName: 'design_templates',
     order: { column: 'createdAt', direction: 'desc' },
     realtime: false,
     limit: 50
   });
 
-  const { data: userDesigns, refresh: refreshUserDesigns } = useSupabaseData<any>({
+  const { data: userDesigns, refresh: refreshUserDesigns } = useFirestoreData<any>({
     tableName: 'designs',
-    filter: { column: 'ownerId', value: user?.id },
+    filter: { column: 'ownerId', value: user?.uid },
     skip: !user,
     realtime: true,
     limit: 50
@@ -357,16 +357,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     
     const toastId = toast.loading("Suppression...");
     try {
-      const { error } = await supabase.from(collectionName).delete().eq('id', id);
-      if (error) throw error;
+      await firestoreService.delete(collectionName, id);
       
       // Give Firestore a moment to propagate the deletion
       await new Promise(resolve => setTimeout(resolve, 500));
       
       if (collectionName === 'design_templates') {
-        await refreshTemplates(true); // Force refresh from server, bypassing cache
+        await refreshTemplates(); // Force refresh from server, bypassing cache
       } else {
-        await refreshUserDesigns(true); // Force refresh for user designs too
+        await refreshUserDesigns(); // Force refresh for user designs too
       }
       
       toast.success("Design supprimé.", { id: toastId });
@@ -586,24 +585,17 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     try {
       const designData = {
         name: designTitle,
-        owner_id: user.id,
+        owner_id: user.uid,
         elements: elements,
         bg_color: bgColor,
         updated_at: new Date().toISOString(),
       };
 
       if (designId) {
-        const { error } = await supabase.from('designs').update(designData).eq('id', designId);
-        if (error) throw error;
+        await firestoreService.update('designs', designId, designData);
         toast.success("Design mis à jour !", { id: toastId });
       } else {
-        const newId = crypto.randomUUID();
-        const { error } = await supabase.from('designs').insert({
-          ...designData,
-          id: newId,
-          created_at: new Date().toISOString(),
-        });
-        if (error) throw error;
+        const newId = await firestoreService.add('designs', designData);
         setDesignId(newId);
         toast.success("Design enregistré !", { id: toastId });
       }
@@ -1018,7 +1010,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       
       const selectedCategory = TEMPLATE_CATEGORIES.find(c => c.name === templateCategory);
       
-      await supabase.from('design_templates').insert({
+      await firestoreService.add('design_templates', {
         name: templateName,
         category: templateCategory,
         subCategory: templateSubCategory,
@@ -1027,9 +1019,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         promotionPercentage: templatePromotion && templatePromotionPercentage ? Number(templatePromotionPercentage) : 0,
         categoryId: selectedCategory?.categoryId || 'print',
         pages: sanitizedPages,
-        created_at: new Date().toISOString(),
         isPublic: true,
-        user_id: user?.id || 'anonymous'
+        user_id: user?.uid || 'anonymous'
       });
       
       toast.success("Modèle enregistré avec succès !");
@@ -1058,15 +1049,14 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       // Capture a preview of the front side
       const dataUrl = stageRef.current.toDataURL();
       
-      await supabase.from('design_requests').insert({
-        user_id: user?.id || null,
+      await firestoreService.add('design_requests', {
+        user_id: user?.uid || null,
         user_email: user?.email || contactInfo.email,
-        user_name: profile?.displayName || user?.user_metadata?.full_name || contactInfo.name || 'Client',
+        user_name: profile?.displayName || contactInfo.name || 'Client',
         user_phone: contactInfo.phone || null,
         pages: pages,
         preview_url: dataUrl,
-        status: 'pending',
-        created_at: new Date().toISOString(),
+        status: 'pending'
       });
 
       setIsSuccessModalOpen(true);
@@ -2055,7 +2045,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                             <p className="text-xs font-bold truncate">{t.name}</p>
                             <p className="text-[9px] text-primary font-medium truncate">{t.category || 'Carte de visite'}</p>
                           </div>
-                          {(isAdmin || isManager || t.userId === user?.id) && (
+                          {(isAdmin || isManager || t.userId === user?.uid) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

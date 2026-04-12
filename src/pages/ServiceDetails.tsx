@@ -14,7 +14,7 @@ import {
   Star,
   FileText
 } from 'lucide-react';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Service } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { isPromotionActive, getDiscountedPrice } from '../lib/promotions';
@@ -46,7 +46,7 @@ const ServiceDetails = () => {
     mapper: serviceMapper
   }), [serviceId, serviceMapper]);
 
-  const { data: dbServices, loading } = useSupabaseData<Service>(serviceOptions);
+  const { data: dbServices, loading } = useFirestoreData<Service>(serviceOptions);
 
   const service = useMemo(() => {
     if (!loading && dbServices.length > 0) return dbServices[0];

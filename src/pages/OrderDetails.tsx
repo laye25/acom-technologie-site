@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Order, Service, UserProfile, OrderStatus, PaymentRecord } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
@@ -70,7 +70,7 @@ const OrderDetails = () => {
     tableName: 'orders' as TableName,
     filters: [
       { column: 'id', value: orderId },
-      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.id }] : [])
+      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.uid }] : [])
     ],
     skip: authLoading || !user || !orderId
   }), [orderId, user, isAdmin, isManager, authLoading]);
@@ -79,8 +79,8 @@ const OrderDetails = () => {
     tableName: 'services' as TableName
   }), []);
 
-  const { data: orderData, loading: orderLoading, error: orderError } = useSupabaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
+  const { data: orderData, loading: orderLoading, error: orderError } = useFirestoreData<Order>(orderOptions);
+  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
 
   const order = orderData?.[0] || null;
 
@@ -193,7 +193,7 @@ const OrderDetails = () => {
     skip: !order || !(isAdmin || isManager)
   }), [order, isAdmin, isManager]);
 
-  const { data: userProfiles } = useSupabaseData<UserProfile>(userProfileOptions);
+  const { data: userProfiles } = useFirestoreData<UserProfile>(userProfileOptions);
   const client = userProfiles?.[0] || null;
 
   const [accepting, setAccepting] = React.useState(false);
@@ -579,7 +579,7 @@ const OrderDetails = () => {
         {/* Header Section */}
         <div className="p-6 sm:p-8 md:p-12 bg-gradient-to-br from-gray-50 to-white border-b border-black/5">
           {/* Pending Validation Message for Client */}
-          {order.status === 'pending' && user?.id === order.userId && (
+          {order.status === 'pending' && user?.uid === order.userId && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -653,7 +653,7 @@ const OrderDetails = () => {
           )}
 
           {/* Contract Acceptance Banner */}
-          {order.status === 'confirmed' && order.clientAccepted !== true && order.details?.type !== 'pos' && (user?.id === order.userId || (!isAdmin && !isManager)) && (
+          {order.status === 'confirmed' && order.clientAccepted !== true && order.details?.type !== 'pos' && (user?.uid === order.userId || (!isAdmin && !isManager)) && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -719,7 +719,7 @@ const OrderDetails = () => {
           )}
 
           {/* Balance Payment Banner */}
-          {order.status === 'delivered' && !order.paid && (user?.id === order.userId || (!isAdmin && !isManager)) && (
+          {order.status === 'delivered' && !order.paid && (user?.uid === order.userId || (!isAdmin && !isManager)) && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -1051,7 +1051,7 @@ const OrderDetails = () => {
                           )}
 
                           {/* Client Actions */}
-                          {user?.id === order.userId && d.status === 'to_validate' && (
+                          {user?.uid === order.userId && d.status === 'to_validate' && (
                             <div className="flex gap-2">
                               <button 
                                 onClick={() => handleUpdateDeliverableStatus(d.id, 'validated')}

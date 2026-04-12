@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PortfolioItem } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useSupabaseData, TableName } from '../../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
 import { dbService as db } from '../../services/dbService';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
 import { OptimizedImage } from '../OptimizedImage';
@@ -24,7 +24,7 @@ const PortfolioManager = () => {
     mapper: projectMapper
   }), [projectMapper]);
 
-  const { data: items, loading, error: fetchError, refresh } = useSupabaseData<PortfolioItem>(portfolioOptions);
+  const { data: items, loading, error: fetchError, refresh } = useFirestoreData<PortfolioItem>(portfolioOptions);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentItem, setCurrentItem] = useState<Partial<PortfolioItem> | null>(null);

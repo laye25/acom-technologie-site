@@ -4,7 +4,7 @@ import { dbService } from '../services/dbService';
 import { db } from '../db/db';
 import { syncService } from '../services/syncService';
 import { Order, OrderStatus, UserProfile, Service, Expense, SiteSettings } from '../types';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
@@ -29,7 +29,7 @@ import { notificationService } from '../services/notificationService';
 
 type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom';
 
-import { isSupabaseConfigured } from '../lib/supabase';
+// import { isSupabaseConfigured } from '../lib/supabase';
 
 const AdminDashboard = () => {
   const { user, isAdmin, isManager, isSuperAdmin, loading: authLoading } = useAuth();
@@ -53,12 +53,10 @@ const AdminDashboard = () => {
       const { storageService } = await import('../services/storageService');
       
       // Force sync before fixing to ensure Dexie is up to date
-      if (user?.id) {
+      if (user?.uid) {
         toast.loading('Synchronisation des données...', { id: toastId });
         await Promise.all([
-          syncService.syncServices(user.id),
-          syncService.syncCategories(user.id),
-          syncService.syncProducts(user.id)
+          syncService.syncServices(user.uid)
         ]);
       }
 
@@ -491,15 +489,13 @@ const AdminDashboard = () => {
         setSettingsData(st);
 
         // Sync in background (séquentiel pour lisser la charge IO)
-        if (user?.id) {
+        if (user?.uid) {
           const syncTasks = [
-            () => syncService.syncOrders(user.id),
-            () => syncService.syncServices(user.id),
-            () => syncService.syncUsers(user.id),
-            () => syncService.syncExpenses(user.id),
-            () => syncService.syncSettings(user.id),
-            () => syncService.syncCategories(user.id),
-            () => syncService.syncProducts(user.id)
+            () => syncService.syncOrders(user.uid),
+            () => syncService.syncServices(user.uid),
+            () => syncService.syncUsers(user.uid),
+            () => syncService.syncExpenses(user.uid),
+            () => syncService.syncSettings(user.uid)
           ];
 
           for (const task of syncTasks) {
@@ -537,7 +533,7 @@ const AdminDashboard = () => {
       }
     };
     loadData();
-  }, [user?.id]);
+  }, [user?.uid]);
   
   // Point 6: Aggregation - Fetch global stats
   const globalStats = settingsData?.find((s: any) => s.id === 'stats') || {};
@@ -1066,25 +1062,25 @@ const AdminDashboard = () => {
   };
 
   // Early returns must happen AFTER all hooks are defined
-  if (!isSupabaseConfigured) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <div className="bg-amber-50 border border-amber-100 rounded-3xl p-12 inline-block max-w-lg">
-          <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Configuration requise</h2>
-          <p className="text-gray-600 mb-8">
-            Supabase n'est pas encore configuré. Veuillez ajouter <strong>VITE_SUPABASE_URL</strong> et <strong>VITE_SUPABASE_ANON_KEY</strong> dans les paramètres de l'application.
-          </p>
-          <Link 
-            to="/"
-            className="px-8 py-3 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all inline-block"
-          >
-            Retour à l'accueil
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // if (!isSupabaseConfigured) {
+  //   return (
+  //     <div className="max-w-7xl mx-auto px-4 py-20 text-center">
+  //       <div className="bg-amber-50 border border-amber-100 rounded-3xl p-12 inline-block max-w-lg">
+  //         <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+  //         <h2 className="text-xl font-bold text-gray-900 mb-2">Configuration requise</h2>
+  //         <p className="text-gray-600 mb-8">
+  //           Supabase n'est pas encore configuré. Veuillez ajouter <strong>VITE_SUPABASE_URL</strong> et <strong>VITE_SUPABASE_ANON_KEY</strong> dans les paramètres de l'application.
+  //         </p>
+  //         <Link 
+  //           to="/"
+  //           className="px-8 py-3 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all inline-block"
+  //         >
+  //           Retour à l'accueil
+  //         </Link>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center font-medium text-gray-500">Vérification des accès...</div>;
   if (!hasAccess) return <div className="p-20 text-center font-bold text-red-500">Accès refusé</div>;

@@ -4,7 +4,7 @@ import { BLOG_POSTS as STATIC_POSTS } from '../constants';
 import { BlogPost } from '../types';
 import { motion } from 'motion/react';
 import { Calendar, User, Clock, ArrowRight, ChevronRight, Bookmark } from 'lucide-react';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { OptimizedImage } from '../components/OptimizedImage';
 
 const Blog = () => {
@@ -27,7 +27,7 @@ const Blog = () => {
     limit: 20
   }), [postMapper]);
 
-  const { data: dbPosts, loading } = useSupabaseData<BlogPost>(blogOptions);
+  const { data: dbPosts, loading } = useFirestoreData<BlogPost>(blogOptions);
 
   const posts = useMemo(() => {
     if (!loading && dbPosts.length === 0) {

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useSupabaseData, TableName } from '../../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
 import { Order, UserProfile, Service } from '../../types';
 import { dbService as db } from '../../services/dbService';
 import { Link } from 'react-router-dom';
@@ -29,9 +29,9 @@ const MessageManager = () => {
     skip: !hasAccess
   }), [hasAccess]);
 
-  const { data: orders, loading: ordersLoading } = useSupabaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
-  const { data: users } = useSupabaseData<UserProfile>(userOptions);
+  const { data: orders, loading: ordersLoading } = useFirestoreData<Order>(orderOptions);
+  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
+  const { data: users } = useFirestoreData<UserProfile>(userOptions);
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { firestoreService } from '../services/firestoreService';
 
 interface CacheItem {
   data: any;
@@ -73,8 +73,7 @@ export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     fetchingRef.current[key] = true;
     try {
-      const { data, error } = await supabase.from(collectionName).select('*').limit(50);
-      if (error) throw error;
+      const data = await firestoreService.getAll(collectionName);
       setCachedData(key, data);
       console.log(`[Prefetch] Loaded ${collectionName}`);
     } catch (e) {

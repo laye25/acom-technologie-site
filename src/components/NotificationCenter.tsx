@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Notification } from '../types';
 import { dbService as db } from '../services/dbService';
 import { Bell, CheckCircle, MessageSquare, CreditCard, Clock, X, Info } from 'lucide-react';
@@ -16,11 +16,11 @@ export const NotificationCenter = () => {
 
   const notificationOptions = useMemo(() => ({
     tableName: 'notifications' as TableName,
-    filters: user ? [{ column: 'userId', value: user.id }] : [],
+    filters: user ? [{ column: 'userId', value: user.uid }] : [],
     skip: !user
   }), [user]);
 
-  const { data: rawNotifications } = useSupabaseData<Notification>(notificationOptions);
+  const { data: rawNotifications } = useFirestoreData<Notification>(notificationOptions);
 
   const notifications = useMemo(() => {
     if (!rawNotifications) return [];

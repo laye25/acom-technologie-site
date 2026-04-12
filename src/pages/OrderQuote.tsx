@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Order, Service } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { 
@@ -48,7 +48,7 @@ const OrderQuote = () => {
     tableName: 'orders' as TableName,
     filters: [
       { column: 'id', value: orderId },
-      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.id }] : [])
+      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.uid }] : [])
     ],
     skip: !user || !orderId
   }), [orderId, user, isAdmin, isManager]);
@@ -57,8 +57,8 @@ const OrderQuote = () => {
     tableName: 'services' as TableName
   }), []);
 
-  const { data: orderData, loading: orderLoading } = useSupabaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
+  const { data: orderData, loading: orderLoading } = useFirestoreData<Order>(orderOptions);
+  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
 
   const order = orderData?.[0] || null;
 

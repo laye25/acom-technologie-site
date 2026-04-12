@@ -6,7 +6,7 @@ import Hero from '../components/Hero';
 import { Service, ServiceCategory, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ArrowRight, CheckCircle2, Star, Users, Briefcase, Award, Filter, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, Package, FileText, BarChart3, Construction, Hospital, Truck, GraduationCap, Settings } from 'lucide-react';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Link } from 'react-router-dom';
 import { Translate, useTranslation } from '../context/LanguageContext';
 import { dbService as db } from '../services/dbService';
@@ -51,7 +51,7 @@ const Home = () => {
     limit: 20
   }), [serviceMapper]);
 
-  const { data: dbServices, loading } = useSupabaseData<Service>(serviceOptions);
+  const { data: dbServices, loading } = useFirestoreData<Service>(serviceOptions);
 
   const [activeCategory, setActiveCategory] = useState<ServiceCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');

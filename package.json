@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "node dist/server.js",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --target=node22 --outfile=dist/server.js --format=esm --external:vite --external:express --external:stripe --external:resend --external:dotenv --external:path --external:url",
+    "start": "node server.ts",
+    "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
@@ -15,7 +15,6 @@
     "@google/genai": "^1.29.0",
     "@stripe/react-stripe-js": "^5.6.1",
     "@stripe/stripe-js": "^8.11.0",
-    "@supabase/supabase-js": "^2.102.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "better-sqlite3": "^12.4.1",

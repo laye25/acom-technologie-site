@@ -26,7 +26,7 @@ const Navbar = () => {
     const checkMerchant = async () => {
       if (user) {
         try {
-          const merchant = await dbService.merchants.getByOwner(user.id);
+          const merchant = await dbService.merchants.getByOwner(user.uid);
           setHasMerchantAccount(!!merchant);
         } catch (error) {
           console.error('Error checking merchant account:', error);

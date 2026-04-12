@@ -12,6 +12,7 @@ import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/f
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
 import { OptimizedImage } from '../OptimizedImage';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
+import { useStudioAcom } from '../../hooks/useStudioAcom';
 
 interface DesignSelectorModalProps {
   isOpen: boolean;
@@ -437,110 +438,15 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Memoize mappers to prevent infinite re-fetching
-  const categoryMapper = useCallback((cat: any) => {
-    const initial = INITIAL_CATEGORIES.find(c => 
-      c.id === cat.id || 
-      c.name.toLowerCase() === cat.name?.toLowerCase() ||
-      cat.name?.toLowerCase().includes(c.name.toLowerCase()) ||
-      c.name.toLowerCase().includes(cat.name?.toLowerCase())
-    );
-    const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
-    return {
-      ...cat,
-      icon: iconMap[cat.icon] || initial?.icon || Sparkles,
-      color: cat.color || initial?.color || 'text-gray-600',
-      coverImage: cat.cover_image || cat.coverImage || initial?.coverImage
-    };
-  }, []);
-
-  const productMapper = useCallback((prod: any) => ({
-    ...prod,
-    categoryId: prod.category_id || prod.categoryId,
-    coverImage: prod.cover_image || prod.coverImage,
-    userId: prod.user_id || prod.userId
-  }), []);
-
-  const variantMapper = useCallback((v: any) => ({
-    ...v,
-    productId: v.product_id,
-    templateId: v.template_id,
-    previewImage: v.preview_image,
-    minQuantity: v.min_quantity,
-    maxQuantity: v.max_quantity,
-    templateSvg: v.template_svg
-  }), []);
-
-  // 1. Fetch Categories with Real-time
-  const [dbCategories, setDbCategories] = useState<StudioCategory[]>([]);
-  const [loadingCats, setLoadingCats] = useState(true);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-
-    const q = query(collection(db, 'studio_acom_categories'), limit(100));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => categoryMapper({ id: doc.id, ...doc.data() }));
-      setDbCategories(data);
-      setLoadingCats(false);
-    });
-
-    return () => unsubscribe();
-  }, [isOpen, categoryMapper]);
-
-  // 2. Fetch Products with Real-time
-  const [dbProducts, setDbProducts] = useState<Product[]>([]);
-  const [loadingProds, setLoadingProds] = useState(true);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-
-    const q = query(collection(db, 'studio_acom_products'), limit(500));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => productMapper({ id: doc.id, ...doc.data() }));
-      setDbProducts(data);
-      setLoadingProds(false);
-    });
-
-    return () => unsubscribe();
-  }, [isOpen, productMapper]);
-
-  // 3. Fetch Variants with Real-time
-  const [dbVariants, setDbVariants] = useState<Variant[]>([]);
-
-  React.useEffect(() => {
-    if (!isOpen) return;
-
-    const q = query(collection(db, 'variants'), limit(1000));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => variantMapper({ id: doc.id, ...doc.data() }));
-      setDbVariants(data);
-    });
-
-    return () => unsubscribe();
-  }, [isOpen, variantMapper]);
-
-  // Merge Products and Variants
-  const allProducts = useMemo(() => {
-    return dbProducts.map(p => ({
-      ...p,
-      variants: dbVariants.filter(v => v.productId === p.id)
-    }));
-  }, [dbProducts, dbVariants]);
-
-  // Merge Categories (System + DB)
-  const allCategories = useMemo(() => {
-    const systemCats = CATEGORIES.filter(c => ['saved', 'all', 'favorites', 'categories'].includes(c.id));
-    
-    // Start with system categories and add DB categories
-    const merged = [...systemCats, ...dbCategories];
-    
-    return merged;
-  }, [dbCategories]);
+  const { categories: allCategories, products: allProducts, loading: loadingData } = useStudioAcom(isOpen);
 
   // Use the merged data
-  const categories = allCategories;
-  const loadingVariants = loadingCats || loadingProds;
+  const categories = useMemo(() => {
+    const navItems = CATEGORIES.filter(c => ['saved', 'all', 'favorites', 'categories'].includes(c.id));
+    return [...navItems, ...allCategories];
+  }, [allCategories]);
+
+  const loadingVariants = loadingData;
 
   // Reset view when category changes
   React.useEffect(() => {
@@ -574,11 +480,11 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const [userDesigns, setUserDesigns] = useState<any[]>([]);
 
   React.useEffect(() => {
-    if (!isOpen || !user?.id || activeCategory !== 'saved') return;
+    if (!isOpen || !user?.uid || activeCategory !== 'saved') return;
 
     const q = query(
       collection(db, 'designs'),
-      where('user_id', '==', user.id),
+      where('user_id', '==', user.uid),
       limit(50)
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {

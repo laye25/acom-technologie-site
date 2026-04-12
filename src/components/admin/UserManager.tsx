@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useSupabaseData, TableName } from '../../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
 import { UserProfile } from '../../types';
 import { dbService as db } from '../../services/dbService';
 import { motion, AnimatePresence } from 'motion/react';
@@ -42,7 +42,7 @@ const UserManager = () => {
     order: { column: 'created_at' as const, ascending: false }
   }), []);
 
-  const { data: users, loading, error, refresh } = useSupabaseData<UserProfile>(userOptions);
+  const { data: users, loading, error, refresh } = useFirestoreData<UserProfile>(userOptions);
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => {

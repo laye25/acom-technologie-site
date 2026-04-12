@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, X, Save, FileText, Calendar, User, Upload, Loader2
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useSupabaseData, TableName } from '../../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
 import { dbService as db } from '../../services/dbService';
 import { ai, getGeminiModel } from '../../lib/gemini';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
@@ -33,7 +33,7 @@ const BlogManager = () => {
     mapper: postMapper
   }), [postMapper]);
 
-  const { data: posts, loading, error: fetchError, refresh } = useSupabaseData<BlogPost>(blogOptions);
+  const { data: posts, loading, error: fetchError, refresh } = useFirestoreData<BlogPost>(blogOptions);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentPost, setCurrentPost] = useState<Partial<BlogPost> | null>(null);

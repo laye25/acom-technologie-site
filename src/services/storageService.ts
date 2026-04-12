@@ -1,28 +1,30 @@
-import { supabase } from '../lib/supabase';
+import { storage } from '../firebase';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 export const storageService = {
   /**
-   * Uploads a file to Supabase Storage
-   * @param bucket The bucket name
+   * Uploads a file to Firebase Storage
+   * @param bucket The bucket name (used as a prefix in Firebase Storage)
    * @param path The path within the bucket
    * @param file The file to upload (File object or base64 string)
-   * @returns The public URL of the uploaded file
+   * @returns The download URL of the uploaded file
    */
   async uploadFile(bucket: string, path: string, file: File | string): Promise<string> {
     try {
-      let fileBody: any;
+      let fileBody: Blob | Uint8Array;
       let contentType: string | undefined;
 
       if (typeof file === 'string') {
         // Handle base64 string
-        const base64Data = file.split(',')[1];
+        const parts = file.split(',');
+        const base64Data = parts[1];
         const binaryData = atob(base64Data);
         const arrayBuffer = new ArrayBuffer(binaryData.length);
         const uint8Array = new Uint8Array(arrayBuffer);
         for (let i = 0; i < binaryData.length; i++) {
           uint8Array[i] = binaryData.charCodeAt(i);
         }
-        fileBody = arrayBuffer;
+        fileBody = uint8Array;
         
         // Try to extract content type from base64
         const match = file.match(/^data:(image\/[a-zA-Z+]+);base64,/);
@@ -34,37 +36,30 @@ export const storageService = {
         contentType = file.type;
       }
 
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, fileBody, {
-          contentType,
-          upsert: true
-        });
+      // In Firebase Storage, we use a single bucket usually, so we prefix the path with the "bucket" name
+      const storageRef = ref(storage, `${bucket}/${path}`);
+      
+      const metadata = contentType ? { contentType } : undefined;
+      const snapshot = await uploadBytes(storageRef, fileBody, metadata);
+      const downloadURL = await getDownloadURL(snapshot.ref);
 
-      if (error) {
-        // If bucket doesn't exist, we might need to inform the user
-        if (error.message.includes('bucket not found')) {
-          throw new Error(`Le bucket "${bucket}" n'existe pas dans Supabase Storage. Veuillez le créer.`);
-        }
-        throw error;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(data.path);
-
-      return publicUrl;
+      return downloadURL;
     } catch (error) {
-      console.error('Error uploading file:', error);
+      console.error('Error uploading file to Firebase Storage:', error);
       throw error;
     }
   },
 
   /**
-   * Deletes a file from Supabase Storage
+   * Deletes a file from Firebase Storage
    */
   async deleteFile(bucket: string, path: string): Promise<void> {
-    const { error } = await supabase.storage.from(bucket).remove([path]);
-    if (error) throw error;
+    try {
+      const storageRef = ref(storage, `${bucket}/${path}`);
+      await deleteObject(storageRef);
+    } catch (error) {
+      console.error('Error deleting file from Firebase Storage:', error);
+      throw error;
+    }
   }
 };

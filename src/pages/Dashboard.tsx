@@ -10,7 +10,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
-import { supabase } from '../lib/supabase';
+import { firestoreService } from '../services/firestoreService';
 import { NotificationCenter } from '../components/NotificationCenter';
 import { getOrderDiscountedTotal } from '../lib/promotions';
 import { OptimizedImage } from '../components/OptimizedImage';
@@ -33,43 +33,48 @@ const Dashboard = () => {
   const filter = useMemo(() => {
     if (!user) return undefined;
     if (isManager || isAdmin) return undefined; // Managers and admins see all orders
-    return { column: 'user_id', value: user.id };
+    return { column: 'user_id', value: user.uid };
   }, [user, isManager, isAdmin]);
   
   const [rawOrders, setRawOrders] = React.useState<Order[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [ordersError, setOrdersError] = React.useState<any>(null);
 
+  const ordersQuery = useMemo(() => {
+    if (!user) return null;
+    
+    if (!(isManager || isAdmin)) {
+      const uid = user?.uid;
+      if (!uid) {
+        console.warn('Dashboard: user.uid is undefined. User object:', user);
+        return null;
+      }
+      console.log('Dashboard: Creating query for user:', uid);
+      return query(collection(db, 'orders'), where('user_id', '==', uid), limit(50));
+    } else {
+      return query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50));
+    }
+  }, [user, isManager, isAdmin]);
+
   React.useEffect(() => {
-    console.log('Dashboard useEffect - user:', user);
-    if (!user) {
-      setLoading(false);
+    if (!ordersQuery) {
+      if (!user) setLoading(false);
       return;
     }
 
-    let q = query(collection(db, 'orders'), limit(50));
-    if (!(isManager || isAdmin)) {
-      if (!user?.id) {
-        console.warn('Dashboard: user.id is undefined');
-        return;
-      }
-      console.log('Dashboard: querying orders for user:', user.id);
-      q = query(collection(db, 'orders'), where('user_id', '==', user.id), limit(50));
-    } else {
-      q = query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50));
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    console.log('Dashboard: Starting onSnapshot with query');
+    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
       setRawOrders(data);
       setLoading(false);
     }, (error) => {
+      console.error('Dashboard: onSnapshot error:', error);
       setOrdersError(error);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [user, isManager, isAdmin]);
+  }, [ordersQuery]);
 
   const [dynamicServices, setDynamicServices] = React.useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = React.useState(true);
@@ -127,7 +132,7 @@ const Dashboard = () => {
   const [designsLoading, setDesignsLoading] = React.useState(true);
   React.useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, 'designs'), where('user_id', '==', user.id), limit(50));
+    const q = query(collection(db, 'designs'), where('user_id', '==', user.uid), limit(50));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Design));
       setUserDesigns(data);
@@ -478,7 +483,7 @@ const Dashboard = () => {
                       onClick={async () => {
                         if (window.confirm('Supprimer ce design ?')) {
                           try {
-                            await supabase.from('designs').delete().eq('id', design.id);
+                            await firestoreService.delete('designs', design.id);
                             toast.success('Design supprimé');
                           } catch (err) {
                             console.error(err);
@@ -563,8 +568,8 @@ const Dashboard = () => {
           <div className="bg-white rounded-3xl border border-black/5 p-8 sm:p-12 shadow-sm">
             <div className="flex flex-col items-center text-center mb-10">
               <div className="w-24 h-24 bg-primary-light rounded-3xl flex items-center justify-center mb-6 shadow-inner">
-                {user?.user_metadata?.avatar_url || profile?.photoURL ? (
-                  <OptimizedImage src={user?.user_metadata?.avatar_url || profile?.photoURL} alt="" width={200} className="w-full h-full object-cover rounded-3xl" />
+                {profile?.photoURL ? (
+                  <OptimizedImage src={profile.photoURL} alt="" width={200} className="w-full h-full object-cover rounded-3xl" />
                 ) : (
                   <User className="w-12 h-12 text-primary" />
                 )}

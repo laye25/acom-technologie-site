@@ -1,33 +1,211 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: services
+// Fields: id, name, description, price, category, image, updated_at
+//
+// Collection: orders
+// Fields: id, user_id, service_id, status, total_price, updated_at
+//
+// Collection: portfolio
+// Fields: id, title, description, image, category, updated_at
+//
+// Collection: blog_posts
+// Fields: id, title, content, category, image, updated_at
+//
+// Collection: settings
+// Fields: id, data, updated_at
+//
+// Collection: messages
+// Fields: id, user_id, content, created_at
+//
+// Collection: expenses
+// Fields: id, title, amount, date, category, updated_at
+//
+// Collection: notifications
+// Fields: id, user_id, title, message, read, created_at
+//
+// Collection: studio_acom_categories
+// Fields: id, name, icon, color, cover_image, updated_at
+//
+// Collection: studio_acom_products
+// Fields: id, name, category_id, user_id, cover_image, updated_at
+//
+// Collection: variants
+// Fields: id, product_id, name, price, updated_at
+//
+// Collection: users
+// Fields: id, email, display_name, role, updated_at
+//
+// Collection: merchants
+// Fields: id, owner_id, name, type, plan, created_at, updated_at
+//
+// [And other merchant-related collections...]
+//
+// ===============================================================
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
+    
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         request.auth.token.email in ['contact.acomtechnologie@gmail.com', 'contact.abdoulayendiaye@gmail.com']);
+    }
 
-    // Collections
+    function isManager() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager' ||
+         request.auth.token.email == 'gestionnaire.acomtechnologie@gmail.com');
+    }
+
+    function hasAnyAdminRole() {
+      return isAdmin() || isManager();
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Public Collections (Read only for everyone, write for admin)
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /portfolio/{portfolioId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /blog_posts/{postId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
     match /studio_acom_categories/{categoryId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Admin only
+      allow read: if true;
+      allow write: if isAdmin();
     }
+    
     match /studio_acom_products/{productId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Admin only
+      allow read: if true;
+      allow write: if isAdmin();
     }
+    
     match /variants/{variantId} {
-      allow read: if isAuthenticated();
-      allow write: if false; // Admin only
+      allow read: if true;
+      allow write: if isAdmin();
     }
-    match /designs/{designId} {
-      allow read, write: if isOwner(resource.data.user_id) || isOwner(request.resource.data.user_id);
+
+    // User Specific Collections
+    match /users/{userId} {
+      allow read: if isOwner(userId) || hasAnyAdminRole();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
     }
+    
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isOwner(resource.data.user_id) || isAdmin());
-      allow write: if false; // Admin only
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || hasAnyAdminRole());
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update: if hasAnyAdminRole();
+      allow delete: if isAdmin();
+    }
+    
+    match /designs/{designId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || hasAnyAdminRole());
+      allow write: if isAuthenticated() && (request.resource.data.user_id == request.auth.uid || isAdmin());
+    }
+    
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || hasAnyAdminRole());
+      allow write: if hasAnyAdminRole();
+    }
+    
+    match /messages/{messageId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || hasAnyAdminRole());
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    // Admin Only Collections
+    match /expenses/{expenseId} {
+      allow read, write: if isAdmin();
+    }
+    
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Merchant SaaS Collections
+    match /merchants/{merchantId} {
+      allow read: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || hasAnyAdminRole());
+      allow create: if isAuthenticated() && request.resource.data.owner_id == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /merchant_products/{productId} {
+      allow read, write: if isAuthenticated(); // Simplified for now, should check merchant ownership
+    }
+    
+    match /merchant_sales/{saleId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /merchant_expenses/{expenseId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /merchant_suppliers/{supplierId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /stock_movements/{movementId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /interventions/{interventionId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /projects/{projectId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /vehicles/{vehicleId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /employees/{employeeId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /students/{studentId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /patients/{patientId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /appointments/{appointmentId} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

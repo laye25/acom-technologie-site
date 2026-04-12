@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { dbService as db } from '../services/dbService';
 import { Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, MerchantPlan } from '../types';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, Package, ShoppingCart, PieChart, Plus, Trash2, 
@@ -121,7 +121,7 @@ const MerchantSaaS = () => {
       try {
         setLoadingMerchant(true);
         // Fetch from Supabase
-        const m = await db.merchants.getByOwner(user.id);
+        const m = await db.merchants.getByOwner(user.uid);
         setMerchant(m);
       } catch (error) {
         console.error('Error fetching merchant:', error);
@@ -357,7 +357,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     setLoading(true);
     try {
       const merchantData = {
-        ownerId: user.id,
+        ownerId: user.uid,
         name,
         currency,
         type, // Store the type in the merchant profile
@@ -653,25 +653,25 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
     })
   }), [merchant.id]);
 
-  const { data: products } = useSupabaseData<MerchantProduct>(productOptions);
-  const { data: sales } = useSupabaseData<MerchantSale>(saleOptions);
-  const { data: expenses } = useSupabaseData<MerchantExpense>(expenseOptions);
+  const { data: products } = useFirestoreData<MerchantProduct>(productOptions);
+  const { data: sales } = useFirestoreData<MerchantSale>(saleOptions);
+  const { data: expenses } = useFirestoreData<MerchantExpense>(expenseOptions);
   
   // Point 6: Aggregation - Fetch global merchant stats
-  const { data: merchantStatsData } = useSupabaseData<any>(useMemo(() => ({ 
+  const { data: merchantStatsData } = useFirestoreData<any>(useMemo(() => ({ 
     tableName: 'merchant_stats', 
     filter: { column: 'id', value: merchant.id } 
   }), [merchant.id]));
   const merchantStats = merchantStatsData?.[0];
 
   // Specialized data for stats
-  const { data: interventions } = useSupabaseData<any>(useMemo(() => ({ tableName: 'interventions', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: projects } = useSupabaseData<any>(useMemo(() => ({ tableName: 'projects', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: vehicles } = useSupabaseData<any>(useMemo(() => ({ tableName: 'vehicles', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: employees } = useSupabaseData<any>(useMemo(() => ({ tableName: 'employees', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: students } = useSupabaseData<any>(useMemo(() => ({ tableName: 'students', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: patients } = useSupabaseData<any>(useMemo(() => ({ tableName: 'patients', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: appointments } = useSupabaseData<any>(useMemo(() => ({ tableName: 'appointments', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const { data: interventions } = useFirestoreData<any>(useMemo(() => ({ tableName: 'interventions', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const { data: projects } = useFirestoreData<any>(useMemo(() => ({ tableName: 'projects', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const { data: vehicles } = useFirestoreData<any>(useMemo(() => ({ tableName: 'vehicles', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const { data: employees } = useFirestoreData<any>(useMemo(() => ({ tableName: 'employees', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const { data: students } = useFirestoreData<any>(useMemo(() => ({ tableName: 'students', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const { data: patients } = useFirestoreData<any>(useMemo(() => ({ tableName: 'patients', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const { data: appointments } = useFirestoreData<any>(useMemo(() => ({ tableName: 'appointments', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -1457,7 +1457,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
     })
   }), [merchant.id]);
 
-  const { data: products, loading } = useSupabaseData<MerchantProduct>(productOptions);
+  const { data: products, loading } = useFirestoreData<MerchantProduct>(productOptions);
 
   const movementOptions = useMemo(() => ({
     tableName: 'stock_movements' as TableName,
@@ -1476,7 +1476,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
     })
   }), [merchant.id]);
 
-  const { data: movements } = useSupabaseData<any>(movementOptions);
+  const { data: movements } = useFirestoreData<any>(movementOptions);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -1958,7 +1958,7 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
     where: [['merchantId', '==', merchant.id]]
   }), [merchant.id]);
 
-  const { data: products } = useSupabaseData<MerchantProduct>(productOptions);
+  const { data: products } = useFirestoreData<MerchantProduct>(productOptions);
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) && p.stockQuantity > 0);
@@ -1993,7 +1993,7 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
         paymentMethod,
         customerName,
         customerPhone,
-        processedBy: user.id,
+        processedBy: user.uid,
         createdAt: new Date()
       };
       
@@ -2205,7 +2205,7 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
     where: [['merchantId', '==', merchant.id]]
   }), [merchant.id]);
 
-  const { data: products } = useSupabaseData<MerchantProduct>(productOptions);
+  const { data: products } = useFirestoreData<MerchantProduct>(productOptions);
 
   const movementOptions = useMemo(() => ({
     tableName: 'stock_movements' as TableName,
@@ -2213,7 +2213,7 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: movements, loading } = useSupabaseData<any>(movementOptions);
+  const { data: movements, loading } = useFirestoreData<any>(movementOptions);
 
   return (
     <motion.div 
@@ -2314,7 +2314,7 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: expenses, loading } = useSupabaseData<MerchantExpense>(expenseOptions);
+  const { data: expenses, loading } = useFirestoreData<MerchantExpense>(expenseOptions);
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2466,7 +2466,7 @@ const MerchantSalesHistory = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: sales, loading } = useSupabaseData<MerchantSale>(saleOptions);
+  const { data: sales, loading } = useFirestoreData<MerchantSale>(saleOptions);
 
   return (
     <motion.div 
@@ -2586,7 +2586,7 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
     })
   }), [merchant.id]);
 
-  const { data: suppliers, loading } = useSupabaseData<MerchantSupplier>(supplierOptions);
+  const { data: suppliers, loading } = useFirestoreData<MerchantSupplier>(supplierOptions);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2879,7 +2879,7 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: interventions, loading } = useSupabaseData<any>(options);
+  const { data: interventions, loading } = useFirestoreData<any>(options);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3063,7 +3063,7 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: projects, loading } = useSupabaseData<any>(options);
+  const { data: projects, loading } = useFirestoreData<any>(options);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3257,7 +3257,7 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: vehicles, loading } = useSupabaseData<any>(options);
+  const { data: vehicles, loading } = useFirestoreData<any>(options);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3440,7 +3440,7 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: employees, loading } = useSupabaseData<any>(options);
+  const { data: employees, loading } = useFirestoreData<any>(options);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3660,7 +3660,7 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: students, loading } = useSupabaseData<any>(options);
+  const { data: students, loading } = useFirestoreData<any>(options);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3842,7 +3842,7 @@ const MedicalManager = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: patients, loading } = useSupabaseData<any>(options);
+  const { data: patients, loading } = useFirestoreData<any>(options);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4042,7 +4042,7 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
     order: { column: 'createdAt' as const, direction: 'desc' as const }
   }), [merchant.id]);
 
-  const { data: appointments, loading } = useSupabaseData<any>(options);
+  const { data: appointments, loading } = useFirestoreData<any>(options);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

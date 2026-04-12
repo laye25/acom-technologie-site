@@ -1,5 +1,113 @@
 {
   "entities": {
+    "Service": {
+      "title": "Service",
+      "description": "Service offered by the platform",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "service_id": { "type": "string" },
+        "status": { "type": "string" },
+        "total_price": { "type": "number" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "status"]
+    },
+    "PortfolioItem": {
+      "title": "PortfolioItem",
+      "description": "Portfolio item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "category": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "description": "Blog post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "image": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Application settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "data": { "type": "object" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "User message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "content": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "content"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Business expense",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "category": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "amount"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "title"]
+    },
     "StudioCategory": {
       "title": "StudioCategory",
       "description": "Category for design products",
@@ -9,20 +117,24 @@
         "name": { "type": "string" },
         "icon": { "type": "string" },
         "color": { "type": "string" },
-        "coverImage": { "type": "string" }
+        "cover_image": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name"]
     },
-    "Product": {
-      "title": "Product",
+    "StudioProduct": {
+      "title": "StudioProduct",
       "description": "Design product",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "categoryId": { "type": "string" }
+        "category_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "cover_image": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name", "categoryId"]
+      "required": ["id", "name", "category_id"]
     },
     "Variant": {
       "title": "Variant",
@@ -30,10 +142,190 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "productId": { "type": "string" },
-        "name": { "type": "string" }
+        "product_id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "updated_at": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "productId", "name"]
+      "required": ["id", "product_id", "name"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Application user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "display_name": { "type": "string" },
+        "role": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email"]
+    },
+    "Merchant": {
+      "title": "Merchant",
+      "description": "SaaS Merchant",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "owner_id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "plan": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "owner_id", "name"]
+    },
+    "MerchantProduct": {
+      "title": "MerchantProduct",
+      "description": "Merchant product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "stock_quantity": { "type": "number" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "name"]
+    },
+    "MerchantSale": {
+      "title": "MerchantSale",
+      "description": "Merchant sale",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "total_amount": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "total_amount"]
+    },
+    "MerchantExpense": {
+      "title": "MerchantExpense",
+      "description": "Merchant expense",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "title", "amount"]
+    },
+    "MerchantSupplier": {
+      "title": "MerchantSupplier",
+      "description": "Merchant supplier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "name": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "name"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Stock movement record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "product_id": { "type": "string" },
+        "type": { "type": "string" },
+        "quantity": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "product_id", "type", "quantity"]
+    },
+    "Intervention": {
+      "title": "Intervention",
+      "description": "Technical intervention",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "title": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "title"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Merchant project",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "name": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "name"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Merchant vehicle",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "model": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "model"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Merchant employee",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "name": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "name"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "School student",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "name": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "name"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Clinic patient",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "name": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "name"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Clinic appointment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "patient_id": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "patient_id", "date"]
     },
     "Design": {
       "title": "Design",
@@ -42,27 +334,38 @@
       "properties": {
         "id": { "type": "string" },
         "user_id": { "type": "string" },
-        "name": { "type": "string" }
+        "name": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "user_id", "name"]
     }
   },
   "firestore": {
-    "/studio_acom_categories/{categoryId}": {
-      "schema": "StudioCategory",
-      "description": "Categories collection"
-    },
-    "/studio_acom_products/{productId}": {
-      "schema": "Product",
-      "description": "Products collection"
-    },
-    "/variants/{variantId}": {
-      "schema": "Variant",
-      "description": "Variants collection"
-    },
-    "/designs/{designId}": {
-      "schema": "Design",
-      "description": "Designs collection"
-    }
+    "/services/{serviceId}": { "schema": "Service", "description": "Services collection" },
+    "/orders/{orderId}": { "schema": "Order", "description": "Orders collection" },
+    "/portfolio/{portfolioId}": { "schema": "PortfolioItem", "description": "Portfolio collection" },
+    "/blog_posts/{postId}": { "schema": "BlogPost", "description": "Blog posts collection" },
+    "/settings/{settingId}": { "schema": "Settings", "description": "Settings collection" },
+    "/messages/{messageId}": { "schema": "Message", "description": "Messages collection" },
+    "/expenses/{expenseId}": { "schema": "Expense", "description": "Expenses collection" },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "Notifications collection" },
+    "/studio_acom_categories/{categoryId}": { "schema": "StudioCategory", "description": "Studio categories collection" },
+    "/studio_acom_products/{productId}": { "schema": "StudioProduct", "description": "Studio products collection" },
+    "/variants/{variantId}": { "schema": "Variant", "description": "Product variants collection" },
+    "/users/{userId}": { "schema": "User", "description": "Users collection" },
+    "/merchants/{merchantId}": { "schema": "Merchant", "description": "Merchants collection" },
+    "/merchant_products/{productId}": { "schema": "MerchantProduct", "description": "Merchant products collection" },
+    "/merchant_sales/{saleId}": { "schema": "MerchantSale", "description": "Merchant sales collection" },
+    "/merchant_expenses/{expenseId}": { "schema": "MerchantExpense", "description": "Merchant expenses collection" },
+    "/merchant_suppliers/{supplierId}": { "schema": "MerchantSupplier", "description": "Merchant suppliers collection" },
+    "/stock_movements/{movementId}": { "schema": "StockMovement", "description": "Stock movements collection" },
+    "/interventions/{interventionId}": { "schema": "Intervention", "description": "Interventions collection" },
+    "/projects/{projectId}": { "schema": "Project", "description": "Projects collection" },
+    "/vehicles/{vehicleId}": { "schema": "Vehicle", "description": "Vehicles collection" },
+    "/employees/{employeeId}": { "schema": "Employee", "description": "Employees collection" },
+    "/students/{studentId}": { "schema": "Student", "description": "Students collection" },
+    "/patients/{patientId}": { "schema": "Patient", "description": "Patients collection" },
+    "/appointments/{appointmentId}": { "schema": "Appointment", "description": "Appointments collection" },
+    "/designs/{designId}": { "schema": "Design", "description": "Designs collection" }
   }
 }

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { dbService as db } from '../services/dbService';
 import { Message, Order, Service } from '../types';
-import { useSupabaseData, TableName } from '../hooks/useSupabase';
+import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, Paperclip, Clock, User, ShieldCheck, MessageSquare, ChevronLeft, Loader2, FileText, Image as ImageIcon } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
@@ -24,7 +24,7 @@ const Chat = () => {
     
     const filters = [{ column: 'orderId', value: orderId }];
     if (!isAdmin && !isManager) {
-      filters.push({ column: 'clientUid', value: user.id });
+      filters.push({ column: 'clientUid', value: user.uid });
     }
     
     return {
@@ -39,7 +39,7 @@ const Chat = () => {
     
     const filters = [{ column: 'id', value: orderId }];
     if (!isAdmin && !isManager) {
-      filters.push({ column: 'userId', value: user.id });
+      filters.push({ column: 'userId', value: user.uid });
     }
     
     return {
@@ -53,9 +53,9 @@ const Chat = () => {
     tableName: 'services' as TableName
   }), []);
 
-  const { data: messages, loading: messagesLoading, error: messagesError } = useSupabaseData<Message>(chatOptions);
-  const { data: orderData, loading: orderLoading, error: orderError } = useSupabaseData<Order>(orderOptions);
-  const { data: dynamicServices } = useSupabaseData<Service>(serviceOptions);
+  const { data: messages, loading: messagesLoading, error: messagesError } = useFirestoreData<Message>(chatOptions);
+  const { data: orderData, loading: orderLoading, error: orderError } = useFirestoreData<Order>(orderOptions);
+  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
 
   const order = orderData?.[0] || null;
 
@@ -65,7 +65,7 @@ const Chat = () => {
     skip: !order || !(isAdmin || isManager)
   }), [order, isAdmin, isManager]);
 
-  const { data: userProfiles } = useSupabaseData<UserProfile>(userProfileOptions);
+  const { data: userProfiles } = useFirestoreData<UserProfile>(userProfileOptions);
   const client = userProfiles?.[0] || null;
 
   const allServices = useMemo(() => {
@@ -134,7 +134,7 @@ const Chat = () => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Attempting to send message...', { inputText, orderId, userId: user?.id });
+    console.log('Attempting to send message...', { inputText, orderId, userId: user?.uid });
     if (!inputText.trim() || !user || !orderId || isSending) {
       console.log('Send blocked:', { 
         empty: !inputText.trim(), 
@@ -148,12 +148,12 @@ const Chat = () => {
     setIsSending(true);
     setError(null);
     try {
-      const clientUid = (isAdmin || isManager) ? (order?.user_id || order?.userId) : user.id;
+      const clientUid = (isAdmin || isManager) ? (order?.user_id || order?.userId) : user.uid;
       console.log('Saving message to Firestore...');
       
       const messageId = await db.messages.save({
         orderId: orderId,
-        senderId: user.id,
+        senderId: user.uid,
         senderName: profile?.displayName || user.email?.split('@')[0] || 'Utilisateur',
         text: inputText,
         isAdmin: isAdmin || isManager || false,
@@ -307,7 +307,7 @@ const Chat = () => {
           </div>
         ) : (
           sortedMessages.map((msg, i) => {
-            const isMe = msg.senderId === user?.id;
+            const isMe = msg.senderId === user?.uid;
             const msgDate = msg.createdAt || msg.created_at ? new Date(msg.createdAt?.toDate ? msg.createdAt.toDate() : (msg.createdAt || msg.created_at)) : new Date();
             const prevMsgDate = i > 0 ? (sortedMessages[i-1].createdAt || sortedMessages[i-1].created_at ? new Date(sortedMessages[i-1].createdAt?.toDate ? sortedMessages[i-1].createdAt.toDate() : (sortedMessages[i-1].createdAt || sortedMessages[i-1].created_at)) : new Date()) : null;
             const showDateSeparator = i === 0 || (prevMsgDate && !isSameDay(msgDate, prevMsgDate));

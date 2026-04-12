@@ -1,10 +1,10 @@
 import React from 'react';
-import { useSupabaseData } from '../../hooks/useSupabase';
+import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { motion } from 'motion/react';
 import { Clock, CheckCircle, XCircle, Eye, User, Mail, Calendar, Palette, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { supabase } from '../../lib/supabase';
+import { firestoreService } from '../../services/firestoreService';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { OptimizedImage } from '../OptimizedImage';
@@ -22,15 +22,14 @@ interface DesignRequest {
 
 const DesignRequestManager = () => {
   const navigate = useNavigate();
-  const { data: requests, loading, refresh } = useSupabaseData<DesignRequest>({
+  const { data: requests, loading, refresh } = useFirestoreData<DesignRequest>({
     tableName: 'design_requests',
     order: { column: 'createdAt', direction: 'desc' }
   });
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      const { error } = await supabase.from('design_requests').update({ status }).eq('id', id);
-      if (error) throw error;
+      await firestoreService.update('design_requests', id, { status });
       toast.success(`Statut mis à jour : ${status}`);
       refresh();
     } catch (error) {

@@ -1,398 +1,226 @@
-import { supabase } from '../lib/supabase';
+import { firestoreService } from './firestoreService';
+import { where, orderBy, limit } from 'firebase/firestore';
 import { Service, PortfolioItem, BlogPost, UserProfile } from '../types';
 
 export const dbService = {
   services: {
     async getById(id: string) {
-      const { data, error } = await supabase.from('services').select('*').eq('id', id).single();
-      if (error) return null;
-      return data as Service;
+      return firestoreService.getById<Service>('services', id);
     },
     async save(service: Partial<Service>) {
-      const id = service.id || crypto.randomUUID();
-      const data = { ...service, id, updated_at: new Date() };
-      const { error } = await supabase.from('services').upsert(data);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('services', service);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('services').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('services', id);
     }
   },
   orders: {
     async getById(id: string) {
-      const { data, error } = await supabase.from('orders').select('*').eq('id', id).single();
-      if (error) return null;
-      return data;
+      return firestoreService.getById<any>('orders', id);
     },
     async save(order: any) {
-      const id = order.id || crypto.randomUUID();
-      const data = { ...order, id, updated_at: new Date() };
-      const { error } = await supabase.from('orders').upsert(data);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('orders', order);
     }
   },
   portfolio: {
     async save(item: Partial<PortfolioItem>) {
-      const id = item.id || crypto.randomUUID();
-      const data = { ...item, id, updated_at: new Date() };
-      const { error } = await supabase.from('portfolio').upsert(data);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('portfolio', item);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('portfolio').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('portfolio', id);
     }
   },
   blog: {
     async getById(id: string) {
-      const { data, error } = await supabase.from('blog_posts').select('*').eq('id', id).single();
-      if (error) return null;
-      return data as BlogPost;
+      return firestoreService.getById<BlogPost>('blog_posts', id);
     },
     async getRelated(category: string, excludeId: string, limitCount: number = 2) {
-      const { data, error } = await supabase
-        .from('blog_posts')
-        .select('*')
-        .eq('category', category)
-        .neq('id', excludeId)
-        .limit(limitCount);
-      if (error) throw error;
-      return data as BlogPost[];
+      return firestoreService.getAll<BlogPost>('blog_posts', [
+        where('category', '==', category),
+        where('id', '!=', excludeId),
+        limit(limitCount)
+      ]);
     },
     async save(post: Partial<BlogPost>) {
-      const id = post.id || crypto.randomUUID();
-      const data = { ...post, id, updated_at: new Date() };
-      const { error } = await supabase.from('blog_posts').upsert(data);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('blog_posts', post);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('blog_posts').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('blog_posts', id);
     }
   },
   settings: {
     async save(id: string, settingsData: any) {
-      try {
-        // First attempt: use 'data' column (standard based on the SQL script provided)
-        const { error: dataError } = await supabase.from('settings').upsert({ 
-          id, 
-          data: settingsData, 
-          updated_at: new Date() 
-        });
-        
-        if (!dataError) return; // Success!
-
-        // Second attempt: try spreading (for legacy or custom schemas)
-        const { error: spreadError } = await supabase.from('settings').upsert({ 
-          id, 
-          ...settingsData, 
-          updated_at: new Date() 
-        });
-
-        if (!spreadError) return; // Success!
-
-        // If both failed, log details and throw a descriptive error
-        console.error('Settings Save Failed:', { dataError, spreadError });
-        
-        let errorMessage = `Impossible de sauvegarder les réglages. `;
-        
-        if (dataError.message.includes('column "data" does not exist') || dataError.code === '42703') {
-          errorMessage += "La colonne 'data' est manquante dans la table 'settings'. ";
-        } else {
-          errorMessage += `Erreur (data): ${dataError.message}. `;
-        }
-        
-        if (spreadError.message.includes('column') || spreadError.code === '42703') {
-          errorMessage += "Certaines colonnes spécifiques sont également manquantes. ";
-        } else {
-          errorMessage += `Erreur (spread): ${spreadError.message}. `;
-        }
-
-        errorMessage += "Veuillez vous assurer d'avoir exécuté le script SQL dans Supabase pour créer la table 'settings' avec une colonne 'data' de type JSONB.";
-        
-        throw new Error(errorMessage);
-      } catch (error) {
-        console.error('Error saving settings:', error);
-        throw error;
-      }
+      return firestoreService.save('settings', { id, data: settingsData });
     },
     async get(id: string) {
-      try {
-        const { data, error } = await supabase.from('settings').select('*').eq('id', id).single();
-        if (error) return null;
-        
-        // Try common JSON columns
-        if (data.data && typeof data.data === 'object') return data.data;
-        if (data.settings && typeof data.settings === 'object') return data.settings;
-        if (data.content && typeof data.content === 'object') return data.content;
-        if (data.value && typeof data.value === 'object') return data.value;
-        
-        // Otherwise return the whole object (it might be spread)
-        return data;
-      } catch (error) {
-        console.error('Error getting settings:', error);
-        return null;
-      }
+      const settings = await firestoreService.getById<any>('settings', id);
+      return settings?.data || settings;
     },
     onSnapshot(id: string, callback: (data: any) => void) {
-      const channel = supabase
-        .channel(`public:settings:id=eq.${id}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: `id=eq.${id}` }, (payload: any) => {
-          const newData = payload.new;
-          if (newData) {
-            callback((newData.data && typeof newData.data === 'object') ? newData.data : newData);
-          }
-        })
-        .subscribe();
-      
-      // Initial fetch
-      this.get(id).then(data => data && callback(data));
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      return firestoreService.onDocSnapshot<any>('settings', id, (data) => {
+        if (data) {
+          callback(data.data || data);
+        }
+      });
     }
   },
   messages: {
     async save(message: any) {
-      const id = crypto.randomUUID();
-      const { error } = await supabase.from('messages').insert({ ...message, id, created_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.add('messages', message);
     }
   },
   contactMessages: {
     async save(message: any) {
-      const id = crypto.randomUUID();
-      const { error } = await supabase.from('messages').insert({ ...message, id, created_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.add('messages', message);
     }
   },
   expenses: {
     async save(expense: any) {
-      const id = expense.id || crypto.randomUUID();
-      const { error } = await supabase.from('expenses').upsert({ ...expense, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('expenses', expense);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('expenses').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('expenses', id);
     },
     async getAll(limitCount: number = 100) {
-      const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false }).limit(limitCount);
-      if (error) throw error;
-      return data;
+      return firestoreService.getAll<any>('expenses', [
+        orderBy('date', 'desc'),
+        limit(limitCount)
+      ]);
     }
   },
   notifications: {
     async save(notification: any) {
-      const id = notification.id || crypto.randomUUID();
-      const { error } = await supabase.from('notifications').upsert({ ...notification, id, created_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('notifications', notification);
     },
     async markAsRead(id: string) {
-      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
-      if (error) throw error;
+      return firestoreService.update('notifications', id, { read: true });
     }
   },
   studioAcom: {
     categories: {
+      async getAll() {
+        return firestoreService.getAll<any>('studio_acom_categories', [orderBy('name', 'asc')]);
+      },
       async save(category: any) {
-        const id = category.id || crypto.randomUUID();
-        const { coverImage, ...rest } = category;
-        const dataToSave = {
-          ...rest,
-          id,
-          cover_image: coverImage || category.cover_image,
-          updated_at: new Date()
+        const data = {
+          name: category.name,
+          sub: category.sub || '',
+          icon: category.icon || 'LayoutGrid',
+          color: category.color || 'text-primary',
+          cover_image: category.coverImage || category.cover_image || '',
+          updated_at: new Date().toISOString()
         };
-        const { error } = await supabase.from('studio_acom_categories').upsert(dataToSave);
-        if (error) throw error;
-        return id;
+        return firestoreService.save('studio_acom_categories', { ...data, id: category.id });
       },
       async delete(id: string) {
-        const { error } = await supabase.from('studio_acom_categories').delete().eq('id', id);
-        if (error) throw error;
+        return firestoreService.delete('studio_acom_categories', id);
       }
     },
     products: {
+      async getAll() {
+        return firestoreService.getAll<any>('studio_acom_products', [orderBy('name', 'asc')]);
+      },
       async save(product: any) {
-        const id = product.id || crypto.randomUUID();
-        const { variants, categoryId, userId, coverImage, ...productData } = product;
-        
-        // Ensure we use the correct field names for Supabase
-        const finalProductData = {
-          ...productData,
-          id,
-          category_id: categoryId || product.category_id,
-          user_id: userId || product.user_id,
-          cover_image: coverImage || product.cover_image,
-          updated_at: new Date()
+        const { variants, ...productData } = product;
+        const data = {
+          name: productData.name,
+          category_id: productData.categoryId || productData.category_id,
+          description: productData.description || '',
+          cover_image: productData.coverImage || productData.cover_image || '',
+          user_id: productData.userId || '',
+          updated_at: new Date().toISOString()
         };
-
-        const { error: pError } = await supabase.from('studio_acom_products').upsert(finalProductData);
-        if (pError) throw pError;
+        
+        const id = await firestoreService.save('studio_acom_products', { ...data, id: productData.id });
 
         if (variants && Array.isArray(variants)) {
-          // Delete existing variants to ensure sync (handle deletions)
-          await supabase.from('variants').delete().eq('product_id', id);
+          // Delete existing variants first to avoid duplicates/orphans if we're updating
+          const existingVariants = await firestoreService.getAll<any>('variants', [where('product_id', '==', id)]);
+          for (const v of existingVariants) {
+            await firestoreService.delete('variants', v.id);
+          }
 
-          if (variants.length > 0) {
-            const variantsToInsert = variants.map((variant: any) => {
-              // Ensure we have a valid UUID for the variant ID
-              // If it's a timestamp from the UI, generate a new UUID
-              const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(variant.id || '');
-              const vId = isUuid ? variant.id : crypto.randomUUID();
-
-              return {
-                id: vId,
-                product_id: id,
-                name: variant.name || '',
-                size: variant.size || '',
-                color: variant.color || '',
-                shape: variant.shape || '',
-                format: variant.format || '',
-                finish: variant.finish || '',
-                template_id: variant.templateId || variant.template_id || '',
-                preview_image: variant.previewImage || variant.preview_image || '',
-                price: (typeof variant.price === 'number' && !isNaN(variant.price)) ? variant.price : 0,
-                min_quantity: (typeof variant.minQuantity === 'number' && !isNaN(variant.minQuantity)) ? variant.minQuantity : (variant.min_quantity || 0),
-                max_quantity: (typeof variant.maxQuantity === 'number' && !isNaN(variant.maxQuantity)) ? variant.maxQuantity : (variant.max_quantity || 0),
-                template_svg: variant.templateSvg || variant.template_svg || '',
-                updated_at: new Date()
-              };
-            });
-
-            const { error: vError } = await supabase.from('variants').insert(variantsToInsert);
-            if (vError) throw vError;
+          // Save new variants
+          for (const variant of variants) {
+            const variantData = {
+              product_id: id,
+              name: variant.name,
+              size: variant.size || '',
+              color: variant.color || '',
+              shape: variant.shape || '',
+              format: variant.format || 'landscape',
+              finish: variant.finish || '',
+              template_id: variant.templateId || variant.template_id || '',
+              preview_image: variant.previewImage || variant.preview_image || '',
+              price: Number(variant.price) || 0,
+              min_quantity: Number(variant.minQuantity || variant.min_quantity) || 1,
+              max_quantity: Number(variant.maxQuantity || variant.max_quantity) || 1000,
+              template_svg: variant.templateSvg || variant.template_svg || '',
+              updated_at: new Date().toISOString()
+            };
+            await firestoreService.save('variants', variantData as any);
           }
         }
         return id;
       },
       async delete(id: string) {
-        // Delete variants first to avoid foreign key constraint issues
-        const { error: vError } = await supabase.from('variants').delete().eq('product_id', id);
-        if (vError) console.error('Error deleting variants for product:', vError);
-        
-        const { error } = await supabase.from('studio_acom_products').delete().eq('id', id);
-        if (error) throw error;
+        // Delete variants first
+        const variants = await firestoreService.getAll<any>('variants', [where('product_id', '==', id)]);
+        for (const v of variants) {
+          await firestoreService.delete('variants', v.id);
+        }
+        return firestoreService.delete('studio_acom_products', id);
       },
       async getVariants(productId: string) {
-        const { data, error } = await supabase.from('variants').select('*').eq('product_id', productId);
-        if (error) throw error;
-        return (data || []).map((v: any) => ({
-          ...v,
-          productId: v.product_id,
-          templateId: v.template_id,
-          previewImage: v.preview_image,
-          minQuantity: v.min_quantity,
-          maxQuantity: v.max_quantity,
-          templateSvg: v.template_svg
-        }));
+        return firestoreService.getAll<any>('variants', [
+          where('product_id', '==', productId)
+        ]);
       }
     }
   },
   users: {
     async save(user: any) {
-      const id = user.id || user.uid || crypto.randomUUID();
-      const { error } = await supabase.from('users').upsert({ ...user, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('users', user);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('users').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('users', id);
     }
   },
   merchants: {
     async getByOwner(ownerId: string) {
-      const { data, error } = await supabase.from('merchants').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }).limit(1);
-      if (error) throw error;
-      if (!data || data.length === 0) return null;
-      
-      const merchant = data[0];
-      return {
-        ...merchant,
-        ownerId: merchant.owner_id,
-        createdAt: merchant.created_at,
-        updatedAt: merchant.updated_at
-      };
+      const merchants = await firestoreService.getAll<any>('merchants', [
+        where('owner_id', '==', ownerId),
+        orderBy('created_at', 'desc'),
+        limit(1)
+      ]);
+      return merchants.length > 0 ? merchants[0] : null;
     },
     async save(merchant: any) {
-      const id = merchant.id || crypto.randomUUID();
-      const { ownerId, createdAt, updatedAt, ...rest } = merchant;
-      const dataToSave = {
-        ...rest,
-        id,
-        owner_id: ownerId || merchant.owner_id,
-        created_at: createdAt || merchant.created_at || new Date(),
-        updated_at: new Date()
-      };
-      const { error } = await supabase.from('merchants').upsert(dataToSave);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('merchants', merchant);
     }
   },
   merchantProducts: {
     async save(product: any) {
-      const id = product.id || crypto.randomUUID();
-      const { merchantId, costPrice, stockQuantity, minStockLevel, createdAt, updatedAt, ...rest } = product;
-      const dataToSave = {
-        ...rest,
-        id,
-        merchant_id: merchantId || product.merchant_id,
-        cost_price: costPrice || product.cost_price,
-        stock_quantity: stockQuantity || product.stock_quantity,
-        min_stock_level: minStockLevel || product.min_stock_level,
-        created_at: createdAt || product.created_at || new Date(),
-        updated_at: new Date()
-      };
-      const { error } = await supabase.from('merchant_products').upsert(dataToSave);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('merchant_products', product);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('merchant_products').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('merchant_products', id);
     }
   },
   merchantSales: {
     async save(sale: any) {
-      const id = sale.id || crypto.randomUUID();
-      const { merchantId, totalAmount, paymentMethod, customerName, customerPhone, processedBy, createdAt, ...rest } = sale;
-      const dataToSave = {
-        ...rest,
-        id,
-        merchant_id: merchantId || sale.merchant_id,
-        total_amount: totalAmount || sale.total_amount,
-        payment_method: paymentMethod || sale.payment_method,
-        customer_name: customerName || sale.customer_name,
-        customer_phone: customerPhone || sale.customer_phone,
-        processed_by: processedBy || sale.processed_by,
-        created_at: createdAt || sale.created_at || new Date()
-      };
-      const { error } = await supabase.from('merchant_sales').insert(dataToSave);
-      if (error) throw error;
+      const id = await firestoreService.add('merchant_sales', sale);
 
-      // Update stock levels
+      // Update stock levels (simplified for Firestore)
       for (const item of sale.items) {
-        const { data: product } = await supabase.from('merchant_products').select('stock_quantity').eq('id', item.productId).single();
+        const product = await firestoreService.getById<any>('merchant_products', item.productId);
         if (product) {
           const newStock = Math.max(0, (product.stock_quantity || 0) - item.quantity);
-          await supabase.from('merchant_products').update({ stock_quantity: newStock }).eq('id', item.productId);
+          await firestoreService.update('merchant_products', item.productId, { stock_quantity: newStock });
           
           // Record movement
-          await supabase.from('stock_movements').insert({
-            id: crypto.randomUUID(),
-            merchant_id: dataToSave.merchant_id,
+          await firestoreService.add('stock_movements', {
+            merchant_id: sale.merchant_id,
             product_id: item.productId,
             type: 'sale',
             quantity: item.quantity,
@@ -400,8 +228,7 @@ export const dbService = {
             new_quantity: newStock,
             reason: `Vente POS #${id.slice(-6)}`,
             reference_id: id,
-            performed_by: dataToSave.processed_by,
-            created_at: new Date()
+            performed_by: sale.processed_by
           });
         }
       }
@@ -410,56 +237,31 @@ export const dbService = {
   },
   merchantExpenses: {
     async save(expense: any) {
-      const id = expense.id || crypto.randomUUID();
-      const { merchantId, createdAt, ...rest } = expense;
-      const dataToSave = {
-        ...rest,
-        id,
-        merchant_id: merchantId || expense.merchant_id,
-        created_at: createdAt || expense.created_at || new Date()
-      };
-      const { error } = await supabase.from('merchant_expenses').upsert(dataToSave);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('merchant_expenses', expense);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('merchant_expenses').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('merchant_expenses', id);
     }
   },
   merchantSuppliers: {
     async save(supplier: any) {
-      const id = supplier.id || crypto.randomUUID();
-      const { merchantId, contactName, createdAt, updatedAt, ...rest } = supplier;
-      const dataToSave = {
-        ...rest,
-        id,
-        merchant_id: merchantId || supplier.merchant_id,
-        contact_name: contactName || supplier.contact_name,
-        created_at: createdAt || supplier.created_at || new Date(),
-        updated_at: new Date()
-      };
-      const { error } = await supabase.from('merchant_suppliers').upsert(dataToSave);
-      if (error) throw error;
-      return id;
+      return firestoreService.save('merchant_suppliers', supplier);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('merchant_suppliers').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('merchant_suppliers', id);
     }
   },
   stockMovements: {
     async addStock(merchantId: string, productId: string, quantity: number, reason: string, performedBy: string, cost?: number) {
-      const { data: product } = await supabase.from('merchant_products').select('name, stock_quantity').eq('id', productId).single();
+      const product = await firestoreService.getById<any>('merchant_products', productId);
       if (!product) throw new Error('Produit non trouvé');
 
       const currentStock = product.stock_quantity || 0;
       const newStock = currentStock + quantity;
 
-      await supabase.from('merchant_products').update({ stock_quantity: newStock }).eq('id', productId);
+      await firestoreService.update('merchant_products', productId, { stock_quantity: newStock });
 
-      await supabase.from('stock_movements').insert({
-        id: crypto.randomUUID(),
+      await firestoreService.add('stock_movements', {
         merchant_id: merchantId,
         product_id: productId,
         type: 'in',
@@ -467,122 +269,85 @@ export const dbService = {
         previous_quantity: currentStock,
         new_quantity: newStock,
         reason,
-        performed_by: performedBy,
-        created_at: new Date()
+        performed_by: performedBy
       });
 
       if (cost && cost > 0) {
-        await supabase.from('merchant_expenses').insert({
-          id: crypto.randomUUID(),
+        await firestoreService.add('merchant_expenses', {
           merchant_id: merchantId,
           title: `Approvisionnement: ${product.name}`,
           amount: cost,
           category: 'Stock',
-          date: new Date().toISOString().split('T')[0],
-          created_at: new Date()
+          date: new Date().toISOString().split('T')[0]
         });
       }
     }
   },
   interventions: {
     async save(intervention: any) {
-      const id = intervention.id || crypto.randomUUID();
-      const { error } = await supabase.from('interventions').upsert({ ...intervention, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('interventions', intervention);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('interventions').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('interventions', id);
     }
   },
   projects: {
     async save(project: any) {
-      const id = project.id || crypto.randomUUID();
-      const { error } = await supabase.from('projects').upsert({ ...project, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('projects', project);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('projects').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('projects', id);
     }
   },
   vehicles: {
     async save(vehicle: any) {
-      const id = vehicle.id || crypto.randomUUID();
-      const { error } = await supabase.from('vehicles').upsert({ ...vehicle, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('vehicles', vehicle);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('vehicles').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('vehicles', id);
     }
   },
   employees: {
     async save(employee: any) {
-      const id = employee.id || crypto.randomUUID();
-      const { error } = await supabase.from('employees').upsert({ ...employee, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('employees', employee);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('employees').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('employees', id);
     }
   },
   students: {
     async save(student: any) {
-      const id = student.id || crypto.randomUUID();
-      const { error } = await supabase.from('students').upsert({ ...student, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('students', student);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('students').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('students', id);
     }
   },
   patients: {
     async save(patient: any) {
-      const id = patient.id || crypto.randomUUID();
-      const { error } = await supabase.from('patients').upsert({ ...patient, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('patients', patient);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('patients').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('patients', id);
     }
   },
   appointments: {
     async save(appointment: any) {
-      const id = appointment.id || crypto.randomUUID();
-      const { error } = await supabase.from('appointments').upsert({ ...appointment, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('appointments', appointment);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('appointments').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('appointments', id);
     }
   },
   designs: {
     async save(design: any) {
-      const id = design.id || crypto.randomUUID();
-      const { error } = await supabase.from('designs').upsert({ ...design, id, updated_at: new Date() });
-      if (error) throw error;
-      return id;
+      return firestoreService.save('designs', design);
     },
     async getById(id: string) {
-      const { data, error } = await supabase.from('designs').select('*').eq('id', id).single();
-      if (error) return null;
-      return data;
+      return firestoreService.getById<any>('designs', id);
     },
     async delete(id: string) {
-      const { error } = await supabase.from('designs').delete().eq('id', id);
-      if (error) throw error;
+      return firestoreService.delete('designs', id);
     }
   }
 };
