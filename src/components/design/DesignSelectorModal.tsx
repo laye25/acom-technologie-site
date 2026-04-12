@@ -225,6 +225,14 @@ const getCategoryColor = (index: number) => CATEGORY_COLORS[index % CATEGORY_COL
 // Helper to optimize Supabase Storage images
 // (Moved to top level)
 
+const SafeIcon = ({ icon: Icon, className }: { icon: any, className?: string }) => {
+  if (!Icon) return <LayoutGrid className={className} />;
+  if (typeof Icon === 'function' || (typeof Icon === 'object' && '$$typeof' in Icon)) {
+    return <Icon className={className} />;
+  }
+  return <LayoutGrid className={className} />;
+};
+
 const CategoryBanner = ({ category, onClick }: { category: NavCategory, onClick: () => void }) => {
   return (
     <motion.div
@@ -249,7 +257,7 @@ const CategoryBanner = ({ category, onClick }: { category: NavCategory, onClick:
       <div className="absolute bottom-0 left-0 right-0 p-6">
         <div className="flex items-center space-x-3 mb-2">
           <div className={`p-2 rounded-xl bg-white/20 backdrop-blur-md ${category.color}`}>
-            <category.icon className="w-5 h-5" />
+            <SafeIcon icon={category.icon} className="w-5 h-5" />
           </div>
           <h3 className="text-xl font-black text-white">{category.name}</h3>
         </div>
@@ -622,23 +630,25 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
               </div>
 
               <div className="flex flex-col w-full px-4 space-y-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setActiveCategory(cat.id);
-                      setIsSidebarOpen(false);
-                    }}
-                    className={`flex items-center space-x-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${
-                      activeCategory === cat.id 
-                        ? 'bg-gray-50 text-gray-900 shadow-sm' 
-                        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                  >
-                    <cat.icon className={`w-6 h-6 ${cat.color}`} />
-                    <span>{cat.name}</span>
-                  </button>
-                ))}
+                {categories.map((cat) => {
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setActiveCategory(cat.id);
+                        setIsSidebarOpen(false);
+                      }}
+                      className={`flex items-center space-x-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all ${
+                        activeCategory === cat.id 
+                          ? 'bg-gray-50 text-gray-900 shadow-sm' 
+                          : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <SafeIcon icon={cat.icon} className={`w-6 h-6 ${cat.color}`} />
+                      <span>{cat.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

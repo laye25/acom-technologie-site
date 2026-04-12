@@ -336,7 +336,11 @@ const StudioAcomManager = () => {
                 {/* Category Icon Badge */}
                 {activeTab === 'categories' && (
                   <div className="absolute top-3 left-3 px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-lg flex items-center gap-2 shadow-sm">
-                    {React.createElement(getIcon(item.icon), { className: `w-4 h-4 ${item.color || 'text-primary'}` })}
+                    {typeof item.icon === 'function' || typeof item.icon === 'object' ? (
+                      <item.icon className={`w-4 h-4 ${item.color || 'text-primary'}`} />
+                    ) : (
+                      React.createElement(getIcon(item.icon), { className: `w-4 h-4 ${item.color || 'text-primary'}` })
+                    )}
                     <span className="text-[10px] font-black uppercase tracking-wider text-gray-900">{item.id}</span>
                   </div>
                 )}
@@ -474,8 +478,8 @@ const StudioAcomManager = () => {
                         <div>
                           <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 ml-1">Icône</label>
                           <select
-                            value={editingItem?.icon || 'LayoutGrid'}
-                            onChange={(e) => setEditingItem({ ...editingItem, icon: e.target.value })}
+                            value={editingItem?.iconName || (typeof editingItem?.icon === 'string' ? editingItem.icon : 'LayoutGrid')}
+                            onChange={(e) => setEditingItem({ ...editingItem, iconName: e.target.value, icon: e.target.value })}
                             className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold transition-all appearance-none"
                           >
                             <option value="Sparkles">Étincelles</option>
