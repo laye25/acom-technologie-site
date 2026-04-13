@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDataCache } from '../context/CacheContext';
 import LanguageSwitcher from './LanguageSwitcher';
+import { NotificationCenter } from './NotificationCenter';
 import { dbService } from '../services/dbService';
 import { LayoutDashboard, LogOut, Menu, X, ShoppingBag, MessageSquare, User, ChevronRight, Calculator, Store, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -189,6 +190,7 @@ const Navbar = () => {
           {/* Actions */}
           <div className="hidden md:flex items-center space-x-4">
             <LanguageSwitcher light={useWhiteText} />
+            {user && <NotificationCenter />}
             {user ? (
               <div className={`flex items-center space-x-2 p-1 rounded-full border transition-all ${
                 useWhiteText ? 'bg-white/10 border-white/10' : 'bg-gray-50 border-black/5'
@@ -242,6 +244,7 @@ const Navbar = () => {
           {/* Mobile Toggle */}
           <div className="flex items-center space-x-2 md:hidden">
             <LanguageSwitcher light={useWhiteText} />
+            {user && <NotificationCenter />}
             <button
               onClick={() => setIsOpen(!isOpen)}
               className={`p-2 rounded-xl transition-colors ${

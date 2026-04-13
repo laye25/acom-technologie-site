@@ -8,7 +8,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { db, auth } from '../../firebase';
-import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
 import { OptimizedImage } from '../OptimizedImage';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
@@ -485,23 +486,13 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     };
   }, [isOpen]);
 
-  const [userDesigns, setUserDesigns] = useState<any[]>([]);
-
-  React.useEffect(() => {
-    if (!isOpen || !user?.uid || activeCategory !== 'saved') return;
-
-    const q = query(
-      collection(db, 'designs'),
-      where('user_id', '==', user.uid),
-      limit(50)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setUserDesigns(data);
-    });
-
-    return () => unsubscribe();
-  }, [isOpen, user, activeCategory]);
+  const { data: userDesigns } = useFirestoreData<any>({
+    tableName: 'designs',
+    where: [['user_id', '==', user?.uid]],
+    limit: 50,
+    realtime: true,
+    skip: !isOpen || !user?.uid || activeCategory !== 'saved'
+  });
 
   const selectedProduct = useMemo(() => 
     allProducts.find(p => p.id === selectedProductId) || null

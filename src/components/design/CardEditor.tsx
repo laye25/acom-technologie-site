@@ -7,7 +7,7 @@ import {
   Wrench, FolderOpen, Sparkles, Mic, Image as ImageIcon, StickyNote, 
   Timer, Maximize2, Grid3X3, ChevronDown, Search, X, ArrowLeft,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, PaintRoller, CaseSensitive, ArrowUpDown, Scaling, Undo, Redo
+  List, ListOrdered, PaintRoller, CaseSensitive, ArrowUpDown, Scaling, Undo, Redo, Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
@@ -15,9 +15,15 @@ import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { generateDesign } from '../../lib/gemini';
 import { firestoreService } from '../../services/firestoreService';
 import { useAuth } from '../../context/AuthContext';
+import { usePresence } from '../../hooks/usePresence';
+import { geminiService } from '../../services/geminiService';
+import { bus } from '../../lib/events/EventBus';
+import '../../lib/events/SyncEngine'; // Initialize SyncEngine
+import { trackUsage } from '../../lib/billing/usageTracker';
+import { AssetLibrary } from './AssetLibrary';
 import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
 import { OptimizedImage } from '../OptimizedImage';
-import { CanvasElement, Design, Template } from '../../types';
+import { CanvasElement, Design, Template, DesignBlock } from '../../types';
 
 interface CardEditorProps {
   initialTemplate?: any; // SVG string, URL, or design object
@@ -214,11 +220,13 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
 };
 
 // --- Helper for Image Element ---
-const URLImage = ({ element, isSelected, onSelect, onChange }: { 
+const URLImage = ({ element, isSelected, onSelect, onChange, lockedBy, lockColor }: { 
   element: CanvasElement; 
   isSelected: boolean; 
   onSelect: () => void;
   onChange: (newAttrs: Partial<CanvasElement>) => void;
+  lockedBy?: string | null;
+  lockColor?: string;
 }) => {
   const [img] = useImage(element.src || '');
   const shapeRef = useRef<any>(null);
@@ -233,7 +241,7 @@ const URLImage = ({ element, isSelected, onSelect, onChange }: {
         y={element.y}
         width={element.width}
         height={element.height}
-        draggable
+        draggable={!lockedBy}
         onClick={onSelect}
         onTap={onSelect}
         onDragEnd={(e) => {
@@ -256,17 +264,30 @@ const URLImage = ({ element, isSelected, onSelect, onChange }: {
           });
         }}
       />
+      {lockedBy && (
+        <Rect
+          x={element.x - 2}
+          y={element.y - 2}
+          width={(element.width || 100) + 4}
+          height={(element.height || 100) + 4}
+          stroke={lockColor || '#ef4444'}
+          strokeWidth={2}
+          dash={[4, 2]}
+        />
+      )}
     </>
   );
 };
 
 // --- Helper for Text Element ---
-const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick }: { 
+const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick, lockedBy, lockColor }: { 
   element: CanvasElement; 
   isSelected: boolean; 
   onSelect: () => void;
   onChange: (newAttrs: Partial<CanvasElement>) => void;
   onDoubleClick: (e: any) => void;
+  lockedBy?: string | null;
+  lockColor?: string;
 }) => {
   const shapeRef = useRef<any>(null);
 
@@ -292,11 +313,11 @@ const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick }
         shadowOffsetX={element.shadowOffsetX}
         shadowOffsetY={element.shadowOffsetY}
         shadowOpacity={element.shadowOpacity}
-        draggable
+        draggable={!lockedBy}
         onClick={onSelect}
         onTap={onSelect}
-        onDblClick={onDoubleClick}
-        onDblTap={onDoubleClick}
+        onDblClick={lockedBy ? undefined : onDoubleClick}
+        onDblTap={lockedBy ? undefined : onDoubleClick}
         onDragEnd={(e) => {
           onChange({
             x: e.target.x(),
@@ -314,6 +335,17 @@ const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick }
           });
         }}
       />
+      {lockedBy && (
+        <Rect
+          x={element.x - 2}
+          y={element.y - 2}
+          width={(shapeRef.current?.width() || 100) + 4}
+          height={(shapeRef.current?.height() || 20) + 4}
+          stroke={lockColor || '#ef4444'}
+          strokeWidth={2}
+          dash={[4, 2]}
+        />
+      )}
     </>
   );
 };
@@ -327,12 +359,17 @@ const FONTS = [
 
 export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport, autoOpenSelector }) => {
   const { isAdmin, isManager, profile, user } = useAuth();
+  const { others, updateMyPresence } = usePresence(templateId || null);
   const { data: dbTemplates, loading: loadingTemplates, refresh: refreshTemplates } = useFirestoreData<any>({
     tableName: 'design_templates',
     order: { column: 'createdAt', direction: 'desc' },
     realtime: false,
     limit: 50
   });
+
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [designTitle, setDesignTitle] = useState('Design sans titre');
+  const [designId, setDesignId] = useState<string | null>(null);
 
   const { data: userDesigns, refresh: refreshUserDesigns } = useFirestoreData<any>({
     tableName: 'designs',
@@ -341,6 +378,63 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     realtime: true,
     limit: 50
   });
+
+  const { data: blocks, loading: loadingBlocks, mutate: mutateBlocks } = useFirestoreData<DesignBlock>({
+    tableName: `designs/${designId}/blocks` as any,
+    skip: !designId,
+    realtime: true
+  });
+
+  // Sync blocks to pages when they change from other sources
+  useEffect(() => {
+    if (blocks && blocks.length > 0 && designId) {
+      setPages(prevPages => {
+        const nextPages = [...prevPages];
+        blocks.forEach(block => {
+          const pageIdx = block.pageIndex;
+          if (pageIdx >= nextPages.length) {
+            // Add missing pages if necessary
+            for (let i = nextPages.length; i <= pageIdx; i++) {
+              nextPages.push({ elements: [], bgColor: '#ffffff' });
+            }
+          }
+          
+          const element: CanvasElement = {
+            ...block.content,
+            id: block.id,
+            type: block.type,
+            x: block.x,
+            y: block.y,
+            width: block.width,
+            height: block.height,
+            rotation: block.rotation
+          };
+
+          const existingIdx = nextPages[pageIdx].elements.findIndex(el => el.id === element.id);
+          if (existingIdx > -1) {
+            // Only update if changed to avoid loops
+            const existing = nextPages[pageIdx].elements[existingIdx];
+            if (JSON.stringify(existing) !== JSON.stringify(element)) {
+              nextPages[pageIdx].elements[existingIdx] = element;
+            }
+          } else {
+            nextPages[pageIdx].elements.push(element);
+          }
+        });
+        
+        // Sort elements by zIndex if available in block
+        nextPages.forEach(p => {
+          p.elements.sort((a, b) => {
+            const blockA = blocks.find(bl => bl.id === a.id);
+            const blockB = blocks.find(bl => bl.id === b.id);
+            return (blockA?.zIndex || 0) - (blockB?.zIndex || 0);
+          });
+        });
+
+        return nextPages;
+      });
+    }
+  }, [blocks, designId]);
 
   const [itemToDelete, setItemToDelete] = useState<{ id: string, collection: string } | null>(null);
 
@@ -449,10 +543,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     }
   };
 
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [designTitle, setDesignTitle] = useState('Design sans titre');
-  const [designId, setDesignId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImprovingLayout, setIsImprovingLayout] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectionRect, setSelectionRect] = useState({
     x1: 0,
@@ -461,6 +553,65 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     y2: 0,
     visible: false
   });
+
+  const prevSelectedIds = useRef<string[]>([]);
+
+  const lockBlock = async (blockId: string) => {
+    if (!designId || !user) return;
+    await firestoreService.update(`designs/${designId}/blocks`, blockId, {
+      lockedBy: user.uid,
+      lockedAt: new Date()
+    });
+  };
+
+  const unlockBlock = async (blockId: string) => {
+    if (!designId || !user) return;
+    await firestoreService.update(`designs/${designId}/blocks`, blockId, {
+      lockedBy: null,
+      lockedAt: null
+    });
+  };
+
+  // Handle block locking
+  useEffect(() => {
+    if (!designId || !user || !blocks) return;
+
+    const currentSelected = selectedIds;
+    const previouslySelected = prevSelectedIds.current;
+
+    // Unlock blocks that were deselected
+    const deselected = previouslySelected.filter(id => !currentSelected.includes(id));
+    deselected.forEach(id => {
+      const block = blocks.find(b => b.id === id);
+      if (block && block.lockedBy === user.uid) {
+        unlockBlock(id);
+      }
+    });
+
+    // Lock blocks that were newly selected
+    const newlySelected = currentSelected.filter(id => !previouslySelected.includes(id));
+    newlySelected.forEach(id => {
+      const block = blocks.find(b => b.id === id);
+      // Only lock if it's not already locked by someone else
+      if (block && (!block.lockedBy || block.lockedBy === user.uid)) {
+        lockBlock(id);
+      }
+    });
+
+    prevSelectedIds.current = currentSelected;
+  }, [selectedIds, designId, user, blocks]);
+
+  // Unlock all blocks on unmount
+  useEffect(() => {
+    return () => {
+      if (prevSelectedIds.current.length > 0 && designId && user) {
+        prevSelectedIds.current.forEach(id => {
+          // We use a firestore update directly here to ensure it's sent
+          unlockBlock(id);
+        });
+      }
+    };
+  }, [designId, user]);
   const [showGrid, setShowGrid] = useState(false);
   const [showRulers, setShowRulers] = useState(false);
   const [showMargins, setShowMargins] = useState(false);
@@ -472,6 +623,55 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     const toCopy = elements.filter(el => selectedIds.includes(el.id));
     setClipboard(toCopy);
     toast.success(`${toCopy.length} élément(s) copié(s)`);
+  };
+
+  const handleImproveLayout = async () => {
+    if (elements.length === 0) {
+      toast.error("Ajoutez des éléments d'abord !");
+      return;
+    }
+
+    setIsImprovingLayout(true);
+    const loadingToast = toast.loading("L'IA analyse votre design...");
+    
+    try {
+      const suggestions = await geminiService.improveLayout(elements, 600, 350);
+      
+      if (suggestions && suggestions.length > 0) {
+        // Apply suggestions optimistically
+        const nextElements = elements.map(el => {
+          const suggestion = suggestions.find(s => s.id === el.id);
+          if (suggestion) {
+            return { ...el, ...suggestion };
+          }
+          return el;
+        });
+
+        setElements(nextElements);
+        toast.success("Mise en page améliorée par l'IA !", { id: loadingToast });
+        
+        // Trigger save for each modified block
+        if (designId) {
+          suggestions.forEach(s => {
+            const block = blocks?.find(b => b.id === s.id);
+            if (block) {
+              mutateBlocks(prev => prev?.map(b => b.id === s.id ? { ...b, ...s } : b) || null);
+              firestoreService.update(`designs/${designId}/blocks`, s.id, {
+                ...s,
+                updatedAt: new Date()
+              });
+            }
+          });
+        }
+      } else {
+        toast.error("L'IA n'a pas pu suggérer d'améliorations.", { id: loadingToast });
+      }
+    } catch (error) {
+      console.error("Gemini Error:", error);
+      toast.error("Erreur lors de l'appel à l'IA.", { id: loadingToast });
+    } finally {
+      setIsImprovingLayout(false);
+    }
   };
 
   const pasteSelected = () => {
@@ -562,6 +762,83 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     });
   };
 
+  // Auto-sync blocks to Firestore when elements change using EventBus
+  useEffect(() => {
+    if (!designId || !user || loadingBlocks) return;
+
+    const timer = setTimeout(() => {
+      // Find elements that are different from blocks
+      const currentElements = pages.flatMap((p, pi) => p.elements.map(el => ({ ...el, pageIndex: pi })));
+      
+      // Optimistic update for blocks (local state)
+      mutateBlocks(prev => {
+        return currentElements.map(el => {
+          const existing = prev.find(b => b.id === el.id);
+          return {
+            id: el.id,
+            designId: designId!,
+            pageIndex: (el as any).pageIndex,
+            type: el.type,
+            x: el.x,
+            y: el.y,
+            width: el.width || 0,
+            height: el.height || 0,
+            rotation: el.rotation || 0,
+            content: { ...el },
+            zIndex: pages[(el as any).pageIndex].elements.indexOf(el as any),
+            updatedAt: new Date().toISOString(),
+            ...existing
+          } as DesignBlock;
+        });
+      });
+
+      // Emit events for creates/updates
+      for (const el of currentElements) {
+        const block = blocks?.find(b => b.id === el.id);
+        
+        if (!block || JSON.stringify(block.content) !== JSON.stringify(el)) {
+          bus.emit('block_event', {
+            type: block ? 'block_update' : 'block_create',
+            designId,
+            pageIndex: (el as any).pageIndex,
+            blockId: el.id,
+            changes: { ...el },
+            data: {
+              type: el.type,
+              x: el.x,
+              y: el.y,
+              width: el.width,
+              height: el.height,
+              rotation: el.rotation || 0,
+              content: { ...el },
+              zIndex: pages[(el as any).pageIndex].elements.indexOf(el as any)
+            },
+            userId: user.uid,
+            timestamp: Date.now()
+          });
+        }
+      }
+
+      // Emit events for deletions
+      if (blocks) {
+        for (const block of blocks) {
+          if (!currentElements.find(el => el.id === block.id)) {
+            bus.emit('block_event', {
+              type: 'block_delete',
+              designId,
+              pageIndex: block.pageIndex,
+              blockId: block.id,
+              userId: user.uid,
+              timestamp: Date.now()
+            });
+          }
+        }
+      }
+    }, 1000); // Reduced debounce since queue handles batching
+
+    return () => clearTimeout(timer);
+  }, [pages, designId, user, blocks]);
+
   const setBgColor = (newColor: string) => {
     setPages(prev => {
       const nextPages = [...prev];
@@ -585,20 +862,46 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     try {
       const designData = {
         name: designTitle,
-        owner_id: user.uid,
-        elements: elements,
+        user_id: user.uid,
         bg_color: bgColor,
         updated_at: new Date().toISOString(),
       };
 
-      if (designId) {
-        await firestoreService.update('designs', designId, designData);
-        toast.success("Design mis à jour !", { id: toastId });
+      let currentDesignId = designId;
+
+      if (currentDesignId) {
+        await firestoreService.update('designs', currentDesignId, designData);
       } else {
-        const newId = await firestoreService.add('designs', designData);
-        setDesignId(newId);
-        toast.success("Design enregistré !", { id: toastId });
+        currentDesignId = await firestoreService.add('designs', designData);
+        setDesignId(currentDesignId);
       }
+
+      // Save blocks (elements)
+      if (currentDesignId) {
+        const savePromises = pages.flatMap((page, pageIndex) => 
+          page.elements.map((el, zIndex) => {
+            const blockData = {
+              id: el.id,
+              designId: currentDesignId,
+              pageIndex,
+              type: el.type,
+              x: el.x,
+              y: el.y,
+              width: el.width,
+              height: el.height,
+              rotation: el.rotation || 0,
+              content: { ...el }, // Store all properties in content for now
+              zIndex,
+              updatedAt: new Date()
+            };
+            // Use element ID as block ID for consistency
+            return firestoreService.save(`designs/${currentDesignId}/blocks`, blockData);
+          })
+        );
+        await Promise.all(savePromises);
+      }
+
+      toast.success("Design enregistré avec succès !", { id: toastId });
     } catch (error) {
       console.error("Erreur lors de l'enregistrement du design:", error);
       toast.error("Erreur lors de l'enregistrement.", { id: toastId });
@@ -614,6 +917,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const stageRef = useRef<any>(null);
   const trRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastCursorUpdateRef = useRef<number>(0);
   const [stageSize, setStageSize] = useState({ width: 600, height: 350 });
   const [zoom, setZoom] = useState(1);
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
@@ -921,7 +1225,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [templatePromotion, setTemplatePromotion] = useState(false);
   const [templatePromotionPercentage, setTemplatePromotionPercentage] = useState('');
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(autoOpenSelector || false);
-  const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai' | 'assets'>('templates');
   const [prompt, setPrompt] = useState('');
   
   const [copiedStyle, setCopiedStyle] = useState<Partial<CanvasElement> | null>(null);
@@ -967,6 +1271,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     { id: 'text', label: 'Texte', icon: Type },
     { id: 'background', label: 'Fond', icon: Palette },
     { id: 'brand', label: 'Marque', icon: Crown },
+    { id: 'assets', label: 'Assets', icon: ImageIcon },
     { id: 'upload', label: 'Importer', icon: Upload },
     { id: 'tools', label: 'Outils', icon: Wrench },
     { id: 'projects', label: 'Projets', icon: FolderOpen },
@@ -1414,6 +1719,25 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     reader.readAsDataURL(file);
   };
 
+  const handleShare = () => {
+    if (!designId) {
+      toast.error("Veuillez d'abord sauvegarder le design pour le partager.");
+      return;
+    }
+    
+    // Create the invitation link
+    const baseUrl = window.location.origin;
+    const shareUrl = `${baseUrl}/design-editor?template_id=${designId}`;
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      toast.success("Lien d'invitation copié ! Envoyez-le à vos collaborateurs.");
+    }).catch(err => {
+      console.error('Failed to copy link: ', err);
+      toast.error("Impossible de copier le lien.");
+    });
+  };
+
   const handleExport = () => {
     if (stageRef.current) {
       const dataUrl = stageRef.current.toDataURL({ pixelRatio: 3 });
@@ -1461,14 +1785,14 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden relative">
       {/* Top Header Bar (Canva Style) */}
-      <div className="h-14 bg-black text-white flex items-center justify-between px-4 z-40 shadow-md flex-shrink-0">
-        <div className="flex items-center space-x-4">
+      <div className="h-14 bg-black text-white flex items-center justify-between px-2 md:px-4 z-40 shadow-md flex-shrink-0 overflow-x-auto no-scrollbar">
+        <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
           <button 
             onClick={() => window.history.back()}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="p-1.5 md:p-2 hover:bg-white/10 rounded-lg transition-colors"
             title="Retour"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
           </button>
           <div className="h-6 w-px bg-white/20" />
           
@@ -1477,7 +1801,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             <button 
               onClick={undo}
               disabled={historyIndex <= 0}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 md:p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               title="Annuler (Ctrl+Z)"
             >
               <Undo className="w-4 h-4" />
@@ -1485,7 +1809,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             <button 
               onClick={redo}
               disabled={historyIndex >= history.length - 1}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1.5 md:p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               title="Rétablir (Ctrl+Y)"
             >
               <Redo className="w-4 h-4" />
@@ -1498,14 +1822,36 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
               type="text" 
               value={designTitle}
               onChange={(e) => setDesignTitle(e.target.value)}
-              className="bg-transparent border-none outline-none text-sm font-bold text-white focus:ring-0 w-40 md:w-64 placeholder:text-white/50"
+              className="bg-transparent border-none outline-none text-xs md:text-sm font-bold text-white focus:ring-0 w-24 sm:w-40 md:w-64 placeholder:text-white/50"
               placeholder="Design sans titre"
             />
             <span className="text-[10px] text-white/70 font-medium px-3 -mt-1 hidden">Modifié il y a quelques instants</span>
           </div>
         </div>
         
-        <div className="flex items-center space-x-2 md:space-x-4">
+        <div className="flex items-center space-x-1.5 md:space-x-4 flex-shrink-0 ml-2">
+          {/* Presence Indicators */}
+          <div className="flex -space-x-2 mr-2">
+            {others.slice(0, 3).map((p) => (
+              <div 
+                key={p.id} 
+                className="w-8 h-8 rounded-full border-2 border-black bg-primary flex items-center justify-center overflow-hidden"
+                title={p.userName}
+              >
+                {p.userPhoto ? (
+                  <img src={p.userPhoto} alt={p.userName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="text-[10px] font-bold text-white">{p.userName.charAt(0)}</span>
+                )}
+              </div>
+            ))}
+            {others.length > 3 && (
+              <div className="w-8 h-8 rounded-full border-2 border-black bg-gray-700 flex items-center justify-center text-[10px] font-bold text-white">
+                +{others.length - 3}
+              </div>
+            )}
+          </div>
+
           <div className="hidden md:flex items-center space-x-1 bg-white/10 p-1 rounded-lg">
             <button onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} className="p-1.5 hover:bg-white/10 rounded-md text-white"><Minus className="w-4 h-4" /></button>
             <span className="text-xs font-bold text-white min-w-[45px] text-center">{Math.round(zoom * 100)}%</span>
@@ -1513,10 +1859,34 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           </div>
 
           <button 
-            onClick={() => handleExport()}
-            className="flex items-center space-x-1 md:space-x-2 px-2 md:px-4 py-2 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-xs md:text-sm"
+            onClick={handleImproveLayout}
+            disabled={isImprovingLayout}
+            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition-all text-xs md:text-sm shadow-lg shadow-primary/20 disabled:opacity-50"
+            title="IA Assistant"
           >
-            <Download className="w-4 h-4" />
+            {isImprovingLayout ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4 md:mr-2" />
+            )}
+            <span className="hidden md:inline">IA Assistant</span>
+          </button>
+
+          <button 
+            onClick={handleShare}
+            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-xs md:text-sm"
+            title="Session invité"
+          >
+            <Share2 className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline">Session invité</span>
+          </button>
+
+          <button 
+            onClick={() => handleExport()}
+            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-xs md:text-sm"
+            title="Exporter"
+          >
+            <Download className="w-4 h-4 md:mr-2" />
             <span className="hidden md:inline">Exporter</span>
           </button>
 
@@ -1529,14 +1899,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
               }
             }}
             disabled={isSaving || isSubmitting}
-            className="flex items-center space-x-1 md:space-x-2 px-2 md:px-4 py-2 bg-white text-black rounded-lg font-bold hover:bg-white/90 transition-all shadow-lg disabled:opacity-50 text-xs md:text-sm"
+            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white text-black rounded-lg font-bold hover:bg-white/90 transition-all shadow-lg disabled:opacity-50 text-xs md:text-sm"
+            title={isAdmin || isManager ? "Sauvegarder" : "Commander"}
           >
             {isSaving || isSubmitting ? (
-              <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin md:mr-2" />
             ) : (
-              <Save className="w-4 h-4" />
+              <Save className="w-4 h-4 md:mr-2" />
             )}
-            <span>{isAdmin || isManager ? "Sauvegarder" : "Commander"}</span>
+            <span className="hidden sm:inline">{isAdmin || isManager ? "Sauvegarder" : "Commander"}</span>
           </button>
         </div>
       </div>
@@ -1675,6 +2046,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                     setElements(generatedElements);
                     setUploadedImage(null); // Clear image after generation
                     setIsMobileSidebarOpen(false);
+                    
+                    // Track AI usage for the current user's tenant
+                    if (user) {
+                      // In a real SaaS, you'd get the actual tenantId from the user's context
+                      // For now, we use the user's UID as their personal tenant ID
+                      trackUsage(user.uid, 'ai_generations');
+                    }
                   } finally {
                     setIsSubmitting(false);
                   }
@@ -1950,6 +2328,22 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'assets' && (
+            <AssetLibrary onInsert={(url) => {
+              const newElement: CanvasElement = {
+                id: Math.random().toString(36).substr(2, 9),
+                type: 'image',
+                x: 100,
+                y: 100,
+                width: 100,
+                height: 100,
+                src: url
+              };
+              setElements(prev => [...prev, newElement]);
+              toast.success("Asset ajouté au canevas !");
+            }} />
           )}
 
           {activeTab === 'tools' && (
@@ -2616,7 +3010,23 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       </div>
 
         {/* Canvas Stage */}
-        <div ref={containerRef} className="flex-1 flex items-center justify-center p-4 md:p-12 overflow-auto custom-scrollbar">
+        <div 
+          ref={containerRef} 
+          className="flex-1 flex items-center justify-center p-4 md:p-12 overflow-auto custom-scrollbar"
+          onMouseMove={(e) => {
+            if (!containerRef.current) return;
+            
+            // Throttle presence updates to every 100ms
+            const now = Date.now();
+            if (now - lastCursorUpdateRef.current > 100) {
+              const rect = containerRef.current.getBoundingClientRect();
+              const x = (e.clientX - rect.left) / stageScale;
+              const y = (e.clientY - rect.top) / stageScale;
+              updateMyPresence(x, y);
+              lastCursorUpdateRef.current = now;
+            }
+          }}
+        >
           <div 
             className="relative shadow-2xl bg-white transition-transform duration-200 ease-out"
             style={{ 
@@ -2651,9 +3061,16 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                   }
                 }}
                 onMouseMove={(e) => {
-                  if (!selectionRect.visible) return;
                   const pos = e.target.getStage().getPointerPosition();
                   if (pos) {
+                    // Throttle presence updates to every 100ms
+                    const now = Date.now();
+                    if (now - lastCursorUpdateRef.current > 100) {
+                      updateMyPresence(pos.x, pos.y);
+                      lastCursorUpdateRef.current = now;
+                    }
+                    
+                    if (!selectionRect.visible) return;
                     setSelectionRect(prev => ({
                       ...prev,
                       x2: pos.x,
@@ -2706,6 +3123,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                   )}
                   <Rect name="background" width={600} height={350} fill={bgColor} />
                   {elements.map((el) => {
+                    const block = blocks?.find(b => b.id === el.id);
+                    const isLockedByOther = block?.lockedBy && block.lockedBy !== user?.uid;
+                    const lockColor = isLockedByOther ? (others.find(p => p.userId === block.lockedBy) ? '#ef4444' : '#9ca3af') : undefined;
+
                     if (el.type === 'text') {
                       return (
                         <EditableText
@@ -2714,9 +3135,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                           isSelected={selectedIds.includes(el.id)}
                           onSelect={() => setSelectedIds([el.id])}
                           onChange={(newAttrs) => {
+                            if (isLockedByOther) return;
                             setElements(elements.map(item => item.id === el.id ? { ...item, ...newAttrs } : item));
                           }}
-                          onDoubleClick={(e) => handleTextDoubleClick(e, el.id)}
+                          onDoubleClick={(e) => {
+                            if (isLockedByOther) return;
+                            handleTextDoubleClick(e, el.id);
+                          }}
+                          lockedBy={isLockedByOther ? block.lockedBy : null}
+                          lockColor={lockColor}
                         />
                       );
                     }
@@ -2728,136 +3155,194 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                           isSelected={selectedIds.includes(el.id)}
                           onSelect={() => setSelectedIds([el.id])}
                           onChange={(newAttrs) => {
+                            if (isLockedByOther) return;
                             setElements(elements.map(item => item.id === el.id ? { ...item, ...newAttrs } : item));
                           }}
+                          lockedBy={isLockedByOther ? block.lockedBy : null}
+                          lockColor={lockColor}
                         />
                       );
                     }
                     if (el.type === 'shape') {
                       return (
-                        <Rect
-                          key={el.id}
-                          id={el.id}
-                          x={el.x}
-                          y={el.y}
-                          width={el.width}
-                          height={el.height}
-                          cornerRadius={el.cornerRadius}
-                          fill={el.fill}
-                          stroke={el.stroke}
-                          strokeWidth={el.strokeWidth}
-                          fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                          fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                          fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                          opacity={el.opacity}
-                          shadowColor={el.shadowColor}
-                          shadowBlur={el.shadowBlur}
-                          shadowOffsetX={el.shadowOffsetX}
-                          shadowOffsetY={el.shadowOffsetY}
-                          shadowOpacity={el.shadowOpacity}
-                          draggable
-                          onClick={() => setSelectedIds([el.id])}
-                          onTap={() => setSelectedIds([el.id])}
-                          onDragEnd={(e) => {
-                            setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
-                          }}
-                        />
+                        <Group key={el.id}>
+                          <Rect
+                            id={el.id}
+                            x={el.x}
+                            y={el.y}
+                            width={el.width}
+                            height={el.height}
+                            cornerRadius={el.cornerRadius}
+                            fill={el.fill}
+                            stroke={el.stroke}
+                            strokeWidth={el.strokeWidth}
+                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
+                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
+                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
+                            opacity={el.opacity}
+                            shadowColor={el.shadowColor}
+                            shadowBlur={el.shadowBlur}
+                            shadowOffsetX={el.shadowOffsetX}
+                            shadowOffsetY={el.shadowOffsetY}
+                            shadowOpacity={el.shadowOpacity}
+                            draggable={!isLockedByOther}
+                            onClick={() => setSelectedIds([el.id])}
+                            onTap={() => setSelectedIds([el.id])}
+                            onDragEnd={(e) => {
+                              if (isLockedByOther) return;
+                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                            }}
+                          />
+                          {isLockedByOther && (
+                            <Rect
+                              x={el.x - 2}
+                              y={el.y - 2}
+                              width={(el.width || 100) + 4}
+                              height={(el.height || 100) + 4}
+                              stroke={lockColor || '#ef4444'}
+                              strokeWidth={2}
+                              dash={[4, 2]}
+                            />
+                          )}
+                        </Group>
                       );
                     }
                     if (el.type === 'path') {
                       return (
-                        <Path
-                          key={el.id}
-                          id={el.id}
-                          x={el.x}
-                          y={el.y}
-                          data={el.data || ''}
-                          scaleX={el.scaleX}
-                          scaleY={el.scaleY}
-                          fill={el.fill}
-                          stroke={el.stroke}
-                          strokeWidth={el.strokeWidth}
-                          fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                          fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                          fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                          opacity={el.opacity}
-                          shadowColor={el.shadowColor}
-                          shadowBlur={el.shadowBlur}
-                          shadowOffsetX={el.shadowOffsetX}
-                          shadowOffsetY={el.shadowOffsetY}
-                          shadowOpacity={el.shadowOpacity}
-                          draggable
-                          onClick={() => setSelectedIds([el.id])}
-                          onTap={() => setSelectedIds([el.id])}
-                          onDragEnd={(e) => {
-                            setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
-                          }}
-                        />
+                        <Group key={el.id}>
+                          <Path
+                            id={el.id}
+                            x={el.x}
+                            y={el.y}
+                            data={el.data || ''}
+                            scaleX={el.scaleX}
+                            scaleY={el.scaleY}
+                            fill={el.fill}
+                            stroke={el.stroke}
+                            strokeWidth={el.strokeWidth}
+                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
+                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
+                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
+                            opacity={el.opacity}
+                            shadowColor={el.shadowColor}
+                            shadowBlur={el.shadowBlur}
+                            shadowOffsetX={el.shadowOffsetX}
+                            shadowOffsetY={el.shadowOffsetY}
+                            shadowOpacity={el.shadowOpacity}
+                            draggable={!isLockedByOther}
+                            onClick={() => setSelectedIds([el.id])}
+                            onTap={() => setSelectedIds([el.id])}
+                            onDragEnd={(e) => {
+                              if (isLockedByOther) return;
+                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                            }}
+                          />
+                          {isLockedByOther && (
+                            <Rect
+                              x={el.x - 2}
+                              y={el.y - 2}
+                              width={100}
+                              height={100}
+                              stroke={lockColor || '#ef4444'}
+                              strokeWidth={2}
+                              dash={[4, 2]}
+                            />
+                          )}
+                        </Group>
                       );
                     }
                     if (el.type === 'circle') {
                       return (
-                        <Circle
-                          key={el.id}
-                          id={el.id}
-                          x={el.x}
-                          y={el.y}
-                          radius={el.radius || 0}
-                          fill={el.fill}
-                          stroke={el.stroke}
-                          strokeWidth={el.strokeWidth}
-                          fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                          fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                          fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                          opacity={el.opacity}
-                          shadowColor={el.shadowColor}
-                          shadowBlur={el.shadowBlur}
-                          shadowOffsetX={el.shadowOffsetX}
-                          shadowOffsetY={el.shadowOffsetY}
-                          shadowOpacity={el.shadowOpacity}
-                          draggable
-                          onClick={() => setSelectedIds([el.id])}
-                          onTap={() => setSelectedIds([el.id])}
-                          onDragEnd={(e) => {
-                            setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
-                          }}
-                        />
+                        <Group key={el.id}>
+                          <Circle
+                            id={el.id}
+                            x={el.x}
+                            y={el.y}
+                            radius={el.radius || 0}
+                            fill={el.fill}
+                            stroke={el.stroke}
+                            strokeWidth={el.strokeWidth}
+                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
+                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
+                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
+                            opacity={el.opacity}
+                            shadowColor={el.shadowColor}
+                            shadowBlur={el.shadowBlur}
+                            shadowOffsetX={el.shadowOffsetX}
+                            shadowOffsetY={el.shadowOffsetY}
+                            shadowOpacity={el.shadowOpacity}
+                            draggable={!isLockedByOther}
+                            onClick={() => setSelectedIds([el.id])}
+                            onTap={() => setSelectedIds([el.id])}
+                            onDragEnd={(e) => {
+                              if (isLockedByOther) return;
+                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                            }}
+                          />
+                          {isLockedByOther && (
+                            <Rect
+                              x={el.x - (el.radius || 0) - 2}
+                              y={el.y - (el.radius || 0) - 2}
+                              width={(el.radius || 0) * 2 + 4}
+                              height={(el.radius || 0) * 2 + 4}
+                              stroke={lockColor || '#ef4444'}
+                              strokeWidth={2}
+                              dash={[4, 2]}
+                            />
+                          )}
+                        </Group>
                       );
                     }
                     if (el.type === 'ellipse') {
                       return (
-                        <Ellipse
-                          key={el.id}
-                          id={el.id}
-                          x={el.x}
-                          y={el.y}
-                          radiusX={el.radiusX || 0}
-                          radiusY={el.radiusY || 0}
-                          fill={el.fill}
-                          stroke={el.stroke}
-                          strokeWidth={el.strokeWidth}
-                          fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                          fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                          fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                          opacity={el.opacity}
-                          shadowColor={el.shadowColor}
-                          shadowBlur={el.shadowBlur}
-                          shadowOffsetX={el.shadowOffsetX}
-                          shadowOffsetY={el.shadowOffsetY}
-                          shadowOpacity={el.shadowOpacity}
-                          draggable
-                          onClick={() => setSelectedIds([el.id])}
-                          onTap={() => setSelectedIds([el.id])}
-                          onDragEnd={(e) => {
-                            setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
-                          }}
-                        />
+                        <Group key={el.id}>
+                          <Ellipse
+                            id={el.id}
+                            x={el.x}
+                            y={el.y}
+                            radiusX={el.radiusX || 0}
+                            radiusY={el.radiusY || 0}
+                            fill={el.fill}
+                            stroke={el.stroke}
+                            strokeWidth={el.strokeWidth}
+                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
+                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
+                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
+                            opacity={el.opacity}
+                            shadowColor={el.shadowColor}
+                            shadowBlur={el.shadowBlur}
+                            shadowOffsetX={el.shadowOffsetX}
+                            shadowOffsetY={el.shadowOffsetY}
+                            shadowOpacity={el.shadowOpacity}
+                            draggable={!isLockedByOther}
+                            onClick={() => setSelectedIds([el.id])}
+                            onTap={() => setSelectedIds([el.id])}
+                            onDragEnd={(e) => {
+                              if (isLockedByOther) return;
+                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                            }}
+                          />
+                          {isLockedByOther && (
+                            <Rect
+                              x={el.x - (el.radiusX || 0) - 2}
+                              y={el.y - (el.radiusY || 0) - 2}
+                              width={(el.radiusX || 0) * 2 + 4}
+                              height={(el.radiusY || 0) * 2 + 4}
+                              stroke={lockColor || '#ef4444'}
+                              strokeWidth={2}
+                              dash={[4, 2]}
+                            />
+                          )}
+                        </Group>
                       );
                     }
                     return null;
                   })}
 
-                  {selectedIds.length > 0 && (
+                  {selectedIds.length > 0 && !elements.some(el => {
+                    const block = blocks?.find(b => b.id === el.id);
+                    return selectedIds.includes(el.id) && block?.lockedBy && block.lockedBy !== user?.uid;
+                  }) && (
                     <Transformer
                       ref={trRef}
                       boundBoxFunc={(oldBox, newBox) => {
@@ -2880,6 +3365,48 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       strokeWidth={1}
                     />
                   )}
+                </Layer>
+                {/* Cursors Layer */}
+                <Layer>
+                  {others.map((p) => {
+                    // Generate a consistent color based on user ID
+                    const colors = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#d946ef', '#f43f5e'];
+                    const colorIndex = p.userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+                    const cursorColor = colors[colorIndex];
+
+                    return (
+                      <Group key={p.id} x={p.cursorX} y={p.cursorY}>
+                        <Path
+                          data="M0,0 L0,15 L4,11 L9,11 Z"
+                          fill={cursorColor}
+                          stroke="white"
+                          strokeWidth={1.5}
+                          shadowColor="rgba(0,0,0,0.2)"
+                          shadowBlur={2}
+                          shadowOffset={{ x: 1, y: 1 }}
+                        />
+                        <Group x={12} y={12}>
+                          <Rect
+                            width={p.userName.length * 7 + 12}
+                            height={20}
+                            fill={cursorColor}
+                            cornerRadius={4}
+                            shadowColor="rgba(0,0,0,0.1)"
+                            shadowBlur={2}
+                            shadowOffset={{ x: 0, y: 2 }}
+                          />
+                          <Text
+                            text={p.userName}
+                            fill="white"
+                            fontSize={11}
+                            fontFamily="Inter, sans-serif"
+                            fontStyle="bold"
+                            padding={5}
+                          />
+                        </Group>
+                      </Group>
+                    );
+                  })}
                 </Layer>
               </Stage>
             </div>

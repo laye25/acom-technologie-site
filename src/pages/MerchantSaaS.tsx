@@ -26,6 +26,9 @@ import {
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
+import { activityService } from '../services/activityService';
+import { GlobalActivityFeed } from '../components/GlobalActivityFeed';
+import { DailyBriefing } from '../components/DailyBriefing';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { InstallButton } from '../components/InstallButton';
 import { NetworkStatusIndicator } from '../components/NetworkStatusIndicator';
@@ -812,6 +815,11 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
       exit={{ opacity: 0, x: -20 }}
       className="space-y-8"
     >
+      <DailyBriefing 
+        merchantId={merchant.id} 
+        data={{ sales, products, expenses }} 
+      />
+
       {/* Plan Upgrade Banner */}
       {merchant.plan !== 'PREMIUM' && (
         <div className="relative overflow-hidden bg-gradient-to-r from-primary to-primary-hover rounded-[2rem] p-8 text-white shadow-xl shadow-primary/20">
@@ -985,59 +993,41 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
           </div>
         </div>
 
-        {/* Accounting Breakdown */}
-        <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
-          <h3 className="text-xl font-bold text-gray-900 mb-8">Résumé Comptable</h3>
-          <div className="space-y-6">
-            <AccountingRow 
-              label={`${merchant.type === 'scolaire' ? 'Frais' : 
-                        merchant.type === 'medical' ? 'Consultations' :
-                        merchant.type === 'chantier' ? 'Facturation' :
-                        merchant.type === 'transport' ? 'Recettes' :
-                        merchant.type === 'rh' ? 'Budget' :
-                        merchant.type === 'entreprise' ? 'Interventions' : 'Ventes'} (Jour)`} 
-              value={stats.revenue.today} 
-              currency={merchant.currency} 
-              icon={ArrowUpRight} 
-              color="text-emerald-600" 
-            />
-            <AccountingRow 
-              label={`${merchant.type === 'scolaire' ? 'Frais' : 
-                        merchant.type === 'medical' ? 'Consultations' :
-                        merchant.type === 'chantier' ? 'Facturation' :
-                        merchant.type === 'transport' ? 'Recettes' :
-                        merchant.type === 'rh' ? 'Budget' :
-                        merchant.type === 'entreprise' ? 'Interventions' : 'Ventes'} (Mois)`} 
-              value={stats.revenue.month} 
-              currency={merchant.currency} 
-              icon={TrendingUp} 
-              color="text-emerald-600" 
-            />
-            <AccountingRow 
-              label={`${merchant.type === 'scolaire' ? 'Frais' : 
-                        merchant.type === 'medical' ? 'Consultations' :
-                        merchant.type === 'chantier' ? 'Facturation' :
-                        merchant.type === 'transport' ? 'Recettes' :
-                        merchant.type === 'rh' ? 'Budget' :
-                        merchant.type === 'entreprise' ? 'Interventions' : 'Ventes'} (Année)`} 
-              value={stats.revenue.year} 
-              currency={merchant.currency} 
-              icon={BarChart3} 
-              color="text-emerald-600" 
-            />
-            <div className="h-px bg-gray-100 my-4" />
-            <AccountingRow label="Dépenses (Jour)" value={stats.expenses.today} currency={merchant.currency} icon={ArrowDownRight} color="text-red-600" />
-            <AccountingRow label="Dépenses (Mois)" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" />
-            <AccountingRow label="Dépenses (Année)" value={stats.expenses.year} currency={merchant.currency} icon={Receipt} color="text-red-600" />
-          </div>
-          
-          <div className="mt-8 p-4 bg-primary/5 rounded-2xl border border-primary/10">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold text-primary">Bénéfice Net</span>
-              <span className={`text-lg font-black ${stats.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {stats.netProfit.toLocaleString()} {merchant.currency}
-              </span>
+        {/* Accounting & Activity */}
+        <div className="space-y-8">
+          <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
+            <h3 className="text-xl font-bold text-gray-900 mb-8">Résumé Comptable</h3>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-500">Revenu (Mois)</span>
+                <span className="text-lg font-black text-emerald-600">
+                  {stats.revenue.month.toLocaleString()} {merchant.currency}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-500">Dépenses (Mois)</span>
+                <span className="text-lg font-black text-rose-600">
+                  {stats.expenses.month.toLocaleString()} {merchant.currency}
+                </span>
+              </div>
+              <div className="h-px bg-gray-100 my-4" />
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-900">Marge Nette (Total)</span>
+                <span className={`text-xl font-black ${stats.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {stats.netProfit.toLocaleString()} {merchant.currency}
+                </span>
+              </div>
             </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Activité Récente</h3>
+              <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Clock className="w-4 h-4 text-primary" />
+              </div>
+            </div>
+            <GlobalActivityFeed merchantId={merchant.id} limit={5} />
           </div>
         </div>
       </div>

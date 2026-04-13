@@ -11,10 +11,11 @@ import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { dbService } from '../../services/dbService';
 import { Category as StudioCategory, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { firestoreService } from '../../services/firestoreService';
+import { storageService } from '../../services/storageService';
 import { where } from 'firebase/firestore';
+import { ImageService } from '../../data/services/image.service';
 import { OptimizedImage } from '../OptimizedImage';
 import { ConfirmModal } from './ConfirmModal';
-import { storageService } from '../../services/storageService';
 import { useStudioAcom } from '../../hooks/useStudioAcom';
 
 const StudioAcomManager = () => {
@@ -31,8 +32,11 @@ const StudioAcomManager = () => {
   const loadingCats = loading;
   const loadingProducts = loading;
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     
     if (!editingItem?.name) {
       toast.error('Le nom est requis');
@@ -50,12 +54,21 @@ const StudioAcomManager = () => {
     }
 
     setShowSaveConfirm(false);
+    setIsSaving(true);
     const loadingToast = toast.loading('Enregistrement en cours...');
     try {
       if (activeTab === 'categories') {
-        await dbService.studioAcom.categories.save(editingItem);
+        const catData = {
+          ...editingItem,
+          cover_image: editingItem.coverImage || editingItem.cover_image
+        };
+        await dbService.studioAcom.categories.save(catData);
       } else {
-        await dbService.studioAcom.products.save({ ...editingItem, userId: user?.uid });
+        const prodData = {
+          ...editingItem,
+          cover_image: editingItem.coverImage || editingItem.cover_image
+        };
+        await dbService.studioAcom.products.save({ ...prodData, userId: user?.uid });
       }
       
       toast.success('Enregistré avec succès !', { id: loadingToast });
@@ -64,6 +77,8 @@ const StudioAcomManager = () => {
     } catch (error) {
       console.error('Error saving item:', error);
       toast.error('Erreur lors de l\'enregistrement : ' + (error instanceof Error ? error.message : 'Erreur inconnue'), { id: loadingToast });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -131,7 +146,7 @@ const StudioAcomManager = () => {
             sub: cat.sub,
             icon: iconName,
             color: cat.color,
-            coverImage: cat.coverImage
+            cover_image: cat.coverImage
           };
           
           await dbService.studioAcom.categories.save(catData);
@@ -171,31 +186,26 @@ const StudioAcomManager = () => {
     }
   };
 
+  const [isUploading, setIsUploading] = useState(false);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, subPath: string = 'general') => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || isUploading) return;
 
-    const loadingToast = toast.loading('Téléchargement de l\'image...');
+    setIsUploading(true);
     try {
       // Create a unique path for the image
       const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const bucket = 'studio-acom';
       const path = `${activeTab}/${subPath}/${fileName}`;
 
-      const publicUrl = await storageService.uploadFile(bucket, path, file);
+      const publicUrl = await ImageService.compressAndUpload(file, path);
       
       setEditingItem({ ...editingItem, [field]: publicUrl });
-      toast.success('Image téléchargée !', { id: loadingToast });
     } catch (error) {
       console.error('Error uploading image:', error);
-      
-      // Fallback to base64 if storage fails (e.g. bucket not created yet)
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditingItem({ ...editingItem, [field]: reader.result as string });
-        toast.error('Échec du téléchargement vers Supabase Storage. L\'image est enregistrée localement (base64).', { id: loadingToast });
-      };
-      reader.readAsDataURL(file);
+      toast.error('Échec du téléchargement de l\'image.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -289,9 +299,11 @@ const StudioAcomManager = () => {
             >
               <div className="aspect-video bg-gray-50 rounded-xl mb-4 overflow-hidden relative group/image">
                 {item.coverImage ? (
-                  <img 
+                  <OptimizedImage 
                     src={item.coverImage} 
                     alt={item.name} 
+                    width={400}
+                    placeholder="blur"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-110" 
                   />
                 ) : (
@@ -598,6 +610,7 @@ const StudioAcomManager = () => {
                                 src={editingItem.coverImage} 
                                 alt="Preview" 
                                 width={800}
+                                placeholder="blur"
                                 className="w-full h-full object-cover"
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

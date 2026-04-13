@@ -4,6 +4,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import Stripe from "stripe";
 import { Resend } from "resend";
+import admin from "firebase-admin";
+
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +17,82 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = 3000;
+
+  // Stripe Webhook MUST be before express.json() to keep the raw body for signature verification
+  app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!endpointSecret || !process.env.STRIPE_SECRET_KEY) {
+      return res.status(400).send('Webhook secret not configured.');
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret);
+    } catch (err: any) {
+      console.error(`Webhook Error: ${err.message}`);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const tenantId = session.client_reference_id; // We pass tenantId here when creating the checkout session
+          const subscriptionId = session.subscription as string;
+          const customerId = session.customer as string;
+
+          if (tenantId) {
+            // Update Firestore: Stripe is the source of truth
+            await admin.firestore().collection('merchants').doc(tenantId).set({
+              billing: {
+                status: 'active',
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: subscriptionId,
+                plan: 'pro', // Extract from line items in a real scenario
+                updatedAt: new Date().toISOString()
+              }
+            }, { merge: true });
+          }
+          break;
+        }
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          const customerId = subscription.customer as string;
+          const status = subscription.status;
+
+          // Find the tenant by customer ID
+          const merchantsSnapshot = await admin.firestore().collection('merchants')
+            .where('billing.stripeCustomerId', '==', customerId)
+            .limit(1)
+            .get();
+
+          if (!merchantsSnapshot.empty) {
+            const tenantDoc = merchantsSnapshot.docs[0];
+            await tenantDoc.ref.set({
+              billing: {
+                status: status === 'active' ? 'active' : 'inactive',
+                updatedAt: new Date().toISOString()
+              }
+            }, { merge: true });
+          }
+          break;
+        }
+        default:
+          console.log(`Unhandled event type ${event.type}`);
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error('Error processing webhook:', error);
+      res.status(500).send('Internal Server Error');
+    }
+  });
 
   app.use(express.json());
 
@@ -78,6 +160,18 @@ async function startServer() {
       res.json({ clientSecret: paymentIntent.client_secret });
     } catch (error: any) {
       console.error("Stripe error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Custom Claims Management
+  app.post("/api/auth/set-custom-claims", async (req, res) => {
+    try {
+      const { uid, claims } = req.body;
+      await admin.auth().setCustomUserClaims(uid, claims);
+      res.json({ success: true, message: `Custom claims set for user ${uid}` });
+    } catch (error: any) {
+      console.error("Custom claims error:", error);
       res.status(500).json({ error: error.message });
     }
   });

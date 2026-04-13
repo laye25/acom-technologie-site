@@ -123,3 +123,11 @@ export const getOptimizedUrl = (url: string, width: number = 800, quality: numbe
 
   return url;
 };
+
+/**
+ * Normalizes image URL from item (category, product, etc.)
+ */
+export const getImageUrl = (item: any): string => {
+  if (!item) return '';
+  return item.coverImage || item.cover_image || item.image || item.previewImage || item.preview || '';
+};

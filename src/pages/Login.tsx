@@ -1,26 +1,29 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 // import { isSupabaseConfigured } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, ArrowRight, LogIn, UserPlus } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
+
+  const from = location.state?.from?.pathname + (location.state?.from?.search || '') || '/dashboard';
 
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
       const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
-      if (isSaaSDomain) {
+      if (isSaaSDomain && from === '/dashboard') {
         navigate('/');
       } else {
-        navigate('/dashboard');
+        navigate(from);
       }
     }
-  }, [user, navigate]);
+  }, [user, navigate, from]);
 
   const [isResetting, setIsResetting] = useState(false);
   const [loading, setLoading] = useState(false);

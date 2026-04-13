@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { dbService as db } from '../services/dbService';
 import { SERVICES as STATIC_SERVICES } from '../constants';
-import { Service } from '../types';
+import { Service, OrderStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'motion/react';
 import { Upload, CheckCircle, ArrowRight, Loader2, Tag, Calendar, FileText } from 'lucide-react';
@@ -105,7 +105,7 @@ const OrderForm = () => {
         serviceImage: service.image,
         clientName: fullName || profile?.displayName || 'Client',
         clientEmail: user.email,
-        status: 'pending',
+        status: 'pending' as OrderStatus,
         totalPrice: originalTotal,
         originalPrice: originalTotal,
         couponDiscount: couponDiscount,
@@ -123,7 +123,7 @@ const OrderForm = () => {
       };
 
       console.log('Submitting order:', orderData);
-      const orderId = await db.orders.save(orderData);
+      const orderId = await db.orders.save(orderData) as string;
       console.log('Order saved with ID:', orderId);
       
       setAnalyzing(true);

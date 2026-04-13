@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dbService as db } from '../services/dbService';
 import { useAuth } from '../context/AuthContext';
+import { OrderStatus } from '../types';
 import { motion } from 'motion/react';
 import { Send, CheckCircle, ArrowRight, Loader2, FileText, MessageSquare, ShieldCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -43,7 +44,7 @@ const QuoteRequest = () => {
       const orderData = {
         userId: user.uid,
         serviceId: 'custom',
-        status: 'pending',
+        status: 'pending' as OrderStatus,
         totalPrice: 0, // Admin will set this later
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -54,7 +55,7 @@ const QuoteRequest = () => {
         files: [],
       };
 
-      const orderId = await db.orders.save(orderData);
+      const orderId = await db.orders.save(orderData) as string;
       
       setAnalyzing(true);
       try {

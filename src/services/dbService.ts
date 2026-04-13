@@ -1,88 +1,145 @@
-import { firestoreService } from './firestoreService';
 import { where, orderBy, limit } from 'firebase/firestore';
-import { Service, PortfolioItem, BlogPost, UserProfile } from '../types';
+import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment } from '../types';
+import { serviceRepository } from '../data/repositories/service.repository';
+import { orderRepository } from '../data/repositories/order.repository';
+import { portfolioRepository } from '../data/repositories/portfolio.repository';
+import { blogRepository } from '../data/repositories/blog.repository';
+import { messageRepository } from '../data/repositories/message.repository';
+import { expenseRepository } from '../data/repositories/expense.repository';
+import { notificationRepository } from '../data/repositories/notification.repository';
+import { userRepository } from '../data/repositories/user.repository';
+import { merchantRepository } from '../data/repositories/merchant.repository';
+import { merchantProductRepository } from '../data/repositories/merchant-product.repository';
+import { merchantSaleRepository } from '../data/repositories/merchant-sale.repository';
+import { merchantExpenseRepository } from '../data/repositories/merchant-expense.repository';
+import { merchantSupplierRepository } from '../data/repositories/merchant-supplier.repository';
+import { stockMovementRepository } from '../data/repositories/stock-movement.repository';
+import { interventionRepository } from '../data/repositories/intervention.repository';
+import { projectRepository } from '../data/repositories/project.repository';
+import { vehicleRepository } from '../data/repositories/vehicle.repository';
+import { employeeRepository } from '../data/repositories/employee.repository';
+import { studentRepository } from '../data/repositories/student.repository';
+import { patientRepository } from '../data/repositories/patient.repository';
+import { appointmentRepository } from '../data/repositories/appointment.repository';
+import { designRepository } from '../data/repositories/design.repository';
+import { designBlockRepository } from '../data/repositories/design-block.repository';
+import { categoryRepository } from '../data/repositories/category.repository';
+import { studioAcomProductRepository } from '../data/repositories/studio-acom-product.repository';
+import { variantRepository } from '../data/repositories/variant.repository';
+import { activityService } from './activityService';
 
 export const dbService = {
   services: {
     async getById(id: string) {
-      return firestoreService.getById<Service>('services', id);
+      return serviceRepository.getById(id);
     },
     async save(service: Partial<Service>) {
-      return firestoreService.save('services', service);
+      if (service.id) {
+        return serviceRepository.update(service.id, service);
+      }
+      return serviceRepository.create(service as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('services', id);
+      return serviceRepository.delete(id);
     }
   },
   orders: {
     async getById(id: string) {
-      return firestoreService.getById<any>('orders', id);
+      return orderRepository.getById(id);
     },
-    async save(order: any) {
-      return firestoreService.save('orders', order);
+    async save(order: Partial<Order>) {
+      if (order.id) {
+        const result = await orderRepository.update(order.id, order);
+        await activityService.log({
+          type: 'order_updated',
+          entityId: order.id,
+          entityType: 'order',
+          message: `Commande mise à jour: ${order.status || 'statut inconnu'}`,
+          metadata: { status: order.status }
+        });
+        return result;
+      }
+      const id = await orderRepository.create(order as any);
+      await activityService.log({
+        type: 'order_created',
+        entityId: id,
+        entityType: 'order',
+        message: `Nouvelle commande créée`,
+        metadata: { totalPrice: order.totalPrice }
+      });
+      return id;
     }
   },
   portfolio: {
     async save(item: Partial<PortfolioItem>) {
-      return firestoreService.save('portfolio', item);
+      if (item.id) {
+        return portfolioRepository.update(item.id, item);
+      }
+      return portfolioRepository.create(item as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('portfolio', id);
+      return portfolioRepository.delete(id);
     }
   },
   blog: {
     async getById(id: string) {
-      return firestoreService.getById<BlogPost>('blog_posts', id);
+      return blogRepository.getById(id);
     },
     async getRelated(category: string, excludeId: string, limitCount: number = 2) {
-      return firestoreService.getAll<BlogPost>('blog_posts', [
+      return blogRepository.getAll([
         where('category', '==', category),
         where('id', '!=', excludeId),
         limit(limitCount)
       ]);
     },
     async save(post: Partial<BlogPost>) {
-      return firestoreService.save('blog_posts', post);
+      if (post.id) {
+        return blogRepository.update(post.id, post);
+      }
+      return blogRepository.create(post as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('blog_posts', id);
+      return blogRepository.delete(id);
     }
   },
   settings: {
     async save(id: string, settingsData: any) {
-      return firestoreService.save('settings', { id, data: settingsData });
+      // Settings are a bit special, usually a single doc per type
+      const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
+        protected collectionName = 'settings';
+      })();
+      return repo.update(id, { data: settingsData });
     },
     async get(id: string) {
-      const settings = await firestoreService.getById<any>('settings', id);
+      const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
+        protected collectionName = 'settings';
+      })();
+      const settings = await repo.getById(id);
       return settings?.data || settings;
-    },
-    onSnapshot(id: string, callback: (data: any) => void) {
-      return firestoreService.onDocSnapshot<any>('settings', id, (data) => {
-        if (data) {
-          callback(data.data || data);
-        }
-      });
     }
   },
   messages: {
     async save(message: any) {
-      return firestoreService.add('messages', message);
+      return messageRepository.create(message);
     }
   },
   contactMessages: {
     async save(message: any) {
-      return firestoreService.add('messages', message);
+      return messageRepository.create(message);
     }
   },
   expenses: {
-    async save(expense: any) {
-      return firestoreService.save('expenses', expense);
+    async save(expense: Partial<Expense>) {
+      if (expense.id) {
+        return expenseRepository.update(expense.id, expense);
+      }
+      return expenseRepository.create(expense as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('expenses', id);
+      return expenseRepository.delete(id);
     },
     async getAll(limitCount: number = 100) {
-      return firestoreService.getAll<any>('expenses', [
+      return expenseRepository.getAll([
         orderBy('date', 'desc'),
         limit(limitCount)
       ]);
@@ -90,16 +147,19 @@ export const dbService = {
   },
   notifications: {
     async save(notification: any) {
-      return firestoreService.save('notifications', notification);
+      if (notification.id) {
+        return notificationRepository.update(notification.id, notification);
+      }
+      return notificationRepository.create(notification);
     },
     async markAsRead(id: string) {
-      return firestoreService.update('notifications', id, { read: true });
+      return notificationRepository.update(id, { read: true } as any);
     }
   },
   studioAcom: {
     categories: {
       async getAll() {
-        return firestoreService.getAll<any>('studio_acom_categories', [orderBy('name', 'asc')]);
+        return categoryRepository.getAll([orderBy('name', 'asc')]);
       },
       async save(category: any) {
         const data = {
@@ -108,17 +168,19 @@ export const dbService = {
           icon: category.icon || 'LayoutGrid',
           color: category.color || 'text-primary',
           cover_image: category.coverImage || category.cover_image || '',
-          updated_at: new Date().toISOString()
         };
-        return firestoreService.save('studio_acom_categories', { ...data, id: category.id });
+        if (category.id) {
+          return categoryRepository.update(category.id, data);
+        }
+        return categoryRepository.create(data as any);
       },
       async delete(id: string) {
-        return firestoreService.delete('studio_acom_categories', id);
+        return categoryRepository.delete(id);
       }
     },
     products: {
       async getAll() {
-        return firestoreService.getAll<any>('studio_acom_products', [orderBy('name', 'asc')]);
+        return studioAcomProductRepository.getAll([orderBy('name', 'asc')]);
       },
       async save(product: any) {
         const { variants, ...productData } = product;
@@ -128,16 +190,20 @@ export const dbService = {
           description: productData.description || '',
           cover_image: productData.coverImage || productData.cover_image || '',
           user_id: productData.userId || '',
-          updated_at: new Date().toISOString()
         };
         
-        const id = await firestoreService.save('studio_acom_products', { ...data, id: productData.id });
+        let id = productData.id;
+        if (id) {
+          await studioAcomProductRepository.update(id, data);
+        } else {
+          id = await studioAcomProductRepository.create(data as any);
+        }
 
         if (variants && Array.isArray(variants)) {
-          // Delete existing variants first to avoid duplicates/orphans if we're updating
-          const existingVariants = await firestoreService.getAll<any>('variants', [where('product_id', '==', id)]);
+          // Delete existing variants first
+          const existingVariants = await variantRepository.getAll([where('product_id', '==', id)]);
           for (const v of existingVariants) {
-            await firestoreService.delete('variants', v.id);
+            await variantRepository.delete(v.id);
           }
 
           // Save new variants
@@ -156,198 +222,298 @@ export const dbService = {
               min_quantity: Number(variant.minQuantity || variant.min_quantity) || 1,
               max_quantity: Number(variant.maxQuantity || variant.max_quantity) || 1000,
               template_svg: variant.templateSvg || variant.template_svg || '',
-              updated_at: new Date().toISOString()
             };
-            await firestoreService.save('variants', variantData as any);
+            await variantRepository.create(variantData as any);
           }
         }
         return id;
       },
       async delete(id: string) {
         // Delete variants first
-        const variants = await firestoreService.getAll<any>('variants', [where('product_id', '==', id)]);
+        const variants = await variantRepository.getAll([where('product_id', '==', id)]);
         for (const v of variants) {
-          await firestoreService.delete('variants', v.id);
+          await variantRepository.delete(v.id);
         }
-        return firestoreService.delete('studio_acom_products', id);
+        return studioAcomProductRepository.delete(id);
       },
       async getVariants(productId: string) {
-        return firestoreService.getAll<any>('variants', [
+        return variantRepository.getAll([
           where('product_id', '==', productId)
         ]);
       }
     }
   },
   users: {
-    async save(user: any) {
-      return firestoreService.save('users', user);
+    async save(user: Partial<UserProfile>) {
+      if (user.uid) {
+        // For users, we use uid as doc id
+        const repo = userRepository;
+        const exists = await repo.getById(user.uid);
+        if (exists) {
+          return repo.update(user.uid, user);
+        } else {
+          // Use setDoc logic via repository if possible, or direct for now
+          // BaseRepository uses addDoc for create, which generates random ID.
+          // We need a way to set ID.
+          const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+          const { db } = await import('../firebase');
+          await setDoc(doc(db, 'users', user.uid), {
+            ...user,
+            created_at: serverTimestamp(),
+            updated_at: serverTimestamp()
+          });
+          return user.uid;
+        }
+      }
+      return '';
     },
     async delete(id: string) {
-      return firestoreService.delete('users', id);
+      return userRepository.delete(id);
     }
   },
   merchants: {
     async getByOwner(ownerId: string) {
-      const merchants = await firestoreService.getAll<any>('merchants', [
+      const merchants = await merchantRepository.getAll([
         where('owner_id', '==', ownerId),
         orderBy('created_at', 'desc'),
         limit(1)
       ]);
       return merchants.length > 0 ? merchants[0] : null;
     },
-    async save(merchant: any) {
-      return firestoreService.save('merchants', merchant);
+    async save(merchant: Partial<Merchant>) {
+      if (merchant.id) {
+        return merchantRepository.update(merchant.id, merchant);
+      }
+      const id = await merchantRepository.create(merchant as any);
+      await activityService.log({
+        type: 'merchant_created',
+        entityId: id,
+        entityType: 'merchant',
+        merchantId: id,
+        message: `Nouveau marchand créé: ${merchant.name}`
+      });
+      return id;
     }
   },
   merchantProducts: {
-    async save(product: any) {
-      return firestoreService.save('merchant_products', product);
+    async save(product: Partial<MerchantProduct>) {
+      if (product.id) {
+        return merchantProductRepository.update(product.id, product);
+      }
+      return merchantProductRepository.create(product as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('merchant_products', id);
+      return merchantProductRepository.delete(id);
     }
   },
   merchantSales: {
     async save(sale: any) {
-      const id = await firestoreService.add('merchant_sales', sale);
+      const id = await merchantSaleRepository.create(sale);
 
-      // Update stock levels (simplified for Firestore)
+      // Update stock levels
       for (const item of sale.items) {
-        const product = await firestoreService.getById<any>('merchant_products', item.productId);
+        const product = await merchantProductRepository.getById(item.productId);
         if (product) {
-          const newStock = Math.max(0, (product.stock_quantity || 0) - item.quantity);
-          await firestoreService.update('merchant_products', item.productId, { stock_quantity: newStock });
+          const newStock = Math.max(0, (product.stockQuantity || (product as any).stock_quantity || 0) - item.quantity);
+          await merchantProductRepository.update(item.productId, { stockQuantity: newStock } as any);
           
           // Record movement
-          await firestoreService.add('stock_movements', {
-            merchant_id: sale.merchant_id,
-            product_id: item.productId,
+          await stockMovementRepository.create({
+            merchantId: sale.merchantId || sale.merchant_id,
+            productId: item.productId,
             type: 'sale',
             quantity: item.quantity,
-            previous_quantity: product.stock_quantity,
-            new_quantity: newStock,
+            previousQuantity: product.stockQuantity || (product as any).stock_quantity,
+            newQuantity: newStock,
             reason: `Vente POS #${id.slice(-6)}`,
-            reference_id: id,
-            performed_by: sale.processed_by
-          });
+            referenceId: id,
+            performedBy: sale.processedBy || sale.processed_by
+          } as any);
+
+          // Check for low stock alert
+          const minLevel = product.minStockLevel || (product as any).min_stock_level || 5;
+          if (newStock <= minLevel) {
+            await activityService.log({
+              type: 'stock_alert',
+              entityId: item.productId,
+              entityType: 'product',
+              merchantId: sale.merchantId || sale.merchant_id,
+              message: `Alerte Stock: Le produit "${product.name}" est en dessous du seuil critique (${newStock} restants).`,
+              metadata: { currentStock: newStock, minLevel }
+            });
+          }
         }
       }
+
+      await activityService.log({
+        type: 'payment_received',
+        entityId: id,
+        entityType: 'sale',
+        merchantId: sale.merchantId || sale.merchant_id,
+        message: `Nouvelle vente enregistrée: ${(sale.totalAmount || sale.total_amount).toLocaleString()} FCFA`,
+        metadata: { amount: sale.totalAmount || sale.total_amount }
+      });
+
       return id;
     }
   },
   merchantExpenses: {
-    async save(expense: any) {
-      return firestoreService.save('merchant_expenses', expense);
+    async save(expense: Partial<MerchantExpense>) {
+      if (expense.id) {
+        return merchantExpenseRepository.update(expense.id, expense);
+      }
+      return merchantExpenseRepository.create(expense as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('merchant_expenses', id);
+      return merchantExpenseRepository.delete(id);
     }
   },
   merchantSuppliers: {
-    async save(supplier: any) {
-      return firestoreService.save('merchant_suppliers', supplier);
+    async save(supplier: Partial<MerchantSupplier>) {
+      if (supplier.id) {
+        return merchantSupplierRepository.update(supplier.id, supplier);
+      }
+      return merchantSupplierRepository.create(supplier as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('merchant_suppliers', id);
+      return merchantSupplierRepository.delete(id);
     }
   },
   stockMovements: {
     async addStock(merchantId: string, productId: string, quantity: number, reason: string, performedBy: string, cost?: number) {
-      const product = await firestoreService.getById<any>('merchant_products', productId);
+      const product = await merchantProductRepository.getById(productId);
       if (!product) throw new Error('Produit non trouvé');
 
-      const currentStock = product.stock_quantity || 0;
+      const currentStock = product.stockQuantity || (product as any).stock_quantity || 0;
       const newStock = currentStock + quantity;
 
-      await firestoreService.update('merchant_products', productId, { stock_quantity: newStock });
+      await merchantProductRepository.update(productId, { stockQuantity: newStock } as any);
 
-      await firestoreService.add('stock_movements', {
-        merchant_id: merchantId,
-        product_id: productId,
+      await stockMovementRepository.create({
+        merchantId,
+        productId,
         type: 'in',
         quantity,
-        previous_quantity: currentStock,
-        new_quantity: newStock,
+        previousQuantity: currentStock,
+        newQuantity: newStock,
         reason,
-        performed_by: performedBy
-      });
+        performedBy
+      } as any);
 
       if (cost && cost > 0) {
-        await firestoreService.add('merchant_expenses', {
-          merchant_id: merchantId,
+        await merchantExpenseRepository.create({
+          merchantId,
           title: `Approvisionnement: ${product.name}`,
           amount: cost,
           category: 'Stock',
           date: new Date().toISOString().split('T')[0]
-        });
+        } as any);
       }
     }
   },
   interventions: {
-    async save(intervention: any) {
-      return firestoreService.save('interventions', intervention);
+    async save(intervention: Partial<ServiceIntervention>) {
+      if (intervention.id) {
+        return interventionRepository.update(intervention.id, intervention);
+      }
+      return interventionRepository.create(intervention as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('interventions', id);
+      return interventionRepository.delete(id);
     }
   },
   projects: {
-    async save(project: any) {
-      return firestoreService.save('projects', project);
+    async save(project: Partial<ConstructionProject>) {
+      if (project.id) {
+        return projectRepository.update(project.id, project);
+      }
+      return projectRepository.create(project as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('projects', id);
+      return projectRepository.delete(id);
     }
   },
   vehicles: {
-    async save(vehicle: any) {
-      return firestoreService.save('vehicles', vehicle);
+    async save(vehicle: Partial<TransportVehicle>) {
+      if (vehicle.id) {
+        return vehicleRepository.update(vehicle.id, vehicle);
+      }
+      return vehicleRepository.create(vehicle as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('vehicles', id);
+      return vehicleRepository.delete(id);
     }
   },
   employees: {
-    async save(employee: any) {
-      return firestoreService.save('employees', employee);
+    async save(employee: Partial<HREmployee>) {
+      if (employee.id) {
+        return employeeRepository.update(employee.id, employee);
+      }
+      return employeeRepository.create(employee as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('employees', id);
+      return employeeRepository.delete(id);
     }
   },
   students: {
-    async save(student: any) {
-      return firestoreService.save('students', student);
+    async save(student: Partial<SchoolStudent>) {
+      if (student.id) {
+        return studentRepository.update(student.id, student);
+      }
+      return studentRepository.create(student as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('students', id);
+      return studentRepository.delete(id);
     }
   },
   patients: {
-    async save(patient: any) {
-      return firestoreService.save('patients', patient);
+    async save(patient: Partial<MedicalPatient>) {
+      if (patient.id) {
+        return patientRepository.update(patient.id, patient);
+      }
+      return patientRepository.create(patient as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('patients', id);
+      return patientRepository.delete(id);
     }
   },
   appointments: {
-    async save(appointment: any) {
-      return firestoreService.save('appointments', appointment);
+    async save(appointment: Partial<MedicalAppointment>) {
+      if (appointment.id) {
+        return appointmentRepository.update(appointment.id, appointment);
+      }
+      return appointmentRepository.create(appointment as any);
     },
     async delete(id: string) {
-      return firestoreService.delete('appointments', id);
+      return appointmentRepository.delete(id);
+    }
+  },
+  designBlocks: {
+    async getAll(designId: string) {
+      return designBlockRepository.getAll(designId);
+    },
+    async save(designId: string, block: any) {
+      if (block.id) {
+        return designBlockRepository.update(designId, block.id, block);
+      }
+      return designBlockRepository.create(designId, block);
+    },
+    async delete(designId: string, blockId: string) {
+      return designBlockRepository.delete(designId, blockId);
     }
   },
   designs: {
-    async save(design: any) {
-      return firestoreService.save('designs', design);
+    async save(design: Partial<Design>) {
+      if (design.id) {
+        return designRepository.update(design.id, design);
+      }
+      return designRepository.create(design as any);
     },
     async getById(id: string) {
-      return firestoreService.getById<any>('designs', id);
+      return designRepository.getById(id);
     },
     async delete(id: string) {
-      return firestoreService.delete('designs', id);
+      return designRepository.delete(id);
     }
   }
 };

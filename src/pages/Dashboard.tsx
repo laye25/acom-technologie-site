@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit } from 'firebase/firestore';
+import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Order, Service, UserProfile, OrderStatus, Design } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion } from 'motion/react';
@@ -36,59 +37,20 @@ const Dashboard = () => {
     return { column: 'user_id', value: user.uid };
   }, [user, isManager, isAdmin]);
   
-  const [rawOrders, setRawOrders] = React.useState<Order[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [ordersError, setOrdersError] = React.useState<any>(null);
+  const { data: rawOrders, loading, error: ordersError } = useFirestoreData<Order>({
+    tableName: 'orders',
+    where: (isManager || isAdmin) ? undefined : [['user_id', '==', user?.uid]],
+    order: (isManager || isAdmin) ? { column: 'created_at', direction: 'desc' } : undefined,
+    limit: 50,
+    realtime: true,
+    skip: !user
+  });
 
-  const ordersQuery = useMemo(() => {
-    if (!user) return null;
-    
-    if (!(isManager || isAdmin)) {
-      const uid = user?.uid;
-      if (!uid) {
-        console.warn('Dashboard: user.uid is undefined. User object:', user);
-        return null;
-      }
-      console.log('Dashboard: Creating query for user:', uid);
-      return query(collection(db, 'orders'), where('user_id', '==', uid), limit(50));
-    } else {
-      return query(collection(db, 'orders'), orderBy('created_at', 'desc'), limit(50));
-    }
-  }, [user, isManager, isAdmin]);
-
-  React.useEffect(() => {
-    if (!ordersQuery) {
-      if (!user) setLoading(false);
-      return;
-    }
-
-    console.log('Dashboard: Starting onSnapshot with query');
-    const unsubscribe = onSnapshot(ordersQuery, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
-      setRawOrders(data);
-      setLoading(false);
-    }, (error) => {
-      console.error('Dashboard: onSnapshot error:', error);
-      setOrdersError(error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [ordersQuery]);
-
-  const [dynamicServices, setDynamicServices] = React.useState<Service[]>([]);
-  const [servicesLoading, setServicesLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    const q = query(collection(db, 'services'), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-      setDynamicServices(data);
-      setServicesLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const { data: dynamicServices, loading: servicesLoading } = useFirestoreData<Service>({
+    tableName: 'services',
+    limit: 50,
+    realtime: true
+  });
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];
@@ -117,29 +79,20 @@ const Dashboard = () => {
     });
   }, [rawOrders]);
 
-  const [users, setUsers] = React.useState<UserProfile[]>([]);
-  React.useEffect(() => {
-    if (!(isManager || isAdmin)) return;
-    const q = query(collection(db, 'users'), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
-      setUsers(data);
-    });
-    return () => unsubscribe();
-  }, [isManager, isAdmin]);
+  const { data: users } = useFirestoreData<UserProfile>({
+    tableName: 'users',
+    limit: 50,
+    realtime: true,
+    skip: !(isManager || isAdmin)
+  });
 
-  const [userDesigns, setUserDesigns] = React.useState<Design[]>([]);
-  const [designsLoading, setDesignsLoading] = React.useState(true);
-  React.useEffect(() => {
-    if (!user) return;
-    const q = query(collection(db, 'designs'), where('user_id', '==', user.uid), limit(50));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Design));
-      setUserDesigns(data);
-      setDesignsLoading(false);
-    });
-    return () => unsubscribe();
-  }, [user]);
+  const { data: userDesigns, loading: designsLoading } = useFirestoreData<Design>({
+    tableName: 'designs',
+    where: [['user_id', '==', user?.uid]],
+    limit: 50,
+    realtime: true,
+    skip: !user
+  });
 
   const getStatusLabel = (status: string, clientAccepted?: boolean, type?: string) => {
     switch (status) {

@@ -34,15 +34,17 @@ import FAQ from './pages/FAQ';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import AIAssistant from './components/AIAssistant';
+import { CommandPalette } from './components/CommandPalette';
 
 import { Toaster } from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, profile, loading, isAdmin, isManager } = useAuth();
+  const location = useLocation();
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-medium text-gray-500">Chargement de votre session...</div>;
-  if (!user) return <Navigate to="/login" />;
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   if (adminOnly && !(isAdmin || isManager)) return <Navigate to="/" />;
 
   return <>{children}</>;
@@ -62,6 +64,7 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 selection:bg-primary-light selection:text-primary">
       <Toaster position="top-center" reverseOrder={false} />
+      <CommandPalette />
       {!hideNavbar && <Navbar />}
       <main key={location.key} className={isEditor ? 'h-screen' : ''}>
         <Routes>

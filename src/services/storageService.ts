@@ -42,6 +42,7 @@ export const storageService = {
       const metadata = contentType ? { contentType } : undefined;
       const snapshot = await uploadBytes(storageRef, fileBody, metadata);
       const downloadURL = await getDownloadURL(snapshot.ref);
+      console.log('File uploaded, URL:', downloadURL);
 
       return downloadURL;
     } catch (error) {

@@ -117,6 +117,7 @@ export interface UserProfile {
   displayName: string;
   photoURL: string;
   role: 'client' | 'admin' | 'manager';
+  merchantId?: string;
   phoneNumber?: string;
   address?: string;
   jobTitle?: string;
@@ -180,6 +181,33 @@ export interface Design {
   updatedAt: any;
   created_at?: any;
   updated_at?: any;
+}
+
+export interface DesignBlock {
+  id: string;
+  designId: string;
+  pageIndex: number;
+  type: 'text' | 'image' | 'shape' | 'path' | 'circle';
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  content: any; // Specific properties for the block type
+  zIndex: number;
+  lockedBy?: string | null;
+  lockedAt?: any;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface Asset {
+  id: string;
+  userId: string;
+  name: string;
+  url: string;
+  type: 'image' | 'logo' | 'icon';
+  createdAt: any;
 }
 
 export interface Template {

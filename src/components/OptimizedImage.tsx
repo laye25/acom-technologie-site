@@ -11,6 +11,8 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   containerClassName?: string;
   fallbackClassName?: string;
   priority?: boolean;
+  placeholder?: 'blur' | 'empty';
+  fallback?: string;
 }
 
 export const OptimizedImage: React.FC<OptimizedImageProps> = ({ 
@@ -22,49 +24,39 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   containerClassName = '',
   fallbackClassName = '',
   priority = false,
+  placeholder = 'empty',
+  fallback = '/images/placeholder.jpg',
   ...props 
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
 
-  const optimizedSrc = getOptimizedUrl(src, width, quality);
+  // Utilisation du fallback si src est vide
+  const finalSrc = src || fallback;
+  const optimizedSrc = getOptimizedUrl(finalSrc, width, quality);
 
   // Reset state when src changes
   useEffect(() => {
     setIsLoaded(false);
     setError(false);
-  }, [src]);
+  }, [finalSrc]); // Use finalSrc instead of src for stability
 
   return (
     <div className={`relative overflow-hidden bg-gray-100 ${containerClassName} ${className.includes('h-') ? '' : 'h-full'} ${className.includes('w-') ? '' : 'w-full'}`}>
       {!isLoaded && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
-          <div className="w-full h-full bg-gray-200" />
-        </div>
+        <div className={`absolute inset-0 flex items-center justify-center bg-gray-200 z-10 ${placeholder === 'blur' ? 'animate-pulse' : ''}`} />
       )}
 
       {error ? (
-        <div className={`flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${fallbackClassName || 'h-full'}`}>
-          <ImageIcon className="w-1/3 h-1/3 opacity-20" />
-          <span className="text-[10px] mt-2 font-mono uppercase tracking-tighter opacity-50">Image non disponible</span>
-        </div>
+        <img src={fallback} alt={alt} className={`w-full h-full object-cover ${className}`} />
       ) : (
         <img
           src={optimizedSrc}
           alt={alt}
           onLoad={() => setIsLoaded(true)}
-          onError={(e) => {
-            console.error(`Failed to load image: ${optimizedSrc}`, {
-              originalSrc: src,
-              error: e,
-              isSupabase: src.includes('supabase.co'),
-              isBase64: src.startsWith('data:')
-            });
-            setError(true);
-          }}
+          onError={() => setError(true)}
           className={`w-full h-full object-cover ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 ${className}`}
-          loading="eager"
-          referrerPolicy="no-referrer"
+          loading={priority ? "eager" : "lazy"}
           {...props}
         />
       )}

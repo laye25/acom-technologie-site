@@ -213,3 +213,35 @@ export const generateOrderDraft = async (orderData: any, service: any) => {
     return null;
   }
 };
+
+export const generateDailyBriefing = async (userName: string, data: any) => {
+  try {
+    const prompt = `En tant qu'assistant stratégique IA pour Acom Technologie, génère un briefing matinal personnalisé et motivant pour ${userName}.
+    
+    Données de l'entreprise:
+    - Ventes récentes: ${data.sales.length} ventes
+    - Chiffre d'affaires récent: ${data.sales.reduce((acc: number, s: any) => acc + (s.totalAmount || s.total_amount || 0), 0)} FCFA
+    - Produits en stock: ${data.products.length}
+    - Alertes stock faible: ${data.products.filter((p: any) => (p.stockQuantity || p.stock_quantity) <= (p.minStockLevel || 5)).length}
+    - Dépenses récentes: ${data.expenses.reduce((acc: number, e: any) => acc + (e.amount || 0), 0)} FCFA
+    
+    Le message doit être:
+    1. Accueillant et professionnel.
+    2. Synthétique (max 3-4 phrases).
+    3. Inclure un chiffre clé positif.
+    4. Mentionner une action prioritaire si nécessaire (ex: stock bas).
+    5. Ton: Inspirant, comme un partenaire d'affaires.
+    
+    Réponds uniquement avec le texte du message, sans guillemets.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+
+    return response.text?.trim() || "Bonjour ! Prêt pour une nouvelle journée de succès ?";
+  } catch (error) {
+    console.error('Error generating daily briefing:', error);
+    return "Bonjour ! Prêt pour une nouvelle journée de succès ?";
+  }
+};

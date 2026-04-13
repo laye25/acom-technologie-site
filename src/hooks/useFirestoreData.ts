@@ -1,16 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   collection, 
   query, 
   where, 
   orderBy, 
   limit, 
-  onSnapshot,
   QueryConstraint,
-  DocumentData
+  DocumentData,
+  getDocs
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useDataCache } from '../context/CacheContext';
+import { subscriptionEngine } from '../data/services/subscription.engine';
 
 export type TableName = 
   | 'services' 
@@ -43,7 +44,8 @@ export type TableName =
   | 'templates'
   | 'expenses'
   | 'studio_acom_products'
-  | 'variants';
+  | 'variants'
+  | 'assets';
 
 export type CollectionName = TableName;
 
@@ -77,6 +79,12 @@ export function useFirestoreData<T>({
   const [loading, setLoading] = useState(!skip);
   const [error, setError] = useState<Error | null>(null);
 
+  // Use a ref for the mapper to avoid re-triggering the effect if the mapper changes
+  const mapperRef = useRef(mapper);
+  useEffect(() => {
+    mapperRef.current = mapper;
+  }, [mapper]);
+
   const cacheKey = JSON.stringify({
     tableName,
     order,
@@ -95,9 +103,7 @@ export function useFirestoreData<T>({
     const cached = getCachedData(cacheKey);
     if (cached) {
       setData(cached);
-      if (!realtime) {
-        setLoading(false);
-      }
+      setLoading(false);
     } else {
       setLoading(true);
     }
@@ -136,20 +142,38 @@ export function useFirestoreData<T>({
     const colRef = collection(db, tableName);
     const q = query(colRef, ...constraints);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const result = snapshot.docs.map(doc => mapper({ id: doc.id, ...doc.data() }));
-      setCachedData(cacheKey, result);
-      setData(result);
-      setLoading(false);
-      setError(null);
-    }, (err) => {
-      console.error(`Firestore error fetching ${tableName}:`, err);
-      setError(err as Error);
-      setLoading(false);
+    if (realtime) {
+      const unsubscribe = subscriptionEngine.subscribe(cacheKey, q, (snapshot) => {
+        const result = snapshot.docs.map(doc => mapperRef.current({ id: doc.id, ...doc.data() }));
+        setCachedData(cacheKey, result);
+        setData(result);
+        setLoading(false);
+        setError(null);
+      });
+      return () => unsubscribe();
+    } else {
+      // One-time fetch
+      getDocs(q).then((snapshot) => {
+        const result = snapshot.docs.map(doc => mapperRef.current({ id: doc.id, ...doc.data() }));
+        setCachedData(cacheKey, result);
+        setData(result);
+        setLoading(false);
+        setError(null);
+      }).catch(err => {
+        console.error(`Error fetching ${tableName}:`, err);
+        setError(err);
+        setLoading(false);
+      });
+    }
+  }, [tableName, cacheKey, skip, realtime, JSON.stringify(whereClauses), JSON.stringify(filters), filter?.column, filter?.value, order?.column, order?.ascending, order?.direction, limitCount, getCachedData, setCachedData]);
+
+  const mutate = useCallback((updater: T[] | ((prev: T[]) => T[])) => {
+    setData(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      setCachedData(cacheKey, next);
+      return next;
     });
+  }, [cacheKey, setCachedData]);
 
-    return () => unsubscribe();
-  }, [tableName, cacheKey, skip, realtime, JSON.stringify(whereClauses), JSON.stringify(filters), filter?.column, filter?.value, order?.column, order?.ascending, order?.direction, limitCount, mapper, getCachedData, setCachedData]);
-
-  return { data, loading, error, refresh: () => {} }; // refresh is no-op with onSnapshot
+  return { data, loading, error, mutate, refresh: () => {} }; // refresh is no-op with onSnapshot
 }

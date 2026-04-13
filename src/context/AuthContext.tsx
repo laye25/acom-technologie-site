@@ -20,6 +20,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isManager: boolean;
   isSuperAdmin: boolean;
+  syncCustomClaims: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, fullName: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -34,6 +35,7 @@ const AuthContext = createContext<AuthContextType>({
   isAdmin: false,
   isManager: false,
   isSuperAdmin: false,
+  syncCustomClaims: async () => {},
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
   signInWithGoogle: async () => {},
@@ -60,6 +62,7 @@ const SUPER_ADMIN_EMAILS = [
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [customClaims, setCustomClaims] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -67,15 +70,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('AuthContext: onAuthStateChanged - currentUser:', currentUser);
       setUser(currentUser);
       if (currentUser) {
+        // Fetch custom claims
+        const tokenResult = await currentUser.getIdTokenResult();
+        setCustomClaims(tokenResult.claims);
+        
         await fetchProfile(currentUser);
       } else {
         setProfile(null);
+        setCustomClaims(null);
         setLoading(false);
       }
     });
 
     return () => unsubscribe();
   }, []);
+
+  const syncCustomClaims = async () => {
+    if (!user || !profile) return;
+    
+    try {
+      // Call our backend API to set custom claims
+      const response = await fetch('/api/auth/set-custom-claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: user.uid,
+          claims: {
+            role: profile.role,
+            merchantId: profile.merchantId || null,
+            admin: profile.role === 'admin'
+          }
+        })
+      });
+      
+      if (response.ok) {
+        // Force token refresh to get new claims
+        const tokenResult = await user.getIdTokenResult(true);
+        setCustomClaims(tokenResult.claims);
+      }
+    } catch (error) {
+      console.error('Error syncing custom claims:', error);
+    }
+  };
 
   const fetchProfile = async (currentUser: User) => {
     try {
@@ -183,8 +219,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await sendPasswordResetEmail(auth, email);
   };
 
-  const isAdmin = !!user?.email && ADMIN_EMAILS.includes(user.email);
-  const isManager = !!user?.email && MANAGER_EMAILS.includes(user.email);
+  const isAdmin = customClaims?.admin || (!!user?.email && ADMIN_EMAILS.includes(user.email));
+  const isManager = customClaims?.role === 'manager' || (!!user?.email && MANAGER_EMAILS.includes(user.email));
   const isSuperAdmin = !!user?.email && SUPER_ADMIN_EMAILS.includes(user.email);
 
   const value = {
@@ -194,6 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAdmin,
     isManager,
     isSuperAdmin,
+    syncCustomClaims,
     signInWithEmail,
     signUpWithEmail,
     signInWithGoogle,

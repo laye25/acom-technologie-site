@@ -13,6 +13,7 @@ import { toast } from 'react-hot-toast';
 import { fr } from 'date-fns/locale';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell } from 'recharts';
 import { getOrderDiscountedTotal } from '../lib/promotions';
+import { getImageUrl } from '../lib/imageUtils';
 import ServiceManager from '../components/admin/ServiceManager';
 import BlogManager from '../components/admin/BlogManager';
 import SettingsManager from '../components/admin/SettingsManager';
@@ -24,15 +25,18 @@ import { ExpenseManager } from '../components/admin/ExpenseManager';
 import StudioAcomManager from '../components/admin/StudioAcomManager';
 import { PlatformAIInsights } from '../components/admin/PlatformAIInsights';
 import { ConfirmModal } from '../components/admin/ConfirmModal';
+import { storageService } from '../services/storageService';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { notificationService } from '../services/notificationService';
+import { GlobalActivityFeed } from '../components/GlobalActivityFeed';
+import { DailyBriefing } from '../components/DailyBriefing';
 
 type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom';
 
 // import { isSupabaseConfigured } from '../lib/supabase';
 
 const AdminDashboard = () => {
-  const { user, isAdmin, isManager, isSuperAdmin, loading: authLoading } = useAuth();
+  const { user, isAdmin, isManager, isSuperAdmin, syncCustomClaims, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialTab = (searchParams.get('tab') as Tab) || (user?.email === 'contact.acomtechnologie@gmail.com' ? 'services' : 'overview');
@@ -43,6 +47,22 @@ const AdminDashboard = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
   const [isFixingImages, setIsFixingImages] = useState(false);
   const [showFixConfirm, setShowFixConfirm] = useState(false);
+
+  const [isSyncingPermissions, setIsSyncingPermissions] = useState(false);
+
+  const handleSyncPermissions = async () => {
+    setIsSyncingPermissions(true);
+    const toastId = toast.loading('Synchronisation des permissions...');
+    try {
+      await syncCustomClaims();
+      toast.success('Permissions synchronisées avec succès !', { id: toastId });
+    } catch (error) {
+      console.error('Error syncing permissions:', error);
+      toast.error('Erreur lors de la synchronisation.', { id: toastId });
+    } finally {
+      setIsSyncingPermissions(false);
+    }
+  };
 
   const handleFixImages = async () => {
     setShowFixConfirm(false);
@@ -71,7 +91,7 @@ const AdminDashboard = () => {
       // 1. Fix Services
       console.log(`Checking ${services.length} services for base64 images...`);
       for (const service of services) {
-        const img = service.image || (service as any).cover_image;
+        const img = getImageUrl(service);
         if (img && typeof img === 'string' && img.startsWith('data:')) {
           try {
             const url = await storageService.uploadFile('services', `main/${service.id}.jpg`, img);
@@ -85,7 +105,7 @@ const AdminDashboard = () => {
       // 2. Fix Studio ACOM Categories
       console.log(`Checking ${categories.length} categories for base64 images...`);
       for (const cat of categories) {
-        const img = cat.coverImage || cat.cover_image;
+        const img = getImageUrl(cat);
         if (img && typeof img === 'string' && img.startsWith('data:')) {
           try {
             const url = await storageService.uploadFile('studio-acom', `categories/${cat.id}.jpg`, img);
@@ -100,7 +120,7 @@ const AdminDashboard = () => {
       // 3. Fix Studio ACOM Products
       console.log(`Checking ${products.length} products for base64 images...`);
       for (const prod of products) {
-        const img = prod.coverImage || prod.cover_image || prod.image;
+        const img = getImageUrl(prod);
         if (img && typeof img === 'string' && img.startsWith('data:')) {
           try {
             const url = await storageService.uploadFile('studio-acom', `products/${prod.id}.jpg`, img);
@@ -1219,6 +1239,18 @@ const AdminDashboard = () => {
               </div>
             ) : (
               <>
+                <DailyBriefing 
+                  data={{ 
+                    sales: orders.filter(o => o.status === 'completed'), 
+                    products: dynamicServices, 
+                    expenses: expenses 
+                  }} 
+                />
+                <PlatformAIInsights 
+                  orders={orders}
+                  services={dynamicServices}
+                  expenses={expenses}
+                />
                 {/* Maintenance & Tools */}
               {(isSuperAdmin || isManager) && (
                 <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
@@ -1295,22 +1327,38 @@ const AdminDashboard = () => {
                 <PlatformAIInsights orders={orders} services={allServices} expenses={expenses} />
 
                 {/* Level 1: Global KPIs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-                  {stats.map((stat, i) => (
-                    <motion.div 
-                      key={i}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.1 }}
-                      className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all"
-                    >
-                      <div className={`w-10 h-10 ${stat.color} rounded-xl flex items-center justify-center mb-4`}>
-                        <stat.icon className="w-5 h-5" />
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-12">
+                  <div className="lg:col-span-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                      {stats.map((stat, i) => (
+                        <motion.div 
+                          key={i}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.1 }}
+                          className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all"
+                        >
+                          <div className={`w-10 h-10 ${stat.color} rounded-xl flex items-center justify-center mb-4`}>
+                            <stat.icon className="w-5 h-5" />
+                          </div>
+                          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{stat.label}</p>
+                          <p className="text-2xl font-display font-bold text-gray-900 mt-1">{stat.value}</p>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-1">
+                    <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm h-full">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-display font-bold text-gray-900">Activité Récente</h3>
+                        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                          <Bell className="w-4 h-4 text-primary" />
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{stat.label}</p>
-                      <p className="text-2xl font-display font-bold text-gray-900 mt-1">{stat.value}</p>
-                    </motion.div>
-                  ))}
+                      <GlobalActivityFeed limit={8} />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Level 1.5: Trésorerie Réelle */}
@@ -1384,6 +1432,36 @@ const AdminDashboard = () => {
                       >
                         <Download className="w-4 h-4 mr-2" />
                         Exporter CSV
+                      </button>
+                    </div>
+
+                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                          <Tag className="w-5 h-5 text-indigo-600" />
+                        </div>
+                      </div>
+                      <h4 className="font-bold text-gray-900 mb-2">Permissions & Sécurité</h4>
+                      <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                        Mettez à jour vos permissions d'accès (Custom Claims) pour garantir une sécurité optimale 
+                        et des performances accrues lors de la navigation.
+                      </p>
+                      <button
+                        onClick={handleSyncPermissions}
+                        disabled={isSyncingPermissions}
+                        className="w-full py-3 bg-white text-indigo-600 border border-indigo-100 rounded-xl text-sm font-bold hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isSyncingPermissions ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Synchronisation...
+                          </>
+                        ) : (
+                          <>
+                            <Database className="w-4 h-4" />
+                            Synchroniser les permissions
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

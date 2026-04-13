@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
 import { ai, getGeminiModel } from '../lib/gemini';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Service } from '../types';
 import { Link } from 'react-router-dom';
 
@@ -22,16 +22,11 @@ const AIAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [services, setServices] = useState<Service[]>([]);
-
-  useEffect(() => {
-    const q = query(collection(db, 'services'), orderBy('name'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-      setServices(data);
-    });
-    return () => unsubscribe();
-  }, []);
+  const { data: services } = useFirestoreData<Service>({
+    tableName: 'services',
+    order: { column: 'name', direction: 'asc' },
+    realtime: true
+  });
 
   useEffect(() => {
     if (scrollRef.current) {

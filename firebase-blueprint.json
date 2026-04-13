@@ -172,6 +172,16 @@
         "name": { "type": "string" },
         "type": { "type": "string" },
         "plan": { "type": "string" },
+        "billing": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" },
+            "stripeCustomerId": { "type": "string" },
+            "stripeSubscriptionId": { "type": "string" },
+            "plan": { "type": "string" },
+            "updatedAt": { "type": "string", "format": "date-time" }
+          }
+        },
         "created_at": { "type": "string", "format": "date-time" },
         "updated_at": { "type": "string", "format": "date-time" }
       },
@@ -338,6 +348,91 @@
         "updated_at": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "user_id", "name"]
+    },
+    "Activity": {
+      "title": "Activity",
+      "description": "System-wide activity log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "user_photo": { "type": "string" },
+        "type": { "type": "string", "enum": ["order_created", "order_updated", "payment_received", "stock_alert", "message_sent", "user_joined", "merchant_created"] },
+        "entity_id": { "type": "string" },
+        "entity_type": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "message": { "type": "string" },
+        "metadata": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "created_at"]
+    },
+    "DesignBlock": {
+      "title": "DesignBlock",
+      "description": "An individual element (block) of a design",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "design_id": { "type": "string" },
+        "page_index": { "type": "number" },
+        "type": { "type": "string", "enum": ["text", "image", "shape", "path", "circle"] },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "rotation": { "type": "number" },
+        "content": { "type": "object" },
+        "z_index": { "type": "number" },
+        "locked_by": { "type": "string", "description": "UID of the user who currently locks this block" },
+        "locked_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "design_id", "page_index", "type", "x", "y"]
+    },
+    "Presence": {
+      "title": "Presence",
+      "description": "Real-time user presence and cursor position",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "design_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "user_photo": { "type": "string" },
+        "cursor_x": { "type": "number" },
+        "cursor_y": { "type": "number" },
+        "last_active": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "design_id", "user_id"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "User-uploaded design asset",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "logo", "icon"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "name", "url", "type"]
+    },
+    "TenantUsage": {
+      "title": "TenantUsage",
+      "description": "Usage tracking for SaaS billing",
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string" },
+        "reads": { "type": "number" },
+        "writes": { "type": "number" },
+        "ai_generations": { "type": "number" },
+        "storage_mb": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tenantId"]
     }
   },
   "firestore": {
@@ -366,6 +461,11 @@
     "/students/{studentId}": { "schema": "Student", "description": "Students collection" },
     "/patients/{patientId}": { "schema": "Patient", "description": "Patients collection" },
     "/appointments/{appointmentId}": { "schema": "Appointment", "description": "Appointments collection" },
-    "/designs/{designId}": { "schema": "Design", "description": "Designs collection" }
+    "/designs/{designId}": { "schema": "Design", "description": "Designs collection" },
+    "/designs/{designId}/blocks/{blockId}": { "schema": "DesignBlock", "description": "Blocks within a design" },
+    "/designs/{designId}/presence/{presenceId}": { "schema": "Presence", "description": "Real-time presence within a design" },
+    "/activities/{activityId}": { "schema": "Activity", "description": "Activities collection" },
+    "/usage/{tenantId}": { "schema": "TenantUsage", "description": "Usage tracking for SaaS billing" },
+    "/assets/{assetId}": { "schema": "Asset", "description": "User assets collection" }
   }
 }

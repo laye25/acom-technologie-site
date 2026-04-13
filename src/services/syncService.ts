@@ -1,6 +1,10 @@
 import { db } from '../db/db';
-import { firestoreService } from './firestoreService';
 import { where } from 'firebase/firestore';
+import { merchantSaleRepository } from '../data/repositories/merchant-sale.repository';
+import { merchantExpenseRepository } from '../data/repositories/merchant-expense.repository';
+import { orderRepository } from '../data/repositories/order.repository';
+import { serviceRepository } from '../data/repositories/service.repository';
+import { userRepository } from '../data/repositories/user.repository';
 
 export const syncService = {
   async isOnline() {
@@ -14,10 +18,14 @@ export const syncService = {
     try {
       const localSales = await db.sales.where('merchantId').equals(merchantId).toArray();
       for (const sale of localSales) {
-        await firestoreService.save('merchant_sales', sale);
+        if (sale.id) {
+          await merchantSaleRepository.update(sale.id, sale as any);
+        } else {
+          await merchantSaleRepository.create(sale as any);
+        }
       }
 
-      const remoteSales = await firestoreService.getAll<any>('merchant_sales', [
+      const remoteSales = await merchantSaleRepository.getAll([
         where('merchant_id', '==', merchantId)
       ]);
 
@@ -35,10 +43,14 @@ export const syncService = {
     try {
       const localExpenses = await db.expenses.where('merchantId').equals(merchantId).toArray();
       for (const expense of localExpenses) {
-        await firestoreService.save('merchant_expenses', expense);
+        if (expense.id) {
+          await merchantExpenseRepository.update(expense.id, expense as any);
+        } else {
+          await merchantExpenseRepository.create(expense as any);
+        }
       }
 
-      const remoteExpenses = await firestoreService.getAll<any>('merchant_expenses', [
+      const remoteExpenses = await merchantExpenseRepository.getAll([
         where('merchant_id', '==', merchantId)
       ]);
 
@@ -53,7 +65,7 @@ export const syncService = {
   async syncOrders(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      const remoteOrders = await firestoreService.getAll<any>('orders', [
+      const remoteOrders = await orderRepository.getAll([
         where('merchant_id', '==', merchantId)
       ]);
       if (remoteOrders) await db.orders.bulkPut(remoteOrders);
@@ -65,7 +77,7 @@ export const syncService = {
   async syncServices(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      const remoteServices = await firestoreService.getAll<any>('services', [
+      const remoteServices = await serviceRepository.getAll([
         where('merchant_id', '==', merchantId)
       ]);
       if (remoteServices) await db.services.bulkPut(remoteServices);
@@ -77,7 +89,7 @@ export const syncService = {
   async syncUsers(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      const remoteUsers = await firestoreService.getAll<any>('users', [
+      const remoteUsers = await userRepository.getAll([
         where('merchant_id', '==', merchantId)
       ]);
       if (remoteUsers) await db.users.bulkPut(remoteUsers);
@@ -89,7 +101,10 @@ export const syncService = {
   async syncSettings(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      const remoteSettings = await firestoreService.getAll<any>('settings');
+      const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
+        protected collectionName = 'settings';
+      })();
+      const remoteSettings = await repo.getAll();
       
       if (remoteSettings) {
         // Map data if it's wrapped in a 'data' column
