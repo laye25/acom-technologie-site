@@ -116,76 +116,7 @@ const StudioAcomManager = () => {
     }
   };
 
-  const [isImporting, setIsImporting] = useState(false);
-  const [importSuccess, setImportSuccess] = useState(false);
 
-  const handleImportDefaults = async () => {
-    setIsImporting(true);
-    setImportSuccess(false);
-    try {
-      // Import Categories
-      const defaultCats = INITIAL_CATEGORIES.filter(c => !['all', 'favorites', 'categories', 'saved'].includes(c.id));
-      
-      for (const cat of defaultCats) {
-        // Check if category with same name already exists to avoid duplicates
-        const existing = categories.find(c => 
-          c.id === cat.id || 
-          c.name.toLowerCase() === cat.name.toLowerCase()
-        );
-        
-        if (existing) continue;
-
-        // Map the icon object to its name
-        const iconMap: { [key: string]: any } = { Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2 };
-        const iconName = Object.keys(iconMap).find(key => iconMap[key] === cat.icon) || 'LayoutGrid';
-        
-        try {
-          // Map to snake_case for Firestore
-          const catData = { 
-            id: cat.id,
-            name: cat.name,
-            sub: cat.sub,
-            icon: iconName,
-            color: cat.color,
-            cover_image: cat.coverImage
-          };
-          
-          await dbService.studioAcom.categories.save(catData);
-        } catch (err) {
-          console.error(`Failed to save category ${cat.name}:`, err);
-          throw err;
-        }
-      }
-
-      // Import Products
-      if (INITIAL_PRODUCTS.length > 0) {
-        for (const product of INITIAL_PRODUCTS) {
-          try {
-            await dbService.studioAcom.products.save({
-              id: product.id,
-              name: product.name,
-              categoryId: product.categoryId,
-              description: product.description,
-              coverImage: product.coverImage,
-              userId: product.userId,
-              variants: product.variants
-            });
-          } catch (err) {
-            console.error(`Failed to save product ${product.name}:`, err);
-            throw err;
-          }
-        }
-      }
-      
-      setImportSuccess(true);
-      setTimeout(() => setImportSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error importing defaults:', error);
-      toast.error('Erreur lors de l\'importation : ' + (error instanceof Error ? error.message : 'Erreur inconnue'));
-    } finally {
-      setIsImporting(false);
-    }
-  };
 
   const [isUploading, setIsUploading] = useState(false);
 
@@ -262,29 +193,6 @@ const StudioAcomManager = () => {
               className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
             />
           </div>
-          <button
-            onClick={handleImportDefaults}
-            disabled={isImporting}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-              isImporting 
-                ? 'bg-gray-50 text-gray-400 cursor-not-allowed' 
-                : importSuccess 
-                  ? 'bg-emerald-50 text-emerald-600' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            title="Importer toutes les catégories et modèles par défaut"
-          >
-            {isImporting ? (
-              <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
-            ) : importSuccess ? (
-              <Check className="w-4 h-4" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
-            <span className="hidden lg:inline">
-              {isImporting ? 'Importation...' : importSuccess ? 'Importé !' : 'Par défaut'}
-            </span>
-          </button>
           <button
             onClick={() => {
               setEditingItem(activeTab === 'categories' ? { name: '', sub: '', color: 'text-gray-600' } : { name: '', categoryId: categories[0]?.id || '', description: '', variants: [] });
@@ -423,15 +331,9 @@ const StudioAcomManager = () => {
             <Search className="w-8 h-8 text-gray-300" />
           </div>
           <h3 className="text-lg font-bold text-gray-900 mb-2">Aucun élément trouvé</h3>
-          <p className="text-gray-500 mb-6 max-w-xs mx-auto">
-            Commencez par ajouter un élément ou importez les données par défaut.
+          <p className="text-gray-500 max-w-xs mx-auto">
+            Commencez par ajouter un élément.
           </p>
-          <button
-            onClick={handleImportDefaults}
-            className="px-6 py-2 bg-primary/10 text-primary rounded-xl text-sm font-bold hover:bg-primary/20 transition-all"
-          >
-            Importer les données par défaut
-          </button>
         </div>
       )}
 
@@ -540,7 +442,10 @@ const StudioAcomManager = () => {
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <button 
                                 type="button"
-                                onClick={() => setEditingItem(prev => prev ? { ...prev, coverImage: '', cover_image: '', image: '' } : null)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingItem(prev => prev ? { ...prev, coverImage: '', cover_image: '', image: '', previewImage: '', preview: '' } : null);
+                                }}
                                 className="p-3 bg-red-500 text-white rounded-2xl hover:bg-red-600 transition-colors shadow-lg"
                               >
                                 <Trash2 className="w-6 h-6" />
@@ -626,7 +531,10 @@ const StudioAcomManager = () => {
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <button 
                                   type="button"
-                                  onClick={() => setEditingItem(prev => prev ? { ...prev, coverImage: '', cover_image: '', image: '' } : null)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingItem(prev => prev ? { ...prev, coverImage: '', cover_image: '', image: '', previewImage: '', preview: '' } : null);
+                                  }}
                                   className="p-3 bg-red-500 text-white rounded-2xl hover:bg-red-600 transition-colors shadow-lg"
                                 >
                                   <Trash2 className="w-6 h-6" />

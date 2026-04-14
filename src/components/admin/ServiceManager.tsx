@@ -500,6 +500,30 @@ const ServiceManager = () => {
                       )}
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Sous-catégorie</label>
+                    <select
+                      value={(currentService as any)?.subCategory || ''}
+                      onChange={e => setCurrentService(prev => prev ? { ...prev, subCategory: e.target.value } : null)}
+                      className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
+                    >
+                      <option value="">Sélectionner une sous-catégorie...</option>
+                      {currentService?.category?.toLowerCase() === 'design' && (
+                        <>
+                          <option value="Identité & Branding">Identité & Branding</option>
+                          <option value="Impression & Marquage">Impression & Marquage</option>
+                          <option value="Signalétique">Signalétique</option>
+                        </>
+                      )}
+                      {currentService?.category?.toLowerCase() === 'digital' && (
+                        <>
+                          <option value="Développement Logiciel">Développement Logiciel</option>
+                          <option value="Web & Plateformes">Web & Plateformes</option>
+                        </>
+                      )}
+                      <option value="Autres">Autres</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>

@@ -150,6 +150,8 @@ export interface CanvasElement {
   rotation?: number;
   src?: string;
   radius?: number;
+  locked?: boolean;
+  hidden?: boolean;
   stroke?: string;
   strokeWidth?: number;
   shadowColor?: string;
@@ -167,6 +169,13 @@ export interface CanvasElement {
   scaleY?: number;
   fillLinearGradientStartPoint?: { x: number; y: number };
   fillLinearGradientEndPoint?: { x: number; y: number };
+  filters?: {
+    brightness?: number;
+    contrast?: number;
+    blur?: number;
+    grayscale?: boolean;
+    sepia?: boolean;
+  };
 }
 
 export interface Design {

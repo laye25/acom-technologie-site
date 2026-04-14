@@ -16,6 +16,40 @@ const iconMap: { [key: string]: any } = {
   Briefcase, Users, Award, Star, CheckCircle2, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code
 };
 
+// Helper Component to fix hook violation
+function SubCategorySection({ subCat, subServices }: { subCat: string, subServices: any[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleServices = showAll ? subServices : subServices.slice(0, 6);
+
+  return (
+    <div className="space-y-6">
+      <h4 className="text-lg font-bold text-gray-700">{subCat}</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {visibleServices.map((service, index) => (
+          <motion.div
+            key={service.id}
+            layout
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.4, delay: index * 0.05 }}
+          >
+            <ServiceCard service={service} />
+          </motion.div>
+        ))}
+      </div>
+      {subServices.length > 6 && (
+        <button 
+          onClick={() => setShowAll(!showAll)}
+          className="text-primary font-bold hover:underline"
+        >
+          {showAll ? 'Voir moins' : 'Voir plus'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 const Home = () => {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<SiteSettings | null>(null);
@@ -39,6 +73,7 @@ const Home = () => {
     description: s.description,
     price: s.price,
     category: s.category,
+    subCategory: s.subCategory,
     image: s.image || s.image_url || `https://picsum.photos/seed/${s.id}/800/600`,
     features: s.features || [],
     promotion: s.promotion
@@ -77,11 +112,18 @@ const Home = () => {
     const matchesSearch = service.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) || 
                           service.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
+  }).sort((a, b) => {
+    // Sort by category first, then by name
+    const catA = (a.category || '').toLowerCase();
+    const catB = (b.category || '').toLowerCase();
+    if (catA < catB) return -1;
+    if (catA > catB) return 1;
+    return a.name.localeCompare(b.name);
   });
 
   const categories = useMemo(() => {
     const cats = services.map(s => s.category);
-    const uniqueCats = Array.from(new Set(cats));
+    const uniqueCats = Array.from(new Set(cats)).sort((a, b) => a.localeCompare(b));
     return [
       { id: 'all', label: 'Tous' },
       ...uniqueCats.map(cat => ({
@@ -210,25 +252,55 @@ const Home = () => {
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-16">
             <AnimatePresence mode="popLayout">
               {loading ? (
-                Array(3).fill(0).map((_, i) => (
-                  <div key={i} className="h-[500px] bg-gray-100 animate-pulse" />
-                ))
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Array(3).fill(0).map((_, i) => (
+                    <div key={i} className="h-[500px] bg-gray-100 animate-pulse rounded-[2.5rem]" />
+                  ))}
+                </div>
               ) : (
-                filteredServices.map((service, index) => (
-                  <motion.div
-                    key={service.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.4, delay: index * 0.05 }}
-                  >
-                    <ServiceCard service={service} />
-                  </motion.div>
-                ))
+                categories.filter(c => c.id !== 'all' && (activeCategory === 'all' || activeCategory === c.id)).map((category) => {
+                  const categoryServices = filteredServices.filter(s => s.category === category.id);
+                  if (categoryServices.length === 0) return null;
+                  
+                  return (
+                    <motion.div key={category.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      {/* Category Header */}
+                      <h3 className="text-2xl font-black text-gray-900 mb-8 flex items-center gap-3">
+                        <span className="w-2 h-8 bg-primary rounded-full"></span>
+                        {category.label}
+                      </h3>
+
+                      {/* Subcategories */}
+                      {(() => {
+                        const subCategories = Array.from(new Set(categoryServices.map(s => s.subCategory).filter(Boolean)));
+                        
+                        // Define subcategory mapping
+                        const subCatMap: Record<string, string[]> = {
+                          'design': ['Identité & Branding', 'Impression & Marquage', 'Signalétique'],
+                          'digital': ['Développement Logiciel', 'Web & Plateformes']
+                        };
+                        
+                        const currentSubCats = subCatMap[category.id.toLowerCase()] || subCategories;
+
+                        return (
+                          <div className="space-y-12">
+                            {currentSubCats.map(subCat => {
+                              const subServices = categoryServices.filter(s => s.subCategory === subCat || (!s.subCategory && subCat === 'Autres'));
+                              if (subServices.length === 0) return null;
+
+                              return (
+                                <SubCategorySection key={subCat} subCat={subCat} subServices={subServices} />
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                    </motion.div>
+                  );
+                })
               )}
             </AnimatePresence>
           </div>

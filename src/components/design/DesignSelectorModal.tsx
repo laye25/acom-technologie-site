@@ -33,7 +33,7 @@ const MiniPreview = ({ elements, bgColor }: { elements: any[], bgColor: string }
       className="relative w-full h-full overflow-hidden pointer-events-none" 
       style={{ backgroundColor: bgColor, containerType: 'inline-size' }}
     >
-      {elements.map((el: any) => {
+      {elements.filter(el => !el.hidden).map((el: any) => {
         // Ensure coordinates and dimensions are numbers
         const x = Number(el.x) || 0;
         const y = Number(el.y) || 0;

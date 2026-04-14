@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Stage, Layer, Rect, Text, Image, Transformer, Group, Path, Circle, Line, Ellipse } from 'react-konva';
+import Konva from 'konva';
 import useImage from 'use-image';
 import { 
   Upload, Type, Palette, Download, Trash2, Plus, Minus, Move, MousePointer2, 
@@ -7,7 +8,8 @@ import {
   Wrench, FolderOpen, Sparkles, Mic, Image as ImageIcon, StickyNote, 
   Timer, Maximize2, Grid3X3, ChevronDown, Search, X, ArrowLeft,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  List, ListOrdered, PaintRoller, CaseSensitive, ArrowUpDown, Scaling, Undo, Redo, Share2
+  List, ListOrdered, PaintRoller, CaseSensitive, ArrowUpDown, Scaling, Undo, Redo, Share2,
+  Eye, Lock, Unlock, ChevronUp, ArrowUpToLine, ArrowRightToLine, ArrowDownToLine, GripHorizontal, GripVertical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
@@ -116,7 +118,7 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
       className="relative w-full h-full overflow-hidden pointer-events-none" 
       style={{ backgroundColor: bgColor, containerType: 'inline-size' }}
     >
-      {elements.map((el) => {
+      {elements.filter(el => !el.hidden).map((el) => {
         const style: React.CSSProperties = {
           position: 'absolute',
           left: `${(el.x / 600) * 100}%`,
@@ -220,16 +222,39 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
 };
 
 // --- Helper for Image Element ---
-const URLImage = ({ element, isSelected, onSelect, onChange, lockedBy, lockColor }: { 
+const URLImage = ({ element, isSelected, onSelect, onChange, lockedBy, lockColor, onDragMove, onDragEnd }: { 
   element: CanvasElement; 
   isSelected: boolean; 
   onSelect: () => void;
   onChange: (newAttrs: Partial<CanvasElement>) => void;
   lockedBy?: string | null;
   lockColor?: string;
+  onDragMove?: (e: any) => void;
+  onDragEnd?: (e: any, onChange: (attrs: any) => void) => void;
 }) => {
   const [img] = useImage(element.src || '');
   const shapeRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (img && shapeRef.current) {
+      if (element.filters && Object.keys(element.filters).length > 0) {
+        shapeRef.current.cache();
+      } else {
+        shapeRef.current.clearCache();
+      }
+    }
+  }, [img, element.filters]);
+
+  const activeFilters = useMemo(() => {
+    if (!element.filters) return [];
+    const f = [];
+    if (element.filters.brightness !== undefined) f.push(Konva.Filters.Brighten);
+    if (element.filters.contrast !== undefined) f.push(Konva.Filters.Contrast);
+    if (element.filters.blur !== undefined) f.push(Konva.Filters.Blur);
+    if (element.filters.grayscale) f.push(Konva.Filters.Grayscale);
+    if (element.filters.sepia) f.push(Konva.Filters.Sepia);
+    return f;
+  }, [element.filters]);
 
   return (
     <>
@@ -241,14 +266,23 @@ const URLImage = ({ element, isSelected, onSelect, onChange, lockedBy, lockColor
         y={element.y}
         width={element.width}
         height={element.height}
+        filters={activeFilters.length > 0 ? activeFilters : undefined}
+        brightness={element.filters?.brightness || 0}
+        contrast={element.filters?.contrast || 0}
+        blurRadius={element.filters?.blur || 0}
         draggable={!lockedBy}
         onClick={onSelect}
         onTap={onSelect}
+        onDragMove={onDragMove}
         onDragEnd={(e) => {
-          onChange({
-            x: e.target.x(),
-            y: e.target.y(),
-          });
+          if (onDragEnd) {
+            onDragEnd(e, onChange);
+          } else {
+            onChange({
+              x: e.target.x(),
+              y: e.target.y(),
+            });
+          }
         }}
         onTransformEnd={(e) => {
           const node = shapeRef.current;
@@ -280,7 +314,7 @@ const URLImage = ({ element, isSelected, onSelect, onChange, lockedBy, lockColor
 };
 
 // --- Helper for Text Element ---
-const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick, lockedBy, lockColor }: { 
+const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick, lockedBy, lockColor, onDragMove, onDragEnd }: { 
   element: CanvasElement; 
   isSelected: boolean; 
   onSelect: () => void;
@@ -288,6 +322,8 @@ const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick, 
   onDoubleClick: (e: any) => void;
   lockedBy?: string | null;
   lockColor?: string;
+  onDragMove?: (e: any) => void;
+  onDragEnd?: (e: any, onChange: (attrs: any) => void) => void;
 }) => {
   const shapeRef = useRef<any>(null);
 
@@ -318,11 +354,16 @@ const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick, 
         onTap={onSelect}
         onDblClick={lockedBy ? undefined : onDoubleClick}
         onDblTap={lockedBy ? undefined : onDoubleClick}
+        onDragMove={onDragMove}
         onDragEnd={(e) => {
-          onChange({
-            x: e.target.x(),
-            y: e.target.y(),
-          });
+          if (onDragEnd) {
+            onDragEnd(e, onChange);
+          } else {
+            onChange({
+              x: e.target.x(),
+              y: e.target.y(),
+            });
+          }
         }}
         onTransformEnd={(e) => {
           const node = shapeRef.current;
@@ -354,11 +395,24 @@ const EditableText = ({ element, isSelected, onSelect, onChange, onDoubleClick, 
 const TEMPLATES: any[] = [];
 
 const FONTS = [
-  'Inter', 'Cormorant Garamond', 'Montserrat', 'Playfair Display', 'Roboto', 'Open Sans', 'Lato'
+  'Inter', 'Cormorant Garamond', 'Montserrat', 'Playfair Display', 'Roboto', 'Open Sans', 'Lato',
+  'Oswald', 'Raleway', 'Poppins', 'Nunito', 'Ubuntu', 'Merriweather', 'PT Serif', 'Lora', 'Rubik', 'Work Sans',
+  'Dancing Script', 'Space Grotesk', 'Anton', 'JetBrains Mono'
 ];
 
 export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport, autoOpenSelector }) => {
   const { isAdmin, isManager, profile, user } = useAuth();
+
+  useEffect(() => {
+    // Dynamically load Google Fonts
+    const link = document.createElement('link');
+    link.href = `https://fonts.googleapis.com/css2?${FONTS.map(f => `family=${f.replace(/ /g, '+')}:wght@300;400;500;600;700`).join('&')}&display=swap`;
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []);
   const { others, updateMyPresence } = usePresence(templateId || null);
   const { data: dbTemplates, loading: loadingTemplates, refresh: refreshTemplates } = useFirestoreData<any>({
     tableName: 'design_templates',
@@ -613,6 +667,100 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     };
   }, [designId, user]);
   const [showGrid, setShowGrid] = useState(false);
+  const [guides, setGuides] = useState<{ type: 'vertical' | 'horizontal', position: number }[]>([]);
+
+  // Snapping logic
+  const getLineGuideStops = (skipShapeId?: string) => {
+    const vertical = [0, 600 / 2, 600]; // Canvas edges and center
+    const horizontal = [0, 350 / 2, 350];
+
+    elements.forEach((el) => {
+      if (el.id === skipShapeId || el.hidden) return;
+      const w = el.width || (el.type === 'circle' ? (el.radius || 0) * 2 : 100);
+      const h = el.height || (el.type === 'circle' ? (el.radius || 0) * 2 : 100);
+      
+      vertical.push(el.x, el.x + w / 2, el.x + w);
+      horizontal.push(el.y, el.y + h / 2, el.y + h);
+    });
+
+    return { vertical, horizontal };
+  };
+
+  const getObjectSnappingEdges = (node: any) => {
+    const box = node.getClientRect();
+    return {
+      vertical: [
+        { guide: Math.round(box.x), offset: Math.round(node.x() - box.x), snap: 'start' },
+        { guide: Math.round(box.x + box.width / 2), offset: Math.round(node.x() - box.x - box.width / 2), snap: 'center' },
+        { guide: Math.round(box.x + box.width), offset: Math.round(node.x() - box.x - box.width), snap: 'end' },
+      ],
+      horizontal: [
+        { guide: Math.round(box.y), offset: Math.round(node.y() - box.y), snap: 'start' },
+        { guide: Math.round(box.y + box.height / 2), offset: Math.round(node.y() - box.y - box.height / 2), snap: 'center' },
+        { guide: Math.round(box.y + box.height), offset: Math.round(node.y() - box.y - box.height), snap: 'end' },
+      ],
+    };
+  };
+
+  const getGuides = (lineGuideStops: any, itemBounds: any) => {
+    const resultV: any[] = [];
+    const resultH: any[] = [];
+    const GUIDELINE_OFFSET = 5;
+
+    lineGuideStops.vertical.forEach((lineGuide: number) => {
+      itemBounds.vertical.forEach((itemBound: any) => {
+        const diff = Math.abs(lineGuide - itemBound.guide);
+        if (diff < GUIDELINE_OFFSET) {
+          resultV.push({ lineGuide, diff, snap: itemBound.snap, offset: itemBound.offset });
+        }
+      });
+    });
+
+    lineGuideStops.horizontal.forEach((lineGuide: number) => {
+      itemBounds.horizontal.forEach((itemBound: any) => {
+        const diff = Math.abs(lineGuide - itemBound.guide);
+        if (diff < GUIDELINE_OFFSET) {
+          resultH.push({ lineGuide, diff, snap: itemBound.snap, offset: itemBound.offset });
+        }
+      });
+    });
+
+    const guides = [];
+    const minV = resultV.sort((a, b) => a.diff - b.diff)[0];
+    const minH = resultH.sort((a, b) => a.diff - b.diff)[0];
+
+    if (minV) guides.push({ type: 'vertical', position: minV.lineGuide, offset: minV.offset });
+    if (minH) guides.push({ type: 'horizontal', position: minH.lineGuide, offset: minH.offset });
+
+    return guides;
+  };
+
+  const handleDragMove = (e: any, id: string) => {
+    const node = e.target;
+    const lineGuideStops = getLineGuideStops(id);
+    const itemBounds = getObjectSnappingEdges(node);
+    const newGuides = getGuides(lineGuideStops, itemBounds) as { type: 'vertical' | 'horizontal', position: number, offset: number }[];
+
+    if (!newGuides.length) {
+      setGuides([]);
+      return;
+    }
+
+    setGuides(newGuides.map(g => ({ type: g.type, position: g.position })));
+
+    newGuides.forEach((lg) => {
+      if (lg.type === 'vertical') {
+        node.x(lg.position + lg.offset);
+      } else if (lg.type === 'horizontal') {
+        node.y(lg.position + lg.offset);
+      }
+    });
+  };
+
+  const handleDragEnd = (e: any, id: string, onChange: (attrs: any) => void) => {
+    setGuides([]);
+    onChange({ x: e.target.x(), y: e.target.y() });
+  };
   const [showRulers, setShowRulers] = useState(false);
   const [showMargins, setShowMargins] = useState(false);
   const [showBleed, setShowBleed] = useState(false);
@@ -1261,12 +1409,108 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     }
   };
 
+  const alignSelected = (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
+    if (selectedIds.length < 2) return;
+    
+    setElements(prev => {
+      const selected = prev.filter(el => selectedIds.includes(el.id));
+      if (selected.length === 0) return prev;
+
+      let targetValue = 0;
+      
+      switch (alignment) {
+        case 'left':
+          targetValue = Math.min(...selected.map(el => el.x));
+          break;
+        case 'center':
+          const minX = Math.min(...selected.map(el => el.x));
+          const maxX = Math.max(...selected.map(el => el.x + (el.width || 0)));
+          targetValue = minX + (maxX - minX) / 2;
+          break;
+        case 'right':
+          targetValue = Math.max(...selected.map(el => el.x + (el.width || 0)));
+          break;
+        case 'top':
+          targetValue = Math.min(...selected.map(el => el.y));
+          break;
+        case 'middle':
+          const minY = Math.min(...selected.map(el => el.y));
+          const maxY = Math.max(...selected.map(el => el.y + (el.height || 0)));
+          targetValue = minY + (maxY - minY) / 2;
+          break;
+        case 'bottom':
+          targetValue = Math.max(...selected.map(el => el.y + (el.height || 0)));
+          break;
+      }
+
+      return prev.map(el => {
+        if (!selectedIds.includes(el.id)) return el;
+        
+        switch (alignment) {
+          case 'left': return { ...el, x: targetValue };
+          case 'center': return { ...el, x: targetValue - (el.width || 0) / 2 };
+          case 'right': return { ...el, x: targetValue - (el.width || 0) };
+          case 'top': return { ...el, y: targetValue };
+          case 'middle': return { ...el, y: targetValue - (el.height || 0) / 2 };
+          case 'bottom': return { ...el, y: targetValue - (el.height || 0) };
+          default: return el;
+        }
+      });
+    });
+  };
+
+  const distributeSelected = (axis: 'horizontal' | 'vertical') => {
+    if (selectedIds.length < 3) return;
+
+    setElements(prev => {
+      const selected = prev.filter(el => selectedIds.includes(el.id));
+      if (selected.length < 3) return prev;
+
+      const sorted = [...selected].sort((a, b) => axis === 'horizontal' ? a.x - b.x : a.y - b.y);
+      
+      if (axis === 'horizontal') {
+        const first = sorted[0];
+        const last = sorted[sorted.length - 1];
+        const totalSpace = (last.x) - (first.x + (first.width || 0));
+        let sumWidths = 0;
+        for (let i = 1; i < sorted.length - 1; i++) sumWidths += (sorted[i].width || 0);
+        
+        const gap = (totalSpace - sumWidths) / (sorted.length - 1);
+        
+        let currentX = first.x + (first.width || 0) + gap;
+        return prev.map(el => {
+          if (!selectedIds.includes(el.id) || el.id === first.id || el.id === last.id) return el;
+          const newEl = { ...el, x: currentX };
+          currentX += (el.width || 0) + gap;
+          return newEl;
+        });
+      } else {
+        const first = sorted[0];
+        const last = sorted[sorted.length - 1];
+        const totalSpace = (last.y) - (first.y + (first.height || 0));
+        let sumHeights = 0;
+        for (let i = 1; i < sorted.length - 1; i++) sumHeights += (sorted[i].height || 0);
+        
+        const gap = (totalSpace - sumHeights) / (sorted.length - 1);
+        
+        let currentY = first.y + (first.height || 0) + gap;
+        return prev.map(el => {
+          if (!selectedIds.includes(el.id) || el.id === first.id || el.id === last.id) return el;
+          const newEl = { ...el, y: currentY };
+          currentY += (el.height || 0) + gap;
+          return newEl;
+        });
+      }
+    });
+  };
+
   const [isPositionMenuOpen, setIsPositionMenuOpen] = useState(false);
   const [isEffectsMenuOpen, setIsEffectsMenuOpen] = useState(false);
   const [isSpacingMenuOpen, setIsSpacingMenuOpen] = useState(false);
 
   const sidebarTabs = [
     { id: 'templates', label: 'Modèles', icon: LayoutGrid },
+    { id: 'layers', label: 'Calques', icon: Layers },
     { id: 'ai', label: 'Assistant IA', icon: Sparkles },
     { id: 'elements', label: 'Éléments', icon: Shapes },
     { id: 'text', label: 'Texte', icon: Type },
@@ -2053,6 +2297,98 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
               </div>
             </div>
           )}
+          {activeTab === 'layers' && (
+            <div className="space-y-4">
+              <h3 className="font-bold text-gray-900">Calques</h3>
+              <div className="space-y-2">
+                {[...elements].reverse().map((el, index) => {
+                  const isSelected = selectedIds.includes(el.id);
+                  let Icon = Shapes;
+                  if (el.type === 'text') Icon = Type;
+                  if (el.type === 'image') Icon = ImageIcon;
+                  
+                  return (
+                    <div 
+                      key={el.id}
+                      onClick={() => setSelectedIds([el.id])}
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                        isSelected ? 'bg-primary/5 border-primary' : 'bg-gray-50 border-gray-100 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 overflow-hidden">
+                        <div className="p-1.5 bg-white rounded-lg shadow-sm text-gray-500">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 truncate max-w-[120px]">
+                          {el.type === 'text' ? el.text : el.type === 'image' ? 'Image' : 'Forme'}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setElements(elements.map(item => item.id === el.id ? { ...item, hidden: !item.hidden } : item));
+                          }}
+                          className={`p-1.5 rounded-lg transition-colors ${el.hidden ? 'text-gray-400 hover:bg-gray-200' : 'text-gray-600 hover:bg-gray-200'}`}
+                        >
+                          <Eye className={`w-4 h-4 ${el.hidden ? 'opacity-50' : ''}`} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setElements(elements.map(item => item.id === el.id ? { ...item, locked: !item.locked } : item));
+                          }}
+                          className={`p-1.5 rounded-lg transition-colors ${el.locked ? 'text-red-500 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-200'}`}
+                        >
+                          {el.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                        </button>
+                        <div className="flex flex-col">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const actualIndex = elements.length - 1 - index;
+                              if (actualIndex < elements.length - 1) {
+                                const newElements = [...elements];
+                                const temp = newElements[actualIndex];
+                                newElements[actualIndex] = newElements[actualIndex + 1];
+                                newElements[actualIndex + 1] = temp;
+                                setElements(newElements);
+                              }
+                            }}
+                            className="p-0.5 text-gray-400 hover:text-gray-700"
+                          >
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const actualIndex = elements.length - 1 - index;
+                              if (actualIndex > 0) {
+                                const newElements = [...elements];
+                                const temp = newElements[actualIndex];
+                                newElements[actualIndex] = newElements[actualIndex - 1];
+                                newElements[actualIndex - 1] = temp;
+                                setElements(newElements);
+                              }
+                            }}
+                            className="p-0.5 text-gray-400 hover:text-gray-700"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {elements.length === 0 && (
+                  <div className="text-center py-8 text-gray-400 text-sm">
+                    Aucun calque
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'ai' && (
             <div className="space-y-6">
               <h3 className="font-bold text-gray-900">Assistant IA</h3>
@@ -2605,6 +2941,90 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                     />
                   </div>
                 </div>
+
+                {/* Image Filters */}
+                {selectedElement.type === 'image' && (
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Filtres Photo</h4>
+                    <div className="bg-gray-50 p-4 rounded-2xl space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-600">Luminosité</span>
+                          <span className="text-xs font-mono text-gray-400">{Math.round((selectedElement.filters?.brightness || 0) * 100)}%</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="-1" 
+                          max="1" 
+                          step="0.05" 
+                          value={selectedElement.filters?.brightness || 0}
+                          onChange={(e) => updateSelectedElement({ filters: { ...selectedElement.filters, brightness: parseFloat(e.target.value) } })}
+                          className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-600">Contraste</span>
+                          <span className="text-xs font-mono text-gray-400">{Math.round((selectedElement.filters?.contrast || 0) * 100)}%</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="-100" 
+                          max="100" 
+                          step="1" 
+                          value={selectedElement.filters?.contrast || 0}
+                          onChange={(e) => updateSelectedElement({ filters: { ...selectedElement.filters, contrast: parseFloat(e.target.value) } })}
+                          className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-600">Flou</span>
+                          <span className="text-xs font-mono text-gray-400">{selectedElement.filters?.blur || 0}px</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="40" 
+                          step="1" 
+                          value={selectedElement.filters?.blur || 0}
+                          onChange={(e) => updateSelectedElement({ filters: { ...selectedElement.filters, blur: parseFloat(e.target.value) } })}
+                          className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedElement.filters?.grayscale || false}
+                            onChange={(e) => updateSelectedElement({ filters: { ...selectedElement.filters, grayscale: e.target.checked } })}
+                            className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
+                          />
+                          <span className="text-xs font-bold text-gray-600">Noir & Blanc</span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedElement.filters?.sepia || false}
+                            onChange={(e) => updateSelectedElement({ filters: { ...selectedElement.filters, sepia: e.target.checked } })}
+                            className="w-4 h-4 text-primary rounded border-gray-300 focus:ring-primary"
+                          />
+                          <span className="text-xs font-bold text-gray-600">Sépia</span>
+                        </label>
+                      </div>
+
+                      <button 
+                        onClick={() => updateSelectedElement({ filters: {} })}
+                        className="w-full py-2 bg-white border border-gray-200 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 transition-colors mt-2"
+                      >
+                        Réinitialiser les filtres
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -2808,7 +3228,23 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             </div>
             <div className="flex items-center space-x-2 overflow-visible pb-2 -mb-2 w-full justify-start lg:justify-center">
               {/* Contextual Tools */}
-              {selectedElement ? (
+              {selectedIds.length > 1 ? (
+                <div className="flex items-center space-x-1 flex-shrink-0">
+                  <span className="text-xs font-bold text-gray-500 mr-2">{selectedIds.length} éléments sélectionnés</span>
+                  <div className="h-6 w-px bg-gray-200 mx-2" />
+                  {/* Group Alignment Tools */}
+                  <button onClick={() => alignSelected('left')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner à gauche"><AlignLeft className="w-4 h-4" /></button>
+                  <button onClick={() => alignSelected('center')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner au centre"><AlignCenter className="w-4 h-4" /></button>
+                  <button onClick={() => alignSelected('right')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner à droite"><AlignRight className="w-4 h-4" /></button>
+                  <div className="h-6 w-px bg-gray-200 mx-2" />
+                  <button onClick={() => alignSelected('top')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner en haut"><ArrowUpToLine className="w-4 h-4" /></button>
+                  <button onClick={() => alignSelected('middle')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner au milieu"><ArrowRightToLine className="w-4 h-4" /></button>
+                  <button onClick={() => alignSelected('bottom')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner en bas"><ArrowDownToLine className="w-4 h-4" /></button>
+                  <div className="h-6 w-px bg-gray-200 mx-2" />
+                  <button onClick={() => distributeSelected('horizontal')} className="p-2 hover:bg-gray-100 rounded-lg" title="Distribuer horizontalement"><GripHorizontal className="w-4 h-4" /></button>
+                  <button onClick={() => distributeSelected('vertical')} className="p-2 hover:bg-gray-100 rounded-lg" title="Distribuer verticalement"><GripVertical className="w-4 h-4" /></button>
+                </div>
+              ) : selectedElement ? (
                 <div className="flex items-center space-x-1 flex-shrink-0">
                   {/* General Color Picker */}
                   <div className="relative group">
@@ -3210,9 +3646,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                     </>
                   )}
                   <Rect name="background" width={600} height={350} fill={bgColor} />
-                  {elements.map((el) => {
+                  {elements.filter(el => !el.hidden).map((el) => {
                     const block = blocks?.find(b => b.id === el.id);
-                    const isLockedByOther = block?.lockedBy && block.lockedBy !== user?.uid;
+                    const isLockedByOther = el.locked || (block?.lockedBy && block.lockedBy !== user?.uid);
                     const lockColor = isLockedByOther ? (others.find(p => p.userId === block.lockedBy) ? '#ef4444' : '#9ca3af') : undefined;
 
                     if (el.type === 'text') {
@@ -3276,9 +3712,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                             draggable={!isLockedByOther}
                             onClick={() => setSelectedIds([el.id])}
                             onTap={() => setSelectedIds([el.id])}
+                            onDragMove={(e) => handleDragMove(e, el.id)}
                             onDragEnd={(e) => {
                               if (isLockedByOther) return;
-                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                              handleDragEnd(e, el.id, (attrs) => {
+                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
+                              });
                             }}
                           />
                           {isLockedByOther && (
@@ -3320,9 +3759,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                             draggable={!isLockedByOther}
                             onClick={() => setSelectedIds([el.id])}
                             onTap={() => setSelectedIds([el.id])}
+                            onDragMove={(e) => handleDragMove(e, el.id)}
                             onDragEnd={(e) => {
                               if (isLockedByOther) return;
-                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                              handleDragEnd(e, el.id, (attrs) => {
+                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
+                              });
                             }}
                           />
                           {isLockedByOther && (
@@ -3362,9 +3804,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                             draggable={!isLockedByOther}
                             onClick={() => setSelectedIds([el.id])}
                             onTap={() => setSelectedIds([el.id])}
+                            onDragMove={(e) => handleDragMove(e, el.id)}
                             onDragEnd={(e) => {
                               if (isLockedByOther) return;
-                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                              handleDragEnd(e, el.id, (attrs) => {
+                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
+                              });
                             }}
                           />
                           {isLockedByOther && (
@@ -3405,9 +3850,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                             draggable={!isLockedByOther}
                             onClick={() => setSelectedIds([el.id])}
                             onTap={() => setSelectedIds([el.id])}
+                            onDragMove={(e) => handleDragMove(e, el.id)}
                             onDragEnd={(e) => {
                               if (isLockedByOther) return;
-                              setElements(elements.map(item => item.id === el.id ? { ...item, x: e.target.x(), y: e.target.y() } : item));
+                              handleDragEnd(e, el.id, (attrs) => {
+                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
+                              });
                             }}
                           />
                           {isLockedByOther && (
@@ -3426,6 +3874,20 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                     }
                     return null;
                   })}
+
+                  {guides.map((guide, i) => (
+                    <Line
+                      key={`guide-${i}`}
+                      points={
+                        guide.type === 'vertical'
+                          ? [guide.position, 0, guide.position, 350]
+                          : [0, guide.position, 600, guide.position]
+                      }
+                      stroke="#3b82f6"
+                      strokeWidth={1}
+                      dash={[4, 4]}
+                    />
+                  ))}
 
                   {selectedIds.length > 0 && !elements.some(el => {
                     const block = blocks?.find(b => b.id === el.id);
