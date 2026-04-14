@@ -2388,7 +2388,6 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
               </div>
             </div>
           )}
-
           {activeTab === 'ai' && (
             <div className="space-y-6">
               <h3 className="font-bold text-gray-900">Assistant IA</h3>
