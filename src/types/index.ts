@@ -8,6 +8,7 @@ export interface Service {
   price: number;
   cost?: number; // Estimated cost to calculate margin
   category: ServiceCategory;
+  subCategory?: string;
   image: string;
   additionalImages?: string[];
   features: string[];
