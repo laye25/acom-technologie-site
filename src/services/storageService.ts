@@ -40,7 +40,14 @@ export const storageService = {
       const storageRef = ref(storage, `${bucket}/${path}`);
       
       const metadata = contentType ? { contentType } : undefined;
-      const snapshot = await uploadBytes(storageRef, fileBody, metadata);
+      
+      // Add a 5-second timeout to prevent infinite hanging if Storage is not configured
+      const uploadPromise = uploadBytes(storageRef, fileBody, metadata);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Upload timeout: Firebase Storage might not be configured')), 5000);
+      });
+      
+      const snapshot = await Promise.race([uploadPromise, timeoutPromise]);
       const downloadURL = await getDownloadURL(snapshot.ref);
       console.log('File uploaded, URL:', downloadURL);
 

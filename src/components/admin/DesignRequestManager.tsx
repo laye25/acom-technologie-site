@@ -84,7 +84,7 @@ const DesignRequestManager = () => {
                   src={request.previewUrl} 
                   alt="Preview" 
                   width={600}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
                 <div className="absolute top-4 right-4">
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${

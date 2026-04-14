@@ -771,7 +771,7 @@ const OrderDetails = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
               <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-3xl flex items-center justify-center shadow-lg shadow-black/5 flex-shrink-0">
                 {service?.image ? (
-                  <OptimizedImage src={service.image} alt="" width={200} className="w-full h-full object-cover rounded-3xl" />
+                  <OptimizedImage src={service.image} alt="" width={200} className="w-full h-full object-contain rounded-3xl" />
                 ) : (
                   <Package className="w-8 h-8 sm:w-10 sm:h-10 text-primary" />
                 )}

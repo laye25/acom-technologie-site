@@ -234,5 +234,14 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }
+
+    match /design_templates/{templateId} {
+      // Anyone can read public templates
+      allow read: if true;
+      // Authenticated users can create templates
+      allow create: if isAuthenticated();
+      // Only the creator or an admin can update/delete
+      allow update, delete: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+    }
   }
 }

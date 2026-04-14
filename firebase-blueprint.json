@@ -433,6 +433,26 @@
         "lastUpdated": { "type": "string", "format": "date-time" }
       },
       "required": ["tenantId"]
+    },
+    "DesignTemplate": {
+      "title": "DesignTemplate",
+      "description": "Reusable design template",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "subCategory": { "type": "string" },
+        "price": { "type": "number" },
+        "promotion": { "type": "boolean" },
+        "promotionPercentage": { "type": "number" },
+        "categoryId": { "type": "string" },
+        "pages": { "type": "array" },
+        "isPublic": { "type": "boolean" },
+        "user_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "category", "pages", "user_id"]
     }
   },
   "firestore": {
@@ -466,6 +486,7 @@
     "/designs/{designId}/presence/{presenceId}": { "schema": "Presence", "description": "Real-time presence within a design" },
     "/activities/{activityId}": { "schema": "Activity", "description": "Activities collection" },
     "/usage/{tenantId}": { "schema": "TenantUsage", "description": "Usage tracking for SaaS billing" },
-    "/assets/{assetId}": { "schema": "Asset", "description": "User assets collection" }
+    "/assets/{assetId}": { "schema": "Asset", "description": "User assets collection" },
+    "/design_templates/{templateId}": { "schema": "DesignTemplate", "description": "Reusable design templates" }
   }
 }

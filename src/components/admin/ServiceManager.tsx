@@ -95,27 +95,12 @@ const ServiceManager = () => {
     setUploadError(null);
 
     try {
-      // Use storageService to upload to Supabase Storage
-      const { storageService } = await import('../../services/storageService');
-      const publicUrl = await storageService.uploadFile(
-        'services',
-        `main/${crypto.randomUUID()}-${file.name}`,
-        file
-      );
-      
-      setCurrentService(prev => prev ? { ...prev, image: publicUrl } : null);
+      const compressedBase64 = await compressImage(file, 1200, 800, 0.7);
+      setCurrentService(prev => prev ? { ...prev, image: compressedBase64 } : null);
       setUploading(false);
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      
-      // Fallback to base64 if storage upload fails (e.g. bucket doesn't exist)
-      try {
-        const compressedBase64 = await compressImage(file, 1200, 800, 0.7);
-        setCurrentService(prev => prev ? { ...prev, image: compressedBase64 } : null);
-        setUploadError('Note: Image sauvegardée localement (Bucket "services" non trouvé)');
-      } catch (compressError) {
-        setUploadError(`Erreur lors du chargement : ${error.message}`);
-      }
+      setUploadError(`Erreur lors du chargement : ${error.message}`);
       setUploading(false);
     }
   };
@@ -128,7 +113,6 @@ const ServiceManager = () => {
     setUploadError(null);
 
     try {
-      const { storageService } = await import('../../services/storageService');
       const newImages: string[] = [];
       const fileArray = Array.from(files);
 
@@ -136,21 +120,10 @@ const ServiceManager = () => {
         if (file.size > 5 * 1024 * 1024) continue;
 
         try {
-          const publicUrl = await storageService.uploadFile(
-            'services',
-            `gallery/${crypto.randomUUID()}-${file.name}`,
-            file
-          );
-          newImages.push(publicUrl);
-        } catch (uploadError) {
-          // Fallback to base64 for gallery images too
-          const reader = new FileReader();
-          const promise = new Promise<string>((resolve) => {
-            reader.onloadend = () => resolve(reader.result as string);
-          });
-          reader.readAsDataURL(file);
-          const base64 = await promise;
-          newImages.push(base64);
+          const compressedBase64 = await compressImage(file, 1200, 800, 0.7);
+          newImages.push(compressedBase64);
+        } catch (compressError) {
+          console.error('Error compressing gallery image:', compressError);
         }
       }
 
@@ -581,7 +554,7 @@ const ServiceManager = () => {
                   <div className="space-y-3">
                     {currentService?.image && (
                       <div className="relative h-32 w-full rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                        <OptimizedImage src={currentService.image} alt="Preview" width={600} className="w-full h-full object-cover" />
+                        <OptimizedImage src={currentService.image} alt="Preview" width={600} className="w-full h-full object-contain" />
                         <button
                           type="button"
                           onClick={() => setCurrentService(prev => prev ? { ...prev, image: '' } : null)}
@@ -634,7 +607,7 @@ const ServiceManager = () => {
                       <div className="grid grid-cols-4 gap-2">
                         {currentService.additionalImages.map((imgUrl, idx) => (
                           <div key={idx} className="relative h-20 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 group">
-                            <OptimizedImage src={imgUrl} alt={`Gallery ${idx}`} width={200} className="w-full h-full object-cover" />
+                            <OptimizedImage src={imgUrl} alt={`Gallery ${idx}`} width={200} className="w-full h-full object-contain" />
                             <button
                               type="button"
                               onClick={() => removeAdditionalImage(idx)}

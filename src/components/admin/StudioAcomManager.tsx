@@ -12,6 +12,7 @@ import { dbService } from '../../services/dbService';
 import { Category as StudioCategory, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { firestoreService } from '../../services/firestoreService';
 import { storageService } from '../../services/storageService';
+import { compressImage, getImageUrl } from '../../lib/imageUtils';
 import { where } from 'firebase/firestore';
 import { ImageService } from '../../data/services/image.service';
 import { OptimizedImage } from '../OptimizedImage';
@@ -188,6 +189,15 @@ const StudioAcomManager = () => {
 
   const [isUploading, setIsUploading] = useState(false);
 
+  const updateVariant = (index: number, updates: any) => {
+    setEditingItem(prev => {
+      if (!prev) return null;
+      const newVariants = [...(prev.variants || [])];
+      newVariants[index] = { ...newVariants[index], ...updates };
+      return { ...prev, variants: newVariants };
+    });
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, subPath: string = 'general') => {
     const file = e.target.files?.[0];
     if (!file || isUploading) return;
@@ -200,7 +210,7 @@ const StudioAcomManager = () => {
 
       const publicUrl = await ImageService.compressAndUpload(file, path);
       
-      setEditingItem({ ...editingItem, [field]: publicUrl });
+      setEditingItem(prev => prev ? { ...prev, [field]: publicUrl } : null);
     } catch (error) {
       console.error('Error uploading image:', error);
       toast.error('Échec du téléchargement de l\'image.');
@@ -297,10 +307,10 @@ const StudioAcomManager = () => {
               layout
               className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all group"
             >
-              <div className="aspect-video bg-gray-50 rounded-xl mb-4 overflow-hidden relative group/image">
-                {item.coverImage ? (
+              <div className="aspect-video bg-white rounded-xl mb-4 overflow-hidden relative group/image">
+                {getImageUrl(item) ? (
                   <OptimizedImage 
-                    src={item.coverImage} 
+                    src={getImageUrl(item)} 
                     alt={item.name} 
                     width={400}
                     placeholder="blur"
@@ -471,7 +481,7 @@ const StudioAcomManager = () => {
                           type="text"
                           required
                           value={editingItem?.name || ''}
-                          onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                          onChange={(e) => setEditingItem(prev => prev ? { ...prev, name: e.target.value } : null)}
                           className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold transition-all"
                           placeholder="Ex: Papeterie"
                         />
@@ -481,7 +491,7 @@ const StudioAcomManager = () => {
                         <input
                           type="text"
                           value={editingItem?.sub || ''}
-                          onChange={(e) => setEditingItem({ ...editingItem, sub: e.target.value })}
+                          onChange={(e) => setEditingItem(prev => prev ? { ...prev, sub: e.target.value } : null)}
                           className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold transition-all"
                           placeholder="Ex: Cartes, enveloppes..."
                         />
@@ -491,7 +501,7 @@ const StudioAcomManager = () => {
                           <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 ml-1">Icône</label>
                           <select
                             value={editingItem?.iconName || (typeof editingItem?.icon === 'string' ? editingItem.icon : 'LayoutGrid')}
-                            onChange={(e) => setEditingItem({ ...editingItem, iconName: e.target.value, icon: e.target.value })}
+                            onChange={(e) => setEditingItem(prev => prev ? { ...prev, iconName: e.target.value, icon: e.target.value } : null)}
                             className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold transition-all appearance-none"
                           >
                             <option value="Sparkles">Étincelles</option>
@@ -508,7 +518,7 @@ const StudioAcomManager = () => {
                           <input
                             type="text"
                             value={editingItem?.color || 'text-gray-600'}
-                            onChange={(e) => setEditingItem({ ...editingItem, color: e.target.value })}
+                            onChange={(e) => setEditingItem(prev => prev ? { ...prev, color: e.target.value } : null)}
                             placeholder="ex: text-blue-600"
                             className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold transition-all"
                           />
@@ -519,10 +529,10 @@ const StudioAcomManager = () => {
                     <div className="space-y-4">
                       <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 ml-1">Image de couverture</label>
                       <div className="relative group aspect-video bg-gray-50 rounded-3xl overflow-hidden border-2 border-dashed border-gray-200 hover:border-purple-300 transition-all">
-                        {editingItem?.coverImage ? (
+                        {getImageUrl(editingItem) ? (
                           <>
                             <OptimizedImage 
-                              src={editingItem.coverImage} 
+                              src={getImageUrl(editingItem)} 
                               alt="Preview" 
                               width={800}
                               className="w-full h-full object-cover"
@@ -530,7 +540,7 @@ const StudioAcomManager = () => {
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <button 
                                 type="button"
-                                onClick={() => setEditingItem({ ...editingItem, coverImage: '' })}
+                                onClick={() => setEditingItem(prev => prev ? { ...prev, coverImage: '', cover_image: '', image: '' } : null)}
                                 className="p-3 bg-red-500 text-white rounded-2xl hover:bg-red-600 transition-colors shadow-lg"
                               >
                                 <Trash2 className="w-6 h-6" />
@@ -553,8 +563,8 @@ const StudioAcomManager = () => {
                       <input
                         type="text"
                         placeholder="Ou collez une URL d'image ici..."
-                        value={editingItem?.coverImage || ''}
-                        onChange={(e) => setEditingItem({ ...editingItem, coverImage: e.target.value })}
+                        value={getImageUrl(editingItem)}
+                        onChange={(e) => setEditingItem(prev => prev ? { ...prev, coverImage: e.target.value } : null)}
                         className="w-full px-4 py-2 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none font-bold text-xs transition-all"
                       />
                     </div>
@@ -570,7 +580,7 @@ const StudioAcomManager = () => {
                             type="text"
                             required
                             value={editingItem?.name || ''}
-                            onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
+                            onChange={(e) => setEditingItem(prev => prev ? { ...prev, name: e.target.value } : null)}
                             className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold transition-all"
                             placeholder="Ex: Carte de Visite Luxe"
                           />
@@ -580,7 +590,7 @@ const StudioAcomManager = () => {
                           <select
                             required
                             value={editingItem?.categoryId || ''}
-                            onChange={(e) => setEditingItem({ ...editingItem, categoryId: e.target.value })}
+                            onChange={(e) => setEditingItem(prev => prev ? { ...prev, categoryId: e.target.value } : null)}
                             className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold transition-all appearance-none"
                           >
                             <option value="" disabled>Sélectionnez une catégorie</option>
@@ -593,7 +603,7 @@ const StudioAcomManager = () => {
                           <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 ml-1">Description détaillée</label>
                           <textarea
                             value={editingItem?.description || ''}
-                            onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
+                            onChange={(e) => setEditingItem(prev => prev ? { ...prev, description: e.target.value } : null)}
                             rows={4}
                             className="w-full px-5 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm resize-none transition-all"
                             placeholder="Décrivez les caractéristiques de ce produit..."
@@ -604,10 +614,10 @@ const StudioAcomManager = () => {
                       <div className="space-y-4">
                         <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2 ml-1">Image principale du produit</label>
                         <div className="relative group aspect-video bg-gray-50 rounded-3xl overflow-hidden border-2 border-dashed border-gray-200 hover:border-purple-300 transition-all">
-                          {editingItem?.coverImage ? (
+                          {getImageUrl(editingItem) ? (
                             <>
                               <OptimizedImage 
-                                src={editingItem.coverImage} 
+                                src={getImageUrl(editingItem)} 
                                 alt="Preview" 
                                 width={800}
                                 placeholder="blur"
@@ -616,7 +626,7 @@ const StudioAcomManager = () => {
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                 <button 
                                   type="button"
-                                  onClick={() => setEditingItem({ ...editingItem, coverImage: '' })}
+                                  onClick={() => setEditingItem(prev => prev ? { ...prev, coverImage: '', cover_image: '', image: '' } : null)}
                                   className="p-3 bg-red-500 text-white rounded-2xl hover:bg-red-600 transition-colors shadow-lg"
                                 >
                                   <Trash2 className="w-6 h-6" />
@@ -639,8 +649,8 @@ const StudioAcomManager = () => {
                         <input
                           type="text"
                           placeholder="Ou URL de l'image..."
-                          value={editingItem?.coverImage || ''}
-                          onChange={(e) => setEditingItem({ ...editingItem, coverImage: e.target.value })}
+                          value={getImageUrl(editingItem)}
+                          onChange={(e) => setEditingItem(prev => prev ? { ...prev, coverImage: e.target.value } : null)}
                           className="w-full px-4 py-2 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none font-bold text-xs transition-all"
                         />
                       </div>
@@ -696,7 +706,7 @@ const StudioAcomManager = () => {
                           >
                             <div 
                               className={`p-5 flex items-center justify-between cursor-pointer transition-colors ${index === editingItem.expandedVariant ? 'bg-purple-50/30' : 'bg-white'}`}
-                              onClick={() => setEditingItem({ ...editingItem, expandedVariant: index === editingItem.expandedVariant ? null : index })}
+                              onClick={() => setEditingItem(prev => prev ? { ...prev, expandedVariant: index === prev.expandedVariant ? null : index } : null)}
                             >
                               <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
@@ -725,7 +735,12 @@ const StudioAcomManager = () => {
                                     e.stopPropagation(); 
                                     const newVariants = [...(editingItem.variants || [])]; 
                                     newVariants.splice(index, 1); 
-                                    setEditingItem({ ...editingItem, variants: newVariants }); 
+                                    setEditingItem(prev => {
+                                      if (!prev) return null;
+                                      const newVariants = [...(prev.variants || [])];
+                                      newVariants.splice(index, 1);
+                                      return { ...prev, variants: newVariants };
+                                    }); 
                                   }} 
                                   className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
                                 >
@@ -742,30 +757,30 @@ const StudioAcomManager = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                   <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Nom du modèle</label>
-                                    <input type="text" value={v.name} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].name = e.target.value; setEditingItem({ ...editingItem, variants: newVariants }); }} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
+                                    <input type="text" value={v.name} onChange={(e) => updateVariant(index, { name: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
                                   </div>
                                   <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Dimensions</label>
-                                    <input type="text" value={v.size} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].size = e.target.value; setEditingItem({ ...editingItem, variants: newVariants }); }} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
+                                    <input type="text" value={v.size} onChange={(e) => updateVariant(index, { size: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
                                   </div>
                                   <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Prix (€)</label>
-                                    <input type="number" value={v.price} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].price = parseFloat(e.target.value); setEditingItem({ ...editingItem, variants: newVariants }); }} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
+                                    <input type="number" value={v.price} onChange={(e) => updateVariant(index, { price: parseFloat(e.target.value) })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
                                   </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                   <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Finition</label>
-                                    <input type="text" value={v.finish} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].finish = e.target.value; setEditingItem({ ...editingItem, variants: newVariants }); }} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" placeholder="Ex: Mat, Brillant..." />
+                                    <input type="text" value={v.finish} onChange={(e) => updateVariant(index, { finish: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" placeholder="Ex: Mat, Brillant..." />
                                   </div>
                                   <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Qté Min</label>
-                                    <input type="number" value={v.minQuantity} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].minQuantity = parseInt(e.target.value); setEditingItem({ ...editingItem, variants: newVariants }); }} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
+                                    <input type="number" value={v.minQuantity} onChange={(e) => updateVariant(index, { minQuantity: parseInt(e.target.value) })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
                                   </div>
                                   <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Qté Max</label>
-                                    <input type="number" value={v.maxQuantity} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].maxQuantity = parseInt(e.target.value); setEditingItem({ ...editingItem, variants: newVariants }); }} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
+                                    <input type="number" value={v.maxQuantity} onChange={(e) => updateVariant(index, { maxQuantity: parseInt(e.target.value) })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
                                   </div>
                                 </div>
 
@@ -784,11 +799,7 @@ const StudioAcomManager = () => {
                                             />
                                             <button 
                                               type="button"
-                                              onClick={() => {
-                                                const newVariants = [...editingItem.variants];
-                                                newVariants[index].previewImage = '';
-                                                setEditingItem({ ...editingItem, variants: newVariants });
-                                              }}
+                                              onClick={() => updateVariant(index, { previewImage: '', preview_image: '' })}
                                               className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
                                             >
                                               <Trash2 className="w-5 h-5" />
@@ -807,28 +818,24 @@ const StudioAcomManager = () => {
                                                 const bucket = 'studio-acom';
                                                 const path = `variants/${fileName}`;
                                                 const publicUrl = await storageService.uploadFile(bucket, path, file);
-                                                
-                                                const newVariants = [...editingItem.variants];
-                                                newVariants[index].previewImage = publicUrl;
-                                                setEditingItem({ ...editingItem, variants: newVariants });
+                                                updateVariant(index, { previewImage: publicUrl });
                                                 toast.success('Image téléchargée !', { id: loadingToast });
                                               } catch (error) {
                                                 console.error('Error uploading variant image:', error);
-                                                const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                  const newVariants = [...editingItem.variants];
-                                                  newVariants[index].previewImage = reader.result as string;
-                                                  setEditingItem({ ...editingItem, variants: newVariants });
-                                                  toast.error('Enregistré localement (base64)', { id: loadingToast });
-                                                };
-                                                reader.readAsDataURL(file);
+                                                try {
+                                                  const compressedBase64 = await compressImage(file, 800, 800, 0.7);
+                                                  updateVariant(index, { previewImage: compressedBase64 });
+                                                  toast.success('Enregistré localement (base64)', { id: loadingToast });
+                                                } catch (compressError) {
+                                                  toast.error('Erreur lors du traitement de l\'image', { id: loadingToast });
+                                                }
                                               }
                                             }} />
                                           </label>
                                         )}
                                       </div>
                                       <div className="flex-1 space-y-2">
-                                        <input type="text" value={v.previewImage || ''} onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].previewImage = e.target.value; setEditingItem({ ...editingItem, variants: newVariants }); }} placeholder="URL de l'image" className="w-full px-4 py-2 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none font-bold text-xs transition-all" />
+                                        <input type="text" value={v.previewImage || ''} onChange={(e) => updateVariant(index, { previewImage: e.target.value })} placeholder="URL de l'image" className="w-full px-4 py-2 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none font-bold text-xs transition-all" />
                                         <p className="text-[10px] text-gray-400 font-bold italic">Image miniature pour ce modèle spécifique.</p>
                                       </div>
                                     </div>
@@ -851,7 +858,7 @@ const StudioAcomManager = () => {
                                                 const content = event.target?.result as string;
                                                 const newVariants = [...editingItem.variants];
                                                 newVariants[index].templateSvg = content;
-                                                setEditingItem({ ...editingItem, variants: newVariants });
+                                                updateVariant(index, { templateSvg: content });
                                               };
                                               reader.readAsText(file);
                                             }
@@ -861,7 +868,7 @@ const StudioAcomManager = () => {
                                     </div>
                                     <textarea 
                                       value={v.templateSvg} 
-                                      onChange={(e) => { const newVariants = [...editingItem.variants]; newVariants[index].templateSvg = e.target.value; setEditingItem({ ...editingItem, variants: newVariants }); }} 
+                                      onChange={(e) => updateVariant(index, { templateSvg: e.target.value })} 
                                       placeholder="<svg>...</svg>" 
                                       className="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-2xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-mono text-[10px] transition-all resize-none" 
                                       rows={5} 

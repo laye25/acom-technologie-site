@@ -165,7 +165,7 @@ export const dbService = {
         const data = {
           name: category.name,
           sub: category.sub || '',
-          icon: category.icon || 'LayoutGrid',
+          icon: typeof category.icon === 'string' ? category.icon : (category.iconName || 'LayoutGrid'),
           color: category.color || 'text-primary',
           cover_image: category.coverImage || category.cover_image || '',
         };

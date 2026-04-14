@@ -1,5 +1,5 @@
 import { storageService } from '../../services/storageService';
-import { compressBase64Image } from '../../lib/imageUtils';
+import { compressImage } from '../../lib/imageUtils';
 import { toast } from 'react-hot-toast';
 
 /**
@@ -9,13 +9,8 @@ export const ImageService = {
   /**
    * Upload avec retry automatique
    */
-  async uploadWithRetry(file: File | string, path: string, retries = 3): Promise<string> {
+  async uploadWithRetry(file: File | string, path: string, retries = 0): Promise<string> {
     try {
-      // Si c'est un fichier, on l'upload directement
-      if (file instanceof File) {
-        return await storageService.uploadFile('studio-acom', path, file);
-      }
-      // Si c'est du base64 (fallback), on l'upload
       return await storageService.uploadFile('studio-acom', path, file);
     } catch (e) {
       if (retries <= 0) throw e;
@@ -30,23 +25,22 @@ export const ImageService = {
   async compressAndUpload(file: File, path: string): Promise<string> {
     const loadingToast = toast.loading('Optimisation et upload...');
     try {
-      // 1. Convertir en base64 pour compresser
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      });
+      // 1. Compresser l'image (utilise le timeout interne de 10s)
+      const compressed = await compressImage(file, 1200, 1200, 0.7);
 
-      // 2. Compresser
-      const compressed = await compressBase64Image(base64, 1200, 1200, 0.7);
-
-      // 3. Upload avec retry
-      const url = await this.uploadWithRetry(compressed, path);
-      
-      toast.success('Image optimisée et enregistrée !', { id: loadingToast });
-      return url;
-    } catch (error) {
-      toast.error('Échec de l\'optimisation de l\'image.', { id: loadingToast });
+      // 2. Upload (utilise le timeout interne de 5s)
+      try {
+        const url = await this.uploadWithRetry(compressed, path);
+        toast.success('Image optimisée et enregistrée !', { id: loadingToast });
+        return url;
+      } catch (uploadError) {
+        console.warn('Storage upload failed, using base64 fallback:', uploadError);
+        toast.success('Image optimisée (stockage local) !', { id: loadingToast });
+        return compressed;
+      }
+    } catch (error: any) {
+      console.error('ImageService error:', error);
+      toast.error(`Échec : ${error.message || 'Erreur inconnue'}`, { id: loadingToast });
       throw error;
     }
   }

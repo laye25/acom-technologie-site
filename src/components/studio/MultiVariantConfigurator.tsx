@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Product, Variant } from '../../constants/studioAcom';
 import { ChevronRight, Box, ShoppingCart, Hash, Info, PenTool } from 'lucide-react';
 import { OptimizedImage } from '../OptimizedImage';
+import { getImageUrl } from '../../lib/imageUtils';
 
 interface MultiVariantConfiguratorProps {
   product: Product;
@@ -118,9 +119,9 @@ const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ pro
             {/* Preview */}
             <div className="space-y-6 lg:space-y-8">
               <div className="aspect-[4/3] bg-gray-50 rounded-2xl lg:rounded-[3rem] overflow-hidden border border-gray-100 relative shadow-inner">
-                {activeVariant.previewImage ? (
+                {getImageUrl(activeVariant) ? (
                   <OptimizedImage 
-                    src={activeVariant.previewImage} 
+                    src={getImageUrl(activeVariant)} 
                     alt={activeVariant.name} 
                     width={800}
                     className="w-full h-full object-cover" 

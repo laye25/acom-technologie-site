@@ -1216,6 +1216,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [contactInfo, setContactInfo] = useState({ name: '', email: '', phone: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAiWriting, setIsAiWriting] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateCategory, setTemplateCategory] = useState('Fondations de Marque');
   const [templateSubCategory, setTemplateSubCategory] = useState('Logo Principal');
@@ -1775,6 +1776,43 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     }
   };
 
+  const handleAiRewrite = async (action: 'improve' | 'professional' | 'translate') => {
+    if (selectedIds.length !== 1) return;
+    const selectedElement = elements.find(el => el.id === selectedIds[0]);
+    if (!selectedElement || selectedElement.type !== 'text' || !selectedElement.text) return;
+
+    setIsAiWriting(true);
+    try {
+      let prompt = '';
+      if (action === 'improve') {
+        prompt = `Améliore ce texte pour le rendre plus percutant et engageant, tout en gardant le même sens. Ne renvoie que le texte amélioré, sans guillemets ni commentaires : "${selectedElement.text}"`;
+      } else if (action === 'professional') {
+        prompt = `Réécris ce texte de manière très professionnelle et formelle. Ne renvoie que le texte réécrit, sans guillemets ni commentaires : "${selectedElement.text}"`;
+      } else if (action === 'translate') {
+        prompt = `Traduis ce texte en anglais (ou en français s'il est déjà en anglais). Ne renvoie que la traduction, sans guillemets ni commentaires : "${selectedElement.text}"`;
+      }
+
+      // Use the geminiService directly for text generation
+      const result = await geminiService.generateText(prompt);
+      
+      if (result) {
+        setElements(elements.map(el => 
+          el.id === selectedElement.id ? { ...el, text: result.trim() } : el
+        ));
+        
+        if (user) {
+          trackUsage(user.uid, 'ai_generations');
+        }
+        toast.success('Texte réécrit avec succès !');
+      }
+    } catch (error) {
+      console.error("Error rewriting text:", error);
+      toast.error("Erreur lors de la réécriture du texte.");
+    } finally {
+      setIsAiWriting(false);
+    }
+  };
+
   const handleRemoveSelected = () => {
     if (selectedIds.length > 0) {
       setElements(elements.filter(el => !selectedIds.includes(el.id)));
@@ -1889,6 +1927,17 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             <Download className="w-4 h-4 md:mr-2" />
             <span className="hidden md:inline">Exporter</span>
           </button>
+
+          {(isAdmin || isManager || user) && (
+            <button 
+              onClick={() => setIsSaveModalOpen(true)}
+              className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-xs md:text-sm"
+              title="Sauvegarder comme Modèle"
+            >
+              <Save className="w-4 h-4 md:mr-2" />
+              <span className="hidden md:inline">Créer un Modèle</span>
+            </button>
+          )}
 
           <button 
             onClick={() => {
@@ -2757,7 +2806,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                 <Redo className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex items-center space-x-2 overflow-x-auto custom-scrollbar pb-2 -mb-2 w-full justify-start lg:justify-center">
+            <div className="flex items-center space-x-2 overflow-visible pb-2 -mb-2 w-full justify-start lg:justify-center">
               {/* Contextual Tools */}
               {selectedElement ? (
                 <div className="flex items-center space-x-1 flex-shrink-0">
@@ -2900,6 +2949,45 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       >
                         <ArrowUpDown className="w-5 h-5" />
                       </button>
+
+                      <div className="h-6 w-px bg-gray-200" />
+
+                      {/* AI Copywriter */}
+                      <div className="relative group">
+                        <button 
+                          className="p-2 rounded-lg transition-all text-purple-600 hover:bg-purple-50 flex items-center space-x-1"
+                          title="Assistant IA"
+                          disabled={isAiWriting}
+                        >
+                          {isAiWriting ? (
+                            <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Sparkles className="w-5 h-5" />
+                          )}
+                        </button>
+                        
+                        {/* AI Menu */}
+                        <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
+                          <button 
+                            onClick={() => handleAiRewrite('improve')}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                          >
+                            Améliorer le texte
+                          </button>
+                          <button 
+                            onClick={() => handleAiRewrite('professional')}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                          >
+                            Rendre professionnel
+                          </button>
+                          <button 
+                            onClick={() => handleAiRewrite('translate')}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                          >
+                            Traduire (FR/EN)
+                          </button>
+                        </div>
+                      </div>
 
                       {/* List */}
                       <button 

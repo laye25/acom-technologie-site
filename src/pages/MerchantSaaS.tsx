@@ -1590,7 +1590,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
                       <div className="flex items-center space-x-5">
                         <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-110 transition-transform shadow-inner">
                           {product.image ? (
-                            <OptimizedImage src={product.image} alt={product.name} width={150} className="w-full h-full object-cover" />
+                            <OptimizedImage src={product.image} alt={product.name} width={150} className="w-full h-full object-contain" />
                           ) : (
                             <Package className="w-7 h-7 text-gray-200" />
                           )}

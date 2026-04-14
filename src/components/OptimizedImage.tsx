@@ -25,10 +25,9 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   fallbackClassName = '',
   priority = false,
   placeholder = 'empty',
-  fallback = '/images/placeholder.jpg',
+  fallback = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop',
   ...props 
 }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
 
   // Utilisation du fallback si src est vide
@@ -37,26 +36,23 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 
   // Reset state when src changes
   useEffect(() => {
-    setIsLoaded(false);
     setError(false);
-  }, [finalSrc]); // Use finalSrc instead of src for stability
+  }, [optimizedSrc]);
 
   return (
-    <div className={`relative overflow-hidden bg-gray-100 ${containerClassName} ${className.includes('h-') ? '' : 'h-full'} ${className.includes('w-') ? '' : 'w-full'}`}>
-      {!isLoaded && !error && (
-        <div className={`absolute inset-0 flex items-center justify-center bg-gray-200 z-10 ${placeholder === 'blur' ? 'animate-pulse' : ''}`} />
-      )}
-
+    <div className={`relative overflow-hidden w-full h-full ${containerClassName}`}>
       {error ? (
-        <img src={fallback} alt={alt} className={`w-full h-full object-cover ${className}`} />
+        <div className={`absolute inset-0 flex items-center justify-center bg-gray-200 text-gray-400`}>
+          <ImageIcon className="w-8 h-8 opacity-50" />
+        </div>
       ) : (
         <img
           src={optimizedSrc}
           alt={alt}
-          onLoad={() => setIsLoaded(true)}
           onError={() => setError(true)}
-          className={`w-full h-full object-cover ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 ${className}`}
+          className={`absolute inset-0 w-full h-full ${className.includes('object-') ? '' : 'object-cover'} ${className}`}
           loading={priority ? "eager" : "lazy"}
+          referrerPolicy="no-referrer"
           {...props}
         />
       )}

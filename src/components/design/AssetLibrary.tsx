@@ -77,7 +77,7 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ onInsert }) => {
             <img 
               src={asset.url} 
               alt={asset.name} 
-              className="w-full h-full object-cover cursor-pointer hover:opacity-80"
+              className="w-full h-full object-contain cursor-pointer hover:opacity-80"
               onClick={() => onInsert(asset.url)}
               referrerPolicy="no-referrer"
             />

@@ -14,6 +14,19 @@ export interface LayoutSuggestion {
 }
 
 export const geminiService = {
+  generateText: async (prompt: string): Promise<string> => {
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+      });
+      return response.text || "";
+    } catch (e) {
+      console.error("Failed to generate text with Gemini", e);
+      return "";
+    }
+  },
+
   improveLayout: async (elements: any[], canvasWidth: number, canvasHeight: number): Promise<LayoutSuggestion[]> => {
     const prompt = `
       Tu es un expert en design graphique. Analyse les éléments suivants d'un design de carte de visite (${canvasWidth}x${canvasHeight}px) et suggère des positions et styles améliorés pour créer une mise en page professionnelle, équilibrée et esthétique.

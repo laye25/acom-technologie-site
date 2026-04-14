@@ -5,11 +5,17 @@
 export const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, quality = 0.8): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    const timeout = setTimeout(() => reject(new Error('Image reading timeout')), 10000);
+    
     reader.readAsDataURL(file);
     reader.onload = (event) => {
+      clearTimeout(timeout);
       const img = new Image();
+      const imgTimeout = setTimeout(() => reject(new Error('Image loading timeout')), 10000);
+      
       img.src = event.target?.result as string;
       img.onload = () => {
+        clearTimeout(imgTimeout);
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
@@ -43,9 +49,15 @@ export const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, qua
         const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
         resolve(compressedBase64);
       };
-      img.onerror = (err) => reject(err);
+      img.onerror = (err) => {
+        clearTimeout(imgTimeout);
+        reject(err);
+      };
     };
-    reader.onerror = (err) => reject(err);
+    reader.onerror = (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    };
   });
 };
 
@@ -55,8 +67,15 @@ export const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, qua
 export const compressBase64Image = (base64: string, maxWidth = 1200, maxHeight = 1200, quality = 0.7): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const timeout = setTimeout(() => reject(new Error('Image compression timeout')), 10000);
+    
+    img.onerror = (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    };
     img.src = base64;
     img.onload = () => {
+      clearTimeout(timeout);
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
@@ -129,5 +148,6 @@ export const getOptimizedUrl = (url: string, width: number = 800, quality: numbe
  */
 export const getImageUrl = (item: any): string => {
   if (!item) return '';
-  return item.coverImage || item.cover_image || item.image || item.previewImage || item.preview || '';
+  const url = item.coverImage || item.cover_image || item.image || item.previewImage || item.preview || '';
+  return typeof url === 'string' && url.trim() !== '' ? url.trim() : '';
 };

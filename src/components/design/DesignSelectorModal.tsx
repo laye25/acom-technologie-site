@@ -12,6 +12,7 @@ import { collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
 import { OptimizedImage } from '../OptimizedImage';
+import { getImageUrl } from '../../lib/imageUtils';
 import MultiVariantConfigurator from '../studio/MultiVariantConfigurator';
 import { useStudioAcom } from '../../hooks/useStudioAcom';
 
@@ -110,6 +111,7 @@ interface NavCategory {
 
 export const CATEGORIES: NavCategory[] = [
   { id: 'saved', name: 'Projets', sub: 'Vos créations enregistrées', icon: FolderOpen, color: 'text-purple-600' },
+  { id: 'community', name: 'Marketplace', sub: 'Modèles de la communauté', icon: Sparkles, color: 'text-indigo-600' },
   { id: 'all', name: 'Tous les modèles', sub: 'Explorez toutes nos créations', icon: Sparkles, color: 'text-gray-600' },
   { id: 'favorites', name: 'Mes Favoris', sub: 'Vos modèles préférés', icon: Star, color: 'text-amber-500' },
   { id: 'categories', name: 'Toutes les catégories', sub: 'Parcourez par thématique', icon: LayoutGrid, color: 'text-blue-600' },
@@ -242,16 +244,12 @@ const CategoryBanner = ({ category, onClick }: { category: NavCategory, onClick:
       onClick={onClick}
       className="relative h-48 rounded-3xl overflow-hidden cursor-pointer group shadow-lg"
     >
-      {category.coverImage ? (
-        <OptimizedImage 
-          src={category.coverImage} 
-          alt={category.name}
-          width={800}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5" />
-      )}
+      <OptimizedImage 
+        src={getImageUrl(category)} 
+        alt={category.name}
+        width={800}
+        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+      />
       
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
       
@@ -318,26 +316,20 @@ const TemplateCard = ({
 }) => {
   const size = item.size || '';
   const aspectClass = getAspectRatioClass(size);
-  const image = item.coverImage || item.previewImage || item.preview;
+  const image = getImageUrl(item);
   
   return (
     <motion.div
       whileHover={{ y: -4 }}
       className="group text-left w-full relative"
     >
-      <div className={`w-full ${aspectClass} bg-[#f3f4f6] rounded-2xl overflow-hidden mb-4 relative flex items-center justify-center transition-all group-hover:shadow-2xl group-hover:shadow-primary/10 border border-gray-100`}>
-        {image ? (
-          <OptimizedImage 
-            src={image} 
-            alt={item.name} 
-            width={600}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300">
-            <LayoutGrid className="w-12 h-12" />
-          </div>
-        )}
+      <div className={`w-full ${aspectClass} bg-white rounded-2xl overflow-hidden mb-4 relative flex items-center justify-center transition-all group-hover:shadow-2xl group-hover:shadow-primary/10 border border-gray-100`}>
+        <OptimizedImage 
+          src={image} 
+          alt={item.name} 
+          width={600}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
         
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 p-4 space-y-3">
@@ -494,6 +486,15 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     skip: !isOpen || !user?.uid || activeCategory !== 'saved'
   });
 
+  const { data: communityTemplates, loading: loadingCommunity } = useFirestoreData<any>({
+    tableName: 'design_templates',
+    where: [['isPublic', '==', true]],
+    order: { column: 'createdAt', direction: 'desc' },
+    limit: 50,
+    realtime: false,
+    skip: !isOpen || activeCategory !== 'community'
+  });
+
   const selectedProduct = useMemo(() => 
     allProducts.find(p => p.id === selectedProductId) || null
   , [allProducts, selectedProductId]);
@@ -508,7 +509,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const filteredProducts = allProducts.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     
-    if (activeCategory === 'all' || activeCategory === 'categories') {
+    if (activeCategory === 'all' || activeCategory === 'categories' || activeCategory === 'community') {
       return matchesSearch;
     }
     
@@ -518,6 +519,9 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   const displayedItems = useMemo(() => {
     if (activeCategory === 'saved') {
       return userDesigns || [];
+    }
+    if (activeCategory === 'community') {
+      return communityTemplates || [];
     }
     if (displayMode === 'products') {
       return filteredProducts;
@@ -551,8 +555,8 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
       setSelectedProductId(product.id);
       setSelectedVariantId(variant.id);
       setViewStep('configurator');
-    } else if (activeCategory === 'saved') {
-      // For saved designs, go directly to editor
+    } else if (activeCategory === 'saved' || activeCategory === 'community') {
+      // For saved designs or community templates, go directly to editor
       navigate('/design-editor', { 
         state: { 
           design: variant,
@@ -883,9 +887,9 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
                   <div className="flex-1 bg-gray-50 p-6 md:p-12 flex items-center justify-center overflow-hidden min-h-[300px] md:min-h-0">
                     <div className={`w-full h-full max-w-2xl max-h-full flex items-center justify-center`}>
                       <div className={`w-full shadow-2xl rounded-2xl md:rounded-3xl overflow-hidden bg-white ${getAspectRatioClass(previewTemplate.size)}`}>
-                        {previewTemplate.coverImage ? (
+                        {getImageUrl(previewTemplate) ? (
                           <OptimizedImage 
-                            src={previewTemplate.coverImage} 
+                            src={getImageUrl(previewTemplate)} 
                             alt={previewTemplate.name} 
                             width={800}
                             className="w-full h-full object-cover"

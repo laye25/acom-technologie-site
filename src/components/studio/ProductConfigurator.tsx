@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Product, Variant } from '../../constants/studioAcom';
 import { OptimizedImage } from '../OptimizedImage';
+import { getImageUrl } from '../../lib/imageUtils';
 
 interface ProductConfiguratorProps {
   product: Product;
@@ -79,9 +80,9 @@ const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
           {/* Left: Preview */}
           <div className="space-y-8">
             <div className="aspect-[4/3] bg-gray-50 rounded-[3rem] overflow-hidden border border-gray-100 relative group shadow-inner">
-              {variant.previewImage ? (
+              {getImageUrl(variant) ? (
                 <OptimizedImage 
-                  src={variant.previewImage} 
+                  src={getImageUrl(variant)} 
                   alt={variant.name} 
                   width={800}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"

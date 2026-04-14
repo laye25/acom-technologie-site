@@ -199,7 +199,7 @@ const PortfolioManager = () => {
                   src={item.image} 
                   alt={item.title} 
                   width={400}
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-contain" 
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -337,7 +337,7 @@ const PortfolioManager = () => {
                   <div className="space-y-3">
                     {currentItem?.image && (
                       <div className="relative h-48 w-full rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-                        <OptimizedImage src={currentItem.image} alt="Preview" width={600} className="w-full h-full object-cover" />
+                        <OptimizedImage src={currentItem.image} alt="Preview" width={600} className="w-full h-full object-contain" />
                         <button
                           type="button"
                           onClick={() => setCurrentItem(prev => prev ? { ...prev, image: '' } : null)}
