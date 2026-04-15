@@ -1,6 +1,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiClient: GoogleGenAI | null = null;
+
+function getAiClient() {
+  if (!aiClient) {
+    const apiKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is not defined. AI features will be disabled.");
+      return null;
+    }
+    aiClient = new GoogleGenAI({ apiKey });
+  }
+  return aiClient;
+}
 
 export interface LayoutSuggestion {
   id: string;
@@ -16,6 +28,9 @@ export interface LayoutSuggestion {
 export const geminiService = {
   generateText: async (prompt: string): Promise<string> => {
     try {
+      const ai = getAiClient();
+      if (!ai) return "L'assistant IA n'est pas configuré (Clé API manquante).";
+      
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -51,6 +66,9 @@ export const geminiService = {
       4. Respecte les dimensions du canevas.
       5. Retourne uniquement un tableau JSON d'objets avec les propriétés modifiées.
     `;
+
+    const ai = getAiClient();
+    if (!ai) return [];
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",

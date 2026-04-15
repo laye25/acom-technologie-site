@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Data
 import { motion, AnimatePresence } from 'motion/react';
 import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
 import { dbService as db } from '../../services/dbService';
-import { ai, getGeminiModel } from '../../lib/gemini';
+import { getAiClient, getGeminiModel } from '../../lib/gemini';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
 import { OptimizedImage } from '../OptimizedImage';
 
@@ -156,6 +156,11 @@ const ServiceManager = () => {
 
     setIsGenerating(true);
     try {
+      const ai = getAiClient();
+      if (!ai) {
+        showNotification('error', 'L\'assistant IA n\'est pas configuré.');
+        return;
+      }
       const model = getGeminiModel();
       const prompt = field === 'shortDescription' 
         ? `Génère une seule phrase d'accroche courte et percutante (maximum 15 mots) pour un service nommé "${currentService.name}" proposé par une agence digitale au Sénégal.`

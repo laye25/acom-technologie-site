@@ -1,12 +1,20 @@
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : '');
+const getApiKey = () => import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : '');
 
-if (!apiKey) {
-  console.warn("GEMINI_API_KEY is not defined in the environment.");
-}
+let aiInstance: GoogleGenAI | null = null;
 
-export const ai = new GoogleGenAI({ apiKey: apiKey || "placeholder-key" });
+export const getAiClient = () => {
+  if (!aiInstance) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is not defined in the environment.");
+      return null;
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+};
 
 export const getGeminiModel = (modelName: string = "gemini-3-flash-preview") => {
   return modelName;
@@ -14,6 +22,9 @@ export const getGeminiModel = (modelName: string = "gemini-3-flash-preview") => 
 
 export const analyzeOrder = async (order: any, service: any) => {
   try {
+    const ai = getAiClient();
+    if (!ai) return null;
+
     const prompt = `En tant qu'expert en analyse commerciale pour Acom Technologie, analyse cette commande et fournis des informations stratégiques.
     
     Détails de la commande:
@@ -50,6 +61,9 @@ export const analyzeOrder = async (order: any, service: any) => {
 
 export const analyzePlatformPerformance = async (orders: any[], services: any[], expenses: any[]) => {
   try {
+    const ai = getAiClient();
+    if (!ai) return null;
+
     const prompt = `Analyse la performance globale de la plateforme Acom Technologie sur la base des données suivantes:
     
     - Nombre total de commandes: ${orders.length}
@@ -82,6 +96,9 @@ export const analyzePlatformPerformance = async (orders: any[], services: any[],
 
 export const translateText = async (text: string, targetLang: string, context: string = "Site web d'agence digitale Acom Technologie") => {
   try {
+    const ai = getAiClient();
+    if (!ai) return text;
+
     const prompt = `Traduisez le texte suivant en ${targetLang}. 
     Contexte: ${context}. 
     Gardez le ton professionnel, moderne et accueillant de l'agence.
@@ -105,6 +122,9 @@ export const translateText = async (text: string, targetLang: string, context: s
 
 export const generateDesign = async (prompt: string, image?: string) => {
   try {
+    const ai = getAiClient();
+    if (!ai) return [];
+
     const contents: any[] = [{ text: `Génère un design pour une carte de visite basé sur le prompt suivant: "${prompt}".
       
       Retourne uniquement un tableau JSON d'objets CanvasElement.
@@ -154,6 +174,9 @@ export const generateDesign = async (prompt: string, image?: string) => {
 
 export const analyzeSEO = async (type: 'service' | 'blog', content: any) => {
   try {
+    const ai = getAiClient();
+    if (!ai) return null;
+
     const prompt = `En tant qu'expert SEO spécialisé dans le marché sénégalais et international, analysez le contenu suivant (${type}) et suggérez des optimisations pour Google.
     
     Contenu à analyser:
@@ -184,6 +207,9 @@ export const analyzeSEO = async (type: 'service' | 'blog', content: any) => {
 
 export const generateOrderDraft = async (orderData: any, service: any) => {
   try {
+    const ai = getAiClient();
+    if (!ai) return null;
+
     const prompt = `En tant qu'expert technique et chef de projet chez Acom Technologie, analysez ce besoin client et générez un premier brouillon de cahier des charges et une estimation de complexité.
     
     Service sélectionné: ${service?.name || 'Inconnu'}
@@ -216,6 +242,9 @@ export const generateOrderDraft = async (orderData: any, service: any) => {
 
 export const generateDailyBriefing = async (userName: string, data: any) => {
   try {
+    const ai = getAiClient();
+    if (!ai) return "Bonjour ! Passez une excellente journée de travail.";
+
     const prompt = `En tant qu'assistant stratégique IA pour Acom Technologie, génère un briefing matinal personnalisé et motivant pour ${userName}.
     
     Données de l'entreprise:

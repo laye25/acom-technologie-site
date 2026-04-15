@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
-import { ai, getGeminiModel } from '../lib/gemini';
+import { getAiClient, getGeminiModel } from '../lib/gemini';
 import { db } from '../firebase';
 import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Service } from '../types';
@@ -43,6 +43,12 @@ const AIAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const ai = getAiClient();
+      if (!ai) {
+        setMessages(prev => [...prev, { role: 'model', text: "L'assistant IA n'est pas configuré pour le moment." }]);
+        setIsLoading(false);
+        return;
+      }
       const model = getGeminiModel();
       
       const systemInstruction = `Tu es l'assistant intelligent d'Acom Technologie, une agence digitale basée au Sénégal.

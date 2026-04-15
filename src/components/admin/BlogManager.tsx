@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
 import { dbService as db } from '../../services/dbService';
-import { ai, getGeminiModel } from '../../lib/gemini';
+import { getAiClient, getGeminiModel } from '../../lib/gemini';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
 import { OptimizedImage } from '../OptimizedImage';
 
@@ -97,6 +97,11 @@ const BlogManager = () => {
 
     setIsGenerating(true);
     try {
+      const ai = getAiClient();
+      if (!ai) {
+        showNotification('error', 'L\'assistant IA n\'est pas configuré.');
+        return;
+      }
       const model = getGeminiModel();
       const prompt = field === 'excerpt' 
         ? `Génère un court extrait accrocheur (environ 20-30 mots) pour un article de blog intitulé "${currentPost.title}" pour une agence digitale au Sénégal.`

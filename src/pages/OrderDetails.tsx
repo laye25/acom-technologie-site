@@ -45,7 +45,8 @@ import { OrderAIAnalysis } from '../components/admin/OrderAIAnalysis';
 import { OrderDraftDisplay } from '../components/OrderDraftDisplay';
 import { OptimizedImage } from '../components/OptimizedImage';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 const OrderDetails = () => {
   const { orderId } = useParams();
@@ -1397,21 +1398,27 @@ const OrderDetails = () => {
                     </p>
                   </div>
                 )}
-                <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
-                  <PaymentForm 
-                    amount={amountToPay} 
-                    totalAmount={getOrderDiscountedTotal(order, service)}
-                    originalTotal={order?.totalPrice}
-                    discountPercentage={isPromotionActive(service) ? (order?.discountPercentage || 0) : 0}
-                    orderId={order?.id || ''} 
-                    paymentType={paymentType}
-                    onSuccess={handlePaymentSuccess}
-                    onCancel={() => {
-                  setShowPaymentModal(false);
-                  setAccepting(false);
-                }}
-                  />
-                </Elements>
+                {stripePromise ? (
+                  <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
+                    <PaymentForm 
+                      amount={amountToPay} 
+                      totalAmount={getOrderDiscountedTotal(order, service)}
+                      originalTotal={order?.totalPrice}
+                      discountPercentage={isPromotionActive(service) ? (order?.discountPercentage || 0) : 0}
+                      orderId={order?.id || ''} 
+                      paymentType={paymentType}
+                      onSuccess={handlePaymentSuccess}
+                      onCancel={() => {
+                    setShowPaymentModal(false);
+                    setAccepting(false);
+                  }}
+                    />
+                  </Elements>
+                ) : (
+                  <div className="p-6 text-center bg-red-50 text-red-600 rounded-2xl">
+                    Le système de paiement n'est pas configuré. Veuillez contacter l'administrateur.
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
