@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Stage, Layer, Rect, Text, Image, Transformer, Group, Path, Circle, Line, Ellipse } from 'react-konva';
+import { FabricCanvas } from './FabricCanvas';
 import Konva from 'konva';
 import useImage from 'use-image';
 import { 
@@ -1194,7 +1195,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     reader.onload = async (event) => {
       const svgText = event.target?.result as string;
       const { parseSvgToElements } = await import('../../lib/svgParser');
-      const newElements = parseSvgToElements(svgText);
+      const newElements = await parseSvgToElements(svgText);
       setElements([...elements, ...newElements]);
     };
     reader.readAsText(file);
@@ -1240,7 +1241,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       // Handle Variant from studioAcom
       try {
         const { parseSvgToElements } = await import('../../lib/svgParser');
-        const newElements = parseSvgToElements(template.templateSvg);
+        const newElements = await parseSvgToElements(template.templateSvg);
         setPages([
           { elements: hydrateElements(newElements), bgColor: template.bgColor || template.bg_color || '#ffffff' },
           { elements: [], bgColor: '#ffffff' }
@@ -1301,7 +1302,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       } else if (initialTemplate && typeof initialTemplate === 'string' && initialTemplate.toLowerCase().includes('<svg')) {
         try {
           const { parseSvgToElements } = await import('../../lib/svgParser');
-          const newElements = parseSvgToElements(initialTemplate);
+          const newElements = await parseSvgToElements(initialTemplate);
           if (newElements.length > 0) {
             setPages([
               { elements: newElements, bgColor: '#ffffff' },
@@ -1374,7 +1375,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [templatePromotion, setTemplatePromotion] = useState(false);
   const [templatePromotionPercentage, setTemplatePromotionPercentage] = useState('');
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(autoOpenSelector || false);
-  const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai' | 'assets'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai' | 'assets' | 'layers'>('templates');
   const [prompt, setPrompt] = useState('');
   
   const [copiedStyle, setCopiedStyle] = useState<Partial<CanvasElement> | null>(null);
@@ -1998,19 +1999,41 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     }
   };
 
-  const handleTextDoubleClick = (e: any, id: string) => {
-    const textNode = e.target;
-    const stage = textNode.getStage();
-    const textPosition = textNode.absolutePosition();
-    const stageBox = stage.container().getBoundingClientRect();
+  const editingTextIdRef = useRef<string | null>(null);
+  const isEditingTextRef = useRef(false);
 
+  const handleTextDoubleClick = useCallback((e: any, id: string) => {
+    // Prevent duplicate editors
+    if ((window as any).__textEditorOpen) return;
+    
+    // Remove any existing editors
+    document.querySelectorAll('.fabric-text-editor').forEach(el => el.remove());
+
+    if (isEditingTextRef.current) return;
+    isEditingTextRef.current = true;
+    (window as any).__textEditorOpen = true;
+    
+    console.log('handleTextDoubleClick called', { e, id });
+    const textNode = e.target;
+    if (!textNode || !textNode.canvas) {
+      console.log('No text node or canvas found');
+      isEditingTextRef.current = false;
+      (window as any).__textEditorOpen = false;
+      return;
+    }
+
+    const boundingRect = textNode.getBoundingRect();
+    const canvasElement = textNode.canvas.getElement();
+    const canvasBox = canvasElement.getBoundingClientRect();
+    
+    console.log('Setting editingTextId', id);
     setEditingTextId(id);
     setTextAreaPos({
-      x: stageBox.left + textPosition.x,
-      y: stageBox.top + textPosition.y,
-      width: textNode.width() * textNode.scaleX(),
+      x: canvasBox.left + boundingRect.left,
+      y: canvasBox.top + boundingRect.top,
+      width: boundingRect.width,
     });
-  };
+  }, [setEditingTextId, setTextAreaPos, elements]);
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (editingTextId) {
@@ -2019,6 +2042,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       ));
     }
   };
+
+  useEffect(() => {
+    if (!editingTextId) {
+      isEditingTextRef.current = false;
+      (window as any).__textEditorOpen = false;
+    }
+  }, [editingTextId]);
 
   const handleAiRewrite = async (action: 'improve' | 'professional' | 'translate') => {
     if (selectedIds.length !== 1) return;
@@ -3551,418 +3581,44 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           }}
         >
           <div 
-            className="relative shadow-2xl bg-white transition-transform duration-200 ease-out"
+            className="relative shadow-2xl transition-transform duration-200 ease-out"
             style={{ 
-              width: 600 * stageScale, 
-              height: 350 * stageScale,
-              minWidth: 600 * stageScale,
-              minHeight: 350 * stageScale
+              width: 1050,
+              height: 600,
+              transform: `scale(${stageScale})`,
+              transformOrigin: 'center center',
+              flexShrink: 0,
+              overflow: 'hidden',
+              borderRadius: '36px'
             }}
           >
-            <div style={{ transform: `scale(${stageScale})`, transformOrigin: 'top left' }}>
-              <Stage
-                width={600}
-                height={350}
-                pixelRatio={4}
+            <div style={{ 
+              width: 1050,
+              height: 600,
+              overflow: 'hidden',
+              backgroundColor: bgColor
+            }}>
+              <FabricCanvas
                 ref={stageRef}
-                onMouseDown={(e) => {
-                  const clickedOnEmpty = e.target === e.target.getStage() || e.target.name() === 'background';
-                  if (clickedOnEmpty) {
-                    setSelectedIds([]);
-                    setEditingTextId(null);
-                    
-                    const pos = e.target.getStage().getPointerPosition();
-                    if (pos) {
-                      setSelectionRect({
-                        x1: pos.x,
-                        y1: pos.y,
-                        x2: pos.x,
-                        y2: pos.y,
-                        visible: true
-                      });
-                    }
-                  }
-                }}
-                onMouseMove={(e) => {
-                  const pos = e.target.getStage().getPointerPosition();
-                  if (pos) {
-                    // Throttle presence updates to every 100ms
-                    const now = Date.now();
-                    if (now - lastCursorUpdateRef.current > 100) {
-                      updateMyPresence(pos.x, pos.y);
-                      lastCursorUpdateRef.current = now;
-                    }
-                    
-                    if (!selectionRect.visible) return;
-                    setSelectionRect(prev => ({
-                      ...prev,
-                      x2: pos.x,
-                      y2: pos.y
-                    }));
-                  }
-                }}
-                onMouseUp={(e) => {
-                  if (!selectionRect.visible) return;
-                  
-                  const box = {
-                    x1: Math.min(selectionRect.x1, selectionRect.x2),
-                    y1: Math.min(selectionRect.y1, selectionRect.y2),
-                    x2: Math.max(selectionRect.x1, selectionRect.x2),
-                    y2: Math.max(selectionRect.y1, selectionRect.y2)
-                  };
-                  
-                  // Only select if the box has some size
-                  if (Math.abs(selectionRect.x1 - selectionRect.x2) > 5 || Math.abs(selectionRect.y1 - selectionRect.y2) > 5) {
-                    const selected = elements.filter(el => {
-                      const elWidth = el.width || (el.type === 'circle' ? (el.radius || 0) * 2 : 50);
-                      const elHeight = el.height || (el.type === 'circle' ? (el.radius || 0) * 2 : 50);
-                      
-                      return (
-                        el.x >= box.x1 &&
-                        el.y >= box.y1 &&
-                        el.x + elWidth <= box.x2 &&
-                        el.y + elHeight <= box.y2
-                      );
-                    }).map(el => el.id);
-
-                    if (selected.length > 0) {
-                      setSelectedIds(selected);
-                    }
-                  }
-                  
-                  setSelectionRect(prev => ({ ...prev, visible: false }));
-                }}
-              >
-                <Layer>
-                  {showGrid && (
-                    <>
-                      {[...Array(20)].map((_, i) => (
-                        <Line key={`v-${i}`} points={[i * 30, 0, i * 30, 350]} stroke="#e5e7eb" strokeWidth={1} />
-                      ))}
-                      {[...Array(12)].map((_, i) => (
-                        <Line key={`h-${i}`} points={[0, i * 30, 600, i * 30]} stroke="#e5e7eb" strokeWidth={1} />
-                      ))}
-                    </>
-                  )}
-                  <Rect name="background" width={600} height={350} fill={bgColor} />
-                  {elements.filter(el => !el.hidden).map((el) => {
-                    const block = blocks?.find(b => b.id === el.id);
-                    const isLockedByOther = el.locked || (block?.lockedBy && block.lockedBy !== user?.uid);
-                    const lockColor = isLockedByOther ? (others.find(p => p.userId === block.lockedBy) ? '#ef4444' : '#9ca3af') : undefined;
-
-                    if (el.type === 'text') {
-                      return (
-                        <EditableText
-                          key={el.id}
-                          element={el}
-                          isSelected={selectedIds.includes(el.id)}
-                          onSelect={() => setSelectedIds([el.id])}
-                          onChange={(newAttrs) => {
-                            if (isLockedByOther) return;
-                            setElements(elements.map(item => item.id === el.id ? { ...item, ...newAttrs } : item));
-                          }}
-                          onDoubleClick={(e) => {
-                            if (isLockedByOther) return;
-                            handleTextDoubleClick(e, el.id);
-                          }}
-                          lockedBy={isLockedByOther ? block.lockedBy : null}
-                          lockColor={lockColor}
-                        />
-                      );
-                    }
-                    if (el.type === 'image') {
-                      return (
-                        <URLImage
-                          key={el.id}
-                          element={el}
-                          isSelected={selectedIds.includes(el.id)}
-                          onSelect={() => setSelectedIds([el.id])}
-                          onChange={(newAttrs) => {
-                            if (isLockedByOther) return;
-                            setElements(elements.map(item => item.id === el.id ? { ...item, ...newAttrs } : item));
-                          }}
-                          lockedBy={isLockedByOther ? block.lockedBy : null}
-                          lockColor={lockColor}
-                        />
-                      );
-                    }
-                    if (el.type === 'shape') {
-                      return (
-                        <Group key={el.id}>
-                          <Rect
-                            id={el.id}
-                            x={el.x}
-                            y={el.y}
-                            width={el.width}
-                            height={el.height}
-                            cornerRadius={el.cornerRadius}
-                            fill={el.fill}
-                            stroke={el.stroke}
-                            strokeWidth={el.strokeWidth}
-                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                            opacity={el.opacity}
-                            shadowColor={el.shadowColor}
-                            shadowBlur={el.shadowBlur}
-                            shadowOffsetX={el.shadowOffsetX}
-                            shadowOffsetY={el.shadowOffsetY}
-                            shadowOpacity={el.shadowOpacity}
-                            draggable={!isLockedByOther}
-                            onClick={() => setSelectedIds([el.id])}
-                            onTap={() => setSelectedIds([el.id])}
-                            onDragMove={(e) => handleDragMove(e, el.id)}
-                            onDragEnd={(e) => {
-                              if (isLockedByOther) return;
-                              handleDragEnd(e, el.id, (attrs) => {
-                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
-                              });
-                            }}
-                          />
-                          {isLockedByOther && (
-                            <Rect
-                              x={el.x - 2}
-                              y={el.y - 2}
-                              width={(el.width || 100) + 4}
-                              height={(el.height || 100) + 4}
-                              stroke={lockColor || '#ef4444'}
-                              strokeWidth={2}
-                              dash={[4, 2]}
-                            />
-                          )}
-                        </Group>
-                      );
-                    }
-                    if (el.type === 'path') {
-                      return (
-                        <Group key={el.id}>
-                          <Path
-                            id={el.id}
-                            x={el.x}
-                            y={el.y}
-                            data={el.data || ''}
-                            scaleX={el.scaleX}
-                            scaleY={el.scaleY}
-                            fill={el.fill}
-                            stroke={el.stroke}
-                            strokeWidth={el.strokeWidth}
-                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                            opacity={el.opacity}
-                            shadowColor={el.shadowColor}
-                            shadowBlur={el.shadowBlur}
-                            shadowOffsetX={el.shadowOffsetX}
-                            shadowOffsetY={el.shadowOffsetY}
-                            shadowOpacity={el.shadowOpacity}
-                            draggable={!isLockedByOther}
-                            onClick={() => setSelectedIds([el.id])}
-                            onTap={() => setSelectedIds([el.id])}
-                            onDragMove={(e) => handleDragMove(e, el.id)}
-                            onDragEnd={(e) => {
-                              if (isLockedByOther) return;
-                              handleDragEnd(e, el.id, (attrs) => {
-                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
-                              });
-                            }}
-                          />
-                          {isLockedByOther && (
-                            <Rect
-                              x={el.x - 2}
-                              y={el.y - 2}
-                              width={100}
-                              height={100}
-                              stroke={lockColor || '#ef4444'}
-                              strokeWidth={2}
-                              dash={[4, 2]}
-                            />
-                          )}
-                        </Group>
-                      );
-                    }
-                    if (el.type === 'circle') {
-                      return (
-                        <Group key={el.id}>
-                          <Circle
-                            id={el.id}
-                            x={el.x}
-                            y={el.y}
-                            radius={el.radius || 0}
-                            fill={el.fill}
-                            stroke={el.stroke}
-                            strokeWidth={el.strokeWidth}
-                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                            opacity={el.opacity}
-                            shadowColor={el.shadowColor}
-                            shadowBlur={el.shadowBlur}
-                            shadowOffsetX={el.shadowOffsetX}
-                            shadowOffsetY={el.shadowOffsetY}
-                            shadowOpacity={el.shadowOpacity}
-                            draggable={!isLockedByOther}
-                            onClick={() => setSelectedIds([el.id])}
-                            onTap={() => setSelectedIds([el.id])}
-                            onDragMove={(e) => handleDragMove(e, el.id)}
-                            onDragEnd={(e) => {
-                              if (isLockedByOther) return;
-                              handleDragEnd(e, el.id, (attrs) => {
-                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
-                              });
-                            }}
-                          />
-                          {isLockedByOther && (
-                            <Rect
-                              x={el.x - (el.radius || 0) - 2}
-                              y={el.y - (el.radius || 0) - 2}
-                              width={(el.radius || 0) * 2 + 4}
-                              height={(el.radius || 0) * 2 + 4}
-                              stroke={lockColor || '#ef4444'}
-                              strokeWidth={2}
-                              dash={[4, 2]}
-                            />
-                          )}
-                        </Group>
-                      );
-                    }
-                    if (el.type === 'ellipse') {
-                      return (
-                        <Group key={el.id}>
-                          <Ellipse
-                            id={el.id}
-                            x={el.x}
-                            y={el.y}
-                            radiusX={el.radiusX || 0}
-                            radiusY={el.radiusY || 0}
-                            fill={el.fill}
-                            stroke={el.stroke}
-                            strokeWidth={el.strokeWidth}
-                            fillLinearGradientStartPoint={el.fillLinearGradientStartPoint}
-                            fillLinearGradientEndPoint={el.fillLinearGradientEndPoint}
-                            fillLinearGradientColorStops={el.fillLinearGradientColorStops}
-                            opacity={el.opacity}
-                            shadowColor={el.shadowColor}
-                            shadowBlur={el.shadowBlur}
-                            shadowOffsetX={el.shadowOffsetX}
-                            shadowOffsetY={el.shadowOffsetY}
-                            shadowOpacity={el.shadowOpacity}
-                            draggable={!isLockedByOther}
-                            onClick={() => setSelectedIds([el.id])}
-                            onTap={() => setSelectedIds([el.id])}
-                            onDragMove={(e) => handleDragMove(e, el.id)}
-                            onDragEnd={(e) => {
-                              if (isLockedByOther) return;
-                              handleDragEnd(e, el.id, (attrs) => {
-                                setElements(elements.map(item => item.id === el.id ? { ...item, ...attrs } : item));
-                              });
-                            }}
-                          />
-                          {isLockedByOther && (
-                            <Rect
-                              x={el.x - (el.radiusX || 0) - 2}
-                              y={el.y - (el.radiusY || 0) - 2}
-                              width={(el.radiusX || 0) * 2 + 4}
-                              height={(el.radiusY || 0) * 2 + 4}
-                              stroke={lockColor || '#ef4444'}
-                              strokeWidth={2}
-                              dash={[4, 2]}
-                            />
-                          )}
-                        </Group>
-                      );
-                    }
-                    return null;
-                  })}
-
-                  {guides.map((guide, i) => (
-                    <Line
-                      key={`guide-${i}`}
-                      points={
-                        guide.type === 'vertical'
-                          ? [guide.position, 0, guide.position, 350]
-                          : [0, guide.position, 600, guide.position]
-                      }
-                      stroke="#3b82f6"
-                      strokeWidth={1}
-                      dash={[4, 4]}
-                    />
-                  ))}
-
-                  {selectedIds.length > 0 && !elements.some(el => {
-                    const block = blocks?.find(b => b.id === el.id);
-                    return selectedIds.includes(el.id) && block?.lockedBy && block.lockedBy !== user?.uid;
-                  }) && (
-                    <Transformer
-                      ref={trRef}
-                      boundBoxFunc={(oldBox, newBox) => {
-                        if (newBox.width < 5 || newBox.height < 5) {
-                          return oldBox;
-                        }
-                        return newBox;
-                      }}
-                    />
-                  )}
-
-                  {selectionRect.visible && (
-                    <Rect
-                      x={Math.min(selectionRect.x1, selectionRect.x2)}
-                      y={Math.min(selectionRect.y1, selectionRect.y2)}
-                      width={Math.abs(selectionRect.x1 - selectionRect.x2)}
-                      height={Math.abs(selectionRect.y1 - selectionRect.y2)}
-                      fill="rgba(59, 130, 246, 0.2)"
-                      stroke="#3b82f6"
-                      strokeWidth={1}
-                    />
-                  )}
-                </Layer>
-                {/* Cursors Layer */}
-                <Layer>
-                  {others.map((p) => {
-                    // Generate a consistent color based on user ID
-                    const colors = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4', '#8b5cf6', '#d946ef', '#f43f5e'];
-                    const colorIndex = p.userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
-                    const cursorColor = colors[colorIndex];
-
-                    return (
-                      <Group key={p.id} x={p.cursorX} y={p.cursorY}>
-                        <Path
-                          data="M0,0 L0,15 L4,11 L9,11 Z"
-                          fill={cursorColor}
-                          stroke="white"
-                          strokeWidth={1.5}
-                          shadowColor="rgba(0,0,0,0.2)"
-                          shadowBlur={2}
-                          shadowOffset={{ x: 1, y: 1 }}
-                        />
-                        <Group x={12} y={12}>
-                          <Rect
-                            width={p.userName.length * 7 + 12}
-                            height={20}
-                            fill={cursorColor}
-                            cornerRadius={4}
-                            shadowColor="rgba(0,0,0,0.1)"
-                            shadowBlur={2}
-                            shadowOffset={{ x: 0, y: 2 }}
-                          />
-                          <Text
-                            text={p.userName}
-                            fill="white"
-                            fontSize={11}
-                            fontFamily="Inter, sans-serif"
-                            fontStyle="bold"
-                            padding={5}
-                          />
-                        </Group>
-                      </Group>
-                    );
-                  })}
-                </Layer>
-              </Stage>
+                elements={elements}
+                setElements={setElements}
+                selectedIds={selectedIds}
+                setSelectedIds={setSelectedIds}
+                bgColor={bgColor}
+                stageScale={stageScale}
+                showGrid={showGrid}
+                guides={guides}
+                blocks={blocks}
+                user={user}
+                others={others}
+                onTextDoubleClick={handleTextDoubleClick}
+              />
             </div>
 
             {/* Text Editing Overlay */}
             {editingTextId && (
               <textarea
+                className="fabric-text-editor"
                 value={elements.find(el => el.id === editingTextId)?.text || ''}
                 onChange={handleTextChange}
                 onBlur={() => setEditingTextId(null)}
@@ -3973,7 +3629,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                 }}
                 autoFocus
                 style={{
-                  position: 'fixed',
+                  position: 'absolute',
                   top: textAreaPos.y,
                   left: textAreaPos.x,
                   width: textAreaPos.width * stageScale,

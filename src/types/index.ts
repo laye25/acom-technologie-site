@@ -177,6 +177,7 @@ export interface CanvasElement {
     grayscale?: boolean;
     sepia?: boolean;
   };
+  fabricData?: any;
 }
 
 export interface Design {

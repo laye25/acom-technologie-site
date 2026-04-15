@@ -45,13 +45,13 @@ export function usePresence(designId: string | null) {
 
     try {
       if (myPresenceId) {
-        await firestoreService.update(`designs/${designId}/presence`, myPresenceId, presenceData);
+        await firestoreService.upsert(`designs/${designId}/presence`, myPresenceId, presenceData);
       } else {
         // Try to find if I already have a presence doc for this design
         const existing = othersPresence.find(p => p.userId === user.uid);
         if (existing) {
           setMyPresenceId(existing.id);
-          await firestoreService.update(`designs/${designId}/presence`, existing.id, presenceData);
+          await firestoreService.upsert(`designs/${designId}/presence`, existing.id, presenceData);
         } else {
           const newId = await firestoreService.add(`designs/${designId}/presence`, presenceData);
           setMyPresenceId(newId);
@@ -76,7 +76,7 @@ export function usePresence(designId: string | null) {
     if (!designId || !user || !myPresenceId) return;
 
     const interval = setInterval(() => {
-      firestoreService.update(`designs/${designId}/presence`, myPresenceId, {
+      firestoreService.upsert(`designs/${designId}/presence`, myPresenceId, {
         lastActive: serverTimestamp()
       }).catch(console.error);
     }, 30000); // Every 30 seconds

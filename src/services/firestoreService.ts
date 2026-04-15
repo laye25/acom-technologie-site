@@ -102,6 +102,18 @@ export const firestoreService = {
     }
   },
 
+  async upsert(collectionName: string, id: string, data: Partial<DocumentData>): Promise<void> {
+    try {
+      const docRef = doc(db, collectionName, id);
+      await setDoc(docRef, {
+        ...data,
+        updated_at: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${collectionName}/${id}`);
+    }
+  },
+
   async delete(collectionName: string, id: string): Promise<void> {
     try {
       const docRef = doc(db, collectionName, id);
