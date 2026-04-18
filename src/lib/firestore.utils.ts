@@ -63,13 +63,20 @@ export function prepareForFirestore(data: any): any {
     return data.map(item => prepareForFirestore(item));
   }
   
+  // If we are at the top level of 'content', just stringify the whole thing
+  // The caller in CardEditor.tsx passes 'el' as 'content' which is a large object
+  // Let's force it to be a JSON string immediately at the top level if it's the 'content' property being prepared.
+  // Actually, prepareForFirestore is recursive. This is tricky.
+  
   const prepared: any = {};
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) continue;
     
-    // Special handling for fabricData to bypass nested array restrictions
-    if (key === 'fabricData' && value !== null) {
-      prepared[key] = typeof value === 'string' ? value : JSON.stringify(value);
+    // Force stringification for 'content' to drastically reduce document size
+    if (key === 'content' && value !== null && typeof value === 'object') {
+       prepared[key] = JSON.stringify(value);
+    } else if (key === 'fabricData' && value !== null) {
+       prepared[key] = typeof value === 'string' ? value : JSON.stringify(value);
     } else {
       prepared[key] = prepareForFirestore(value);
     }
@@ -89,7 +96,7 @@ export function restoreFromFirestore(data: any): any {
   
   const restored: any = {};
   for (const [key, value] of Object.entries(data)) {
-    if (key === 'fabricData' && typeof value === 'string') {
+    if ((key === 'fabricData' || key === 'content') && typeof value === 'string') {
       try {
         restored[key] = JSON.parse(value);
       } catch (e) {
