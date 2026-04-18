@@ -1128,7 +1128,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         timestamp: Date.now(),
         templateId
       };
-      localStorage.setItem('studio_acom_autosave', JSON.stringify(designToSave));
+      try {
+        localStorage.setItem('studio_acom_autosave', JSON.stringify(designToSave));
+      } catch (error) {
+        console.error('Autosave quota exceeded, cannot save to localStorage:', error);
+        // Optionally: clear old autosave if it's too large or take other action
+      }
     }
   }, [pages, designTitle, templateId]);
 
