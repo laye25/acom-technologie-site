@@ -67,14 +67,20 @@ const Dashboard = () => {
     return [...rawOrders].sort((a, b) => {
       const getTime = (val: any) => {
         if (!val) return 0;
-        // Check for Firebase Timestamp object
-        if (val.seconds !== undefined) return val.seconds * 1000;
-        if (typeof val.toMillis === 'function') return val.toMillis();
         
-        // Handle string or Date
-        const date = new Date(val);
-        if (isNaN(date.getTime())) return 0; // Return 0 for invalid dates
-        return date.getTime();
+        // Handle Firebase Timestamp
+        if (typeof val === 'object') {
+          if (val.seconds !== undefined) return val.seconds * 1000;
+          if (typeof val.toMillis === 'function') return val.toMillis();
+        }
+        
+        // If it's a string or number, try to parse it
+        if (typeof val === 'string' || typeof val === 'number') {
+          const date = new Date(val);
+          if (!isNaN(date.getTime())) return date.getTime();
+        }
+        
+        return 0;
       };
       
       const timeA = getTime(a.updated_at || a.created_at || a.updatedAt || a.createdAt);
