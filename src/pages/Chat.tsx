@@ -308,8 +308,13 @@ const Chat = () => {
         ) : (
           sortedMessages.map((msg, i) => {
             const isMe = msg.senderId === user?.uid;
-            const msgDate = msg.createdAt || msg.created_at ? new Date(msg.createdAt?.toDate ? msg.createdAt.toDate() : (msg.createdAt || msg.created_at)) : new Date();
-            const prevMsgDate = i > 0 ? (sortedMessages[i-1].createdAt || sortedMessages[i-1].created_at ? new Date(sortedMessages[i-1].createdAt?.toDate ? sortedMessages[i-1].createdAt.toDate() : (sortedMessages[i-1].createdAt || sortedMessages[i-1].created_at)) : new Date()) : null;
+            const getMsgDate = (m: any) => {
+              const raw = m.createdAt || m.created_at;
+              const d = raw?.toDate ? raw.toDate() : (raw instanceof Date ? raw : new Date(raw));
+              return (d && !isNaN(d.getTime())) ? d : new Date();
+            };
+            const msgDate = getMsgDate(msg);
+            const prevMsgDate = i > 0 ? getMsgDate(sortedMessages[i-1]) : null;
             const showDateSeparator = i === 0 || (prevMsgDate && !isSameDay(msgDate, prevMsgDate));
 
             return (

@@ -14,6 +14,8 @@ interface FabricCanvasProps {
   blocks?: any[];
   user?: any;
   others?: any[];
+  width: number;
+  height: number;
   onTextDoubleClick?: (e: any, id: string) => void;
 }
 
@@ -29,6 +31,8 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
   blocks,
   user,
   others,
+  width,
+  height,
   onTextDoubleClick
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -49,20 +53,20 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
 
   // Initialize Canvas
   useEffect(() => {
-    console.log('FabricCanvas initialized');
+    console.log('FabricCanvas initialized with size:', width, 'x', height);
     if (!canvasRef.current) return;
 
     const canvas = new fabric.Canvas(canvasRef.current, {
-      width: 1050,
-      height: 600,
+      width: width,
+      height: height,
       backgroundColor: bgColor,
       preserveObjectStacking: true,
     });
     
     // Ensure the canvas element itself has the correct dimensions
-    canvasRef.current.width = 1050;
-    canvasRef.current.height = 600;
-    canvas.setDimensions({ width: 1050, height: 600 });
+    canvasRef.current.width = width;
+    canvasRef.current.height = height;
+    canvas.setDimensions({ width, height });
     fabricCanvasRef.current = canvas;
 
     canvas.on('mouse:down', (e) => {
@@ -169,9 +173,14 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
 
     return () => {
       canvas.off('mouse:dblclick', handleDoubleClick);
-      canvas.dispose();
+      try {
+        canvas.dispose();
+      } catch (err) {
+        console.warn('Fabric canvas disposal error:', err);
+      }
+      fabricCanvasRef.current = null;
     };
-  }, [onTextDoubleClick]);
+  }, [width, height]); // Removed onTextDoubleClick to prevent excessive re-inits
 
   // Update background color
   useEffect(() => {
@@ -219,9 +228,21 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
             // This preserves complex SVG gradients unless the user explicitly changes the color
             if (el.fill && el.fill !== 'transparent') {
               enlivenedObj.set('fill', el.fill);
+              if (enlivenedObj.type === 'group') {
+                const group = enlivenedObj as fabric.Group;
+                group.getObjects().forEach(child => {
+                  child.set('fill', el.fill);
+                });
+              }
             }
             if (el.stroke && el.stroke !== 'transparent') {
               enlivenedObj.set('stroke', el.stroke);
+              if (enlivenedObj.type === 'group') {
+                const group = enlivenedObj as fabric.Group;
+                group.getObjects().forEach(child => {
+                  child.set('stroke', el.stroke);
+                });
+              }
             }
 
             canvas.add(enlivenedObj);
@@ -341,7 +362,7 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
   }, [selectedIds]);
 
   return (
-    <div>
+    <div style={{ width: width, height: height, position: 'relative' }}>
       <canvas ref={canvasRef} />
     </div>
   );

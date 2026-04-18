@@ -127,7 +127,12 @@ export const NotificationCenter = () => {
                               {notification.title}
                             </p>
                             <span className="text-[9px] text-gray-400 font-bold whitespace-nowrap ml-2">
-                              {notification.createdAt || notification.created_at ? format(new Date(notification.createdAt?.toDate ? notification.createdAt.toDate() : (notification.createdAt || notification.created_at)), 'HH:mm', { locale: fr }) : '...'}
+                              {(() => {
+                                let rawDate = notification.createdAt || notification.created_at;
+                                const date = rawDate?.toDate ? rawDate.toDate() : (rawDate instanceof Date ? rawDate : new Date(rawDate));
+                                if (!date || isNaN(date.getTime())) return '...';
+                                return format(date, 'HH:mm', { locale: fr });
+                              })()}
                             </span>
                           </div>
                           <p className={`text-xs leading-relaxed line-clamp-2 ${

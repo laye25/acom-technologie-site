@@ -63,14 +63,14 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         request.auth.token.email in ['contact.acomtechnologie@gmail.com', 'contact.abdoulayendiaye@gmail.com']);
+        (request.auth.token.email in ['contact.acomtechnologie@gmail.com', 'contact.abdoulayendiaye@gmail.com'] ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
     }
 
     function isManager() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager' ||
-         request.auth.token.email == 'gestionnaire.acomtechnologie@gmail.com');
+        (request.auth.token.email == 'gestionnaire.acomtechnologie@gmail.com' ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'manager'));
     }
 
     function hasAnyAdminRole() {
@@ -163,14 +163,21 @@ service cloud.firestore {
 
     // Merchant SaaS Collections
     match /merchants/{merchantId} {
-      allow read: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || hasAnyAdminRole());
-      allow create: if isAuthenticated() && request.resource.data.owner_id == request.auth.uid;
+      allow read: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
+      allow create: if isAuthenticated() && (request.resource.data.owner_id == request.auth.uid || request.resource.data.ownerId == request.auth.uid || isAdmin());
       // Prevent users from modifying their own billing status
       allow update: if isAuthenticated() && (
-        (resource.data.owner_id == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['billing'])) || 
+        ( (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['billing'])) || 
         isAdmin()
       );
       allow delete: if isAdmin();
+    }
+
+    match /merchant_stats/{merchantId} {
+      // Stats for a merchant - readable by owner or admin
+      // merchantId here is the document ID which corresponds to the merchant.id
+      allow read: if isAuthenticated() && (get(/databases/$(database)/documents/merchants/$(merchantId)).data.owner_id == request.auth.uid || get(/databases/$(database)/documents/merchants/$(merchantId)).data.ownerId == request.auth.uid || hasAnyAdminRole());
+      allow write: if hasAnyAdminRole();
     }
 
     match /usage/{tenantId} {

@@ -176,6 +176,117 @@ async function startServer() {
     }
   });
 
+  // PayDunya Invoice Creation
+  app.post("/api/paydunya/create-invoice", async (req, res) => {
+    try {
+      const { amount, description, orderId, returnUrl, cancelUrl } = req.body;
+
+      const masterKey = process.env.PAYDUNYA_MASTER_KEY?.trim();
+      const privateKey = process.env.PAYDUNYA_PRIVATE_KEY?.trim();
+      const token = process.env.PAYDUNYA_TOKEN?.trim();
+      const mode = (process.env.PAYDUNYA_MODE || 'test').toLowerCase().trim();
+
+      // Choisir l'URL en fonction du mode (sandbox pour test, app pour live)
+      const baseUrl = mode === 'live' 
+        ? "https://app.paydunya.com/api/v1/checkout-invoice/create"
+        : "https://app.paydunya.com/sandbox-api/v1/checkout-invoice/create";
+
+      if (!masterKey || !privateKey || !token) {
+        const missing = [];
+        if (!masterKey) missing.push('PAYDUNYA_MASTER_KEY');
+        if (!privateKey) missing.push('PAYDUNYA_PRIVATE_KEY');
+        if (!token) missing.push('PAYDUNYA_TOKEN');
+        
+        return res.status(500).json({ 
+          error: `Configuration incomplète. Variables manquantes dans AI Studio: ${missing.join(', ')}.` 
+        });
+      }
+
+      const payload = {
+        invoice: {
+          total_amount: amount,
+          description: description || `Paiement pour la commande #${orderId}`,
+          store: {
+            name: "Acom Technologie",
+            website_url: "https://ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app",
+            logo_url: process.env.APP_LOGO_URL || "https://picsum.photos/seed/acom/400/100" // Placeholder si pas de logo fourni
+          }
+        },
+        store: {
+          name: "Acom Technologie",
+          tagline: "L'excellence technologique à votre service",
+          postal_address: "Dakar, Sénégal",
+          phone_number: "+221 33 000 00 00",
+          website_url: "https://ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app",
+          logo_url: process.env.APP_LOGO_URL || "https://picsum.photos/seed/acom/400/100"
+        },
+        custom_data: {
+          order_id: orderId
+        },
+        actions: {
+          cancel_url: cancelUrl || "https://ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app/merchant/saas",
+          return_url: returnUrl || "https://ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app/merchant/saas?payment=success",
+          callback_url: "https://ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app/api/webhooks/paydunya"
+        }
+      };
+
+      const response = await fetch(baseUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "PAYDUNYA-MASTER-KEY": masterKey,
+          "PAYDUNYA-PRIVATE-KEY": privateKey,
+          "PAYDUNYA-TOKEN": token
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      
+      if (data.response_code !== "00") {
+        console.error("PayDunya Error Response:", data);
+      }
+      
+      res.json(data);
+    } catch (error: any) {
+      console.error("PayDunya invoice creation error:", error);
+      res.status(500).json({ error: "Erreur technique lors de la communication avec PayDunya: " + error.message });
+    }
+  });
+
+  // PayDunya Webhook
+  app.post("/api/webhooks/paydunya", async (req, res) => {
+    try {
+      const { data } = req.body;
+      const hash = req.body.hash;
+      const invoice = data.invoice;
+      const custom_data = data.custom_data;
+      const status = data.status;
+
+      console.log(`Webhook PayDunya reçu pour la commande ${custom_data?.order_id} - Statut: ${status}`);
+
+      // Here you would normally verify the hash using PAYDUNYA_MASTER_KEY
+      // Update order/merchant status in firestore
+      if (status === 'completed' && custom_data?.order_id) {
+        const orderId = custom_data.order_id;
+        // Find if it's an order or a merchant (SaaS instance)
+        // Simulated: Update your firestore document
+        /*
+        await admin.firestore().collection('orders').doc(orderId).set({
+          paid: true,
+          status: 'processing',
+          paidAt: new Date().toISOString()
+        }, { merge: true });
+        */
+      }
+
+      res.status(200).send("Webhook handled successfully");
+    } catch (error: any) {
+      console.error("PayDunya webhook error:", error);
+      res.status(500).send("Internal Server Error");
+    }
+  });
+
   // Mock quote generation endpoint
   app.post("/api/quotes/generate", (req, res) => {
     const { orderId, items, total } = req.body;

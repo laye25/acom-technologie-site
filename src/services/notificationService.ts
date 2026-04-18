@@ -109,6 +109,102 @@ export const notificationService = {
       console.error('Email sending failed:', error);
     }
   },
+  
+  async notifyPrintingStatusChange(order: Order, newStatus: string, client: UserProfile | null) {
+    if (!client) return;
+
+    const statusLabels: Record<string, string> = {
+      pending: 'En attente',
+      in_production: 'En production',
+      shipped: 'Expédiée',
+      delivered: 'Livrée'
+    };
+
+    const statusLabel = statusLabels[newStatus] || newStatus;
+    const dashboardUrl = `${window.location.origin}/dashboard`;
+
+    // 1. Save to Firestore
+    try {
+      await dbService.notifications.save({
+        userId: order.userId,
+        title: 'Mise à jour de votre impression',
+        message: `Votre commande #${order.id.slice(0, 8)} est désormais : ${statusLabel}`,
+        type: 'order_status',
+        orderId: order.id,
+        read: false
+      });
+    } catch (error) {
+      console.error('Failed to save in-app notification:', error);
+    }
+
+    // 2. Send Email via API
+    try {
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: client.email,
+          subject: `Acom Technologie - Impression #${order.id.slice(0, 8)} : ${statusLabel}`,
+          html: `
+            <div style="background-color: #f8f9fa; padding: 40px 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+              <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid #eee;">
+                <!-- Logo Header -->
+                <div style="background-color: white; padding: 40px 30px; text-align: center; border-bottom: 1px solid #f0f0f0;">
+                  <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+                    <tr>
+                      <td style="background-color: #b522c1; border-radius: 14px; width: 56px; height: 56px; text-align: center; vertical-align: middle;">
+                        <span style="color: white; font-family: Arial, sans-serif; font-size: 38px; font-weight: 900; line-height: 56px;">A</span>
+                      </td>
+                      <td style="padding-left: 15px; text-align: left;">
+                        <div style="color: #1e293b; font-family: Arial, sans-serif; font-size: 28px; font-weight: 900; line-height: 1; letter-spacing: -0.5px;">ACOM</div>
+                        <div style="color: #94a3b8; font-family: Arial, sans-serif; font-size: 13px; letter-spacing: 4px; font-weight: bold; margin-top: 4px; text-transform: uppercase;">TECHNOLOGIE</div>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="padding: 45px; color: #1e293b; line-height: 1.6;">
+                  <h2 style="color: #b522c1; margin-top: 0; font-size: 24px; font-weight: 800;">Suivi de votre impression</h2>
+                  <p style="font-size: 16px;">Bonjour <strong>${client.displayName}</strong>,</p>
+                  <p style="font-size: 16px; color: #475569;">Nous avons le plaisir de vous informer de l'avancement de l'impression pour votre commande <strong>#${order.id.slice(0, 8)}</strong>.</p>
+                  
+                  <div style="margin: 35px 0; padding: 30px; background-color: #fdf2ff; border: 1px solid #f5d0fe; border-radius: 16px; text-align: center;">
+                    <p style="margin: 0; color: #6b7280; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">Statut actuel</p>
+                    <p style="margin: 12px 0 0 0; color: #b522c1; font-size: 32px; font-weight: 900;">${statusLabel}</p>
+                    ${newStatus === 'shipped' && order.trackingNumber ? `
+                      <p style="margin: 15px 0 0 0; color: #475569; font-size: 14px;">
+                        Numéro de suivi : <strong>${order.trackingNumber}</strong>
+                      </p>
+                    ` : ''}
+                  </div>
+
+                  <p style="color: #475569; font-size: 15px;">
+                    ${newStatus === 'in_production' ? "Vos supports sont actuellement sur nos presses. Nous apportons un soin particulier à la qualité du rendu." : ""}
+                    ${newStatus === 'shipped' ? "Bonne nouvelle ! Vos supports ont été expédiés et sont en route vers votre adresse de livraison." : ""}
+                    ${newStatus === 'delivered' ? "Vos supports ont été livrés. Nous espérons qu'ils vous donneront entière satisfaction !" : ""}
+                  </p>
+                  
+                  <div style="text-align: center; margin-top: 45px;">
+                    <a href="${dashboardUrl}" style="background-color: #b522c1; color: white; padding: 18px 40px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 15px rgba(181, 34, 193, 0.3);">Suivre ma commande</a>
+                  </div>
+                </div>
+
+                <div style="background-color: #1e293b; padding: 35px; text-align: center; color: #94a3b8; font-size: 13px;">
+                  <p style="margin: 0; color: white; font-weight: bold; font-size: 15px;">Acom Technologie</p>
+                  <p style="margin: 8px 0 0 0;">Service Impression & Logistique</p>
+                  <p style="margin: 20px 0 0 0; color: #64748b; border-top: 1px solid #334155; padding-top: 20px; font-size: 11px;">
+                    Ceci est un message automatique envoyé par notre système de gestion.<br>Merci de ne pas y répondre directement.
+                  </p>
+                </div>
+              </div>
+            </div>
+          `
+        })
+      });
+    } catch (error) {
+      console.error('Email sending failed:', error);
+    }
+  },
 
   async notifyNewMessage(order: Order, senderName: string, recipientId: string, recipientEmail: string, messageText: string) {
     const dashboardUrl = `${window.location.origin}/dashboard/order/${order.id}`;

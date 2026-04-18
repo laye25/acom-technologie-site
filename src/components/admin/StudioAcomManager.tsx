@@ -753,22 +753,31 @@ const StudioAcomManager = () => {
                                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Design SVG (Template)</label>
                                       <label className="cursor-pointer flex items-center gap-1.5 text-[10px] font-black text-purple-600 hover:text-purple-700 uppercase tracking-widest transition-colors">
                                         <Plus className="w-3 h-3" />
-                                        Importer SVG
+                                        Importer SVG(s)
                                         <input 
                                           type="file" 
                                           accept=".svg" 
+                                          multiple
                                           className="hidden" 
                                           onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) {
-                                              const reader = new FileReader();
-                                              reader.onload = (event) => {
-                                                const content = event.target?.result as string;
+                                            const files = e.target.files;
+                                            if (files && files.length > 0) {
+                                              const promises = Array.from(files).map((file) => {
+                                                return new Promise<string>((resolve) => {
+                                                  const reader = new FileReader();
+                                                  reader.onload = (event) => resolve(event.target?.result as string);
+                                                  reader.readAsText(file);
+                                                });
+                                              });
+                                              Promise.all(promises).then((svgContents) => {
+                                                const content = svgContents.length > 1 ? JSON.stringify(svgContents) : svgContents[0];
                                                 const newVariants = [...editingItem.variants];
                                                 newVariants[index].templateSvg = content;
                                                 updateVariant(index, { templateSvg: content });
-                                              };
-                                              reader.readAsText(file);
+                                                if (svgContents.length > 1) {
+                                                  toast.success(`${svgContents.length} pages SVG importées !`);
+                                                }
+                                              });
                                             }
                                           }} 
                                         />

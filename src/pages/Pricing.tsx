@@ -131,13 +131,19 @@ const Pricing = () => {
 
               {/* Action */}
               <div className="p-8 pt-0">
-                <Link
-                  to={user ? "/merchant" : "/login"}
+                <button
+                  onClick={() => {
+                    if (!user) {
+                      window.location.href = '/login';
+                      return;
+                    }
+                    window.location.href = `/merchant?show_upgrade=true&target_plan=${plan.name}`;
+                  }}
                   className={`w-full py-4 ${plan.buttonColor} text-white rounded-full font-bold text-sm hover:scale-105 transition-transform flex items-center justify-center space-x-2 shadow-lg shadow-black/5`}
                 >
-                  <span>{user ? "TABLEAU DE BORD" : "S'INSCRIRE"}</span>
+                  <span>{user ? (plan.name === 'FREE' ? "TABLEAU DE BORD" : "CHOISIR CE PLAN") : "S'INSCRIRE"}</span>
                   <ArrowRight className="w-4 h-4" />
-                </Link>
+                </button>
               </div>
             </motion.div>
           ))}

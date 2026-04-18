@@ -129,7 +129,11 @@ export const GlobalActivityFeed: React.FC<GlobalActivityFeedProps> = ({
                     {activity.userName}
                   </p>
                   <span className="text-[10px] font-medium text-gray-400 whitespace-nowrap">
-                    {formatDistanceToNow(activity.createdAt instanceof Date ? activity.createdAt : new Date(activity.createdAt), { addSuffix: true, locale: fr })}
+                    {(() => {
+                      const date = activity.createdAt?.toDate ? activity.createdAt.toDate() : (activity.createdAt instanceof Date ? activity.createdAt : new Date(activity.createdAt));
+                      if (!date || isNaN(date.getTime())) return '...';
+                      return formatDistanceToNow(date, { addSuffix: true, locale: fr });
+                    })()}
                   </span>
                 </div>
                 <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">

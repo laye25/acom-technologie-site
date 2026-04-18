@@ -28,6 +28,7 @@ import Pricing from './pages/Pricing';
 import SaaSSolutions from './pages/SaaSSolutions';
 import ServiceDetails from './pages/ServiceDetails';
 import DesignEditor from './pages/DesignEditor';
+import EmailPreview from './pages/EmailPreview';
 import ReleaseNotes from './pages/ReleaseNotes';
 import About from './pages/About';
 import FAQ from './pages/FAQ';
@@ -88,6 +89,7 @@ function AppContent() {
           <Route path="/quote-request" element={<ProtectedRoute><QuoteRequest /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/email-preview" element={<ProtectedRoute adminOnly><EmailPreview /></ProtectedRoute>} />
           <Route path="/manager/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
           <Route path="/merchant/saas" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
           <Route path="/solutions-saas" element={<SaaSSolutions />} />

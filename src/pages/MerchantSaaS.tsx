@@ -13,7 +13,8 @@ import {
   Calculator, Receipt, CreditCard, Smartphone, Banknote,
   Clock, CheckCircle, TrendingDown, ArrowRight, FileText, Truck,
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
-  Briefcase, ClipboardList, UserPlus, Building2, Check, Zap, Minus
+  Briefcase, ClipboardList, UserPlus, Building2, Check, Zap, Minus,
+  Lock as LockIcon
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -32,6 +33,10 @@ import { DailyBriefing } from '../components/DailyBriefing';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { InstallButton } from '../components/InstallButton';
 import { NetworkStatusIndicator } from '../components/NetworkStatusIndicator';
+import { payDunyaService } from '../services/payDunyaService';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+import { PaymentForm } from '../components/PaymentForm';
 import { LogOut } from 'lucide-react';
 
 const generateReceiptPDF = (merchant: Merchant, sale: any) => {
@@ -116,7 +121,61 @@ const MerchantSaaS = () => {
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [loadingMerchant, setLoadingMerchant] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Handle payment success from PayDunya
+  useEffect(() => {
+    const handlePaymentSuccess = async () => {
+      const isSuccess = searchParams.get('payment_success') === 'true';
+      const newPlan = searchParams.get('new_plan') as MerchantPlan;
+      const merchantId = searchParams.get('merchant_id');
+
+      if (isSuccess && newPlan && merchantId && merchant && merchant.id === merchantId) {
+        if (merchant.plan !== newPlan) {
+          try {
+            const updatedMerchant = { ...merchant, plan: newPlan, updatedAt: new Date() };
+            await db.merchants.save(updatedMerchant);
+            setMerchant(updatedMerchant);
+            toast.success(`Votre plan a été mis à jour avec succès : ${newPlan} !`, {
+              duration: 5000,
+              icon: '🎉'
+            });
+            
+            // Clear URL parameters
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('payment_success');
+            newParams.delete('new_plan');
+            newParams.delete('merchant_id');
+            newParams.delete('token');
+            setSearchParams(newParams, { replace: true });
+          } catch (error) {
+            console.error('Error updating plan after payment:', error);
+            toast.error('Erreur lors de la mise à jour de votre forfait.');
+          }
+        }
+      }
+    };
+    
+    if (merchant) {
+      handlePaymentSuccess();
+    }
+  }, [searchParams, merchant, db.merchants, setSearchParams]);
+
+  // Handle auto-show upgrade modal from URL
+  useEffect(() => {
+    if (searchParams.get('show_upgrade') === 'true') {
+      setShowUpgradeModal(true);
+      
+      // Optionally clear the param so it doesn't pop up again on refresh
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('show_upgrade');
+      // We keep target_plan for the modal to use if we want
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   // Fetch merchant profile
   useEffect(() => {
     const fetchMerchant = async () => {
@@ -273,7 +332,7 @@ const MerchantSaaS = () => {
 
         {/* Content */}
         <AnimatePresence mode="wait">
-          {activeTab === 'dashboard' && <MerchantDashboard key="dashboard" merchant={merchant} onUpdate={setMerchant} />}
+          {activeTab === 'dashboard' && <MerchantDashboard key="dashboard" merchant={merchant} onUpdate={setMerchant} showUpgradeModal={showUpgradeModal} setShowUpgradeModal={setShowUpgradeModal} />}
           {activeTab === 'inventory' && <InventoryManager key="inventory" merchant={merchant} />}
           {activeTab === 'suppliers' && <SupplierManager key="suppliers" merchant={merchant} />}
           {activeTab === 'pos' && <MerchantPOS key="pos" merchant={merchant} />}
@@ -361,6 +420,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     try {
       const merchantData = {
         ownerId: user.uid,
+        owner_id: user.uid, // Support both snake_case and camelCase for rules/queries
         name,
         currency,
         type, // Store the type in the merchant profile
@@ -478,6 +538,12 @@ const PlanUpgradeModal = ({
   onUpdate: (m: Merchant) => void 
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
+  const [showStripe, setShowStripe] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const stripePromise = useMemo(() => stripeKey ? loadStripe(stripeKey) : null, [stripeKey]);
 
   const plans = [
     {
@@ -516,38 +582,154 @@ const PlanUpgradeModal = ({
   ];
 
   const handleUpgrade = async (planId: string) => {
+    if (planId === merchant.plan) return;
+    
     setLoading(planId);
     try {
-      const updatedMerchant = { ...merchant, plan: planId as any, updatedAt: new Date() };
-      await db.merchants.save(updatedMerchant);
-      onUpdate(updatedMerchant);
-      toast.success(`Plan mis à jour vers ${planId}`);
-      onClose();
+      if (planId === 'FREE') {
+        const updatedMerchant = { ...merchant, plan: 'FREE' as any, updatedAt: new Date() };
+        await db.merchants.save(updatedMerchant);
+        onUpdate(updatedMerchant);
+        toast.success(`Plan mis à jour vers FREE`);
+        onClose();
+        return;
+      }
+
+      const selectedPlan = plans.find(p => p.id === planId);
+      if (!selectedPlan) return;
+
+      const amount = parseInt(selectedPlan.price.replace(/\s/g, ''));
+      const desc = `Abonnement Acom SaaS - Plan ${planId} (${merchant.name})`;
+      
+      const link = await payDunyaService.createPaymentLink({
+        amount,
+        description: desc,
+        orderId: `SUBSCRIPTION_${merchant.id}_${planId}_${Date.now()}`,
+        returnUrl: window.location.origin + `/merchant?payment_success=true&new_plan=${planId}&merchant_id=${merchant.id}`,
+        cancelUrl: window.location.href
+      });
+
+      // Show notification and redirect
+      toast.loading('Redirection vers PayDunya...');
+      
+      // Attempt to open in new tab (some browsers block this, so we also provide a manual way if needed)
+      const win = window.open(link, '_blank');
+      if (!win) {
+        window.location.href = link; // Fallback to current tab if popup blocked
+      } else {
+        toast.dismiss();
+        toast.success('Le lien de paiement a été ouvert dans un nouvel onglet.');
+        onClose();
+      }
     } catch (error) {
-      toast.error('Erreur lors de la mise à jour du plan');
+      console.error('Upgrade error:', error);
+      toast.error('Erreur lors de l\'initialisation du paiement');
     } finally {
       setLoading(null);
     }
   };
 
+  const handleUpgradeWithStripe = async (planId: string) => {
+    if (planId === merchant.plan) return;
+    setLoading(`${planId}_stripe`);
+    try {
+      const selectedPlan = plans.find(p => p.id === planId);
+      if (!selectedPlan) return;
+
+      const amount = parseInt(selectedPlan.price.replace(/\s/g, ''));
+      
+      const response = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount,
+          orderId: `SUBSCRIPTION_${merchant.id}_${planId}_${Date.now()}`,
+          currency: 'xof'
+        }),
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      setClientSecret(data.clientSecret);
+      setSelectedPlanId(planId);
+      setShowStripe(true);
+    } catch (error) {
+      console.error('Stripe upgrade error:', error);
+      toast.error('Erreur lors de l\'initialisation de Stripe');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleStripeSuccess = async () => {
+    if (!selectedPlanId) return;
+    try {
+      const updatedMerchant = { ...merchant, plan: selectedPlanId as any, updatedAt: new Date() };
+      await db.merchants.save(updatedMerchant);
+      onUpdate(updatedMerchant);
+      toast.success(`Plan mis à jour vers ${selectedPlanId} via Stripe !`);
+      onClose();
+    } catch (error) {
+      toast.error('Erreur lors de la mise à jour finale du plan');
+    }
+  };
+
+  if (showStripe && clientSecret && stripePromise) {
+    return (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+        >
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                <LockIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-gray-900">CARTE PREPAYE</h2>
+                <p className="text-xs text-gray-500">Paiement sécurisé via Stripe</p>
+              </div>
+            </div>
+            <button onClick={() => setShowStripe(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <PaymentForm 
+              onSuccess={() => handleStripeSuccess()} 
+              onCancel={() => setShowStripe(false)}
+              amount={parseInt(plans.find(p => p.id === selectedPlanId)?.price.replace(/\s/g, '') || '0')} 
+              totalAmount={parseInt(plans.find(p => p.id === selectedPlanId)?.price.replace(/\s/g, '') || '0')}
+              orderId={`SUBSCRIPTION_${merchant.id}_${selectedPlanId}`}
+              paymentType="full"
+            />
+          </Elements>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm overflow-y-auto pt-20 pb-20 sm:pt-4 sm:pb-4">
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white w-full max-w-5xl rounded-[2.5rem] shadow-2xl overflow-hidden"
+        className="bg-white w-full max-w-5xl rounded-3xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden my-auto"
       >
-        <div className="p-8 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-6 sm:p-8 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Passer au forfait supérieur</h2>
-            <p className="text-sm text-gray-500">Choisissez le plan qui correspond à vos besoins actuels.</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">Passer au forfait supérieur</h2>
+            <p className="text-xs sm:text-sm text-gray-500">Choisissez le plan qui correspond à vos besoins actuels.</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <X className="w-6 h-6 text-gray-400" />
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0">
+            <X className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" />
           </button>
         </div>
 
-        <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-h-[70vh] overflow-y-auto">
           {plans.map((plan) => (
             <div 
               key={plan.id}
@@ -586,23 +768,53 @@ const PlanUpgradeModal = ({
                 ))}
               </ul>
 
-              <button
-                disabled={merchant.plan === plan.id || !!loading}
-                onClick={() => handleUpgrade(plan.id)}
-                className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center ${
-                  merchant.plan === plan.id
-                    ? 'bg-emerald-50 text-emerald-600 cursor-default'
-                    : 'bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20'
-                }`}
-              >
-                {loading === plan.id ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : merchant.plan === plan.id ? (
-                  <><CheckCircle className="w-4 h-4 mr-2" /> Actuel</>
-                ) : (
-                  'Choisir ce plan'
+              <div className="flex flex-col gap-3">
+                <button
+                  disabled={merchant.plan === plan.id || !!loading}
+                  onClick={() => handleUpgrade(plan.id)}
+                  className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all flex flex-col items-center justify-center ${
+                    merchant.plan === plan.id
+                      ? 'bg-emerald-50 text-emerald-600 cursor-default'
+                      : 'bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20'
+                  }`}
+                >
+                  {loading === plan.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : merchant.plan === plan.id ? (
+                    <><CheckCircle className="w-4 h-4 mr-2" /> Forfait Actuel</>
+                  ) : (
+                    <>
+                      <div className="flex items-center mb-1">
+                        {plan.price !== '0' && <Smartphone className="w-4 h-4 mr-2" />}
+                        <span>{plan.price === '0' ? 'Choisir ce plan' : `MOBIL MONEY`}</span>
+                      </div>
+                      {plan.price !== '0' && (
+                        <span className="text-[10px] opacity-70 font-medium">Orange Money, Wave, etc.</span>
+                      )}
+                    </>
+                  )}
+                </button>
+
+                {plan.price !== '0' && merchant.plan !== plan.id && (
+                  <button
+                    disabled={!!loading}
+                    onClick={() => handleUpgradeWithStripe(plan.id)}
+                    className="w-full py-4 rounded-xl border border-gray-200 text-gray-900 font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-all flex flex-col items-center justify-center group"
+                  >
+                    {loading === `${plan.id}_stripe` ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <div className="flex items-center mb-1">
+                          <LockIcon className="w-4 h-4 mr-2 text-gray-400 group-hover:text-primary" />
+                          <span>CARTE PREPAYE</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-medium">Carte Bancaire via Stripe</span>
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
             </div>
           ))}
         </div>
@@ -611,8 +823,17 @@ const PlanUpgradeModal = ({
   );
 };
 
-const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdate: (m: Merchant) => void }) => {
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+const MerchantDashboard = ({ 
+  merchant, 
+  onUpdate,
+  showUpgradeModal,
+  setShowUpgradeModal
+}: { 
+  merchant: Merchant, 
+  onUpdate: (m: Merchant) => void,
+  showUpgradeModal: boolean,
+  setShowUpgradeModal: (val: boolean) => void
+}) => {
   const productOptions = useMemo(() => ({
     tableName: 'merchant_products' as TableName,
     where: [['merchantId', '==', merchant.id]],
@@ -822,29 +1043,29 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
 
       {/* Plan Upgrade Banner */}
       {merchant.plan !== 'PREMIUM' && (
-        <div className="relative overflow-hidden bg-gradient-to-r from-primary to-primary-hover rounded-[2rem] p-8 text-white shadow-xl shadow-primary/20">
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+        <div className="relative overflow-hidden bg-gradient-to-r from-primary to-primary-hover rounded-3xl sm:rounded-[2rem] p-6 lg:p-10 text-white shadow-xl shadow-primary/20">
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-10 text-center lg:text-left">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8">
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center flex-shrink-0">
                 <Zap className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold">Passez au forfait supérieur</h2>
-                <p className="text-white/80 text-sm max-w-md">
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black uppercase tracking-tight mb-2">Passez au forfait supérieur</h2>
+                <p className="text-white/80 text-xs sm:text-sm max-w-md lg:max-w-lg font-medium">
                   Débloquez toutes les fonctionnalités premium et propulsez votre activité vers de nouveaux sommets.
                 </p>
               </div>
             </div>
             <button 
               onClick={() => setShowUpgradeModal(true)}
-              className="px-8 py-4 bg-white text-primary font-bold rounded-2xl hover:bg-gray-50 transition-all shadow-lg active:scale-95 whitespace-nowrap"
+              className="w-full lg:w-auto px-10 py-4 lg:py-5 bg-white text-primary font-black uppercase tracking-widest text-xs sm:text-sm rounded-2xl hover:bg-gray-50 transition-all shadow-lg active:scale-95 whitespace-nowrap"
             >
               Voir les forfaits
             </button>
           </div>
           {/* Decorative elements */}
-          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/4 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/4 w-48 h-48 bg-black/10 rounded-full blur-2xl" />
+          <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/4 w-64 h-64 bg-white/10 rounded-full blur-3xl opacity-50" />
+          <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/4 w-48 h-48 bg-black/10 rounded-full blur-2xl opacity-30" />
         </div>
       )}
 
@@ -855,8 +1076,6 @@ const MerchantDashboard = ({ merchant, onUpdate }: { merchant: Merchant, onUpdat
           onUpdate={onUpdate}
         />
       )}
-
-      {/* Primary Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {merchant.type === 'boutique' || !merchant.type ? (
           <>

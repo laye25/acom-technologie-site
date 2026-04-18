@@ -6,7 +6,7 @@ import { syncService } from '../services/syncService';
 import { Order, OrderStatus, UserProfile, Service, Expense, SiteSettings } from '../types';
 import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette } from 'lucide-react';
+import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Link as LinkIcon } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, startOfYear, eachMonthOfInterval, isSameDay, isSameMonth } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -25,13 +25,16 @@ import { ExpenseManager } from '../components/admin/ExpenseManager';
 import StudioAcomManager from '../components/admin/StudioAcomManager';
 import { PlatformAIInsights } from '../components/admin/PlatformAIInsights';
 import { ConfirmModal } from '../components/admin/ConfirmModal';
+import { AcomSaaSManager } from '../components/admin/AcomSaaSManager';
+import { AcomSaaSSettings } from '../components/admin/AcomSaaSSettings';
 import { storageService } from '../services/storageService';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { notificationService } from '../services/notificationService';
 import { GlobalActivityFeed } from '../components/GlobalActivityFeed';
 import { DailyBriefing } from '../components/DailyBriefing';
+import { PrintingManager } from '../components/admin/PrintingManager';
 
-type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom';
+type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom' | 'printing' | 'saas_subscriptions' | 'saas_appearance';
 
 // import { isSupabaseConfigured } from '../lib/supabase';
 
@@ -172,6 +175,48 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error("Error marking as paid:", error);
       toast.error("Erreur lors de la mise à jour du statut de paiement.");
+    } finally {
+      setIsProcessingPayment(null);
+    }
+  };
+
+  const handleGeneratePayDunyaLink = async (order: Order, type: 'deposit' | 'balance' | 'full' = 'full') => {
+    setIsProcessingPayment(order.id);
+    try {
+      const total = getOrderDiscountedTotal(order);
+      const amount = type === 'full' ? total : total * 0.5;
+      const description = type === 'deposit' 
+        ? `Acompte (50%) - Commande #${order.id}` 
+        : type === 'balance' 
+          ? `Solde (50%) - Commande #${order.id}` 
+          : `Total - Commande #${order.id}`;
+
+      const { payDunyaService } = await import('../services/payDunyaService');
+      const link = await payDunyaService.createPaymentLink({
+        amount,
+        description,
+        orderId: order.id,
+        returnUrl: `${window.location.origin}/order-details/${order.id}?payment_success=true&payment_type=${type}`,
+        cancelUrl: `${window.location.origin}/order-details/${order.id}`
+      });
+
+      navigator.clipboard.writeText(link);
+      toast.success(
+        (t) => (
+          <div className="flex flex-col gap-2">
+            <span className="font-bold">Lien PayDunya copié !</span>
+            <p className="text-xs">Envoyez-le à votre client pour recouvrement.</p>
+            <div className="flex gap-2">
+              <a href={link} target="_blank" rel="noreferrer" className="px-3 py-1 bg-primary text-white text-[10px] font-bold rounded-lg uppercase tracking-wider transition-all" onClick={() => toast.dismiss(t.id)}>
+                Vérifier le lien
+              </a>
+            </div>
+          </div>
+        ),
+        { duration: 10000 }
+      );
+    } catch (error: any) {
+      toast.error(error.message || "Erreur PayDunya");
     } finally {
       setIsProcessingPayment(null);
     }
@@ -401,23 +446,40 @@ const AdminDashboard = () => {
               Fermer
             </button>
             {!order.paid && (
-              <button 
-                onClick={() => {
-                  handleMarkAsPaid(order);
-                  onClose();
-                }}
-                disabled={isProcessingPayment === order.id}
-                className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center disabled:opacity-50"
-              >
-                {isProcessingPayment === order.id ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Banknote className="w-5 h-5 mr-2" />
-                    Marquer comme Payé
-                  </>
-                )}
-              </button>
+              <div className="flex flex-1 flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => handleGeneratePayDunyaLink(order, order.depositPaid ? 'balance' : 'full')}
+                  disabled={isProcessingPayment === order.id}
+                  className="flex-1 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 flex items-center justify-center disabled:opacity-50"
+                >
+                  {isProcessingPayment === order.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <LinkIcon className="w-5 h-5 mr-2" />
+                      Lien PayDunya
+                    </>
+                  )}
+                </button>
+
+                <button 
+                  onClick={() => {
+                    handleMarkAsPaid(order);
+                    onClose();
+                  }}
+                  disabled={isProcessingPayment === order.id}
+                  className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center disabled:opacity-50"
+                >
+                  {isProcessingPayment === order.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Banknote className="w-5 h-5 mr-2" />
+                      Marquer Payé
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
         </motion.div>
@@ -1173,7 +1235,10 @@ const AdminDashboard = () => {
     { id: 'pos', label: 'Caisse', icon: Calculator, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'expenses', label: 'Dépenses', icon: Receipt, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'design_requests', label: 'Demandes Design', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: true },
+    { id: 'printing', label: 'Impression', icon: Printer, adminOnly: true, superAdminOnly: false, allowManager: true },
     { id: 'studio_acom', label: 'Studio ACOM', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: false },
+    { id: 'saas_subscriptions', label: 'Souscriptions', icon: Store, adminOnly: true, superAdminOnly: false, allowManager: false },
+    { id: 'saas_appearance', label: 'Apparence', icon: Layout, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'design', label: 'Éditeur Design', icon: LayoutGrid, adminOnly: true, superAdminOnly: false, allowManager: false },
   ].filter(tab => {
     if (tab.superAdminOnly && !isSuperAdmin) return false;
@@ -1183,33 +1248,68 @@ const AdminDashboard = () => {
     return true;
   });
 
+  const tabGroups = [
+    {
+      title: "Statistiques & Commercial",
+      tabs: ['overview', 'orders', 'users', 'messages']
+    },
+    {
+      title: "Gestion du Site",
+      tabs: ['services', 'portfolio', 'blog', 'settings']
+    },
+    {
+      title: "Finances",
+      tabs: ['pos', 'expenses']
+    },
+    {
+      title: "Studio ACOM",
+      tabs: ['design_requests', 'printing', 'studio_acom', 'design']
+    },
+    {
+      title: "Acom SaaS",
+      tabs: ['saas_subscriptions', 'saas_appearance']
+    }
+  ];
+
   return (
     <div className="max-w-7xl mx-auto px-4 pt-32 pb-16 md:pt-44">
-      <div className="flex flex-col lg:flex-row items-center justify-between mb-12 gap-8 lg:gap-16">
-        <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 text-center lg:text-left tracking-tight">Dashboard Administrateur</h1>
+      <div className="flex flex-col items-center justify-center mb-12 gap-8">
+        <h1 className="text-3xl md:text-5xl lg:text-5xl font-bold text-gray-900 text-center tracking-tight">Dashboard Administrateur</h1>
         
-        <div className="w-full">
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:flex-wrap bg-gray-100 p-1.5 rounded-2xl gap-1.5 justify-center lg:justify-end">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  if (tab.id === 'design') {
-                    navigate('/design-editor');
-                  } else {
-                    setActiveTab(tab.id as Tab);
-                  }
-                }}
-                className={`flex items-center justify-center px-3 py-2.5 md:px-4 md:py-2.5 rounded-xl text-[10px] md:text-xs lg:text-sm font-bold transition-all whitespace-nowrap ${
-                  activeTab === tab.id 
-                    ? 'bg-white text-primary shadow-md' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2 shrink-0" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
+        <div className="w-full max-w-6xl bg-gray-50 p-6 md:p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            {tabGroups.map((group, groupIdx) => {
+              const groupTabs = tabs.filter(t => group.tabs.includes(t.id));
+              if (groupTabs.length === 0) return null;
+              
+              return (
+                <div key={groupIdx} className="flex flex-col gap-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-2 mb-1">{group.title}</h3>
+                  <div className="flex flex-col gap-2">
+                    {groupTabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          if (tab.id === 'design') {
+                            navigate('/design-editor');
+                          } else {
+                            setActiveTab(tab.id as Tab);
+                          }
+                        }}
+                        className={`flex items-center justify-start px-4 py-3 rounded-xl text-xs md:text-sm font-bold transition-all ${
+                          activeTab === tab.id 
+                            ? 'bg-white text-primary shadow border border-primary/10' 
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/50'
+                        }`}
+                      >
+                        <tab.icon className={`w-4 h-4 mr-3 shrink-0 ${activeTab === tab.id ? 'text-primary' : 'text-gray-400'}`} />
+                        <span>{tab.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1318,6 +1418,24 @@ const AdminDashboard = () => {
                         <Eye className="w-4 h-4" />
                         Console Supabase
                       </a>
+                    </div>
+                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                          <Mail className="w-5 h-5 text-emerald-600" />
+                        </div>
+                      </div>
+                      <h4 className="font-bold text-gray-900 mb-2">Prévisualisation Emails</h4>
+                      <p className="text-xs text-gray-500 mb-6 leading-relaxed">
+                        Visualisez le rendu réel des emails de suivi d'impression envoyés à vos clients (Production, Expédition, Livraison).
+                      </p>
+                      <Link
+                        to="/admin/email-preview"
+                        className="w-full py-3 bg-white text-emerald-600 border border-emerald-100 rounded-xl text-sm font-bold hover:bg-emerald-50 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Tester les emails
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -1843,6 +1961,21 @@ const AdminDashboard = () => {
           </motion.div>
         )}
 
+        {activeTab === 'printing' && (
+          <motion.div
+            key="printing"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <PrintingManager 
+              orders={orders} 
+              services={allServices} 
+              users={users} 
+            />
+          </motion.div>
+        )}
+
         {activeTab === 'orders' && (
           <motion.div
             key="orders"
@@ -2258,6 +2391,32 @@ const AdminDashboard = () => {
           >
             <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
               <StudioAcomManager />
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'saas_subscriptions' && (
+          <motion.div
+            key="saas_subscriptions"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
+              <AcomSaaSManager />
+            </div>
+          </motion.div>
+        )}
+        
+        {activeTab === 'saas_appearance' && (
+          <motion.div
+            key="saas_appearance"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
+              <AcomSaaSSettings />
             </div>
           </motion.div>
         )}

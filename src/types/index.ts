@@ -18,6 +18,20 @@ export interface Service {
     endDate: string;
     isActive: boolean;
   };
+  pillar?: 'saas' | 'studio';
+  // New fields for SaaS Printing Model
+  isPrintProduct?: boolean;
+  hasTemplate?: boolean;
+  templateId?: string;
+  printOptions?: {
+    id: string;
+    label: string;
+    options: { label: string; priceModifier: number }[];
+  }[];
+  quantityTiers?: {
+    quantity: number;
+    price: number;
+  }[];
 }
 
 export type OrderStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'delivered' | 'cancelled';
@@ -36,7 +50,9 @@ export interface Order {
   userId: string;
   user_id?: string;
   status: OrderStatus;
+  originalPrice?: number;
   totalPrice: number;
+  designId?: string;
   createdAt: any;
   updatedAt: any;
   created_at?: any;
@@ -58,6 +74,10 @@ export interface Order {
   unreadByClient?: boolean;
   clientAccepted?: boolean;
   acceptedAt?: any;
+  printPdfUrl?: string;
+  trackingNumber?: string;
+  supplierStatus?: 'pending' | 'in_production' | 'shipped' | 'delivered';
+  supplierId?: string;
   paid?: boolean;
   depositPaid?: boolean;
   depositAmount?: number;
@@ -141,6 +161,7 @@ export interface CanvasElement {
   fontSize?: number;
   fontFamily?: string;
   fontStyle?: string;
+  fontWeight?: string;
   textDecoration?: string;
   align?: string;
   lineHeight?: number;
@@ -356,15 +377,21 @@ export interface CTASection {
   secondaryButtonLink: string;
 }
 
-export interface ExpertiseSection {
-  badge: string;
+export interface ExpertiseUniverse {
   title: string;
-  subtitle1: string;
-  subtitle2: string;
+  image: string;
   description: string;
-  searchPlaceholder: string;
-  noResultsText: string;
-  resetFiltersText: string;
+  features: string[];
+  linkText: string;
+  linkUrl: string;
+  baseColor?: string;
+}
+
+export interface ExpertiseSection {
+  titlePart1: string;
+  titlePart2: string; // The part marked in purple
+  subtitle: string;
+  universes: ExpertiseUniverse[];
 }
 
 export interface PortfolioSection {
@@ -390,6 +417,23 @@ export interface ContactSection {
   whatsappText: string;
 }
 
+export interface SaaSSolutionContent {
+  title: string;
+  description: string;
+  iconName: string;
+  color: string;
+  image: string;
+  link: string;
+}
+
+export interface SaaSPageContent {
+  bannerImage: string;
+  heroTitle1: string;
+  heroTitle2: string;
+  heroDescription: string;
+  solutions: SaaSSolutionContent[];
+}
+
 export interface SiteSettings {
   brandName?: string;
   logoUrl?: string;
@@ -408,6 +452,7 @@ export interface SiteSettings {
   expertiseSection?: ExpertiseSection;
   portfolioSection?: PortfolioSection;
   contactSection?: ContactSection;
+  saasContent?: SaaSPageContent;
 }
 
 // SaaS Merchant Types
@@ -419,6 +464,7 @@ export interface Merchant {
   name: string;
   type?: string; // e.g., 'boutique', 'entreprise', 'chantier', 'transport', 'rh', 'scolaire', 'medical'
   plan?: MerchantPlan;
+  status?: 'active' | 'suspended';
   description?: string;
   logo?: string;
   address?: string;

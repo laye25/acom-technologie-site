@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowRight, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, ChevronRight, Tag } from 'lucide-react';
+import { ArrowRight, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, ChevronRight, Tag, Briefcase, Users, Award, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { dbService as db } from '../services/dbService';
 import { Translate, useTranslation } from '../context/LanguageContext';
 import { OptimizedImage } from './OptimizedImage';
 
 const iconMap: { [key: string]: any } = {
-  Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code
+  Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, Briefcase, Users, Award, Star
 };
 
 const DEFAULT_SLIDES = [
@@ -40,6 +40,7 @@ const HeroBanner = () => {
   const [slides, setSlides] = useState(DEFAULT_SLIDES);
   const [brandName, setBrandName] = useState('Acom Technologie');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [stats, setStats] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -59,6 +60,16 @@ const HeroBanner = () => {
           }
           if (data.logoUrl) {
             setLogoUrl(data.logoUrl);
+          }
+          if (data.statsSection) {
+            setStats(data.statsSection);
+          } else {
+            setStats([
+              { label: 'Projets Terminés', value: '500+', iconName: 'Briefcase' },
+              { label: 'Clients Satisfaits', value: '200+', iconName: 'Users' },
+              { label: 'Années d\'Expérience', value: '10+', iconName: 'Award' },
+              { label: 'Avis Positifs', value: '4.9/5', iconName: 'Star' },
+            ]);
           }
         }
       } catch (error) {
@@ -91,7 +102,7 @@ const HeroBanner = () => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 1 }}
-          className="relative w-full min-h-[600px] lg:h-[800px] flex items-center"
+          className="relative w-full min-h-[800px] lg:min-h-[900px] flex items-center"
         >
           {/* Background Image with Parallax effect */}
           <motion.div 
@@ -113,8 +124,8 @@ const HeroBanner = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-transparent z-0" />
 
           {/* Content Container */}
-          <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-12 py-40 lg:pt-40 lg:pb-20">
-            <div className="grid lg:grid-cols-2 gap-12 items-center w-full">
+          <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-12 pt-40 pb-20 lg:pt-56 lg:pb-32 flex flex-col justify-center min-h-[800px] lg:min-h-[900px]">
+            <div className="grid lg:grid-cols-2 gap-12 items-center w-full mb-16 lg:mb-24">
               {/* Text Content */}
               <div className="max-w-2xl">
                 <motion.div
@@ -223,12 +234,38 @@ const HeroBanner = () => {
                 <div className="absolute -bottom-8 -left-8 w-48 h-48 bg-primary/10 rounded-full animate-pulse" />
               </motion.div>
             </div>
+
+            {/* Stats Section in the flow */}
+            <div className="w-full">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+                {stats.map((stat, i) => {
+                  const StatIcon = iconMap[stat.iconName] || Briefcase;
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.8 + (i * 0.1) }}
+                      className="text-center p-3 md:p-6 rounded-2xl md:rounded-3xl bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 transition-colors"
+                    >
+                      <div className="inline-flex items-center justify-center w-6 h-6 md:w-12 md:h-12 rounded-lg md:rounded-2xl bg-primary/10 mb-2 md:mb-4">
+                        <StatIcon className="w-3 h-3 md:w-6 md:h-6 text-primary" />
+                      </div>
+                      <div className="text-lg sm:text-2xl md:text-3xl font-display font-bold mb-0.5 tracking-tighter text-white">{stat.value}</div>
+                      <div className="text-[6px] md:text-[10px] font-mono text-white/40 uppercase tracking-widest leading-tight">
+                        <Translate>{stat.label}</Translate>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </motion.div>
       </AnimatePresence>
 
       {/* Progress Indicators */}
-      <div className="absolute bottom-12 left-6 md:left-12 flex flex-col space-y-4 z-20">
+      <div className="absolute top-1/2 -translate-y-1/2 left-6 md:left-12 flex flex-col space-y-4 z-20 hidden xl:flex">
         {slides.map((_, i) => (
           <button
             key={i}
@@ -249,7 +286,7 @@ const HeroBanner = () => {
       <motion.div 
         animate={{ y: [0, 10, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
-        className="absolute bottom-12 right-6 md:right-12 z-20"
+        className="absolute bottom-12 right-6 md:right-12 z-20 hidden lg:block"
       >
         <div className="w-px h-24 bg-gradient-to-b from-white/20 to-transparent flex items-end justify-center">
           <div className="w-1 h-1 bg-white rounded-full mb-2" />

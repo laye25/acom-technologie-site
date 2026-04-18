@@ -273,6 +273,16 @@ const Dashboard = () => {
                           <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${getStatusColor(order.status)}`}>
                             {getStatusLabel(order.status, order.clientAccepted, order.details?.type)}
                           </span>
+                          {order.supplierStatus && order.supplierStatus !== 'pending' && (
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${
+                              order.supplierStatus === 'in_production' ? 'bg-blue-100 text-blue-700' :
+                              order.supplierStatus === 'shipped' ? 'bg-purple-100 text-purple-700' :
+                              'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {order.supplierStatus === 'in_production' ? 'En production' :
+                               order.supplierStatus === 'shipped' ? 'Expédié' : 'Prêt'}
+                            </span>
+                          )}
                           {order.paid ? (
                             <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap bg-emerald-100 text-emerald-700">
                               Payé

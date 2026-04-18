@@ -7,7 +7,7 @@ import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { motion } from 'motion/react';
-import { ShoppingBag, Plus, Minus, Trash2, CheckCircle, Loader2, Search, Calculator, Tag } from 'lucide-react';
+import { ShoppingBag, Clock, CheckCircle, Package, Send, FileText, MessageSquare, User, Sparkles, Palette, Trash2, ExternalLink, Plus, Loader2, CreditCard, Lock as LockIcon, ArrowRight, Download, Receipt, Banknote, Smartphone, Calculator, Search, Minus, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const POS = () => {
@@ -168,6 +168,80 @@ const POS = () => {
     } catch (error) {
       console.error('Checkout error:', error);
       toast.error('Erreur lors de la validation de la commande.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePayDunyaLink = async () => {
+    if (cart.length === 0) return;
+    if (!customerName || !customerPhone) {
+      toast.error('Veuillez remplir au moins le nom et le téléphone du client.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const now = new Date();
+      const amountToPay = isDeposit ? finalTotal * 0.5 : finalTotal;
+      const desc = `Vente POS #${Date.now()} - ${customerName}`;
+
+      const { payDunyaService } = await import('../services/payDunyaService');
+      
+      // We create the order record first (unpaid)
+      const orderId = 'POS_' + Math.random().toString(36).substr(2, 9);
+      const ordersToInsert = cart.map((item, idx) => ({
+        id: idx === 0 ? orderId : undefined,
+        user_id: user?.uid || 'pos-customer',
+        service_id: item.serviceId,
+        status: 'pending',
+        total_price: item.price * item.quantity,
+        paid: false,
+        details: {
+          quantity: item.quantity,
+          type: 'pos',
+          processed_by: user?.email,
+          full_name: customerName,
+          address: customerAddress,
+          phone: customerPhone
+        },
+        created_at: now.toISOString(),
+        updated_at: now.toISOString()
+      }));
+
+      await firestoreService.add('orders', ordersToInsert);
+
+      const link = await payDunyaService.createPaymentLink({
+        amount: amountToPay,
+        description: desc,
+        orderId,
+        returnUrl: window.location.origin + '/dashboard?tab=orders&payment_success=true',
+        cancelUrl: window.location.href
+      });
+
+      // Show link to admin to share
+      navigator.clipboard.writeText(link);
+      toast.success(
+        (t) => (
+          <div className="flex flex-col gap-2">
+            <span className="font-bold">Lien PayDunya généré !</span>
+            <p className="text-xs">Le lien est copié dans le presse-papier. Partagez-le avec le client.</p>
+            <div className="flex gap-2">
+              <a href={link} target="_blank" rel="noreferrer" className="px-4 py-2 bg-primary text-white text-[10px] font-bold rounded-xl text-center flex-1" onClick={() => toast.dismiss(t.id)}>
+                Vérifier
+              </a>
+            </div>
+          </div>
+        ),
+        { duration: 15000 }
+      );
+
+      setCart([]);
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerAddress('');
+    } catch (error) {
+      console.error('PayDunya POS error:', error);
+      toast.error('Erreur lors de la génération du lien.');
     } finally {
       setIsSubmitting(false);
     }
@@ -376,26 +450,46 @@ const POS = () => {
                 </div>
               </div>
 
-              <button
-                onClick={handleCheckout}
-                disabled={cart.length === 0 || isSubmitting}
-                className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center transition-all ${
-                  success 
-                    ? 'bg-emerald-500 text-white' 
-                    : 'bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20 disabled:opacity-50 disabled:shadow-none'
-                }`}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : success ? (
-                  <>
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    Vente enregistrée !
-                  </>
-                ) : (
-                  'Valider la Commande'
-                )}
-              </button>
+              <div className="flex flex-col gap-2 pt-2">
+                <button
+                  onClick={handleCheckout}
+                  disabled={cart.length === 0 || isSubmitting}
+                  className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center transition-all ${
+                    success 
+                      ? 'bg-emerald-500 text-white' 
+                      : 'bg-gray-900 text-white hover:bg-black shadow-lg shadow-black/20 disabled:opacity-50 disabled:shadow-none'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : success ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Enregistré !
+                    </>
+                  ) : (
+                    <>
+                      <Banknote className="w-5 h-5 mr-2" />
+                      Espèces / Chèque
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handlePayDunyaLink}
+                  disabled={cart.length === 0 || isSubmitting}
+                  className="w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Smartphone className="w-5 h-5 mr-2" />
+                      MOBIL MONEY (OM/Wave)
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

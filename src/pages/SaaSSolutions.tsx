@@ -1,24 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Package, 
-  Settings, 
-  Construction, 
-  Truck, 
-  Users, 
-  GraduationCap, 
-  Hospital,
-  ArrowRight,
-  CheckCircle2
-} from 'lucide-react';
+import * as Icons from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { dbService } from '../services/dbService';
+import { SaaSPageContent } from '../types';
 
-const solutions = [
+const defaultSolutions = [
   {
     title: "Gestion de stock",
     description: "Optimisez votre inventaire, suivez vos ventes en temps réel et automatisez vos réapprovisionnements.",
-    icon: Package,
+    iconName: "Package",
     color: "bg-blue-500",
     image: "https://picsum.photos/seed/stock/800/600",
     link: "/merchant/saas?type=boutique"
@@ -26,7 +18,7 @@ const solutions = [
   {
     title: "Gestion des services",
     description: "Planifiez vos interventions, gérez vos techniciens et suivez la satisfaction client de bout en bout.",
-    icon: Settings,
+    iconName: "Settings",
     color: "bg-purple-500",
     image: "https://picsum.photos/seed/services/800/600",
     link: "/merchant/saas?type=entreprise"
@@ -34,7 +26,7 @@ const solutions = [
   {
     title: "Gestion de chantier (BTP)",
     description: "Suivez l'avancement de vos travaux, gérez vos ressources et maîtrisez vos coûts de construction.",
-    icon: Construction,
+    iconName: "Construction",
     color: "bg-orange-500",
     image: "https://picsum.photos/seed/construction/800/600",
     link: "/merchant/saas?type=chantier"
@@ -42,7 +34,7 @@ const solutions = [
   {
     title: "Gestion de transport et de flotte",
     description: "Gérez vos véhicules, optimisez vos trajets et suivez la consommation de carburant en temps réel.",
-    icon: Truck,
+    iconName: "Truck",
     color: "bg-emerald-500",
     image: "https://picsum.photos/seed/transport/800/600",
     link: "/merchant/saas?type=transport"
@@ -50,7 +42,7 @@ const solutions = [
   {
     title: "Gestion des ressources humaines (RH)",
     description: "Simplifiez la paie, gérez les congés et suivez le développement des compétences de vos collaborateurs.",
-    icon: Users,
+    iconName: "Users",
     color: "bg-rose-500",
     image: "https://picsum.photos/seed/hr/800/600",
     link: "/merchant/saas?type=rh"
@@ -58,7 +50,7 @@ const solutions = [
   {
     title: "Gestion scolaire (écoles / universités)",
     description: "Gérez les inscriptions, les emplois du temps et la communication entre parents, élèves et enseignants.",
-    icon: GraduationCap,
+    iconName: "GraduationCap",
     color: "bg-indigo-500",
     image: "https://picsum.photos/seed/school/800/600",
     link: "/merchant/saas?type=scolaire"
@@ -66,7 +58,7 @@ const solutions = [
   {
     title: "Gestion médicale (cliniques / hôpitaux)",
     description: "Gérez les dossiers patients, les rendez-vous et la facturation médicale en toute sécurité.",
-    icon: Hospital,
+    iconName: "Hospital",
     color: "bg-red-500",
     image: "https://picsum.photos/seed/medical/800/600",
     link: "/merchant/saas?type=medical"
@@ -74,13 +66,38 @@ const solutions = [
 ];
 
 const SaaSSolutions = () => {
+  const [saasContent, setSaasContent] = useState<SaaSPageContent | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const data = await dbService.settings.get('default');
+        if (data && data.saasContent) {
+          setSaasContent(data.saasContent);
+        }
+      } catch (error) {
+        console.error('Error fetching settings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const solutions = saasContent?.solutions && saasContent.solutions.length > 0 ? saasContent.solutions : defaultSolutions;
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Banner Section */}
       <section className="relative min-h-[80vh] flex items-center overflow-hidden bg-ink pt-40 pb-24">
         <div className="absolute inset-0 z-0">
           <OptimizedImage 
-            src="https://picsum.photos/seed/saas-banner/1920/1080" 
+            src={saasContent?.bannerImage || "https://picsum.photos/seed/saas-banner/1920/1080"} 
             alt="SaaS Solutions Banner" 
             width={1920}
             className="w-full h-full object-cover opacity-60"
@@ -104,8 +121,8 @@ const SaaSSolutions = () => {
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-7xl font-display font-bold text-white mb-8 tracking-tighter leading-[1.1]"
           >
-            Pilotez votre entreprise <br />
-            <span className="text-primary italic">en toute simplicité.</span>
+            {saasContent?.heroTitle1 || "Pilotez votre entreprise"} <br />
+            <span className="text-primary italic">{saasContent?.heroTitle2 || "en toute simplicité."}</span>
           </motion.h1>
           
           <motion.p 
@@ -114,17 +131,18 @@ const SaaSSolutions = () => {
             transition={{ delay: 0.2 }}
             className="text-white/90 text-lg md:text-xl max-w-3xl font-light leading-relaxed"
           >
-            Une gamme de solutions SaaS dédiées pour optimiser chaque domaine de votre activité. 
-            Pensées pour les entrepreneurs ambitieux, ces solutions vous accompagnent dans votre croissance au quotidien.
+            {saasContent?.heroDescription || "Une gamme de solutions SaaS dédiées pour optimiser chaque domaine de votre activité. Pensées pour les entrepreneurs ambitieux, ces solutions vous accompagnent dans votre croissance au quotidien."}
           </motion.p>
         </div>
       </section>
 
       <div className="max-w-7xl mx-auto px-6 md:px-12 py-20">
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {solutions.map((solution, i) => (
+          {solutions.map((solution, i) => {
+            const Icon = (Icons as any)[solution.iconName || 'Box'] || Icons.Box;
+            return (
             <motion.div
-              key={solution.title}
+              key={solution.title + i}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -139,8 +157,8 @@ const SaaSSolutions = () => {
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className={`absolute top-4 left-4 w-12 h-12 ${solution.color} rounded-xl flex items-center justify-center text-white shadow-lg`}>
-                  <solution.icon className="w-6 h-6" />
+                <div className={`absolute top-4 left-4 w-12 h-12 ${solution.color || 'bg-primary'} rounded-xl flex items-center justify-center text-white shadow-lg`}>
+                  <Icon className="w-6 h-6" />
                 </div>
               </div>
 
@@ -156,45 +174,13 @@ const SaaSSolutions = () => {
                     className="text-xs font-bold text-ink hover:text-primary transition-colors flex items-center space-x-2"
                   >
                     <span>DÉMARRER L'OFFRE GRATUIT</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <Icons.ArrowRight className="w-4 h-4" />
                   </Link>
-                  <CheckCircle2 className="w-5 h-5 text-primary opacity-20 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
             </motion.div>
-          ))}
+          )})}
         </div>
-
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          className="mt-20 p-12 bg-ink rounded-[3rem] text-center relative overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 -mt-20 -mr-20 w-64 h-64 bg-primary/20 rounded-full" />
-          <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-64 h-64 bg-primary/10 rounded-full" />
-          
-          <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl font-display font-bold text-white mb-6">Prêt à booster votre activité ?</h2>
-            <p className="text-white/60 mb-10 max-w-xl mx-auto font-light">
-              Nos experts sont là pour vous aider à choisir la solution la plus adaptée à vos besoins spécifiques.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                to="/contact"
-                className="px-8 py-4 bg-primary text-white rounded-2xl font-bold hover:scale-105 transition-transform"
-              >
-                Contactez-nous
-              </Link>
-              <Link
-                to="/prix"
-                className="px-8 py-4 bg-white/10 text-white rounded-2xl font-bold hover:bg-white/20 transition-all"
-              >
-                Voir les tarifs
-              </Link>
-            </div>
-          </div>
-        </motion.div>
       </div>
     </div>
   );

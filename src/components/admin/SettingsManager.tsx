@@ -205,14 +205,29 @@ const SettingsManager = () => {
       secondaryButtonLink: "/portfolio"
     },
     expertiseSection: {
-      badge: "Acom Studio",
-      title: "Solutions",
-      subtitle1: "Créatives",
-      subtitle2: "pour Marques Ambitieuses",
-      description: "Nous transformons vos idées en réalités numériques et physiques avec une précision artisanale et une vision stratégique.",
-      searchPlaceholder: "Rechercher un service ou un produit...",
-      noResultsText: "Aucun service ne correspond à votre recherche.",
-      resetFiltersText: "Réinitialiser les filtres"
+      titlePart1: "Une Expertise,",
+      titlePart2: "Deux Univers.",
+      subtitle: "Découvrez nos deux pôles d'excellence conçus pour répondre à l'intégralité de vos besoins digitaux et physiques.",
+      universes: [
+        {
+          title: "Acom SaaS",
+          image: "https://picsum.photos/seed/acom-saas/800/600",
+          description: "Solutions logicielles métiers 100% cloud pour piloter votre activité. Une suite d'outils puissants adaptés à chaque secteur.",
+          features: ["Gestion de stock", "Gestion de chantier (BTP)", "Ressources Humaines (RH)", "Gestion médicale", "Gestion des services", "Gestion de transport & flotte", "Gestion scolaire"],
+          linkText: "Explorer les solutions SaaS",
+          linkUrl: "/solutions-saas",
+          baseColor: "#8e008e"
+        },
+        {
+          title: "Acom Studio",
+          image: "https://picsum.photos/seed/acom-studio/800/600",
+          description: "L'excellence du design et de l'impression. Personnalisez et commandez vos supports physiques avec une qualité irréprochable.",
+          features: ["Goodies", "Papeterie & Bureautique", "Marketing & Publicité", "Signalétique"],
+          linkText: "Explorer Acom Studio",
+          linkUrl: "/merchants",
+          baseColor: "#10b981"
+        }
+      ]
     },
     portfolioSection: {
       badge: "Portfolio",
@@ -261,6 +276,11 @@ const SettingsManager = () => {
           const siteSettings = {
             ...defaultSettings,
             ...data,
+            expertiseSection: {
+              ...defaultSettings.expertiseSection,
+              ...(data.expertiseSection || {}),
+              universes: data.expertiseSection?.universes || defaultSettings.expertiseSection.universes
+            },
             // Also check for nested config for backward compatibility
             primaryColor: data.primaryColor || (data.config && data.config.primaryColor) || defaultSettings.primaryColor
           } as SiteSettings;
@@ -467,6 +487,30 @@ const SettingsManager = () => {
       setNotification({ type: 'error', message: 'Erreur lors de l\'upload.' });
       setTimeout(() => setNotification(null), 3000);
       setUploadingWhyUs(false);
+    }
+  };
+
+  const handleExpertiseImageUpload = async (index: number, file: File) => {
+    setUploading(`expertise_${index}`);
+    try {
+      const compressedBase64 = await compressImage(file, 1200, 800, 0.7);
+      const newUniverses = [...(settings?.expertiseSection?.universes || [])];
+      newUniverses[index].image = compressedBase64;
+      if (settings?.expertiseSection) {
+        setSettings({
+          ...settings,
+          expertiseSection: {
+            ...settings.expertiseSection,
+            universes: newUniverses
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setNotification({ type: 'error', message: 'Erreur lors de l\'upload.' });
+      setTimeout(() => setNotification(null), 3000);
+    } finally {
+      setUploading(null);
     }
   };
 
@@ -1632,80 +1676,306 @@ const SettingsManager = () => {
 
               {/* Expertise Section */}
               <div className="space-y-6 pt-8 border-t border-gray-100">
-                <h4 className="text-lg font-bold text-gray-900">Section Acom Studio (Services)</h4>
+                <h4 className="text-lg font-bold text-gray-900">Section Une Expertise, Deux Univers</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Badge (Petit texte)</label>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Titre (Partie 1)</label>
                     <input
                       type="text"
-                      value={settings.expertiseSection?.badge || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, badge: e.target.value } })}
+                      value={settings.expertiseSection?.titlePart1 || ''}
+                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, titlePart1: e.target.value } })}
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Titre Principal</label>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Titre (Partie 2 - Accent)</label>
                     <input
                       type="text"
-                      value={settings.expertiseSection?.title || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, title: e.target.value } })}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Sous-titre 1</label>
-                    <input
-                      type="text"
-                      value={settings.expertiseSection?.subtitle1 || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, subtitle1: e.target.value } })}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Sous-titre 2 (Italique)</label>
-                    <input
-                      type="text"
-                      value={settings.expertiseSection?.subtitle2 || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, subtitle2: e.target.value } })}
+                      value={settings.expertiseSection?.titlePart2 || ''}
+                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, titlePart2: e.target.value } })}
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Description</label>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Sous-titre / Description</label>
                     <textarea
-                      value={settings.expertiseSection?.description || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, description: e.target.value } })}
-                      rows={3}
+                      value={settings.expertiseSection?.subtitle || ''}
+                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, subtitle: e.target.value } })}
+                      rows={2}
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none resize-none"
                     />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Placeholder de Recherche</label>
-                    <input
-                      type="text"
-                      value={settings.expertiseSection?.searchPlaceholder || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, searchPlaceholder: e.target.value } })}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Texte "Aucun résultat"</label>
-                    <input
-                      type="text"
-                      value={settings.expertiseSection?.noResultsText || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, noResultsText: e.target.value } })}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Texte "Réinitialiser les filtres"</label>
-                    <input
-                      type="text"
-                      value={settings.expertiseSection?.resetFiltersText || ''}
-                      onChange={e => setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, resetFiltersText: e.target.value } })}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                  </div>
+                </div>
+
+                {/* Universes */}
+                <div className="flex flex-col gap-8 mt-8">
+                  {settings.expertiseSection?.universes && settings.expertiseSection.universes.length >= 2 && (
+                    <>
+                      {/* Univers 1 */}
+                      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <h5 className="font-bold text-gray-900 border-b-2 border-primary pb-1 inline-block">Partie 1</h5>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Titre (Partie 1)</label>
+                            <input
+                              type="text"
+                              value={settings.expertiseSection.universes[0].title}
+                              onChange={e => {
+                                const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                newUniverses[0] = { ...newUniverses[0], title: e.target.value };
+                                setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                              }}
+                              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Couleur thématique</label>
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="color"
+                                value={settings.expertiseSection.universes[0].baseColor || '#8e008e'}
+                                onChange={e => {
+                                  const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                  newUniverses[0] = { ...newUniverses[0], baseColor: e.target.value };
+                                  setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                                }}
+                                className="h-10 w-14 rounded cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={settings.expertiseSection.universes[0].baseColor || '#8e008e'}
+                                onChange={e => {
+                                  const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                  newUniverses[0] = { ...newUniverses[0], baseColor: e.target.value };
+                                  setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                                }}
+                                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none text-sm font-mono uppercase"
+                                placeholder="#000000"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Description</label>
+                          <textarea
+                            value={settings.expertiseSection.universes[0].description}
+                            onChange={e => {
+                              const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                              newUniverses[0] = { ...newUniverses[0], description: e.target.value };
+                              setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                            }}
+                            rows={3}
+                            className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none resize-none text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                            La liste des caractéristiques (séparées par des virgules)
+                          </label>
+                          <textarea
+                            value={settings.expertiseSection.universes[0].features.join(', ')}
+                            onChange={e => {
+                              const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                              newUniverses[0] = { ...newUniverses[0], features: e.target.value.split(',').map(f => f.trim()).filter(Boolean) };
+                              setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                            }}
+                            rows={3}
+                            className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none resize-none text-sm"
+                            placeholder="Caractéristique 1, Caractéristique 2, Caractéristique 3"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Joindre image (Partie 1)</label>
+                          <div className="flex items-center space-x-4">
+                            {settings.expertiseSection.universes[0].image && (
+                              <img src={settings.expertiseSection.universes[0].image} alt="Univers 1" className="h-16 w-16 object-cover rounded-lg border border-gray-200" />
+                            )}
+                            <label className="cursor-pointer bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl font-bold text-sm hover:bg-gray-50 flex items-center transition-colors">
+                              <ImageIcon className="w-4 h-4 mr-2" />
+                              {uploading === 'expertise_0' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Changer l\'image'}
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={async e => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    await handleExpertiseImageUpload(0, e.target.files[0]);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 mt-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Texte du lien</label>
+                            <input
+                              type="text"
+                              value={settings.expertiseSection.universes[0].linkText}
+                              onChange={e => {
+                                const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                newUniverses[0] = { ...newUniverses[0], linkText: e.target.value };
+                                setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                              }}
+                              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">URL du lien</label>
+                            <input
+                              type="text"
+                              value={settings.expertiseSection.universes[0].linkUrl}
+                              onChange={e => {
+                                const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                newUniverses[0] = { ...newUniverses[0], linkUrl: e.target.value };
+                                setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                              }}
+                              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Univers 2 */}
+                      <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                        <div className="flex justify-between items-center mb-4">
+                          <h5 className="font-bold text-gray-900 border-b-2 border-primary pb-1 inline-block">Partie 2</h5>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Titre (Partie 2)</label>
+                            <input
+                              type="text"
+                              value={settings.expertiseSection.universes[1].title}
+                              onChange={e => {
+                                const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                newUniverses[1] = { ...newUniverses[1], title: e.target.value };
+                                setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                              }}
+                              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Couleur thématique</label>
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="color"
+                                value={settings.expertiseSection.universes[1].baseColor || '#10b981'}
+                                onChange={e => {
+                                  const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                  newUniverses[1] = { ...newUniverses[1], baseColor: e.target.value };
+                                  setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                                }}
+                                className="h-10 w-14 rounded cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={settings.expertiseSection.universes[1].baseColor || '#10b981'}
+                                onChange={e => {
+                                  const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                  newUniverses[1] = { ...newUniverses[1], baseColor: e.target.value };
+                                  setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                                }}
+                                className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none text-sm font-mono uppercase"
+                                placeholder="#000000"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Description</label>
+                          <textarea
+                            value={settings.expertiseSection.universes[1].description}
+                            onChange={e => {
+                              const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                              newUniverses[1] = { ...newUniverses[1], description: e.target.value };
+                              setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                            }}
+                            rows={3}
+                            className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none resize-none text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                            La liste des caractéristiques (séparées par des virgules)
+                          </label>
+                          <textarea
+                            value={settings.expertiseSection.universes[1].features.join(', ')}
+                            onChange={e => {
+                              const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                              newUniverses[1] = { ...newUniverses[1], features: e.target.value.split(',').map(f => f.trim()).filter(Boolean) };
+                              setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                            }}
+                            rows={3}
+                            className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none resize-none text-sm"
+                            placeholder="Caractéristique 1, Caractéristique 2, Caractéristique 3"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Joindre image (Partie 2)</label>
+                          <div className="flex items-center space-x-4">
+                            {settings.expertiseSection.universes[1].image && (
+                              <img src={settings.expertiseSection.universes[1].image} alt="Univers 2" className="h-16 w-16 object-cover rounded-lg border border-gray-200" />
+                            )}
+                            <label className="cursor-pointer bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl font-bold text-sm hover:bg-gray-50 flex items-center transition-colors">
+                              <ImageIcon className="w-4 h-4 mr-2" />
+                              {uploading === 'expertise_1' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Changer l\'image'}
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={async e => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    await handleExpertiseImageUpload(1, e.target.files[0]);
+                                  }
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 mt-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Texte du lien</label>
+                            <input
+                              type="text"
+                              value={settings.expertiseSection.universes[1].linkText}
+                              onChange={e => {
+                                const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                newUniverses[1] = { ...newUniverses[1], linkText: e.target.value };
+                                setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                              }}
+                              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">URL du lien</label>
+                            <input
+                              type="text"
+                              value={settings.expertiseSection.universes[1].linkUrl}
+                              onChange={e => {
+                                const newUniverses = [...(settings.expertiseSection?.universes || [])];
+                                newUniverses[1] = { ...newUniverses[1], linkUrl: e.target.value };
+                                setSettings({ ...settings, expertiseSection: { ...settings.expertiseSection!, universes: newUniverses } });
+                              }}
+                              className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary/20 outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

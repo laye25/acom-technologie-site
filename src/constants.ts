@@ -1,13 +1,15 @@
 import { Service, BlogPost } from './types';
 
 export const SERVICES: Service[] = [
-  // Développement (Digital)
+  // Acom SaaS (Digital)
   {
     id: 'web-dev-basic',
     name: 'Site Web Vitrine',
     description: 'Un site web moderne et responsive pour présenter votre activité.',
     price: 150000,
     category: 'digital',
+    subCategory: 'Web & Plateformes',
+    pillar: 'saas',
     image: 'https://picsum.photos/seed/web/800/600',
     features: ['Design Responsive', 'Optimisation SEO', 'Formulaire de Contact', 'Hébergement 1 an']
   },
@@ -17,6 +19,8 @@ export const SERVICES: Service[] = [
     description: 'Vendez vos produits en ligne avec une solution complète et sécurisée.',
     price: 450000,
     category: 'digital',
+    subCategory: 'Web & Plateformes',
+    pillar: 'saas',
     image: 'https://picsum.photos/seed/ecommerce/800/600',
     features: ['Gestion de Stock', 'Paiement Mobile Money', 'Dashboard Admin', 'Notifications SMS']
   },
@@ -26,6 +30,8 @@ export const SERVICES: Service[] = [
     description: 'Développement d\'applications iOS et Android sur mesure.',
     price: 800000,
     category: 'digital',
+    subCategory: 'Développement Logiciel',
+    pillar: 'saas',
     image: 'https://picsum.photos/seed/mobile/800/600',
     features: ['Interface Intuitive', 'Notifications Push', 'Mode Hors-ligne', 'Publication Stores']
   },
@@ -35,17 +41,20 @@ export const SERVICES: Service[] = [
     description: 'Conception de logiciels sur mesure pour la gestion de votre entreprise (Stock, RH, Facturation).',
     price: 500000,
     category: 'digital',
+    subCategory: 'Développement Logiciel',
+    pillar: 'saas',
     image: 'https://picsum.photos/seed/software/800/600',
     features: ['Base de données sécurisée', 'Rapports automatisés', 'Multi-utilisateurs', 'Support technique']
   },
   
-  // Marketing
+  // Acom Studio (Marketing & Design)
   {
     id: 'social-media-pack',
     name: 'Pack Réseaux Sociaux',
     description: 'Gestion professionnelle de vos pages Facebook et Instagram.',
     price: 75000,
     category: 'marketing',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/social/800/600',
     features: ['3 posts par semaine', 'Gestion des commentaires', 'Publicité ciblée', 'Rapport mensuel']
   },
@@ -55,6 +64,7 @@ export const SERVICES: Service[] = [
     description: 'Améliorez votre visibilité sur Google et attirez plus de clients.',
     price: 120000,
     category: 'marketing',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/seo/800/600',
     features: ['Audit technique', 'Recherche mots-clés', 'Optimisation on-page', 'Backlinks']
   },
@@ -64,17 +74,79 @@ export const SERVICES: Service[] = [
     description: 'Création de spots publicitaires dynamiques pour vos réseaux sociaux et la TV.',
     price: 150000,
     category: 'marketing',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/video/800/600',
     features: ['Montage pro', 'Motion design', 'Voix off', 'Format Story/Reels']
   },
 
-  // Design & Print
+  // Acom Studio (Design & Print)
+  {
+    id: 'business-cards',
+    name: 'Cartes de Visite',
+    description: 'Impression de cartes de visite professionnelles haute qualité.',
+    price: 15000,
+    category: 'design',
+    subCategory: 'Impression & Marquage',
+    pillar: 'studio',
+    image: 'https://picsum.photos/seed/cards/800/600',
+    features: ['Papier 350g', 'Recto/Verso', 'Finition Mate ou Brillante', 'Livraison incluse'],
+    isPrintProduct: true,
+    hasTemplate: true,
+    templateId: 'business-card-modern',
+    quantityTiers: [
+      { quantity: 100, price: 15000 },
+      { quantity: 250, price: 25000 },
+      { quantity: 500, price: 40000 },
+      { quantity: 1000, price: 70000 }
+    ],
+    printOptions: [
+      {
+        id: 'finish',
+        label: 'Finition',
+        options: [
+          { label: 'Mate', priceModifier: 0 },
+          { label: 'Brillante', priceModifier: 0 },
+          { label: 'Vernis Sélectif', priceModifier: 5000 }
+        ]
+      },
+      {
+        id: 'corners',
+        label: 'Coins',
+        options: [
+          { label: 'Carrés', priceModifier: 0 },
+          { label: 'Arrondis', priceModifier: 2000 }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'flyers-a5',
+    name: 'Flyers A5',
+    description: 'Idéal pour vos promotions et événements locaux.',
+    price: 35000,
+    category: 'design',
+    subCategory: 'Impression & Marquage',
+    pillar: 'studio',
+    image: 'https://picsum.photos/seed/flyer/800/600',
+    features: ['Format A5', 'Papier 135g', 'Couleurs éclatantes', 'Distribution facile'],
+    isPrintProduct: true,
+    hasTemplate: true,
+    templateId: 'flyer-promo-1',
+    quantityTiers: [
+      { quantity: 500, price: 35000 },
+      { quantity: 1000, price: 55000 },
+      { quantity: 2500, price: 110000 },
+      { quantity: 5000, price: 180000 }
+    ]
+  },
   {
     id: 'brand-identity',
     name: 'Identité Visuelle',
     description: 'Création de logo et charte graphique complète pour votre marque.',
     price: 100000,
     category: 'design',
+    subCategory: 'Impression & Marquage',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/brand/800/600',
     features: ['3 concepts de logo', 'Cartes de visite', 'Brochure et flyer', 'Charte graphique']
   },
@@ -84,6 +156,8 @@ export const SERVICES: Service[] = [
     description: 'Impression de haute qualité et personnalisation textile (T-shirts, sacs, objets publicitaires) via sérigraphie, DTF ou flocage.',
     price: 5000,
     category: 'design',
+    subCategory: 'Impression & Marquage',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/print-shop/800/600',
     features: ['Couleurs éclatantes', 'Rendu photo (DTF)', 'Texture velours (Flocage)', 'Tous supports', 'Prix dégressifs']
   },
@@ -93,6 +167,8 @@ export const SERVICES: Service[] = [
     description: 'Impression numérique grand format sur bâche, vinyle adhésif et micro-perforé (one way).',
     price: 15000,
     category: 'design',
+    subCategory: 'Impression & Marquage',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/digital-print/800/600',
     features: ['Bâche publicitaire', 'Vinyle adhésif', 'Micro-perforé (One Way)', 'Haute résolution', 'Résistant aux UV']
   },
@@ -102,6 +178,8 @@ export const SERVICES: Service[] = [
     description: 'Conception et installation d\'enseignes lumineuses et panneaux publicitaires.',
     price: 200000,
     category: 'design',
+    subCategory: 'Signalétique',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/sign/800/600',
     features: ['Enseignes LED', 'Lettres boîtiers', 'Panneaux 4x3', 'Installation incluse']
   },
@@ -113,6 +191,7 @@ export const SERVICES: Service[] = [
     description: 'Organisation et couverture médiatique de vos événements professionnels et privés.',
     price: 250000,
     category: 'event',
+    pillar: 'studio',
     image: 'https://picsum.photos/seed/event/800/600',
     features: ['Planification complète', 'Sonorisation & Lumière', 'Hôtesses d\'accueil', 'Gestion logistique']
   }

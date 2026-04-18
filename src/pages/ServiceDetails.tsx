@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   Zap,
   Star,
-  FileText
+  FileText,
+  Palette
 } from 'lucide-react';
 import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Service } from '../types';
@@ -243,13 +244,39 @@ const ServiceDetails = () => {
                 </div>
               </div>
 
+              {service.isPrintProduct && (
+                <div className="mb-10 space-y-6">
+                  <h4 className="text-xs font-mono text-gray-400 uppercase tracking-widest font-bold">Options d'impression</h4>
+                  {service.quantityTiers && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {service.quantityTiers.map((tier, idx) => (
+                        <div key={idx} className="p-3 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col items-center">
+                          <span className="text-xs font-black text-gray-900">{tier.quantity} ex.</span>
+                          <span className="text-[10px] text-primary font-bold">{tier.price.toLocaleString()} FCFA</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-4">
+                {service.hasTemplate && (
+                  <Link
+                    to={`/design-editor?template_id=${service.templateId}&serviceId=${service.id}`}
+                    className="w-full flex items-center justify-center space-x-3 px-8 py-4 bg-emerald-600 text-white rounded-[2rem] font-bold text-base hover:bg-emerald-700 shadow-xl shadow-emerald-200 transition-all hover:scale-[1.02]"
+                  >
+                    <Palette className="w-5 h-5" />
+                    <span>Personnaliser le Design</span>
+                  </Link>
+                )}
+
                 <Link
                   to={`/order/${service.id}`}
                   className="w-full flex items-center justify-center space-x-3 px-8 py-6 bg-primary text-white rounded-[2rem] font-bold text-lg hover:bg-primary-dark shadow-2xl shadow-primary/30 transition-all hover:scale-[1.02]"
                 >
                   <ShoppingCart className="w-6 h-6" />
-                  <span>Commander ce service</span>
+                  <span>{service.isPrintProduct ? 'Commander l\'impression' : 'Commander ce service'}</span>
                 </Link>
 
                 <Link

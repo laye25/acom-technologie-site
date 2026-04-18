@@ -50,11 +50,18 @@ const OrderForm = () => {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [quantity, setQuantity] = useState(1);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [aiDraft, setAiDraft] = useState<any>(null);
   const [analyzing, setAnalyzing] = useState(false);
+
+  useEffect(() => {
+    if (service?.isPrintProduct && service.quantityTiers && service.quantityTiers.length > 0) {
+      setQuantity(service.quantityTiers[0].quantity);
+    }
+  }, [service]);
 
   if (fetchingService) {
     return (
@@ -67,11 +74,35 @@ const OrderForm = () => {
   if (!service) return <div className="text-center py-20">Service non trouvé</div>;
 
   const promoActive = isPromotionActive(service);
-  const unitPrice = promoActive ? getDiscountedPrice(service.price, service.promotion!.discountPercentage) : service.price;
-  const originalTotal = service.price * quantity;
-  const discountedTotal = unitPrice * quantity;
+  
+  // Calculate Base Price based on quantity tiers if applicable
+  let basePrice = service.price;
+  if (service.isPrintProduct && service.quantityTiers) {
+    const tier = service.quantityTiers.find(t => t.quantity === quantity);
+    if (tier) {
+      basePrice = tier.price / quantity; // Get unit price from tier
+    }
+  }
+
+  // Calculate Options Price Modifier
+  let optionsModifier = 0;
+  if (service.printOptions) {
+    service.printOptions.forEach(optGroup => {
+      const selectedValue = selectedOptions[optGroup.id];
+      if (selectedValue) {
+        const option = optGroup.options.find(o => o.label === selectedValue);
+        if (option) {
+          optionsModifier += option.priceModifier;
+        }
+      }
+    });
+  }
+
+  const unitPrice = promoActive ? getDiscountedPrice(basePrice, service.promotion!.discountPercentage) : basePrice;
+  const originalTotal = (basePrice * quantity) + optionsModifier;
+  const discountedTotal = (unitPrice * quantity) + optionsModifier;
   const finalTotal = Math.max(0, discountedTotal - couponDiscount);
-  const discountAmount = originalTotal - discountedTotal;
+  const discountAmount = (basePrice * quantity) - (unitPrice * quantity);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';
@@ -118,6 +149,7 @@ const OrderForm = () => {
           address: address || '',
           phone: phone || '',
           quantity: Number(quantity || 1),
+          customOptions: selectedOptions,
         },
         files: [],
       };
@@ -296,21 +328,59 @@ const OrderForm = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {service.isPrintProduct && service.printOptions && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {service.printOptions.map((optGroup) => (
+                    <div key={optGroup.id}>
+                      <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">
+                        {optGroup.label}
+                      </label>
+                      <select
+                        value={selectedOptions[optGroup.id] || ''}
+                        onChange={(e) => setSelectedOptions(prev => ({ ...prev, [optGroup.id]: e.target.value }))}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      >
+                        <option value="">Sélectionner...</option>
+                        {optGroup.options.map((opt, idx) => (
+                          <option key={idx} value={opt.label}>
+                            {opt.label} {opt.priceModifier > 0 ? `(+${opt.priceModifier} FCFA)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wider">
-                    Quantité / Durée
+                    {service.isPrintProduct ? 'Quantité' : 'Quantité / Durée'}
                   </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={quantity || ''}
-                    onChange={(e) => {
-                      const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                      setQuantity(val);
-                    }}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  />
+                  {service.isPrintProduct && service.quantityTiers ? (
+                    <select
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    >
+                      {service.quantityTiers.map((tier, idx) => (
+                        <option key={idx} value={tier.quantity}>
+                          {tier.quantity} exemplaires - {tier.price.toLocaleString()} FCFA
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantity || ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                        setQuantity(val);
+                      }}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                    />
+                  )}
                 </div>
               </div>
 

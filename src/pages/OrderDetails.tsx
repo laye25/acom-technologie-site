@@ -15,6 +15,7 @@ import {
   Clock, 
   CheckCircle, 
   MessageSquare, 
+  MessageCircle,
   FileText, 
   Receipt,
   Calendar, 
@@ -34,8 +35,11 @@ import {
   FileUp,
   Banknote,
   Sparkles,
-  Settings
+  Settings,
+  Smartphone,
+  Lock as LockIcon
 } from 'lucide-react';
+import { payDunyaService } from '../services/payDunyaService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { dbService } from '../services/dbService';
@@ -124,10 +128,13 @@ const OrderDetails = () => {
     if (!order) return;
     try {
       const currentType = type || paymentType;
+      const payDunyaToken = searchParams.get('token');
+      const isPayDunya = !!payDunyaToken;
       
       // Check if this payment was already recorded to avoid duplicates
-      if (stripePaymentIntentId && order.payments?.some(p => p.transactionId === stripePaymentIntentId)) {
-        console.log('Payment already recorded:', stripePaymentIntentId);
+      const transactionId = stripePaymentIntentId || (isPayDunya ? `paydunya_${payDunyaToken}` : null);
+      if (transactionId && order.payments?.some(p => p.transactionId === transactionId)) {
+        console.log('Payment already recorded:', transactionId);
         return;
       }
 
@@ -141,10 +148,10 @@ const OrderDetails = () => {
       const newPayment: PaymentRecord = {
         id: Math.random().toString(36).substr(2, 9),
         amount: isFull ? discountedTotal : discountedTotal * 0.5,
-        method: 'stripe',
+        method: isPayDunya ? 'paydunya' as any : 'stripe',
         type: currentType,
         paidAt: new Date(),
-        transactionId: stripePaymentIntentId || ('stripe_' + Math.random().toString(36).substr(2, 9))
+        transactionId: transactionId || (`manual_${Math.random().toString(36).substr(2, 9)}`)
       };
 
       await dbService.orders.save({
@@ -157,7 +164,7 @@ const OrderDetails = () => {
         balanceAmount: isBalance ? discountedTotal * 0.5 : (isFull ? discountedTotal * 0.5 : order.balanceAmount),
         balancePaidAt: (isBalance || isFull) ? new Date() : order.balancePaidAt,
         paidAt: (isBalance || isFull) ? new Date() : order.paidAt,
-        paymentMethod: 'stripe',
+        paymentMethod: isPayDunya ? 'paydunya' as any : 'stripe',
         payments: [...(order.payments || []), newPayment],
         status: (isDeposit || isFull) && (order.status === 'pending' || order.status === 'confirmed') ? 'in_progress' : order.status,
         clientAccepted: true,
@@ -168,7 +175,7 @@ const OrderDetails = () => {
       toast.success(isDeposit ? 'Acompte payé ! Production lancée.' : isBalance ? 'Reliquat payé ! Merci de votre confiance.' : 'Paiement enregistré avec succès !');
       
       // Clear URL params after processing
-      if (stripePaymentIntentId) {
+      if (transactionId || searchParams.get('payment_success')) {
         navigate(`/order-details/${order.id}`, { replace: true });
       }
     } catch (error: any) {
@@ -349,6 +356,63 @@ const OrderDetails = () => {
       toast.error('Une erreur est survenue.');
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const handlePayWithPayDunya = async (type: 'deposit' | 'balance' | 'full' = 'deposit') => {
+    if (!order || !service) return;
+    setPaymentLoading(true);
+    try {
+      const discountedTotal = getOrderDiscountedTotal(order, service);
+      let amount = discountedTotal;
+      let description = `Paiement pour la commande #${order.id}`;
+
+      if (type === 'deposit') {
+        amount = Math.round(discountedTotal * 0.5);
+        description = `Acompte (50%) pour la commande #${order.id}`;
+      } else if (type === 'balance') {
+        amount = Math.round(discountedTotal * 0.5);
+        description = `Reliquat (50%) pour la commande #${order.id}`;
+      }
+
+      const link = await payDunyaService.createPaymentLink({
+        amount,
+        description,
+        orderId: order.id,
+        returnUrl: `${window.location.origin}/order-details/${order.id}?payment_success=true&payment_type=${type}`,
+        cancelUrl: window.location.href
+      });
+
+      // Tentative d'ouverture automatique
+      const win = window.open(link, '_blank');
+      if (!win) {
+        toast.success(
+          (t) => (
+            <div className="flex flex-col gap-2 p-1 text-left">
+              <span className="font-bold text-gray-900 uppercase tracking-tight">Paiement PayDunya prêt !</span>
+              <p className="text-xs text-gray-500">Cliquez sur le lien ci-dessous pour régler votre facture via Orange Money, Wave ou Carte :</p>
+              <div className="flex gap-2 mt-2">
+                <a 
+                  href={link} 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="px-5 py-2.5 bg-primary text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all text-center flex-1 shadow-lg shadow-primary/20" 
+                  onClick={() => toast.dismiss(t.id)}
+                >
+                  Ouvrir PayDunya
+                </a>
+              </div>
+            </div>
+          ),
+          { duration: 15000, position: 'top-center' }
+        );
+      } else {
+        toast.success('Redirection vers PayDunya...');
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Erreur lors de la génération du lien PayDunya.");
+    } finally {
+      setPaymentLoading(false);
     }
   };
 
@@ -564,6 +628,18 @@ const OrderDetails = () => {
     );
   }
 
+  const generateWhatsAppLink = () => {
+    const adminPhone = "221781030000"; // Numéro Acom Studio
+    const text = encodeURIComponent(
+      `Bonjour Acom Studio ! 👋\n\nJe vous contacte concernant ma commande #${order?.id?.toUpperCase()}.\n\n` +
+      `📦 *Produit:* ${service?.name || order?.details?.projectType || 'Design Sur-mesure'}\n` +
+      `💰 *Montant:* ${getOrderDiscountedTotal(order, service).toLocaleString()} FCFA\n` +
+      `🔗 *Lien:* ${window.location.href}\n\n` +
+      `Je souhaite en discuter avec vous.`
+    );
+    return `https://wa.me/${adminPhone}?text=${text}`;
+  };
+
   const statusInfo = getStatusInfo(order.status);
 
   return (
@@ -679,33 +755,56 @@ const OrderDetails = () => {
                     <p>5. Validation : En cliquant sur "Accepter et Confirmer", vous reconnaissez avoir pris connaissance de l'intégralité des conditions générales de vente.</p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <button 
-                      onClick={handleAcceptAndPay}
-                      disabled={accepting || paymentLoading}
-                      className="flex-1 flex items-center justify-center px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
-                    >
-                      {accepting || paymentLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      ) : (
-                        <CreditCard className="w-5 h-5 mr-2" />
-                      )}
-                      Accepter et Payer l'Acompte (50%)
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <button 
+                        onClick={() => handlePayWithPayDunya('deposit')}
+                        disabled={accepting || paymentLoading}
+                        className="flex-1 flex flex-col items-center justify-center p-4 bg-primary text-white rounded-2xl font-black transition-all shadow-lg shadow-primary/20 disabled:opacity-50 group hover:bg-primary-hover"
+                      >
+                        <div className="flex items-center mb-1">
+                          {paymentLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                          ) : (
+                            <Smartphone className="w-5 h-5 mr-2" />
+                          )}
+                          <span className="text-sm uppercase tracking-widest">MOBIL MONEY</span>
+                        </div>
+                        <span className="text-[10px] opacity-80 font-medium">Orange Money, Wave, Free Money</span>
+                        <span className="mt-2 text-xs">Payer l'Acompte (50%)</span>
+                      </button>
 
-                    <button 
-                      onClick={() => handleFastPayment('deposit')}
-                      disabled={accepting}
-                      className="flex-1 flex items-center justify-center px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
-                    >
-                      {accepting ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      ) : (
-                        <ShoppingBag className="w-5 h-5 mr-2" />
-                      )}
-                      Acompte via Mobile Money (50%)
-                    </button>
-                  </div>
+                      <button 
+                        onClick={handleAcceptAndPay}
+                        disabled={accepting || paymentLoading}
+                        className="flex-1 flex flex-col items-center justify-center p-4 bg-gray-900 text-white rounded-2xl font-black transition-all shadow-lg shadow-black/20 disabled:opacity-50 group hover:bg-black"
+                      >
+                        <div className="flex items-center mb-1">
+                          {accepting ? (
+                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                          ) : (
+                            <LockIcon className="w-5 h-5 mr-2" />
+                          )}
+                          <span className="text-sm uppercase tracking-widest">CARTE PREPAYE</span>
+                        </div>
+                        <span className="text-[10px] opacity-80 font-medium">Carte Bancaire (Visa, Mastercard)</span>
+                        <span className="mt-2 text-xs">Payer via Stripe</span>
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                      <button 
+                        onClick={() => handleFastPayment('deposit')}
+                        disabled={accepting}
+                        className="flex-1 flex items-center justify-center px-8 py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-emerald-100 transition-all disabled:opacity-50"
+                      >
+                        {accepting ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <ShoppingBag className="w-4 h-4 mr-2" />
+                        )}
+                        Réglé à la caisse (Simulation)
+                      </button>
+                    </div>
 
                   <button 
                     onClick={handleAcceptContract}
@@ -738,29 +837,52 @@ const OrderDetails = () => {
                   
                   <div className="flex flex-col sm:flex-row gap-4">
                     <button 
-                      onClick={order.depositPaid ? handlePayBalance : () => handleCreatePaymentIntent(getOrderDiscountedTotal(order, service), 'full')}
+                      onClick={() => handlePayWithPayDunya(order.depositPaid ? 'balance' : 'full')}
                       disabled={paymentLoading}
-                      className="flex-1 flex items-center justify-center px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                      className="flex-1 flex flex-col items-center justify-center p-4 bg-primary text-white rounded-2xl font-black transition-all shadow-lg shadow-primary/20 disabled:opacity-50 group hover:bg-primary-hover"
                     >
-                      {paymentLoading ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      ) : (
-                        <CreditCard className="w-5 h-5 mr-2" />
-                      )}
-                      {order.depositPaid ? 'Payer le Reliquat (50%)' : 'Payer la Commande (100%)'}
+                      <div className="flex items-center mb-1">
+                        {paymentLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        ) : (
+                          <Smartphone className="w-5 h-5 mr-2" />
+                        )}
+                        <span className="text-sm uppercase tracking-widest">MOBIL MONEY</span>
+                      </div>
+                      <span className="text-[10px] opacity-80 font-medium">Orange Money, Wave, Free Money</span>
+                      <span className="mt-2 text-xs font-bold">{order.depositPaid ? 'Reliquat (50%) via PayDunya' : 'Payer (100%) via PayDunya'}</span>
                     </button>
 
                     <button 
+                      onClick={order.depositPaid ? handlePayBalance : () => handleCreatePaymentIntent(getOrderDiscountedTotal(order, service), 'full')}
+                      disabled={paymentLoading}
+                      className="flex-1 flex flex-col items-center justify-center p-4 bg-gray-900 text-white rounded-2xl font-black transition-all shadow-lg shadow-black/20 disabled:opacity-50 group hover:bg-black"
+                    >
+                      <div className="flex items-center mb-1">
+                        {paymentLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        ) : (
+                          <LockIcon className="w-5 h-5 mr-2" />
+                        )}
+                        <span className="text-sm uppercase tracking-widest">CARTE PREPAYE</span>
+                      </div>
+                      <span className="text-[10px] opacity-80 font-medium">Carte Bancaire (Visa, Mastercard)</span>
+                      <span className="mt-2 text-xs font-bold">Payer via Stripe</span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                    <button 
                       onClick={() => handleFastPayment(order.depositPaid ? 'balance' : 'full')}
                       disabled={accepting}
-                      className="flex-1 flex items-center justify-center px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center px-8 py-3 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-emerald-100 transition-all disabled:opacity-50"
                     >
                       {accepting ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
-                        <ShoppingBag className="w-5 h-5 mr-2" />
+                        <ShoppingBag className="w-4 h-4 mr-2" />
                       )}
-                      {order.depositPaid ? 'Reliquat via Mobile Money (50%)' : 'Paiement via Mobile Money (100%)'}
+                      Payé à la caisse (Simulation)
                     </button>
                   </div>
                 </div>
@@ -835,6 +957,15 @@ const OrderDetails = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3">
+              <a
+                href={generateWhatsAppLink()}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center px-6 py-3 bg-emerald-500 text-white rounded-2xl font-bold hover:bg-emerald-600 transition-all text-sm sm:text-base whitespace-nowrap shadow-lg shadow-emerald-500/20"
+              >
+                <MessageCircle className="w-5 h-5 mr-2" />
+                WhatsApp
+              </a>
               <Link
                 to={`/chat/${order.id}`}
                 className="flex items-center justify-center px-6 py-3 bg-primary-light text-primary rounded-2xl font-bold hover:bg-primary hover:text-white transition-all text-sm sm:text-base whitespace-nowrap"
@@ -1315,7 +1446,10 @@ const OrderDetails = () => {
                 <h4 className="font-black text-gray-900 text-sm uppercase tracking-wider">Mode de Paiement</h4>
               </div>
               <p className="text-xs text-gray-600 leading-relaxed mb-4">
-                Cartes prépayées Visa & Mastercard acceptées via Stripe. Virement bancaire, Orange Money ou Wave également disponibles.
+                <span className="font-bold text-primary block mb-1 underline decoration-primary/20">MOBIL MONEY :</span>
+                PayDunya (Orange Money, Wave, Free Money).
+                <span className="font-bold text-gray-900 block mt-2 mb-1 underline decoration-gray-900/10">CARTE PREPAYE :</span>
+                Cartes Visa & Mastercard via Stripe sécurisé.
               </p>
 
               {/* Payment History Section */}

@@ -1,28 +1,29 @@
 import { fabric } from 'fabric';
 import { CanvasElement } from '../types';
 
-export const parseSvgToElements = (svgString: string): Promise<CanvasElement[]> => {
+export interface ParseSvgResult {
+  elements: CanvasElement[];
+  width: number;
+  height: number;
+}
+
+export const parseSvgToElements = (svgString: string): Promise<ParseSvgResult> => {
   return new Promise((resolve) => {
     fabric.loadSVGFromString(svgString, (objects, options) => {
       if (!objects || objects.length === 0) {
-        resolve([]);
+        resolve({ elements: [], width: 1050, height: 600 });
         return;
       }
 
       const elements: CanvasElement[] = [];
-      
-      // Create a temporary canvas to handle ungrouping properly
       const canvasEl = document.createElement('canvas');
       const canvas = new fabric.Canvas(canvasEl, { width: options.width || 600, height: options.height || 350 });
       
-      // Add all objects to canvas
       objects.forEach(obj => canvas.add(obj));
 
-      // Function to recursively ungroup
       const ungroupAll = () => {
         let hasGroups = false;
         const currentObjects = [...canvas.getObjects()];
-        
         currentObjects.forEach(obj => {
           if (obj.type === 'group') {
             hasGroups = true;
@@ -32,7 +33,6 @@ export const parseSvgToElements = (svgString: string): Promise<CanvasElement[]> 
             canvas.discardActiveObject();
           }
         });
-        
         if (hasGroups) {
           ungroupAll();
         }
@@ -43,7 +43,7 @@ export const parseSvgToElements = (svgString: string): Promise<CanvasElement[]> 
       const finalObjects = canvas.getObjects();
       if (finalObjects.length === 0) {
         canvas.dispose();
-        resolve([]);
+        resolve({ elements: [], width: 1050, height: 600 });
         return;
       }
 
@@ -59,18 +59,48 @@ export const parseSvgToElements = (svgString: string): Promise<CanvasElement[]> 
       const contentWidth = maxX - minX;
       const contentHeight = maxY - minY;
       
-      if (contentWidth > 0 && contentHeight > 0) {
-        const targetWidth = 1050;
-        const targetHeight = 600;
-        const padding = 0.9;
-        const scale = Math.min((targetWidth * padding) / contentWidth, (targetHeight * padding) / contentHeight);
+      let parsedOptWidth = parseFloat(options.width as any);
+      let parsedOptHeight = parseFloat(options.height as any);
+      
+      let finalWidth = (!isNaN(parsedOptWidth) && parsedOptWidth > 0 ? parsedOptWidth : contentWidth) || 1050;
+      let finalHeight = (!isNaN(parsedOptHeight) && parsedOptHeight > 0 ? parsedOptHeight : contentHeight) || 600;
 
+      // If dimensions are completely unreadable, fall back to content bound box
+      if (finalWidth <= 1 || finalHeight <= 1) {
+        finalWidth = contentWidth > 0 ? contentWidth : 1050;
+        finalHeight = contentHeight > 0 ? contentHeight : 600;
+      }
+
+      // Optional: Normalize to a reasonable size if the internal values are extremely small/large but keep ratio
+      if (finalWidth > 0 && finalHeight > 0) {
+        let displayScale = 1;
+        if (finalWidth < 200 || finalHeight < 200) {
+           displayScale = 800 / Math.max(finalWidth, finalHeight);
+        } else if (finalWidth > 4000 || finalHeight > 4000) {
+           displayScale = 2000 / Math.max(finalWidth, finalHeight);
+        }
+
+        if (displayScale !== 1) {
+          finalObjects.forEach(obj => {
+            obj.set({
+              left: obj.left * displayScale,
+              top: obj.top * displayScale,
+              scaleX: (obj.scaleX || 1) * displayScale,
+              scaleY: (obj.scaleY || 1) * displayScale
+            });
+            obj.setCoords();
+          });
+          finalWidth *= displayScale;
+          finalHeight *= displayScale;
+          minX *= displayScale;
+          minY *= displayScale;
+        }
+
+        // Translate to origin (0,0) so there's no random offset padding
         finalObjects.forEach(obj => {
           obj.set({
-            left: (obj.left - minX) * scale + (targetWidth - contentWidth * scale) / 2,
-            top: (obj.top - minY) * scale + (targetHeight - contentHeight * scale) / 2,
-            scaleX: (obj.scaleX || 1) * scale,
-            scaleY: (obj.scaleY || 1) * scale
+            left: obj.left - minX,
+            top: obj.top - minY
           });
           obj.setCoords();
         });
@@ -172,7 +202,7 @@ export const parseSvgToElements = (svgString: string): Promise<CanvasElement[]> 
       });
 
       canvas.dispose();
-      resolve(elements);
+      resolve({ elements, width: finalWidth, height: finalHeight });
     });
   });
 };

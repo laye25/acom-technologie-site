@@ -7,16 +7,22 @@ import {
   Upload, Type, Palette, Download, Trash2, Plus, Minus, Move, MousePointer2, 
   Layers, Copy, Save, Send, CheckCircle2, LayoutGrid, Shapes, Crown, 
   Wrench, FolderOpen, Sparkles, Mic, Image as ImageIcon, StickyNote, 
-  Timer, Maximize2, Grid3X3, ChevronDown, Search, X, ArrowLeft,
+  Timer, Maximize2, Grid3X3, ChevronDown, ChevronLeft, Search, X, ArrowLeft, Home, Cloud,
+  FileText, Music, Clapperboard, Table, ChevronRight, File, Maximize, Monitor,
+  Smartphone, ExternalLink, Settings, Layout, MousePointer, MessageCircle,
   Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, PaintRoller, CaseSensitive, ArrowUpDown, Scaling, Undo, Redo, Share2,
-  Eye, Lock, Unlock, ChevronUp, ArrowUpToLine, ArrowRightToLine, ArrowDownToLine, GripHorizontal, GripVertical
+  Eye, Lock, Unlock, ChevronUp, ArrowUpToLine, ArrowRightToLine, ArrowDownToLine, GripHorizontal, GripVertical, Check,
+  ShoppingBag, CreditCard, Wallet, Truck, Info, Phone, Printer, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { generateDesign } from '../../lib/gemini';
 import { firestoreService } from '../../services/firestoreService';
+import { dbService } from '../../services/dbService';
+import { SERVICES } from '../../constants';
 import { useAuth } from '../../context/AuthContext';
 import { usePresence } from '../../hooks/usePresence';
 import { geminiService } from '../../services/geminiService';
@@ -108,11 +114,13 @@ const hydrateImage = (element: CanvasElement, profile?: any, contextElements?: C
 };
 
 // --- Components ---
-const MiniPreview = ({ elements, bgColor, profile, contextElements }: { 
+const MiniPreview = ({ elements, bgColor, profile, contextElements, width = 1050, height = 600 }: { 
   elements: CanvasElement[], 
   bgColor: string,
   profile?: any,
-  contextElements?: CanvasElement[]
+  contextElements?: CanvasElement[],
+  width?: number,
+  height?: number
 }) => {
   return (
     <div 
@@ -122,8 +130,8 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
       {elements.filter(el => !el.hidden).map((el) => {
         const style: React.CSSProperties = {
           position: 'absolute',
-          left: `${(el.x / 600) * 100}%`,
-          top: `${(el.y / 350) * 100}%`,
+          left: `${(el.x / width) * 100}%`,
+          top: `${(el.y / height) * 100}%`,
           transform: `rotate(${el.rotation || 0}deg)`,
           transformOrigin: 'top left',
           opacity: el.opacity !== undefined ? el.opacity : 1,
@@ -138,7 +146,7 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
 
         if (el.type === 'text') {
           style.color = el.fill;
-          style.fontSize = `${((el.fontSize || 16) / 600) * 100}cqi`;
+          style.fontSize = `${((el.fontSize || 16) / width) * 100}cqi`;
           style.fontWeight = 'bold';
           style.whiteSpace = 'pre-wrap';
           style.lineHeight = '1';
@@ -157,15 +165,15 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
           } else {
             style.backgroundColor = el.fill;
           }
-          style.width = el.width ? `${(el.width / 600) * 100}%` : (el.radius ? `${(el.radius * 2 / 600) * 100}%` : '10%');
-          style.height = el.height ? `${(el.height / 350) * 100}%` : (el.radius ? `${(el.radius * 2 / 350) * 100}%` : '2%');
+          style.width = el.width ? `${(el.width / width) * 100}%` : (el.radius ? `${(el.radius * 2 / width) * 100}%` : '10%');
+          style.height = el.height ? `${(el.height / height) * 100}%` : (el.radius ? `${(el.radius * 2 / height) * 100}%` : '2%');
           if (el.type === 'circle') style.borderRadius = '50%';
           if (el.stroke) {
             style.border = `${(el.strokeWidth || 1) * 0.1}px solid ${el.stroke}`;
           }
         } else if (el.type === 'image') {
-          style.width = `${(el.width || 100) / 600 * 100}%`;
-          style.height = `${(el.height || 100) / 350 * 100}%`;
+          style.width = `${(el.width || 100) / width * 100}%`;
+          style.height = `${(el.height || 100) / height * 100}%`;
         } else if (el.type === 'path' || el.type === 'ellipse') {
           style.width = '100%';
           style.height = '100%';
@@ -180,7 +188,7 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements }: {
               <OptimizedImage src={hydratedSrc} alt="Preview" width={1200} className="w-full h-full object-contain" />
             )}
             {(el.type === 'path' || el.type === 'ellipse') && (
-              <svg viewBox="0 0 600 350" className="w-full h-full overflow-visible">
+              <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
                 {el.fillLinearGradientColorStops && (
                   <defs>
                     <linearGradient id={`grad-preview-${el.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -403,6 +411,14 @@ const FONTS = [
 
 export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport, autoOpenSelector }) => {
   const { isAdmin, isManager, profile, user } = useAuth();
+  const navigate = useNavigate();
+  const stageRef = useRef<any>(null);
+
+  const [isOrdering, setIsOrdering] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('business-cards');
+  const [selectedQuantity, setSelectedQuantity] = useState<number>(100);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
   useEffect(() => {
     // Dynamically load Google Fonts
@@ -411,7 +427,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     link.rel = 'stylesheet';
     document.head.appendChild(link);
     return () => {
-      document.head.removeChild(link);
+      if (link && link.parentNode) {
+        link.parentNode.removeChild(link);
+      }
     };
   }, []);
   const { others, updateMyPresence } = usePresence(templateId || null);
@@ -425,6 +443,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [designTitle, setDesignTitle] = useState('Design sans titre');
   const [designId, setDesignId] = useState<string | null>(null);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 1050, height: 600 });
 
   const { data: userDesigns, refresh: refreshUserDesigns } = useFirestoreData<any>({
     tableName: 'designs',
@@ -672,8 +691,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
 
   // Snapping logic
   const getLineGuideStops = (skipShapeId?: string) => {
-    const vertical = [0, 600 / 2, 600]; // Canvas edges and center
-    const horizontal = [0, 350 / 2, 350];
+    const vertical = [0, canvasDimensions.width / 2, canvasDimensions.width]; // Canvas edges and center
+    const horizontal = [0, canvasDimensions.height / 2, canvasDimensions.height];
 
     elements.forEach((el) => {
       if (el.id === skipShapeId || el.hidden) return;
@@ -784,7 +803,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     const loadingToast = toast.loading("L'IA analyse votre design...");
     
     try {
-      const suggestions = await geminiService.improveLayout(elements, 600, 350);
+      const suggestions = await geminiService.improveLayout(elements, canvasDimensions.width, canvasDimensions.height);
       
       if (suggestions && suggestions.length > 0) {
         // Apply suggestions optimistically
@@ -1013,6 +1032,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         name: designTitle,
         user_id: user.uid,
         bg_color: bgColor,
+        width: canvasDimensions.width,
+        height: canvasDimensions.height,
         updated_at: new Date().toISOString(),
       };
 
@@ -1063,11 +1084,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [textAreaPos, setTextAreaPos] = useState({ x: 0, y: 0, width: 0 });
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const stageRef = useRef<any>(null);
   const trRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastCursorUpdateRef = useRef<number>(0);
-  const [stageSize, setStageSize] = useState({ width: 600, height: 350 });
+  const [stageSize, setStageSize] = useState({ width: 1050, height: 600 });
   const [zoom, setZoom] = useState(1);
   const [showRestorePrompt, setShowRestorePrompt] = useState(false);
   const [savedDesign, setSavedDesign] = useState<any>(null);
@@ -1195,7 +1215,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     reader.onload = async (event) => {
       const svgText = event.target?.result as string;
       const { parseSvgToElements } = await import('../../lib/svgParser');
-      const newElements = await parseSvgToElements(svgText);
+      const { elements: newElements } = await parseSvgToElements(svgText);
       setElements([...elements, ...newElements]);
     };
     reader.readAsText(file);
@@ -1207,13 +1227,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     if (containerRef.current) {
       const containerWidth = containerRef.current.offsetWidth - 40;
       const containerHeight = containerRef.current.offsetHeight - 40;
-      const scaleX = containerWidth / 600;
-      const scaleY = containerHeight / 350;
+      const scaleX = containerWidth / canvasDimensions.width;
+      const scaleY = containerHeight / canvasDimensions.height;
       const baseScale = Math.min(scaleX, scaleY, 1);
       return baseScale * zoom;
     }
     return zoom;
-  }, [zoom, stageSize.width, isMobileSidebarOpen]);
+  }, [zoom, canvasDimensions.width, canvasDimensions.height, isMobileSidebarOpen]);
 
   const loadTemplate = async (template: any) => {
     // Check if this is a variant pointing to a hardcoded template
@@ -1223,6 +1243,17 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         // Use the hardcoded template but keep the name/subcategory from the variant if needed
         template = { ...hardcoded, name: template.name || hardcoded.name, subCategory: template.subCategory || hardcoded.subCategory };
       }
+    }
+
+    // Set dimensions if present in template or determined by category
+    const foundCategory = TEMPLATE_CATEGORIES.find(c => c.name === template.subCategory || c.name === template.category);
+    if (template.width && template.height) {
+      setCanvasDimensions({ width: Number(template.width), height: Number(template.height) });
+    } else if (foundCategory) {
+      setCanvasDimensions({ width: foundCategory.width, height: foundCategory.height });
+    } else {
+      // Default to business card if unknown
+      setCanvasDimensions({ width: 1050, height: 600 });
     }
 
     const hydrateElements = (elements: CanvasElement[]) => {
@@ -1241,18 +1272,92 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       // Handle Variant from studioAcom
       try {
         const { parseSvgToElements } = await import('../../lib/svgParser');
-        const newElements = await parseSvgToElements(template.templateSvg);
-        setPages([
-          { elements: hydrateElements(newElements), bgColor: template.bgColor || template.bg_color || '#ffffff' },
-          { elements: [], bgColor: '#ffffff' }
-        ]);
+        
+        let svgStrings: string[] = [];
+        try {
+          const parsed = JSON.parse(template.templateSvg);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            svgStrings = parsed;
+          } else {
+            svgStrings = [template.templateSvg];
+          }
+        } catch (e) {
+          // If JSON parse fails, assume it's a raw SVG string
+          svgStrings = [template.templateSvg];
+        }
+
+        const newPages = [];
+        let firstWidth = 1050;
+        let firstHeight = 600;
+
+        for (let i = 0; i < svgStrings.length; i++) {
+          const { elements: newElements, width, height } = await parseSvgToElements(svgStrings[i]);
+          if (i === 0) {
+            firstWidth = width;
+            firstHeight = height;
+          }
+          newPages.push({
+            elements: hydrateElements(newElements),
+            bgColor: template.bgColor || template.bg_color || '#ffffff'
+          });
+        }
+        
+        // Update canvas dimensions based on SVG parsing instead of defaults
+        setCanvasDimensions({ width: Math.round(firstWidth), height: Math.round(firstHeight) });
+
+        setPages(newPages);
         if (template.name) setDesignTitle(template.name);
         if (template.subCategory) setCurrentProductContext(template.subCategory);
+
+        // Try to match with a service to pre-select it in the order modal
+        console.log("Matching template full object:", JSON.stringify(template));
+        console.log("Matching template productId:", template.productId);
+        console.log("Matching template subCategory:", template.subCategory);
+        const pid = template.productId?.toLowerCase() || '';
+        const matchingService = SERVICES.find(s => 
+          s.isPrintProduct && 
+          (s.id === pid || 
+           s.id === template.serviceId || 
+           s.id === template.productId ||
+           s.templateId === template.id ||
+           s.templateId === template.templateId ||
+           s.name.toLowerCase() === (template.subCategory?.toLowerCase() || ''))
+        );
+        console.log("Matching service found:", matchingService);
+
+        if (matchingService) {
+          setSelectedServiceId(matchingService.id);
+          if (matchingService.quantityTiers && matchingService.quantityTiers.length > 0) {
+            setSelectedQuantity(matchingService.quantityTiers[0].quantity);
+          }
+        } else {
+          // Fallback: If not found, try to keep current but ensure it's a valid print product
+          console.warn("No matching service found for template, keeping default if it's a print product");
+        }
       } catch (error) {
         console.error("Error parsing variant SVG:", error);
       }
     } else if (template.pages) {
       if (template.subCategory) setCurrentProductContext(template.subCategory);
+      
+      // Try to match with a service to pre-select it in the order modal
+      const pid = template.productId?.toLowerCase() || '';
+      const mS = SERVICES.find(s => 
+        s.isPrintProduct && 
+        (s.id === pid ||
+         s.id === template.serviceId || 
+         s.id === template.productId ||
+         s.templateId === template.id ||
+         s.templateId === template.templateId ||
+         s.name.toLowerCase() === (template.subCategory?.toLowerCase() || ''))
+      );
+      if (mS) {
+        setSelectedServiceId(mS.id);
+        if (mS.quantityTiers && mS.quantityTiers.length > 0) {
+          setSelectedQuantity(mS.quantityTiers[0].quantity);
+        }
+      }
+
       setPages(template.pages.map((p: any) => ({
         ...p,
         elements: hydrateElements(p.elements),
@@ -1260,6 +1365,25 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       })));
     } else if (template.sides) {
       if (template.subCategory) setCurrentProductContext(template.subCategory);
+
+      // Try to match with a service to pre-select it in the order modal
+      const pid = template.productId?.toLowerCase() || '';
+      const mS = SERVICES.find(s => 
+        s.isPrintProduct && 
+        (s.id === pid ||
+         s.id === template.serviceId || 
+         s.id === template.productId ||
+         s.templateId === template.id ||
+         s.templateId === template.templateId ||
+         s.name.toLowerCase() === (template.subCategory?.toLowerCase() || ''))
+      );
+      if (mS) {
+        setSelectedServiceId(mS.id);
+        if (mS.quantityTiers && mS.quantityTiers.length > 0) {
+          setSelectedQuantity(mS.quantityTiers[0].quantity);
+        }
+      }
+
       setPages([
         { 
           elements: hydrateElements(template.sides.front.elements), 
@@ -1272,6 +1396,24 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       ]);
     } else {
       if (template.subCategory) setCurrentProductContext(template.subCategory);
+
+      // Try to match with a service to pre-select it in the order modal
+      const mS = SERVICES.find(s => 
+        s.isPrintProduct && 
+        (s.id === template.serviceId || 
+         s.id === template.productId ||
+         s.templateId === template.id ||
+         s.templateId === template.templateId ||
+         s.name.toLowerCase() === (template.subCategory || '').toLowerCase() ||
+         (template.subCategory || '').toLowerCase().includes(s.name.toLowerCase()))
+      );
+      if (mS) {
+        setSelectedServiceId(mS.id);
+        if (mS.quantityTiers && mS.quantityTiers.length > 0) {
+          setSelectedQuantity(mS.quantityTiers[0].quantity);
+        }
+      }
+
       const elements = template.elements || [];
       const bgColor = template.bgColor || template.bg_color || '#ffffff';
       
@@ -1302,12 +1444,40 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       } else if (initialTemplate && typeof initialTemplate === 'string' && initialTemplate.toLowerCase().includes('<svg')) {
         try {
           const { parseSvgToElements } = await import('../../lib/svgParser');
-          const newElements = await parseSvgToElements(initialTemplate);
-          if (newElements.length > 0) {
-            setPages([
-              { elements: newElements, bgColor: '#ffffff' },
-              { elements: [], bgColor: '#ffffff' }
-            ]);
+          
+          let svgStrings: string[] = [];
+          try {
+            const parsed = JSON.parse(initialTemplate);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              svgStrings = parsed;
+            } else {
+              svgStrings = [initialTemplate];
+            }
+          } catch (e) {
+            svgStrings = [initialTemplate];
+          }
+
+          const newPages = [];
+          let firstWidth = 1050;
+          let firstHeight = 600;
+          let hasElements = false;
+
+          for (let i = 0; i < svgStrings.length; i++) {
+            const { elements: newElements, width, height } = await parseSvgToElements(svgStrings[i]);
+            if (i === 0) {
+              firstWidth = width;
+              firstHeight = height;
+            }
+            if (newElements.length > 0) hasElements = true;
+            newPages.push({
+              elements: newElements,
+              bgColor: '#ffffff'
+            });
+          }
+
+          if (hasElements) {
+            setCanvasDimensions({ width: Math.round(firstWidth), height: Math.round(firstHeight) });
+            setPages(newPages);
             hasLoaded.current = true;
           } else if (templateId) {
             // Fallback to templateId if SVG parsing yielded no elements
@@ -1375,7 +1545,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [templatePromotion, setTemplatePromotion] = useState(false);
   const [templatePromotionPercentage, setTemplatePromotionPercentage] = useState('');
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(autoOpenSelector || false);
-  const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai' | 'assets' | 'layers'>('templates');
+  const [activeTab, setActiveTab] = useState<'templates' | 'elements' | 'text' | 'brand' | 'upload' | 'tools' | 'projects' | 'effects' | 'position' | 'spacing' | 'background' | 'options' | 'ai' | 'assets' | 'layers' | 'color'>('templates');
+  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(true);
   const [prompt, setPrompt] = useState('');
   
   const [copiedStyle, setCopiedStyle] = useState<Partial<CanvasElement> | null>(null);
@@ -1521,24 +1692,25 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     { id: 'upload', label: 'Importer', icon: Upload },
     { id: 'tools', label: 'Outils', icon: Wrench },
     { id: 'projects', label: 'Projets', icon: FolderOpen },
-    { id: 'options', label: 'Options', icon: Wrench },
+    { id: 'options', label: 'Options', icon: Settings },
   ];
 
   const [svgInput, setSvgInput] = useState('');
 
   const TEMPLATE_CATEGORIES = [
-    { name: 'Logo Principal', size: '500x500px', categoryId: 'brand' },
-    { name: 'Variante de Logo', size: '400x150px', categoryId: 'brand' },
-    { name: 'Favicon', size: '64x64px', categoryId: 'brand' },
-    { name: 'Carte de Visite', size: '3.5x2 pouces', categoryId: 'print' },
-    { name: 'Papier En-tête A4', size: '210x297mm', categoryId: 'print' },
-    { name: 'Enveloppe DL', size: '220x110mm', categoryId: 'print' },
-    { name: 'Flyer A5', size: '148x210mm', categoryId: 'marketing' },
-    { name: 'Dépliant 3 volets', size: 'A4 ouvert', categoryId: 'marketing' },
-    { name: 'Affiche événementielle', size: '40x60cm', categoryId: 'marketing' },
-    { name: 'Roll-up de salon', size: '85x200cm', categoryId: 'goodies' },
-    { name: 'Habillage de mug', size: '200x95mm', categoryId: 'goodies' },
-    { name: 'Étiquette de produit', size: 'personnalisable', categoryId: 'goodies' },
+    { name: 'Logo Principal', width: 500, height: 500, categoryId: 'brand' },
+    { name: 'Variante de Logo', width: 400, height: 150, categoryId: 'brand' },
+    { name: 'Favicon', width: 128, height: 128, categoryId: 'brand' },
+    { name: 'Carte de Visite', width: 1050, height: 600, categoryId: 'print' },
+    { name: 'Papier En-tête A4', width: 2480, height: 3508, categoryId: 'print' },
+    { name: 'Enveloppe DL', width: 2200, height: 1100, categoryId: 'print' },
+    { name: 'Flyer A5', width: 1748, height: 2480, categoryId: 'marketing' },
+    { name: 'Dépliant 3 volets', width: 3508, height: 2480, categoryId: 'marketing' },
+    { name: 'Affiche événementielle', width: 4724, height: 7087, categoryId: 'marketing' },
+    { name: 'Roll-up de salon', width: 2550, height: 6000, categoryId: 'goodies' },
+    { name: 'Habillage de mug', width: 2362, height: 1122, categoryId: 'goodies' },
+    { name: 'Design T-Shirt', width: 2400, height: 3200, categoryId: 'goodies' },
+    { name: 'Étiquette de produit', width: 600, height: 400, categoryId: 'goodies' },
   ];
 
   const STUDIO_CATEGORIES = [
@@ -1586,6 +1758,86 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     } catch (error) {
       console.error("Error saving template:", error);
       toast.error("Erreur lors de l'enregistrement du modèle.");
+    }
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!user) {
+      toast.error('Vous devez être connecté pour passer une commande.');
+      setIsSaveModalOpen(false);
+      navigate('/login', { state: { from: '/design-editor', templateId } });
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    const toastId = toast.loading("Préparation de votre commande...");
+    
+    try {
+      // 1. Capture design thumbnail
+      if (!stageRef.current) throw new Error("Canvas non initialisé");
+      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+      
+      // 2. Save design to Firestore
+      const designDocId = await firestoreService.add('designs', {
+        name: templateName || `Commande - ${new Date().toLocaleDateString()}`,
+        ownerId: user.uid,
+        pages: JSON.parse(JSON.stringify(pages)),
+        thumbnail: dataUrl,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isTemplate: false
+      });
+
+      // 3. Find selected service info
+      const service = SERVICES.find(s => s.id === selectedServiceId);
+      if (!service) throw new Error("Service non trouvé");
+
+      // 4. Calculate prices
+      let basePrice = service.price;
+      if (service.isPrintProduct && service.quantityTiers) {
+        const tier = service.quantityTiers.find(t => t.quantity === selectedQuantity);
+        if (tier) basePrice = tier.price / selectedQuantity;
+      }
+
+      let optionsModifier = 0;
+      Object.entries(selectedOptions).forEach(([optId, value]) => {
+        const optGroup = service.printOptions?.find(g => g.id === optId);
+        const opt = optGroup?.options.find(o => o.label === value);
+        if (opt) optionsModifier += opt.priceModifier;
+      });
+
+      const total = (basePrice * selectedQuantity) + optionsModifier;
+
+      // 5. Create real order
+      const orderId = await dbService.orders.save({
+        userId: user.uid,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceImage: service.image,
+        clientName: profile?.displayName || user.displayName || 'Client',
+        clientEmail: user.email,
+        status: 'pending',
+        totalPrice: total,
+        originalPrice: total,
+        designId: designDocId,
+        details: {
+          quantity: selectedQuantity,
+          customOptions: selectedOptions,
+          designThumbnail: dataUrl,
+          description: `Commande directe via Acom Studio - Modèle: ${templateName || 'Standard'}`
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      toast.success("Commande créée avec succès !", { id: toastId });
+      setIsSaveModalOpen(false);
+      navigate(`/order-details/${orderId}`);
+    } catch (error) {
+      console.error("Order error:", error);
+      toast.error("Erreur lors de la création de la commande.", { id: toastId });
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
@@ -1683,15 +1935,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       }
 
       if (!vWidth || !vHeight) {
-        vWidth = 600;
-        vHeight = 350;
+        vWidth = canvasDimensions.width;
+        vHeight = canvasDimensions.height;
       }
 
-      const scaleX = 600 / vWidth;
-      const scaleY = 350 / vHeight;
+      const scaleX = canvasDimensions.width / vWidth;
+      const scaleY = canvasDimensions.height / vHeight;
       const scale = Math.min(scaleX, scaleY);
-      const offsetX = (600 - vWidth * scale) / 2;
-      const offsetY = (350 - vHeight * scale) / 2;
+      const offsetX = (canvasDimensions.width - vWidth * scale) / 2;
+      const offsetY = (canvasDimensions.height - vHeight * scale) / 2;
 
       const newElements: CanvasElement[] = [];
       const bgColorAttr = svgElement.getAttribute('fill') || svgElement.style.backgroundColor || '#ffffff';
@@ -1814,8 +2066,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             x: (totalX - vX) * scale + offsetX,
             y: (totalY - vY) * scale + offsetY,
             data: el.getAttribute('d') || '',
-            width: 600,
-            height: 350,
+            width: 1050,
+            height: 600,
           });
         } else if (el.tagName === 'circle') {
           newElements.push({
@@ -1913,8 +2165,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     const updateSize = () => {
       if (containerRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
-        const ratio = 350 / 600; // Business card ratio
-        const newWidth = Math.min(containerWidth - 40, 600);
+        const ratio = canvasDimensions.height / canvasDimensions.width;
+        const newWidth = Math.min(containerWidth - 40, canvasDimensions.width);
         setStageSize({
           width: newWidth,
           height: newWidth * ratio
@@ -1931,13 +2183,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     const newElement: CanvasElement = {
       id: newId,
       type: 'text',
-      x: stageSize.width / 2 - 50,
-      y: stageSize.height / 2,
+      x: canvasDimensions.width / 2 - 50,
+      y: canvasDimensions.height / 2,
       text: 'Nouveau texte',
       fontSize: 18,
       fill: '#000000'
     };
-    setElements([...elements, newElement]);
+    setElements(prev => [...prev, newElement]);
     setSelectedIds([newId]);
     setIsMobileSidebarOpen(false);
   };
@@ -1952,10 +2204,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       const newElement: CanvasElement = {
         id: newId,
         type: 'image',
-        x: stageSize.width / 2 - 50,
-        y: stageSize.height / 2 - 50,
-        width: 100,
-        height: 100,
+        x: canvasDimensions.width / 2 - 50,
+        y: canvasDimensions.height / 2 - 50,
+        width: Math.min(200, canvasDimensions.width / 2),
+        height: Math.min(200, canvasDimensions.height / 2),
         src: event.target?.result as string
       };
       setElements([...elements, newElement]);
@@ -1963,6 +2215,22 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       setIsMobileSidebarOpen(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleAddImageFromUrl = (url: string) => {
+    const newId = `img-${Date.now()}`;
+    const newElement: CanvasElement = {
+      id: newId,
+      type: 'image',
+      x: canvasDimensions.width / 2 - 50,
+      y: canvasDimensions.height / 2 - 50,
+      width: Math.min(200, canvasDimensions.width / 2),
+      height: Math.min(200, canvasDimensions.height / 2),
+      src: url
+    };
+    setElements([...elements, newElement]);
+    setSelectedIds([newId]);
+    setIsMobileSidebarOpen(false);
   };
 
   const handleShare = () => {
@@ -2095,147 +2363,122 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   };
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-hidden relative">
-      {/* Top Header Bar (Canva Style) */}
-      <div className="h-14 bg-black text-white flex items-center justify-between px-2 md:px-4 z-40 shadow-md flex-shrink-0 overflow-x-auto no-scrollbar">
-        <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
+    <div className="flex flex-col h-full bg-[#f9f9f9] overflow-hidden relative font-sans">
+      {/* Top Header Bar */}
+      <div className="h-16 bg-[#0a0a0a] border-b border-white/10 flex items-center justify-between px-6 z-50 flex-shrink-0 shadow-xl text-white">
+        <div className="flex items-center space-x-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-1.5 md:p-2 hover:bg-white/10 rounded-lg transition-colors"
-            title="Retour"
+            className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white/70 hover:text-white"
+            title="Retour à l'accueil"
           >
-            <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="h-6 w-px bg-white/20" />
           
-          {/* Undo/Redo Buttons */}
           <div className="flex items-center space-x-1">
             <button 
-              onClick={undo}
-              disabled={historyIndex <= 0}
-              className="p-1.5 md:p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={undo} 
+              disabled={historyIndex <= 0} 
+              className="p-2 hover:bg-white/10 rounded-xl disabled:opacity-20 transition-all text-white/70 hover:text-white"
               title="Annuler (Ctrl+Z)"
             >
-              <Undo className="w-4 h-4" />
+              <Undo className="w-5 h-5" />
             </button>
             <button 
-              onClick={redo}
-              disabled={historyIndex >= history.length - 1}
-              className="p-1.5 md:p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              onClick={redo} 
+              disabled={historyIndex >= history.length - 1} 
+              className="p-2 hover:bg-white/10 rounded-xl disabled:opacity-20 transition-all text-white/70 hover:text-white"
               title="Rétablir (Ctrl+Y)"
             >
-              <Redo className="w-4 h-4" />
+              <Redo className="w-5 h-5" />
             </button>
           </div>
+
+          <div className="h-6 w-px bg-white/10 mx-2" />
           
-          <div className="h-6 w-px bg-white/20" />
           <div className="flex flex-col">
             <input 
               type="text" 
               value={designTitle}
               onChange={(e) => setDesignTitle(e.target.value)}
-              className="bg-transparent border-none outline-none text-xs md:text-sm font-bold text-white focus:ring-0 w-24 sm:w-40 md:w-64 placeholder:text-white/50"
-              placeholder="Design sans titre"
+              className="bg-transparent border-none outline-none text-sm font-black text-white focus:ring-0 p-0 leading-tight"
+              placeholder="Sans titre"
             />
-            <span className="text-[10px] text-white/70 font-medium px-3 -mt-1 hidden">Modifié il y a quelques instants</span>
           </div>
         </div>
-        
-        <div className="flex items-center space-x-1.5 md:space-x-4 flex-shrink-0 ml-2">
-          {/* Presence Indicators */}
-          <div className="flex -space-x-2 mr-2">
-            {others.slice(0, 3).map((p) => (
-              <div 
-                key={p.id} 
-                className="w-8 h-8 rounded-full border-2 border-black bg-primary flex items-center justify-center overflow-hidden"
-                title={p.userName}
-              >
-                {p.userPhoto ? (
-                  <img src={p.userPhoto} alt={p.userName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <span className="text-[10px] font-bold text-white">{p.userName.charAt(0)}</span>
-                )}
-              </div>
-            ))}
-            {others.length > 3 && (
-              <div className="w-8 h-8 rounded-full border-2 border-black bg-gray-700 flex items-center justify-center text-[10px] font-bold text-white">
-                +{others.length - 3}
-              </div>
-            )}
+
+        <div className="flex items-center space-x-3">
+          {/* Right Header Options */}
+          <div className="flex items-center bg-white/5 rounded-xl px-2 py-1 space-x-2 border border-white/5">
+            <button 
+              onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} 
+              className="p-1 hover:bg-white/10 rounded-lg text-white/70"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-bold min-w-[40px] text-center">{Math.round(zoom * 100)}%</span>
+            <button 
+              onClick={() => setZoom(Math.min(3, zoom + 0.1))} 
+              className="p-1 hover:bg-white/10 rounded-lg text-white/70"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="hidden md:flex items-center space-x-1 bg-white/10 p-1 rounded-lg">
-            <button onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} className="p-1.5 hover:bg-white/10 rounded-md text-white"><Minus className="w-4 h-4" /></button>
-            <span className="text-xs font-bold text-white min-w-[45px] text-center">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom(z => Math.min(3, z + 0.1))} className="p-1.5 hover:bg-white/10 rounded-md text-white"><Plus className="w-4 h-4" /></button>
-          </div>
+          <div className="h-6 w-px bg-white/10 mx-1" />
 
+          {/* AI Assistant Button */}
           <button 
-            onClick={handleImproveLayout}
-            disabled={isImprovingLayout}
-            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition-all text-xs md:text-sm shadow-lg shadow-primary/20 disabled:opacity-50"
-            title="IA Assistant"
+            onClick={() => {
+              setActiveTab('ai');
+              setIsMobileSidebarOpen(true);
+            }}
+            className="flex items-center h-10 px-5 bg-[#a855f7] hover:bg-[#9333ea] text-white rounded-xl font-black transition-all text-sm shadow-lg shadow-purple-500/20"
           >
-            {isImprovingLayout ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4 md:mr-2" />
-            )}
-            <span className="hidden md:inline">IA Assistant</span>
+            <Sparkles className="w-4 h-4 mr-2" />
+            IA Assistant
           </button>
 
-          <button 
-            onClick={handleShare}
-            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-xs md:text-sm"
-            title="Session invité"
-          >
-            <Share2 className="w-4 h-4 md:mr-2" />
-            <span className="hidden md:inline">Session invité</span>
+          <button className="flex items-center h-10 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all text-sm border border-white/5">
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Session invité
           </button>
 
           <button 
             onClick={() => handleExport()}
-            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-xs md:text-sm"
-            title="Exporter"
+            className="flex items-center h-10 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all text-sm border border-white/5"
           >
-            <Download className="w-4 h-4 md:mr-2" />
-            <span className="hidden md:inline">Exporter</span>
+            <Download className="w-4 h-4 mr-2" />
+            Exporter
           </button>
 
-          {(isAdmin || isManager || user) && (
+          {(isAdmin || isManager) && (
             <button 
-              onClick={() => setIsSaveModalOpen(true)}
-              className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white/10 text-white border border-white/20 rounded-lg font-bold hover:bg-white/20 transition-all text-xs md:text-sm"
-              title="Sauvegarder comme Modèle"
+              onClick={() => {
+                setIsOrdering(false);
+                setIsSaveModalOpen(true);
+              }}
+              className="flex items-center h-10 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all text-sm border border-white/5"
             >
-              <Save className="w-4 h-4 md:mr-2" />
-              <span className="hidden md:inline">Créer un Modèle</span>
+              <Copy className="w-4 h-4 mr-2" />
+              Créer un Modèle
             </button>
           )}
-
+          
           <button 
             onClick={() => {
-              if (isAdmin || isManager) {
-                saveDesign();
-              } else {
-                handleSubmitForPrinting();
-              }
+              setIsOrdering(true);
+              setIsSaveModalOpen(true);
             }}
-            disabled={isSaving || isSubmitting}
-            className="flex items-center justify-center p-2 md:px-4 md:py-2 bg-white text-black rounded-lg font-bold hover:bg-white/90 transition-all shadow-lg disabled:opacity-50 text-xs md:text-sm"
-            title={isAdmin || isManager ? "Sauvegarder" : "Commander"}
+            className="flex items-center h-10 px-6 bg-white text-black rounded-xl font-black hover:bg-gray-100 transition-all text-sm shadow-xl"
           >
-            {isSaving || isSubmitting ? (
-              <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin md:mr-2" />
-            ) : (
-              <Save className="w-4 h-4 md:mr-2" />
-            )}
-            <span className="hidden sm:inline">{isAdmin || isManager ? "Sauvegarder" : "Commander"}</span>
+            <ShoppingBag className="w-4 h-4 mr-2" />
+            Commander
           </button>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden relative bg-[#f3f4f6]">
         {/* Restore Design Prompt */}
         <AnimatePresence>
           {showRestorePrompt && (
@@ -2270,16 +2513,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           )}
         </AnimatePresence>
 
-        {/* Mobile Sidebar Overlay */}
-        {isMobileSidebarOpen && (
-          <div 
-            className="md:hidden fixed inset-0 bg-black/50 z-40"
-            onClick={() => setIsMobileSidebarOpen(false)}
-          />
-        )}
-
-        {/* Left Sidebar - Main Tabs (Desktop) */}
-        <div className="hidden md:flex w-20 bg-white border-r border-gray-100 flex-col items-center py-4 space-y-2 z-50">
+        {/* Left Sidebar (Narrow) */}
+        <aside className="w-[72px] bg-white border-r border-gray-100 flex flex-col items-center py-4 z-50 flex-shrink-0 shadow-lg overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {sidebarTabs.map((tab) => (
             <button
               key={tab.id}
@@ -2288,71 +2523,114 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                   setIsDesignModalOpen(true);
                 }
                 setActiveTab(tab.id as any);
+                setIsMobileSidebarOpen(true);
               }}
-              className={`w-16 h-16 flex flex-col items-center justify-center rounded-xl transition-all group ${
+              className={`w-full py-3 flex flex-col items-center justify-center transition-all ${
                 activeTab === tab.id 
-                  ? 'text-primary bg-primary/5' 
+                  ? 'text-primary' 
                   : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <tab.icon className={`w-6 h-6 mb-1 transition-transform group-hover:scale-110 ${activeTab === tab.id ? 'text-primary' : ''}`} />
-              <span className="text-[10px] font-bold tracking-tight">{tab.label}</span>
+              <div className={`p-2 rounded-xl transition-all ${activeTab === tab.id ? 'bg-primary/10' : ''}`}>
+                <tab.icon className="w-5 h-5" />
+              </div>
+              <span className="text-[9px] font-bold mt-1 text-center leading-tight px-1">{tab.label}</span>
             </button>
           ))}
-        </div>
+        </aside>
 
-        {/* Secondary Panel - Tab Content */}
-        <div className={`${isMobileSidebarOpen ? 'flex' : 'hidden md:flex'} w-full md:w-80 absolute md:relative left-0 right-0 md:right-auto bottom-16 md:bottom-0 top-0 bg-white border-r border-gray-100 flex-col z-40 shadow-xl md:shadow-none`}>
-          <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-          {activeTab === 'options' && (
-            <div className="space-y-6">
-              <h2 className="text-lg font-bold text-gray-900">Options Avancées</h2>
-              <div className="space-y-4">
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                  <span className="text-sm font-medium text-gray-700">Afficher la Grille</span>
-                </label>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input type="checkbox" checked={showRulers} onChange={(e) => setShowRulers(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                  <span className="text-sm font-medium text-gray-700">Afficher les Règles</span>
-                </label>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input type="checkbox" checked={showMargins} onChange={(e) => setShowMargins(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                  <span className="text-sm font-medium text-gray-700">Marges d'impression</span>
-                </label>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input type="checkbox" checked={showBleed} onChange={(e) => setShowBleed(e.target.checked)} className="rounded text-primary focus:ring-primary" />
-                  <span className="text-sm font-medium text-gray-700">Zones de fond perdu (Bleed)</span>
-                </label>
-              </div>
-            </div>
-          )}
-          {activeTab === 'layers' && (
-            <div className="space-y-4">
-              <h3 className="font-bold text-gray-900">Calques</h3>
-              <div className="space-y-2">
-                {[...elements].reverse().map((el, index) => {
-                  const isSelected = selectedIds.includes(el.id);
-                  let Icon = Shapes;
-                  if (el.type === 'text') Icon = Type;
-                  if (el.type === 'image') Icon = ImageIcon;
+        {/* Detail Panel */}
+        <div 
+          className={`w-80 bg-white border-r border-gray-100 flex flex-col z-40 transition-all duration-300 ${
+            activeTab ? 'translate-x-0' : '-translate-x-full absolute overflow-hidden'
+          }`}
+        >
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="p-6 overflow-y-auto h-full custom-scrollbar">
+              {activeTab === 'options' && (
+                <div className="space-y-6">
+                  <h2 className="text-lg font-black text-gray-900">Options du Design</h2>
                   
-                  return (
-                    <div 
-                      key={el.id}
-                      onClick={() => setSelectedIds([el.id])}
-                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
-                        isSelected ? 'bg-primary/5 border-primary' : 'bg-gray-50 border-gray-100 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3 overflow-hidden">
-                        <div className="p-1.5 bg-white rounded-lg shadow-sm text-gray-500">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-700 truncate max-w-[120px]">
-                          {el.type === 'text' ? el.text : el.type === 'image' ? 'Image' : 'Forme'}
-                        </span>
-                      </div>
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Plan de Travail</h4>
+                    <div className="grid grid-cols-1 gap-2">
+                      {TEMPLATE_CATEGORIES.map(cat => (
+                        <button
+                          key={cat.name}
+                          onClick={() => {
+                            setCanvasDimensions({ width: cat.width, height: cat.height });
+                            setIsMobileSidebarOpen(false);
+                          }}
+                          className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
+                            canvasDimensions.width === cat.width && canvasDimensions.height === cat.height
+                              ? 'bg-primary/5 border-primary text-primary shadow-sm'
+                              : 'bg-gray-50 border-transparent hover:border-gray-200 text-gray-700'
+                          }`}
+                        >
+                          <div className="text-left font-bold">
+                            <p className="text-sm">{cat.name}</p>
+                            <p className="text-[10px] opacity-70">{cat.width} x {cat.height} px</p>
+                          </div>
+                          {canvasDimensions.width === cat.width && canvasDimensions.height === cat.height && (
+                            <div className="w-5 h-5 bg-primary text-white rounded-full flex items-center justify-center scale-90">
+                              <Check className="w-3 h-3" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4">
+                    <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Affichage</h4>
+                    <div className="p-3 bg-gray-50 rounded-2xl space-y-1">
+                      <label className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-white rounded-xl transition-all">
+                        <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} className="rounded text-primary focus:ring-primary w-4 h-4" />
+                        <span className="text-sm font-bold text-gray-700">Afficher la Grille</span>
+                      </label>
+                      <label className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-white rounded-xl transition-all">
+                        <input type="checkbox" checked={showRulers} onChange={(e) => setShowRulers(e.target.checked)} className="rounded text-primary focus:ring-primary w-4 h-4" />
+                        <span className="text-sm font-bold text-gray-700">Afficher les Règles</span>
+                      </label>
+                      <label className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-white rounded-xl transition-all">
+                        <input type="checkbox" checked={showMargins} onChange={(e) => setShowMargins(e.target.checked)} className="rounded text-primary focus:ring-primary w-4 h-4" />
+                        <span className="text-sm font-bold text-gray-700">Marges d'impression</span>
+                      </label>
+                      <label className="flex items-center space-x-3 cursor-pointer p-2 hover:bg-white rounded-xl transition-all">
+                        <input type="checkbox" checked={showBleed} onChange={(e) => setShowBleed(e.target.checked)} className="rounded text-primary focus:ring-primary w-4 h-4" />
+                        <span className="text-sm font-bold text-gray-700">Fond perdu (Bleed)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'layers' && (
+                <div className="space-y-4">
+                  <h3 className="font-black text-lg text-gray-900">Calques</h3>
+                  <div className="space-y-2">
+                    {[...elements].reverse().map((el, index) => {
+                      const isSelected = selectedIds.includes(el.id);
+                      let Icon = Shapes;
+                      if (el.type === 'text') Icon = Type;
+                      if (el.type === 'image') Icon = ImageIcon;
+                      
+                      return (
+                        <div 
+                          key={el.id}
+                          onClick={() => setSelectedIds([el.id])}
+                          className={`flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                            isSelected ? 'bg-primary/5 border-primary shadow-sm' : 'bg-gray-50 border-transparent hover:border-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3 overflow-hidden">
+                            <div className={`p-2 rounded-xl shadow-sm ${isSelected ? 'bg-white text-primary' : 'bg-white text-gray-500'}`}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <span className="text-sm font-bold text-gray-700 truncate max-w-[120px]">
+                              {el.type === 'text' ? el.text : el.type === 'image' ? 'Image' : 'Forme'}
+                            </span>
+                          </div>
                       <div className="flex items-center space-x-1">
                         <button 
                           onClick={(e) => {
@@ -2484,6 +2762,16 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             </div>
           )}
 
+          {activeTab === 'assets' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900">Assets</h3>
+                <button onClick={() => setActiveTab('templates')} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
+              </div>
+              <AssetLibrary onInsert={(url) => handleAddImageFromUrl(url)} />
+            </div>
+          )}
+
           {activeTab === 'templates' && (
             <div className="space-y-4">
               {/* Bouton pour ouvrir le sélecteur de variantes */}
@@ -2582,6 +2870,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                           bgColor={tBgColor}
                           profile={profile}
                           contextElements={elements}
+                          width={t.design?.width || t.width || 1050}
+                          height={t.design?.height || t.height || 600}
                         />
                       </div>
                     )}
@@ -3102,13 +3392,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       Gauche
                     </button>
                     <button 
-                      onClick={() => updateSelectedElement({ x: (600 - (selectedElement.width || 100)) / 2 })}
+                      onClick={() => updateSelectedElement({ x: (1050 - (selectedElement.width || 100)) / 2 })}
                       className="p-3 bg-gray-50 rounded-xl text-xs font-bold hover:bg-gray-100 transition-colors"
                     >
                       Centre
                     </button>
                     <button 
-                      onClick={() => updateSelectedElement({ x: 600 - (selectedElement.width || 100) })}
+                      onClick={() => updateSelectedElement({ x: 1050 - (selectedElement.width || 100) })}
                       className="p-3 bg-gray-50 rounded-xl text-xs font-bold hover:bg-gray-100 transition-colors"
                     >
                       Droite
@@ -3120,17 +3410,64 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       Haut
                     </button>
                     <button 
-                      onClick={() => updateSelectedElement({ y: (350 - (selectedElement.height || 50)) / 2 })}
+                      onClick={() => updateSelectedElement({ y: (600 - (selectedElement.height || 50)) / 2 })}
                       className="p-3 bg-gray-50 rounded-xl text-xs font-bold hover:bg-gray-100 transition-colors"
                     >
                       Milieu
                     </button>
                     <button 
-                      onClick={() => updateSelectedElement({ y: 350 - (selectedElement.height || 50) })}
+                      onClick={() => updateSelectedElement({ y: 600 - (selectedElement.height || 50) })}
                       className="p-3 bg-gray-50 rounded-xl text-xs font-bold hover:bg-gray-100 transition-colors"
                     >
                       Bas
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'color' && selectedElement && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900">Couleur</h3>
+                <button onClick={() => setActiveTab('options')} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Couleur personnalisée</h4>
+                  <div className="flex items-center space-x-3 bg-gray-50 p-4 rounded-2xl">
+                    <div className="relative w-12 h-12 rounded-xl border-2 border-white shadow-sm overflow-hidden flex-shrink-0">
+                      <input 
+                        type="color" 
+                        value={selectedElement.fill && selectedElement.fill !== 'transparent' ? selectedElement.fill : '#000000'}
+                        onChange={(e) => updateSelectedElement({ fill: e.target.value })}
+                        className="absolute inset-0 w-[200%] h-[200%] -translate-x-1/4 -translate-y-1/4 cursor-pointer"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input 
+                        type="text" 
+                        value={(selectedElement.fill || '').toUpperCase()}
+                        onChange={(e) => updateSelectedElement({ fill: e.target.value })}
+                        className="w-full bg-transparent border-none outline-none text-sm font-mono font-bold text-gray-600 focus:ring-0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Couleurs du document</h4>
+                  <div className="grid grid-cols-5 gap-2">
+                    {['#ffffff', '#000000', '#f3f4f6', '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#6366f1', '#8b5cf6', '#ec4899', bgColor].filter((v, i, a) => a.indexOf(v) === i).map(color => (
+                      <button
+                        key={color}
+                        onClick={() => updateSelectedElement({ fill: color })}
+                        className={`w-full aspect-square rounded-lg border-2 transition-all ${selectedElement.fill === color ? 'border-primary scale-110 shadow-md' : 'border-transparent hover:scale-105'}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
                   </div>
                 </div>
               </div>
@@ -3227,345 +3564,92 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           )}
         </div>
       </div>
+    </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col bg-[#f0f2f5] relative overflow-hidden">
-        {/* Floating Formatting Toolbar (Canva Style) */}
-        <div className="h-14 flex items-center justify-center px-4 md:px-6 z-30 overflow-visible relative mt-2">
-          <motion.div 
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="w-full max-w-screen-2xl bg-white rounded-xl shadow-2xl border border-gray-100 h-12 flex items-center px-4 overflow-visible justify-between"
-          >
-            <div className="flex items-center space-x-2 mr-4">
+        {/* Floating Contextual Toolbar */}
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[60] flex items-center bg-white rounded-full shadow-2xl border border-gray-100 py-1.5 px-3 space-x-1 min-h-[48px]">
+          <div className="flex items-center space-x-1 pr-2 border-r border-gray-100">
+            <button onClick={undo} disabled={historyIndex <= 0} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 disabled:opacity-30"><Undo className="w-4 h-4" /></button>
+            <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 disabled:opacity-30"><Redo className="w-4 h-4" /></button>
+          </div>
+
+          {selectedIds.length > 0 && elements.find(el => el.id === selectedIds[0])?.type === 'text' && (
+            <div className="flex items-center space-x-1 px-2 border-r border-gray-100">
+              <button className="flex items-center space-x-2 px-3 py-1.5 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-700">
+                <span>{elements.find(el => el.id === selectedIds[0])?.fontFamily || 'Inter'}</span>
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              <div className="h-4 w-px bg-gray-100 mx-1" />
+              <div className="flex items-center space-x-1">
+                <button onClick={() => updateSelectedElement({ fontSize: Math.max(1, (elements.find(el => el.id === selectedIds[0])?.fontSize || 16) - 1) })} className="p-1 hover:bg-gray-100 rounded"><Minus className="w-3 h-3" /></button>
+                <input 
+                  type="number" 
+                  value={elements.find(el => el.id === selectedIds[0])?.fontSize || 16}
+                  onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) })}
+                  className="w-10 bg-transparent text-center text-xs font-bold border-none outline-none focus:ring-0"
+                />
+                <button onClick={() => updateSelectedElement({ fontSize: (elements.find(el => el.id === selectedIds[0])?.fontSize || 16) + 1 })} className="p-1 hover:bg-gray-100 rounded"><Plus className="w-3 h-3" /></button>
+              </div>
+              <div className="h-4 w-px bg-gray-100 mx-1" />
               <button 
-                onClick={undo} 
-                disabled={historyIndex === 0} 
-                className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 transition-colors"
-                title="Annuler"
+                onClick={() => updateSelectedElement({ fontWeight: (elements.find(el => el.id === selectedIds[0])?.fontWeight === 'bold' ? 'normal' : 'bold') })}
+                className={`p-2 rounded-lg transition-all ${elements.find(el => el.id === selectedIds[0])?.fontWeight === 'bold' ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100 text-gray-600'}`}
               >
-                <Undo className="w-4 h-4" />
+                <Bold className="w-4 h-4" />
               </button>
               <button 
-                onClick={redo} 
-                disabled={historyIndex === history.length - 1} 
-                className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50 transition-colors"
-                title="Rétablir"
+                onClick={() => updateSelectedElement({ fontStyle: (elements.find(el => el.id === selectedIds[0])?.fontStyle === 'italic' ? 'normal' : 'italic') })}
+                className={`p-2 rounded-lg transition-all ${elements.find(el => el.id === selectedIds[0])?.fontStyle === 'italic' ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100 text-gray-600'}`}
               >
-                <Redo className="w-4 h-4" />
+                <Italic className="w-4 h-4" />
+              </button>
+              <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><Underline className="w-4 h-4" /></button>
+              <button 
+                onClick={() => setActiveTab('color')}
+                className="p-1.5 hover:bg-gray-100 rounded-lg flex flex-col items-center"
+              >
+                <span className="text-sm font-black text-[#a855f7]">A</span>
+                <div 
+                  className="w-full h-1 rounded-full -mt-0.5" 
+                  style={{ backgroundColor: elements.find(el => el.id === selectedIds[0])?.fill || '#000000' }}
+                />
               </button>
             </div>
-            <div className="flex items-center space-x-2 overflow-visible pb-2 -mb-2 w-full justify-start lg:justify-center">
-              {/* Contextual Tools */}
-              {selectedIds.length > 1 ? (
-                <div className="flex items-center space-x-1 flex-shrink-0">
-                  <span className="text-xs font-bold text-gray-500 mr-2">{selectedIds.length} éléments sélectionnés</span>
-                  <div className="h-6 w-px bg-gray-200 mx-2" />
-                  {/* Group Alignment Tools */}
-                  <button onClick={() => alignSelected('left')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner à gauche"><AlignLeft className="w-4 h-4" /></button>
-                  <button onClick={() => alignSelected('center')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner au centre"><AlignCenter className="w-4 h-4" /></button>
-                  <button onClick={() => alignSelected('right')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner à droite"><AlignRight className="w-4 h-4" /></button>
-                  <div className="h-6 w-px bg-gray-200 mx-2" />
-                  <button onClick={() => alignSelected('top')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner en haut"><ArrowUpToLine className="w-4 h-4" /></button>
-                  <button onClick={() => alignSelected('middle')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner au milieu"><ArrowRightToLine className="w-4 h-4" /></button>
-                  <button onClick={() => alignSelected('bottom')} className="p-2 hover:bg-gray-100 rounded-lg" title="Aligner en bas"><ArrowDownToLine className="w-4 h-4" /></button>
-                  <div className="h-6 w-px bg-gray-200 mx-2" />
-                  <button onClick={() => distributeSelected('horizontal')} className="p-2 hover:bg-gray-100 rounded-lg" title="Distribuer horizontalement"><GripHorizontal className="w-4 h-4" /></button>
-                  <button onClick={() => distributeSelected('vertical')} className="p-2 hover:bg-gray-100 rounded-lg" title="Distribuer verticalement"><GripVertical className="w-4 h-4" /></button>
-                </div>
-              ) : selectedElement ? (
-                <div className="flex items-center space-x-1 flex-shrink-0">
-                  {/* General Color Picker */}
-                  <div className="relative group">
-                    <button className="p-2 hover:bg-gray-100 rounded-lg flex flex-col items-center">
-                      <span className="text-xs font-black leading-none">C</span>
-                      <div className="w-4 h-1 mt-0.5 rounded-full" style={{ backgroundColor: selectedElement.fill || '#000000' }} />
-                      <input 
-                        type="color" 
-                        value={selectedElement.fill || '#000000'}
-                        onChange={(e) => updateSelectedElement({ fill: e.target.value })}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                      />
-                    </button>
-                  </div>
-                  <div className="h-6 w-px bg-gray-200" />
+          )}
 
-                  {selectedElement?.type === 'text' && (
-                    <>
-                      <div className="flex items-center space-x-1 flex-shrink-0">
-                      {/* Font Family */}
-                      <div className="relative">
-                        <select 
-                          value={selectedElement.fontFamily || 'Inter'}
-                          onChange={(e) => updateSelectedElement({ fontFamily: e.target.value })}
-                          className="appearance-none bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold pr-6 focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer w-24 truncate"
-                        >
-                          {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
-                        </select>
-                        <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                      </div>
+          {selectedIds.length > 0 && !['text', 'image'].includes(elements.find(el => el.id === selectedIds[0])?.type || '') && (
+            <div className="flex items-center space-x-1 px-2 border-r border-gray-100">
+              <button 
+                onClick={() => setActiveTab('color')}
+                className="w-6 h-6 rounded-md border border-gray-200 shadow-sm hover:scale-105 transition-transform"
+                style={{ backgroundColor: elements.find(el => el.id === selectedIds[0])?.fill || elements.find(el => el.id === selectedIds[0])?.stroke || '#000000' }}
+                title="Couleur"
+              />
+            </div>
+          )}
 
-                      {/* Font Size */}
-                      <div className="flex items-center bg-gray-50 border border-gray-200 rounded-lg px-1">
-                        <button 
-                          onClick={() => updateSelectedElement({ fontSize: Math.max(1, (selectedElement.fontSize || 16) - 1) })}
-                          className="p-1 hover:bg-gray-200 rounded text-gray-600"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <input 
-                          type="number" 
-                          value={Math.round(selectedElement.fontSize || 16)}
-                          onChange={(e) => updateSelectedElement({ fontSize: parseInt(e.target.value) || 1 })}
-                          className="w-8 bg-transparent text-center text-xs font-bold outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <button 
-                          onClick={() => updateSelectedElement({ fontSize: (selectedElement.fontSize || 16) + 1 })}
-                          className="p-1 hover:bg-gray-200 rounded text-gray-600"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      <div className="h-6 w-px bg-gray-200" />
-
-                      {/* Style Toggles */}
-                      <div className="flex items-center bg-gray-50 rounded-lg p-0.5 space-x-0.5">
-                        <button 
-                          onClick={() => {
-                            const isBold = selectedElement.fontStyle?.includes('bold');
-                            const newStyle = isBold 
-                              ? selectedElement.fontStyle?.replace('bold', '').trim() || 'normal'
-                              : `${selectedElement.fontStyle || ''} bold`.trim();
-                            updateSelectedElement({ fontStyle: newStyle });
-                          }}
-                          className={`p-1.5 rounded-md transition-all ${selectedElement.fontStyle?.includes('bold') ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          <Bold className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            const isItalic = selectedElement.fontStyle?.includes('italic');
-                            const newStyle = isItalic 
-                              ? selectedElement.fontStyle?.replace('italic', '').trim() || 'normal'
-                              : `${selectedElement.fontStyle || ''} italic`.trim();
-                            updateSelectedElement({ fontStyle: newStyle });
-                          }}
-                          className={`p-1.5 rounded-md transition-all ${selectedElement.fontStyle?.includes('italic') ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          <Italic className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            const isUnderline = selectedElement.textDecoration === 'underline';
-                            updateSelectedElement({ textDecoration: isUnderline ? 'none' : 'underline' });
-                          }}
-                          className={`p-1.5 rounded-md transition-all ${selectedElement.textDecoration === 'underline' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                          <Underline className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Alignment */}
-                      <div className="flex items-center bg-gray-50 rounded-lg p-0.5 space-x-0.5">
-                        <button 
-                          onClick={() => updateSelectedElement({ align: 'left' })}
-                          className={`p-1.5 rounded-md transition-all ${selectedElement.align === 'left' || !selectedElement.align ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                          title="Aligner à gauche"
-                        >
-                          <AlignLeft className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => updateSelectedElement({ align: 'center' })}
-                          className={`p-1.5 rounded-md transition-all ${selectedElement.align === 'center' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                          title="Aligner au centre"
-                        >
-                          <AlignCenter className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => updateSelectedElement({ align: 'right' })}
-                          className={`p-1.5 rounded-md transition-all ${selectedElement.align === 'right' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                          title="Aligner à droite"
-                        >
-                          <AlignRight className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Uppercase Toggle */}
-                      <button 
-                        onClick={() => {
-                          const isUpper = selectedElement.text === selectedElement.text?.toUpperCase();
-                          updateSelectedElement({ text: isUpper ? selectedElement.text?.toLowerCase() : selectedElement.text?.toUpperCase() });
-                        }}
-                        className={`p-2 rounded-lg transition-all ${selectedElement.text === selectedElement.text?.toUpperCase() ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-gray-100'}`}
-                        title="Majuscules/Minuscules"
-                      >
-                        <CaseSensitive className="w-5 h-5" />
-                      </button>
-
-                      {/* Spacing Toggle */}
-                      <button 
-                        onClick={() => {
-                          setActiveTab(activeTab === 'spacing' ? 'templates' : 'spacing');
-                          setIsMobileSidebarOpen(true);
-                        }}
-                        className={`p-2 rounded-lg transition-all ${activeTab === 'spacing' ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-gray-100'}`}
-                        title="Espacement"
-                      >
-                        <ArrowUpDown className="w-5 h-5" />
-                      </button>
-
-                      <div className="h-6 w-px bg-gray-200" />
-
-                      {/* AI Copywriter */}
-                      <div className="relative group">
-                        <button 
-                          className="p-2 rounded-lg transition-all text-purple-600 hover:bg-purple-50 flex items-center space-x-1"
-                          title="Assistant IA"
-                          disabled={isAiWriting}
-                        >
-                          {isAiWriting ? (
-                            <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Sparkles className="w-5 h-5" />
-                          )}
-                        </button>
-                        
-                        {/* AI Menu */}
-                        <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-                          <button 
-                            onClick={() => handleAiRewrite('improve')}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
-                          >
-                            Améliorer le texte
-                          </button>
-                          <button 
-                            onClick={() => handleAiRewrite('professional')}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
-                          >
-                            Rendre professionnel
-                          </button>
-                          <button 
-                            onClick={() => handleAiRewrite('translate')}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
-                          >
-                            Traduire (FR/EN)
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* List */}
-                      <button 
-                        onClick={() => {
-                          if (selectedElement.text) {
-                            const lines = selectedElement.text.split('\n');
-                            const isList = lines.every(line => line.trim().startsWith('•'));
-                            const newText = isList 
-                              ? lines.map(line => line.replace(/^•\s*/, '')).join('\n')
-                              : lines.map(line => line.trim().startsWith('•') ? line : `• ${line}`).join('\n');
-                            updateSelectedElement({ text: newText });
-                          }
-                        }}
-                        className={`p-2 hover:bg-gray-100 rounded-lg transition-all flex-shrink-0 ${selectedElement.text?.includes('•') ? 'text-primary bg-primary/5' : 'text-gray-500'}`}
-                        title="Liste à puces"
-                      >
-                        <List className="w-5 h-5" />
-                      </button>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Effects */}
-                  <button 
-                    onClick={() => {
-                      setActiveTab(activeTab === 'effects' ? 'templates' : 'effects');
-                      setIsMobileSidebarOpen(true);
-                    }}
-                    className={`px-3 py-1.5 hover:bg-gray-100 rounded-lg text-xs font-bold flex items-center space-x-1 transition-all flex-shrink-0 ${activeTab === 'effects' ? 'bg-gray-100 text-primary' : 'text-gray-600'}`}
-                    title="Effets"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span className="hidden lg:inline">Effets</span>
-                  </button>
-                  
-                  <div className="h-6 w-px bg-gray-200 flex-shrink-0" />
-
-                  {/* Position */}
-                  <button 
-                    onClick={() => {
-                      setActiveTab(activeTab === 'position' ? 'templates' : 'position');
-                      setIsMobileSidebarOpen(true);
-                    }}
-                    className={`px-3 py-1.5 hover:bg-gray-100 rounded-lg text-xs font-bold flex items-center space-x-1 transition-all flex-shrink-0 ${activeTab === 'position' ? 'bg-gray-100 text-primary' : 'text-gray-600'}`}
-                    title="Position"
-                  >
-                    <Layers className="w-4 h-4" />
-                    <span className="hidden lg:inline">Position</span>
-                  </button>
-
-                  <div className="h-6 w-px bg-gray-200 flex-shrink-0" />
-
-                  {/* Copy Style */}
-                  <button 
-                    onClick={() => {
-                      if (selectedElement) {
-                        setCopiedStyle({
-                          fontFamily: selectedElement.fontFamily,
-                          fontSize: selectedElement.fontSize,
-                          fontStyle: selectedElement.fontStyle,
-                          textDecoration: selectedElement.textDecoration,
-                          fill: selectedElement.fill,
-                          align: selectedElement.align,
-                          opacity: selectedElement.opacity
-                        });
-                        toast.success("Style copié");
-                      }
-                    }}
-                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 flex-shrink-0"
-                    title="Copier le style"
-                  >
-                    <PaintRoller className="w-5 h-5" />
-                  </button>
-                  
-                  {copiedStyle && (
-                    <button 
-                      onClick={() => updateSelectedElement(copiedStyle)}
-                      className="p-2 hover:bg-primary/10 rounded-lg text-primary flex-shrink-0"
-                      title="Coller le style"
-                    >
-                      <Copy className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2 flex-shrink-0">
-                  <button 
-                  onClick={() => setActiveTab('background')}
-                  className="flex items-center space-x-2 px-3 py-1.5 hover:bg-gray-100 rounded-lg transition-all"
-                >
-                  <div className="w-4 h-4 rounded border border-gray-200 shadow-sm" style={{ backgroundColor: bgColor }} />
-                  <span className="text-xs font-bold text-gray-600">Arrière-plan</span>
-                </button>
-              </div>
+          <div className="flex items-center space-x-1 pl-1">
+            <button onClick={() => setActiveTab('ai')} className="p-2 hover:bg-purple-50 rounded-lg text-purple-600" title="IA Magic"><Sparkles className="w-4 h-4" /></button>
+            <button onClick={() => setActiveTab('spacing')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><AlignJustify className="w-4 h-4 rotate-90" /></button>
+            <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-600"><PaintRoller className="w-4 h-4" /></button>
+            <button onClick={() => setActiveTab('position')} className="flex items-center space-x-1 px-3 py-1.5 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-700">
+              <Layers className="w-3.5 h-3.5" />
+              <span>Position</span>
+            </button>
+            {selectedIds.length > 0 && (
+              <button onClick={handleRemoveSelected} className="p-2 hover:bg-red-50 rounded-lg text-red-400">
+                <Trash2 className="w-4 h-4" />
+              </button>
             )}
           </div>
-          
-          <div className="flex items-center space-x-2 ml-2 pl-2 border-l border-gray-100 bg-white rounded-r-2xl relative z-10">
-            {selectedElement && (
-              <>
-                <button onClick={handleRemoveSelected} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Supprimer">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </>
-            )}
-          </div>
-        </motion.div>
-      </div>
+        </div>
 
         {/* Canvas Stage */}
         <div 
           ref={containerRef} 
-          className="flex-1 flex items-center justify-center p-4 md:p-12 overflow-auto custom-scrollbar"
+          className="flex-1 overflow-auto custom-scrollbar flex p-6 pt-24 md:p-12 md:pt-28"
           onMouseMove={(e) => {
             if (!containerRef.current) return;
             
@@ -3581,22 +3665,31 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           }}
         >
           <div 
-            className="relative shadow-2xl transition-transform duration-200 ease-out"
+            className="m-auto relative bg-transparent"
             style={{ 
-              width: 1050,
-              height: 600,
-              transform: `scale(${stageScale})`,
-              transformOrigin: 'center center',
-              flexShrink: 0,
-              overflow: 'hidden',
-              borderRadius: '36px'
+              width: canvasDimensions.width * stageScale, 
+              height: canvasDimensions.height * stageScale,
+              flexShrink: 0
             }}
           >
+            <div 
+              className="absolute top-0 left-0 shadow-2xl transition-transform duration-200 ease-out"
+              style={{ 
+                width: canvasDimensions.width,
+                height: canvasDimensions.height,
+                transform: `scale(${stageScale})`,
+                transformOrigin: 'top left',
+                overflow: 'hidden',
+                borderRadius: '8px',
+                backgroundColor: bgColor
+              }}
+            >
             <div style={{ 
-              width: 1050,
-              height: 600,
+              width: canvasDimensions.width,
+              height: canvasDimensions.height,
               overflow: 'hidden',
-              backgroundColor: bgColor
+              backgroundColor: bgColor,
+              position: 'relative'
             }}>
               <FabricCanvas
                 ref={stageRef}
@@ -3606,6 +3699,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                 setSelectedIds={setSelectedIds}
                 bgColor={bgColor}
                 stageScale={stageScale}
+                width={canvasDimensions.width}
+                height={canvasDimensions.height}
                 showGrid={showGrid}
                 guides={guides}
                 blocks={blocks}
@@ -3647,64 +3742,71 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
               />
             )}
           </div>
+          </div>
         </div>
 
-        {/* Bottom Bar - Page Navigation & Zoom */}
-        <div className="bg-white border-t border-gray-100 px-2 md:px-6 py-2 flex items-center justify-between z-20">
-          <div className="flex items-center space-x-1 md:space-x-4 overflow-x-auto custom-scrollbar">
-            <div className="flex items-center space-x-1">
-              {pages.map((_, index) => (
-                <button
+        {/* Bottom Bar Controls */}
+        <div className="h-16 bg-white border-t border-gray-100 flex items-center justify-between px-6 z-40">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 bg-gray-50 p-1 rounded-xl border border-gray-100">
+              {pages.map((p, index) => (
+                <button 
                   key={index}
-                  onClick={() => {
-                    setCurrentPageIndex(index);
-                    setSelectedIds([]);
-                  }}
-                  className={`relative group transition-all ${currentPageIndex === index ? 'ring-2 ring-primary ring-offset-1 rounded-md' : ''}`}
+                  onClick={() => setCurrentPageIndex(index)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all ${
+                    currentPageIndex === index 
+                      ? 'bg-white shadow-sm text-gray-900 border border-gray-100' 
+                      : 'hover:bg-white text-gray-400'
+                  }`}
                 >
-                  <div className="w-10 h-8 md:w-16 md:h-10 bg-white border border-gray-200 rounded-md overflow-hidden flex items-center justify-center text-[8px] text-gray-400 font-bold shadow-sm">
-                    <div className="absolute top-0.5 left-0.5 bg-gray-800 text-white text-[6px] px-0.5 rounded">{index + 1}</div>
-                    <span className="hidden md:inline">Page {index + 1}</span>
-                  </div>
+                  Page {index + 1}
                 </button>
               ))}
               <button 
                 onClick={() => {
                   setPages(prev => [...prev, { elements: [], bgColor: '#ffffff' }]);
                   setCurrentPageIndex(pages.length);
-                  setSelectedIds([]);
                 }}
-                className="w-8 h-8 md:w-8 md:h-10 bg-gray-50 border border-dashed border-gray-300 rounded-md flex items-center justify-center hover:bg-gray-100 transition-all"
+                className="p-1.5 hover:bg-white rounded-lg text-gray-400 transition-all border border-dashed border-gray-200"
               >
-                <Plus className="w-4 h-4 text-gray-400" />
+                <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-3">
-              <Timer className="w-4 h-4 text-gray-400" />
-              <input
-                type="range"
-                min="0.5"
-                max="2"
-                step="0.1"
-                value={zoom}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                className="w-32 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
-              />
-              <span className="text-[10px] font-bold text-gray-500 w-10">{Math.round(zoom * 100)}%</span>
+          <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-4">
+              <button className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
+                <Timer className="w-4 h-4" />
+              </button>
+              <div className="flex items-center space-x-3 group">
+                <div className="relative w-40 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="absolute inset-y-0 left-0 bg-primary/30 w-full" 
+                    style={{ clipPath: `inset(0 ${100 - (zoom * 100 / 2)}% 0 0)` }} 
+                  />
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2"
+                    step="0.01"
+                    value={zoom}
+                    onChange={(e) => setZoom(parseFloat(e.target.value))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div 
+                    className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-primary rounded-full shadow-md z-0 pointer-events-none transition-transform group-hover:scale-125"
+                    style={{ left: `${(zoom - 0.1) / 1.9 * 100}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-black text-gray-500 w-8">{Math.round(zoom * 100)}%</span>
+              </div>
             </div>
-            
-            <div className="flex items-center space-x-2 border-l border-gray-100 pl-6">
-              <button className="flex items-center space-x-1 px-3 py-1.5 bg-gray-50 rounded-lg text-gray-600 hover:bg-gray-100 transition-all">
-                <Grid3X3 className="w-4 h-4" />
-                <span className="text-[10px] font-bold">Pages</span>
-              </button>
-              <span className="text-[10px] font-bold text-gray-400">1/1</span>
-              <button className="p-1.5 text-gray-400 hover:text-gray-600 transition-all">
-                <Maximize2 className="w-4 h-4" />
-              </button>
+
+            <div className="flex items-center bg-[#00cba9] text-white px-3 py-1.5 rounded-full space-x-2 shadow-lg shadow-emerald-500/20">
+              <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              <span className="text-[10px] font-black tracking-wider uppercase">En Ligne</span>
+              <Sparkles className="w-3 h-3" />
             </div>
           </div>
         </div>
@@ -3832,149 +3934,355 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
 
       <AnimatePresence>
         {isSaveModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl overflow-hidden max-w-2xl w-full shadow-2xl flex flex-col max-h-[90vh]"
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2.5rem] overflow-hidden max-w-4xl w-full shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
             >
-              <div className="p-6 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                <h3 className="text-2xl font-black text-gray-900">Enregistrer le modèle</h3>
-                <button onClick={() => setIsSaveModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                  <X className="w-6 h-6 text-gray-500" />
-                </button>
-              </div>
-              
-              <div className="p-6 overflow-y-auto space-y-8">
-                {/* Section 1: Informations générales */}
-                <section>
-                  <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <StickyNote className="w-4 h-4" /> Informations générales
-                  </h4>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Nom du modèle <span className="text-red-500">*</span></label>
-                    <input
-                      type="text"
-                      value={templateName}
-                      onChange={(e) => setTemplateName(e.target.value)}
-                      placeholder="Ex: Carte de visite moderne"
-                      className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
-                    />
-                  </div>
-                </section>
-
-                {/* Section 2: Classification */}
-                <section>
-                  <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <LayoutGrid className="w-4 h-4" /> Classification
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Catégorie</label>
-                      <input
-                        list="categories-list"
-                        value={templateCategory}
-                        onChange={(e) => {
-                          setTemplateCategory(e.target.value);
-                          // Auto-select first subcategory if available
-                          const matchedCat = STUDIO_CATEGORIES.find(c => c.name === e.target.value);
-                          if (matchedCat && matchedCat.subs.length > 0) {
-                            setTemplateSubCategory(matchedCat.subs[0]);
-                          } else {
-                            setTemplateSubCategory('');
-                          }
-                        }}
-                        placeholder="Ex: Fondations de Marque"
-                        className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
-                      />
-                      <datalist id="categories-list">
-                        {STUDIO_CATEGORIES.map(c => (
-                          <option key={c.name} value={c.name} />
-                        ))}
-                      </datalist>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Sous catégorie</label>
-                      <input
-                        list="subcategories-list"
-                        value={templateSubCategory}
-                        onChange={(e) => setTemplateSubCategory(e.target.value)}
-                        placeholder="Ex: Logo Principal"
-                        className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
-                      />
-                      <datalist id="subcategories-list">
-                        {(STUDIO_CATEGORIES.find(c => c.name === templateCategory)?.subs || STUDIO_CATEGORIES.flatMap(c => c.subs)).map(sub => (
-                          <option key={sub} value={sub} />
-                        ))}
-                      </datalist>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Section 3: Tarification */}
-                <section>
-                  <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <Crown className="w-4 h-4" /> Tarification
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Prix (€)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={templatePrice}
-                        onChange={(e) => setTemplatePrice(e.target.value)}
-                        placeholder="0.00"
-                        className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
-                      />
-                    </div>
-                    <div className="pt-8">
-                      <label className="flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={templatePromotion}
-                          onChange={(e) => setTemplatePromotion(e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary relative"></div>
-                        <span className="ml-3 text-sm font-bold text-gray-700">Promotion</span>
-                      </label>
-                    </div>
-                    {templatePromotion && (
+              {isOrdering ? (
+                <>
+                  {/* Left Side: Preview & Settings */}
+                  <div className="flex-1 p-8 overflow-y-auto">
+                    <div className="flex justify-between items-center mb-8">
                       <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Réduction (%)</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={templatePromotionPercentage}
-                          onChange={(e) => setTemplatePromotionPercentage(e.target.value)}
-                          placeholder="Ex: 20"
-                          className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
-                        />
+                        <h3 className="text-3xl font-black text-ink">Finaliser ma commande</h3>
+                        <p className="text-gray-500 font-medium tracking-tight">
+                          {SERVICES.find(s => s.id === selectedServiceId)?.name || 'Produit'} - Configuration Impression
+                        </p>
                       </div>
-                    )}
-                  </div>
-                </section>
-              </div>
+                      <button onClick={() => setIsSaveModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <X className="w-6 h-6 text-gray-400" />
+                      </button>
+                    </div>
 
-              <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-                <button
-                  onClick={() => setIsSaveModalOpen(false)}
-                  className="px-6 py-3 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition-all"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={saveAsTemplate}
-                  className="px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
-                >
-                  <Save className="w-5 h-5" />
-                  Enregistrer le modèle
-                </button>
-              </div>
+                    <div className="space-y-8">
+                      {/* Service Selection */}
+                      <div>
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Produit d'impression</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {SERVICES.filter(s => s.isPrintProduct).map(s => (
+                            <button
+                              key={s.id}
+                              onClick={() => {
+                                setSelectedServiceId(s.id);
+                                if (s.quantityTiers && s.quantityTiers.length > 0) {
+                                  setSelectedQuantity(s.quantityTiers[0].quantity);
+                                }
+                                setSelectedOptions({});
+                              }}
+                              className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                selectedServiceId === s.id 
+                                  ? 'border-primary bg-primary/5 ring-4 ring-primary/10' 
+                                  : 'border-gray-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 flex items-center justify-center">
+                                  <Printer className="w-4 h-4 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-black text-sm">{s.name}</p>
+                                  <p className="text-[10px] text-gray-500 uppercase tracking-tight">{s.subCategory}</p>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Quantity Selection */}
+                      {selectedServiceId && (
+                        <div>
+                          <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Quantité souhaitée</label>
+                          <div className="flex flex-wrap gap-2">
+                            {SERVICES.find(s => s.id === selectedServiceId)?.quantityTiers?.map(tier => (
+                              <button
+                                key={tier.quantity}
+                                onClick={() => setSelectedQuantity(tier.quantity)}
+                                className={`px-6 py-3 rounded-xl font-bold transition-all ${
+                                  selectedQuantity === tier.quantity 
+                                    ? 'bg-primary text-white shadow-lg' 
+                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                }`}
+                              >
+                                {tier.quantity} ex.
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-2 italic">* Prix dégressifs appliqués selon la quantité</p>
+                        </div>
+                      )}
+
+                      {/* Options Selection */}
+                      {selectedServiceId && SERVICES.find(s => s.id === selectedServiceId)?.printOptions?.map(optGroup => (
+                        <div key={optGroup.id}>
+                          <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">{optGroup.label}</label>
+                          <div className="flex flex-wrap gap-2">
+                            {optGroup.options.map(opt => (
+                              <button
+                                key={opt.label}
+                                onClick={() => setSelectedOptions(prev => ({ ...prev, [optGroup.id]: opt.label }))}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                                  selectedOptions[optGroup.id] === opt.label 
+                                    ? 'bg-ink text-white shadow-md' 
+                                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100 border border-transparent hover:border-gray-200'
+                                }`}
+                              >
+                                {opt.label}
+                                {opt.priceModifier > 0 && (
+                                  <span className="ml-1 text-[8px] opacity-70">+{opt.priceModifier} FCFA</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right Side: Recap & Payment */}
+                  <div className="w-full md:w-80 bg-gray-50 border-l border-gray-100 p-8 flex flex-col">
+                    <div className="flex-1">
+                      <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6 border-b border-gray-200 pb-2">Récapitulatif</h4>
+                      
+                      <div className="aspect-[3/2] bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6 shadow-sm p-4 ring-1 ring-black/5">
+                         <div className="w-full h-full rounded-lg overflow-hidden flex items-center justify-center bg-gray-50 relative group">
+                            <MiniPreview 
+                              elements={pages[currentPageIndex].elements} 
+                              bgColor={pages[currentPageIndex].bgColor} 
+                              width={canvasDimensions.width}
+                              height={canvasDimensions.height}
+                            />
+                            <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-[8px] bg-white/90 px-2 py-1 rounded-full font-bold text-gray-600 shadow-sm border border-gray-100 tracking-tighter shadow-black/5">Aperçu du Design</span>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-gray-400 font-bold uppercase tracking-wider">Prix de base</span>
+                          <span className="font-mono font-bold text-gray-900">
+                            {(() => {
+                               const s = SERVICES.find(s => s.id === selectedServiceId);
+                               const tier = s?.quantityTiers?.find(t => t.quantity === selectedQuantity);
+                               return (tier?.price || 0).toLocaleString();
+                            })()} FCFA
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-gray-400 font-bold uppercase tracking-wider">Options</span>
+                          <span className="font-mono font-bold text-gray-900">
+                            {(() => {
+                              const s = SERVICES.find(s => s.id === selectedServiceId);
+                              let mod = 0;
+                              Object.entries(selectedOptions).forEach(([id, val]) => {
+                                const g = s?.printOptions?.find(g => g.id === id);
+                                const o = g?.options.find(o => o.label === val);
+                                if (o) mod += o.priceModifier;
+                              });
+                              return mod.toLocaleString();
+                            })()} FCFA
+                          </span>
+                        </div>
+                        <div className="pt-4 border-t border-gray-200">
+                          <div className="flex justify-between items-end">
+                            <span className="text-[10px] font-black text-ink uppercase tracking-wider">Total Final</span>
+                            <span className="text-2xl font-black text-primary">
+                              {(() => {
+                                const s = SERVICES.find(s => s.id === selectedServiceId);
+                                const tier = s?.quantityTiers?.find(t => t.quantity === selectedQuantity);
+                                let mod = 0;
+                                Object.entries(selectedOptions).forEach(([id, val]) => {
+                                  const g = s?.printOptions?.find(g => g.id === id);
+                                  const o = g?.options.find(o => o.label === val);
+                                  if (o) mod += o.priceModifier;
+                                });
+                                return ((tier?.price || 0) + mod).toLocaleString();
+                              })()} FCFA
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 space-y-3">
+                        <div className="p-3 bg-white rounded-xl border border-gray-200 flex items-center gap-3">
+                          <div className="p-2 bg-blue-50 rounded-lg">
+                            <Truck className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-gray-900 uppercase">Livraison incluse</p>
+                            <p className="text-[9px] text-gray-400">Délai estimé : 48h - 72h</p>
+                          </div>
+                        </div>
+                        
+                        <div className="p-3 bg-white rounded-xl border border-gray-200 flex items-center gap-3 opacity-60">
+                           <Smartphone className="w-4 h-4 text-gray-400" />
+                           <span className="text-[9px] font-bold text-gray-400 uppercase">Paiement Mobile & Carte sécurisé</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-8 space-y-3">
+                      <button
+                        disabled={isPlacingOrder}
+                        onClick={handlePlaceOrder}
+                        className="w-full py-4 bg-primary text-white rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isPlacingOrder ? (
+                          <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            Création...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-5 h-5" />
+                            Confirmer & Payer
+                          </>
+                        )}
+                      </button>
+                      <button 
+                        onClick={() => setIsSaveModalOpen(false)}
+                        className="w-full py-3 text-[10px] font-black text-gray-400 uppercase hover:text-gray-600 transition-colors"
+                      >
+                        Annuler et retourner
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="p-8 w-full">
+                  <div className="flex justify-between items-center mb-8">
+                    <div>
+                      <h3 className="text-3xl font-black text-gray-900">Enregistrer le modèle</h3>
+                      <p className="text-gray-500 font-medium italic">Réservé à l'administration - Acom Studio Internal</p>
+                    </div>
+                    <button onClick={() => setIsSaveModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                      <X className="w-6 h-6 text-gray-400" />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <section className="space-y-6">
+                        <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                          <StickyNote className="w-4 h-4" /> Informations générales
+                        </h4>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">Nom du modèle <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={templateName}
+                            onChange={(e) => setTemplateName(e.target.value)}
+                            placeholder="Ex: Carte de visite moderne"
+                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all font-medium"
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Catégorie</label>
+                            <input
+                              list="categories-list"
+                              value={templateCategory}
+                              onChange={(e) => {
+                                setTemplateCategory(e.target.value);
+                                const matchedCat = STUDIO_CATEGORIES.find(c => c.name === e.target.value);
+                                if (matchedCat && matchedCat.subs.length > 0) {
+                                  setTemplateSubCategory(matchedCat.subs[0]);
+                                } else {
+                                  setTemplateSubCategory('');
+                                }
+                              }}
+                              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all font-medium"
+                            />
+                            <datalist id="categories-list">
+                              {STUDIO_CATEGORIES.map(c => (
+                                <option key={c.name} value={c.name} />
+                              ))}
+                            </datalist>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Sous catégorie</label>
+                            <input
+                              list="subcategories-list"
+                              value={templateSubCategory}
+                              onChange={(e) => setTemplateSubCategory(e.target.value)}
+                              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all font-medium"
+                            />
+                            <datalist id="subcategories-list">
+                              {(STUDIO_CATEGORIES.find(c => c.name === templateCategory)?.subs || STUDIO_CATEGORIES.flatMap(c => c.subs)).map(sub => (
+                                <option key={sub} value={sub} />
+                              ))}
+                            </datalist>
+                          </div>
+                        </div>
+                      </section>
+
+                      <section className="space-y-6">
+                        <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                          <Crown className="w-4 h-4" /> Tarification & Visibilité
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Prix (FCFA / Unit)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={templatePrice}
+                              onChange={(e) => setTemplatePrice(e.target.value)}
+                              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all font-medium"
+                            />
+                          </div>
+                          <div className="flex items-center pt-8">
+                            <label className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={templatePromotion}
+                                onChange={(e) => setTemplatePromotion(e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary relative"></div>
+                              <span className="ml-3 text-sm font-bold text-gray-700">En promotion</span>
+                            </label>
+                          </div>
+                        </div>
+                        {templatePromotion && (
+                          <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Réduction (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={templatePromotionPercentage}
+                              onChange={(e) => setTemplatePromotionPercentage(e.target.value)}
+                              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary outline-none transition-all font-medium"
+                            />
+                          </div>
+                        )}
+
+                        <div className="pt-6 border-t border-gray-100 flex justify-end gap-3">
+                          <button
+                            onClick={() => setIsSaveModalOpen(false)}
+                            className="px-6 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all font-mono uppercase tracking-widest text-[10px]"
+                          >
+                            Abandonner
+                          </button>
+                          <button
+                            onClick={saveAsTemplate}
+                            className="px-8 py-4 bg-ink text-white rounded-xl font-bold hover:bg-primary-hover transition-all shadow-xl shadow-primary/20 flex items-center gap-2 uppercase tracking-widest text-[10px]"
+                          >
+                            <Save className="w-4 h-4" />
+                            Publier le modèle
+                          </button>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

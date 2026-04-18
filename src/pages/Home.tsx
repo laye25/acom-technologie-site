@@ -74,6 +74,7 @@ const Home = () => {
     price: s.price,
     category: s.category,
     subCategory: s.subCategory,
+    pillar: s.pillar,
     image: s.image || s.image_url || `https://picsum.photos/seed/${s.id}/800/600`,
     features: s.features || [],
     promotion: s.promotion
@@ -83,11 +84,12 @@ const Home = () => {
     tableName: 'services' as TableName,
     order: { column: 'name' as const },
     mapper: serviceMapper,
-    limit: 20
+    limit: 50
   }), [serviceMapper]);
 
   const { data: dbServices, loading } = useFirestoreData<Service>(serviceOptions);
 
+  const [activePillar, setActivePillar] = useState<'saas' | 'studio' | 'all'>('all');
   const [activeCategory, setActiveCategory] = useState<ServiceCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -108,10 +110,11 @@ const Home = () => {
   }, [dbServices, loading]);
 
   const filteredServices = services.filter(service => {
+    const matchesPillar = activePillar === 'all' || service.pillar === activePillar;
     const matchesCategory = activeCategory === 'all' || service.category === activeCategory;
     const matchesSearch = service.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) || 
                           service.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesPillar && matchesCategory && matchesSearch;
   }).sort((a, b) => {
     // Sort by category first, then by name
     const catA = (a.category || '').toLowerCase();
@@ -121,8 +124,59 @@ const Home = () => {
     return a.name.localeCompare(b.name);
   });
 
+  const groupedServices = useMemo(() => {
+    const groups: { [category: string]: { [subCategory: string]: Service[] } } = {
+      'digital': {},
+      'design': {}
+    };
+
+    // Define subcategory order
+    const subCatOrder: { [key: string]: string[] } = {
+      'digital': ['Développement Logiciel', 'Web & Plateformes'],
+      'design': ['Impression & Marquage', 'Signalétique']
+    };
+
+    filteredServices.forEach(service => {
+      const cat = service.category?.toLowerCase() || 'autres';
+      const subCat = service.subCategory || 'Autres';
+      
+      if (!groups[cat]) groups[cat] = {};
+      if (!groups[cat][subCat]) groups[cat][subCat] = [];
+      groups[cat][subCat].push(service);
+    });
+
+    // Sort subcategories within each category based on defined order
+    const sortedGroups: { category: string, subCategories: { name: string, services: Service[] }[] }[] = [];
+    
+    const catOrder = ['digital', 'design'];
+    catOrder.forEach(cat => {
+      if (groups[cat] && Object.keys(groups[cat]).length > 0) {
+        const subCats: { name: string, services: Service[] }[] = [];
+        const order = subCatOrder[cat] || [];
+        
+        // Add ordered subcategories
+        order.forEach(subName => {
+          if (groups[cat][subName]) {
+            subCats.push({ name: subName, services: groups[cat][subName] });
+            delete groups[cat][subName];
+          }
+        });
+        
+        // Add remaining subcategories
+        Object.entries(groups[cat]).forEach(([name, services]) => {
+          subCats.push({ name, services });
+        });
+        
+        sortedGroups.push({ category: cat, subCategories: subCats });
+      }
+    });
+
+    return sortedGroups;
+  }, [filteredServices]);
+
   const categories = useMemo(() => {
-    const cats = services.map(s => s.category);
+    const currentServices = activePillar === 'all' ? services : services.filter(s => s.pillar === activePillar);
+    const cats = currentServices.map(s => s.category);
     const uniqueCats = Array.from(new Set(cats)).sort((a, b) => a.localeCompare(b));
     return [
       { id: 'all', label: 'Tous' },
@@ -131,14 +185,7 @@ const Home = () => {
         label: cat.charAt(0).toUpperCase() + cat.slice(1)
       }))
     ];
-  }, [services]);
-
-  const stats = settings?.statsSection || [
-    { label: t('Projets Terminés'), value: '500+', iconName: 'Briefcase' },
-    { label: t('Clients Satisfaits'), value: '200+', iconName: 'Users' },
-    { label: t('Années d\'Expérience'), value: '10+', iconName: 'Award' },
-    { label: t('Avis Positifs'), value: '4.9/5', iconName: 'Star' },
-  ];
+  }, [services, activePillar]);
 
   const whyUs = settings?.whyUsSection || {
     title: t("L'Excellence Technique au Service de votre Vision"),
@@ -160,321 +207,248 @@ const Home = () => {
     secondaryButtonLink: '/portfolio'
   };
 
-  const expertise = settings?.expertiseSection || {
-    badge: t('Acom Studio'),
-    title: t('Solutions'),
-    subtitle1: t('Créatives'),
-    subtitle2: t('pour Marques Ambitieuses'),
-    description: t('Nous transformons vos idées en réalités numériques et physiques avec une précision artisanale et une vision stratégique.'),
-    searchPlaceholder: t('Rechercher un service ou un produit...'),
-    noResultsText: t('Aucun service ne correspond à votre recherche.'),
-    resetFiltersText: t('Réinitialiser les filtres')
-  };
-
   return (
     <div className="bg-paper min-h-screen">
       <HeroBanner />
 
-      {/* Stats Section - Clean Utility (Recipe 8) */}
-      <section className="py-12 bg-ink text-white overflow-hidden">
+      {/* Dual Pillar Section - The "Two Worlds" Design */}
+      <section className="py-20 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-12">
-            {stats.map((stat, i) => {
-              const Icon = iconMap[stat.iconName] || Briefcase;
-              return (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  viewport={{ once: true }}
-                  className="text-center p-3 md:p-6 rounded-2xl md:rounded-3xl bg-white/5 border border-white/5"
-                >
-                  <div className="inline-flex items-center justify-center w-6 h-6 md:w-12 md:h-12 rounded-lg md:rounded-2xl bg-primary/10 mb-2 md:mb-6">
-                    <Icon className="w-3 h-3 md:w-6 md:h-6 text-primary" />
-                  </div>
-                  <div className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold mb-1 md:mb-2 tracking-tighter text-white">{stat.value}</div>
-                  <div className="text-[7px] md:text-[10px] font-mono text-white/40 uppercase tracking-widest leading-tight">{stat.label}</div>
-                </motion.div>
-              );
-            })}
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-6xl font-display font-bold text-ink mb-6 tracking-tighter">
+              {settings?.expertiseSection?.titlePart1 || "Une Expertise,"} <span className="text-primary">{settings?.expertiseSection?.titlePart2 || "Deux Univers."}</span>
+            </h2>
+            <p className="text-gray-500 text-lg max-w-2xl mx-auto font-light">
+              {settings?.expertiseSection?.subtitle || "Découvrez nos deux pôles d'excellence conçus pour répondre à l'intégralité de vos besoins digitaux et physiques."}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Pillar 1 */}
+            <motion.div
+              whileHover={{ y: -10, borderColor: `${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}66` }}
+              animate={{
+                borderColor: activePillar === 'saas' ? (settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e') : '#f3f4f6',
+                boxShadow: activePillar === 'saas' ? `0 25px 50px -12px ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}40` : 'none'
+              }}
+              className="relative group cursor-pointer overflow-hidden rounded-[3rem] p-12 min-h-[500px] flex flex-col justify-end border-2 transition-all duration-500 bg-white"
+              onClick={() => setActivePillar('saas')}
+            >
+              <div className="absolute inset-0 z-0">
+                <OptimizedImage 
+                  src={settings?.expertiseSection?.universes?.[0]?.image || "https://picsum.photos/seed/saas-tech/1200/800"} 
+                  alt="Acom SaaS"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                {/* Base Dark Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/80 to-ink/40" />
+                
+                {/* Active Colored Overlay */}
+                <div 
+                  className="absolute inset-0 transition-opacity duration-500"
+                  style={{ 
+                    opacity: activePillar === 'saas' ? 1 : 0, 
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}E6 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                  }} 
+                />
+                
+                {/* Hover Colored Overlay */}
+                <div 
+                  className="absolute inset-0 transition-opacity duration-500 opacity-0 group-hover:opacity-100"
+                  style={{ 
+                    opacity: activePillar === 'saas' ? 0 : '',
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}B3 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                  }} 
+                />
+              </div>
+
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform border border-white/10">
+                  <Code className="w-8 h-8" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
+                </div>
+                <h3 className="text-3xl font-display font-bold text-white mb-4">{settings?.expertiseSection?.universes?.[0]?.title || "Acom SaaS"}</h3>
+                <p className="text-white/70 mb-8 leading-relaxed">
+                  {settings?.expertiseSection?.universes?.[0]?.description || "Solutions logicielles métiers 100% cloud pour piloter votre activité. Une suite d'outils puissants adaptés à chaque secteur."}
+                </p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mb-10">
+                  {(settings?.expertiseSection?.universes?.[0]?.features || [
+                    'Gestion de stock',
+                    'Gestion des services',
+                    'Gestion de chantier (BTP)',
+                    'Gestion de transport & flotte',
+                    'Ressources Humaines (RH)',
+                    'Gestion scolaire',
+                    'Gestion médicale'
+                  ]).map((item, i) => (
+                    <li key={i} className="flex items-center text-xs font-medium text-white/80">
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <Link to={settings?.expertiseSection?.universes?.[0]?.linkUrl || "/solutions-saas"} className="inline-flex items-center font-bold text-white group-hover:gap-4 transition-all gap-2" onClick={(e) => e.stopPropagation()}>
+                  {settings?.expertiseSection?.universes?.[0]?.linkText || "Explorer les solutions SaaS"} <ArrowRight className="w-5 h-5" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
+                </Link>
+              </div>
+            </motion.div>
+
+            {/* Pillar 2 */}
+            <motion.div
+              whileHover={{ y: -10, borderColor: `${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}66` }}
+              animate={{
+                borderColor: activePillar === 'studio' ? (settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981') : '#f3f4f6',
+                boxShadow: activePillar === 'studio' ? `0 25px 50px -12px ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}40` : 'none'
+              }}
+              className="relative group cursor-pointer overflow-hidden rounded-[3rem] p-12 min-h-[500px] flex flex-col justify-end border-2 transition-all duration-500 bg-white"
+              onClick={() => setActivePillar('studio')}
+            >
+              <div className="absolute inset-0 z-0">
+                <OptimizedImage 
+                  src={settings?.expertiseSection?.universes?.[1]?.image || "https://picsum.photos/seed/studio-design/1200/800"} 
+                  alt="Acom Studio"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                />
+                
+                {/* Base Dark Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/80 to-ink/40" />
+                
+                {/* Active Colored Overlay */}
+                <div 
+                  className="absolute inset-0 transition-opacity duration-500"
+                  style={{ 
+                    opacity: activePillar === 'studio' ? 1 : 0, 
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}E6 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                  }} 
+                />
+                
+                {/* Hover Colored Overlay */}
+                <div 
+                  className="absolute inset-0 transition-opacity duration-500 opacity-0 group-hover:opacity-100"
+                  style={{ 
+                    opacity: activePillar === 'studio' ? 0 : '',
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}B3 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                  }} 
+                />
+              </div>
+
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform border border-white/10">
+                  <Palette className="w-8 h-8" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981' }} />
+                </div>
+                <h3 className="text-3xl font-display font-bold text-white mb-4">{settings?.expertiseSection?.universes?.[1]?.title || "Acom Studio"}</h3>
+                <p className="text-white/70 mb-8 leading-relaxed">
+                  {settings?.expertiseSection?.universes?.[1]?.description || "L'excellence du design et de l'impression. Personnalisez et commandez vos supports physiques avec une qualité irréprochable."}
+                </p>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mb-10">
+                  {(settings?.expertiseSection?.universes?.[1]?.features || [
+                    'Goodies',
+                    'Marketing & Publicité',
+                    'Papeterie & Bureautique',
+                    'Signalétique'
+                  ]).map((item, i) => (
+                    <li key={i} className="flex items-center text-xs font-medium text-white/80">
+                      <CheckCircle2 className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981' }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <Link to={settings?.expertiseSection?.universes?.[1]?.linkUrl || "/merchants"} className="inline-flex items-center font-bold text-white group-hover:gap-4 transition-all gap-2" onClick={(e) => e.stopPropagation()}>
+                  {settings?.expertiseSection?.universes?.[1]?.linkText || "Explorer Acom Studio"} <ArrowRight className="w-5 h-5" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981' }} />
+                </Link>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
 
-      <Hero />
-
-      {/* Services Section - Editorial (Recipe 11) */}
+      {/* Services Section - Dynamic Filtering */}
       <section id="services" className="py-20 lg:py-32 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          {/* Exploration Section - Categories & Search */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mb-20 pt-12 border-t border-gray-100"
-          >
-            <div className="grid lg:grid-cols-2 gap-16">
-              <div className="space-y-8">
-                <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
-                  {categories.filter(c => c.id !== 'all').map((cat, i) => (
-                    <div key={i} className="flex items-center space-x-3 group cursor-pointer" onClick={() => setActiveCategory(cat.id as any)}>
-                      <div className={`w-1.5 h-1.5 rounded-full transition-transform group-hover:scale-150 ${activeCategory === cat.id ? 'bg-primary scale-150' : 'bg-gray-300'}`} />
-                      <span className={`text-sm font-medium ${activeCategory === cat.id ? 'text-primary' : 'text-gray-600'}`}>{t(cat.label)}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder={expertise.searchPlaceholder}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
-                  {activeCategory !== 'all' && (
-                    <button 
-                      onClick={() => setActiveCategory('all')}
-                      className="px-6 py-4 bg-gray-100 text-gray-600 rounded-2xl text-sm font-bold hover:bg-gray-200 transition-all"
-                    >
-                      {t('Tous les services')}
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="hidden lg:block">
-                {/* Empty space to maintain alignment with the left column width */}
-              </div>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+            <div className="max-w-xl">
+              <h2 className="text-4xl font-display font-bold text-ink mb-4 tracking-tight">
+                Services <span className="text-primary">Sur Mesure</span>
+              </h2>
+              <p className="text-gray-500">
+                {activePillar === 'saas' ? 'Solutions logicielles et plateformes digitales pour transformer votre entreprise.' : 
+                 activePillar === 'studio' ? 'Design créatif et impression haute qualité pour votre communication.' :
+                 'Explorez l\'intégralité de nos solutions digitales et physiques.'}
+              </p>
             </div>
-          </motion.div>
 
-          <div className="space-y-16">
+            <div className="flex flex-wrap gap-3">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id as any)}
+                  className={`px-6 py-3 rounded-full text-sm font-bold transition-all ${
+                    activeCategory === cat.id 
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  {t(cat.label)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative mb-12">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Rechercher un service (ex: Site web, Cartes de visite...)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-5 bg-gray-50 border border-gray-100 rounded-[2rem] text-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+            />
+          </div>
+
+          <div className="space-y-20">
             <AnimatePresence mode="popLayout">
               {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {Array(3).fill(0).map((_, i) => (
-                    <div key={i} className="h-[500px] bg-gray-100 animate-pulse rounded-[2.5rem]" />
+                    <div key={i} className="h-[500px] bg-gray-50 animate-pulse rounded-[3rem]" />
                   ))}
                 </div>
               ) : (
-                categories.filter(c => c.id !== 'all' && (activeCategory === 'all' || activeCategory === c.id)).map((category) => {
-                  const categoryServices = filteredServices.filter(s => s.category === category.id);
-                  if (categoryServices.length === 0) return null;
-                  
-                  return (
-                    <motion.div key={category.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                      {/* Category Header */}
-                      <h3 className="text-2xl font-black text-gray-900 mb-8 flex items-center gap-3">
-                        <span className="w-2 h-8 bg-primary rounded-full"></span>
-                        {category.label}
-                      </h3>
-
-                      {/* Subcategories */}
-                      {(() => {
-                        const subCategories = Array.from(new Set(categoryServices.map(s => s.subCategory).filter(Boolean)));
-                        
-                        // Define subcategory mapping
-                        const subCatMap: Record<string, string[]> = {
-                          'design': ['Identité & Branding', 'Impression & Marquage', 'Signalétique'],
-                          'digital': ['Développement Logiciel', 'Web & Plateformes']
-                        };
-                        
-                        const currentSubCats = subCatMap[category.id.toLowerCase()] || subCategories;
-
-                        return (
-                          <div className="space-y-12">
-                            {currentSubCats.map(subCat => {
-                              const subServices = categoryServices.filter(s => s.subCategory === subCat || (!s.subCategory && subCat === 'Autres'));
-                              if (subServices.length === 0) return null;
-
-                              return (
-                                <SubCategorySection key={subCat} subCat={subCat} subServices={subServices} />
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
-                    </motion.div>
-                  );
-                })
+                <div className="space-y-24">
+                  {groupedServices.map((group) => (
+                    <div key={group.category} className="space-y-12">
+                      <div className="relative inline-block">
+                        <h3 className="text-2xl font-display font-bold text-ink uppercase tracking-wider">
+                          {group.category}
+                        </h3>
+                        <div className="absolute -bottom-2 left-0 w-full h-1 bg-primary rounded-full" />
+                      </div>
+                      
+                      <div className="space-y-16">
+                        {group.subCategories.map((sub) => (
+                          <SubCategorySection key={sub.name} subCat={sub.name} subServices={sub.services} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </AnimatePresence>
           </div>
 
           {!loading && filteredServices.length === 0 && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-32 bg-white border border-dashed border-gray-200"
-            >
-              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Filter className="w-8 h-8 text-gray-300" />
+            <div className="text-center py-32">
+              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Search className="w-10 h-10 text-gray-200" />
               </div>
-              <p className="text-gray-400 font-medium">{expertise.noResultsText}</p>
+              <p className="text-gray-400 text-lg">Aucun service trouvé pour cette recherche.</p>
               <button 
-                onClick={() => { setActiveCategory('all'); setSearchQuery(''); }}
+                onClick={() => { setActiveCategory('all'); setActivePillar('all'); setSearchQuery(''); }}
                 className="mt-4 text-primary font-bold hover:underline"
               >
-                {expertise.resetFiltersText}
+                Réinitialiser tous les filtres
               </button>
-            </motion.div>
+            </div>
           )}
-        </div>
-      </section>
-
-      {/* Merchant SaaS Promotion Section - Split Layout (Recipe 11) */}
-      <section className="py-20 lg:py-32 bg-gray-50 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="space-y-8"
-            >
-              <div className="inline-flex items-center space-x-3 px-4 py-2 bg-primary/10 rounded-full">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Nouveau : Nos Solutions SaaS</span>
-              </div>
-              
-              <h2 className="text-4xl md:text-6xl font-display font-bold text-ink leading-[1.1] tracking-tighter">
-                Pilotez votre entreprise <br />
-                <span className="text-primary italic">en toute simplicité.</span>
-              </h2>
-              
-              <p className="text-gray-500 text-lg font-light leading-relaxed max-w-md">
-                Une gamme de solutions SaaS dédiées pour optimiser chaque domaine de votre activité :
-              </p>
-
-              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
-                {[
-                  "Gestion de stock",
-                  "Gestion des services",
-                  "Gestion de chantier (BTP)",
-                  "Gestion de transport et de flotte",
-                  "Gestion des ressources humaines (RH)",
-                  "Gestion scolaire (écoles / universités)",
-                  "Gestion médicale (cliniques / hôpitaux)"
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center space-x-3 group">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary group-hover:scale-150 transition-transform" />
-                    <span className="text-sm font-medium text-gray-600">{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-gray-400 text-sm font-light leading-relaxed max-w-md italic">
-                Pensées pour les entrepreneurs ambitieux, ces solutions vous accompagnent dans votre croissance au quotidien.
-              </p>
-
-              <div className="pt-4">
-                <Link
-                  to="/solutions-saas"
-                  className="inline-flex items-center space-x-3 px-8 py-4 bg-ink text-white rounded-2xl font-bold hover:bg-primary transition-all group"
-                >
-                  <span>Découvrir nos Solutions SaaS</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="relative"
-            >
-              {/* Stylized UI Mockup */}
-              <div className="relative bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 p-4 md:p-8 aspect-[4/3] overflow-hidden">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 rounded-full bg-red-400" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                    <div className="w-3 h-3 rounded-full bg-green-400" />
-                  </div>
-                  <div className="h-2 w-32 bg-gray-100 rounded-full" />
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 mb-8">
-                  <div className="h-24 bg-blue-50 rounded-2xl border border-blue-100 p-4">
-                    <div className="w-8 h-8 bg-blue-500/10 rounded-lg mb-2 flex items-center justify-center">
-                      <Truck className="w-4 h-4 text-blue-500" />
-                    </div>
-                    <div className="h-2 w-12 bg-blue-500/20 rounded-full" />
-                  </div>
-                  <div className="h-24 bg-purple-50 rounded-2xl border border-purple-100 p-4">
-                    <div className="w-8 h-8 bg-purple-500/10 rounded-lg mb-2 flex items-center justify-center">
-                      <Settings className="w-4 h-4 text-purple-500" />
-                    </div>
-                    <div className="h-2 w-12 bg-purple-500/20 rounded-full" />
-                  </div>
-                  <div className="h-24 bg-orange-50 rounded-2xl border border-orange-100 p-4">
-                    <div className="w-8 h-8 bg-orange-500/10 rounded-lg mb-2 flex items-center justify-center">
-                      <Construction className="w-4 h-4 text-orange-500" />
-                    </div>
-                    <div className="h-2 w-12 bg-orange-500/20 rounded-full" />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="h-12 bg-gray-50 rounded-xl border border-gray-100" />
-                  <div className="h-12 bg-gray-50 rounded-xl border border-gray-100" />
-                  <div className="h-32 bg-gray-50 rounded-2xl border border-gray-100" />
-                </div>
-
-                {/* Floating Elements */}
-                <motion.div 
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="absolute top-1/4 -right-4 bg-white shadow-xl rounded-2xl p-4 border border-gray-100 flex items-center space-x-3"
-                >
-                  <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center text-white">
-                    <CheckCircle2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Intervention</p>
-                    <p className="text-sm font-bold text-ink">Terminée</p>
-                  </div>
-                </motion.div>
-
-                <motion.div 
-                  animate={{ y: [0, 10, 0] }}
-                  transition={{ duration: 5, repeat: Infinity, delay: 1 }}
-                  className="absolute bottom-1/4 -left-4 bg-white shadow-xl rounded-2xl p-4 border border-gray-100 flex items-center space-x-3"
-                >
-                  <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white">
-                    <Construction className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Chantier</p>
-                    <p className="text-sm font-bold text-ink">85% Complété</p>
-                  </div>
-                </motion.div>
-
-                <motion.div 
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 6, repeat: Infinity, delay: 2 }}
-                  className="absolute top-1/2 -right-8 bg-white shadow-xl rounded-2xl p-4 border border-gray-100 flex items-center space-x-3 z-20"
-                >
-                  <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center text-white">
-                    <Hospital className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Médical</p>
-                    <p className="text-sm font-bold text-ink">Nouveau Patient</p>
-                  </div>
-                </motion.div>
-              </div>
-
-              {/* Background Decoration */}
-              <div className="absolute -top-12 -right-12 w-64 h-64 bg-primary rounded-full -z-10 blur-3xl opacity-10" />
-              <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-primary rounded-full -z-10 blur-3xl opacity-10" />
-            </motion.div>
-          </div>
         </div>
       </section>
 
