@@ -130,6 +130,7 @@ const OrderForm = () => {
     try {
       const orderData = {
         userId: user.uid,
+        user_id: user.uid,
         serviceId: service.id,
         // Denormalized data for performance (Point 6: Aggregation/Denormalization)
         serviceName: service.name,

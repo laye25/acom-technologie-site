@@ -510,7 +510,7 @@ const AdminDashboard = () => {
 
   const orderOptions = useMemo(() => ({
     tableName: 'orders' as TableName,
-    order: { column: 'updatedAt' as const, ascending: false },
+    order: { column: 'updated_at' as const, ascending: false },
     skip: !hasAccess || isRestrictedAdmin,
     limit: 100
   }), [hasAccess, isRestrictedAdmin]);

@@ -122,7 +122,20 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || hasAnyAdminRole());
       allow create: if isAuthenticated() && (request.resource.data.user_id == request.auth.uid || request.resource.data.userId == request.auth.uid);
-      allow update: if hasAnyAdminRole();
+      allow update: if hasAnyAdminRole() || (
+        isAuthenticated() && 
+        (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid) &&
+        request.resource.data.user_id == resource.data.user_id &&
+        request.resource.data.userId == resource.data.userId &&
+        // Ensure created_at cannot be modified
+        (request.resource.data.created_at == resource.data.created_at || request.resource.data.createdAt == resource.data.createdAt) &&
+        // Restrict allowed modification fields
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status', 'paid', 'deposit_paid', 'deposit_amount', 'deposit_paid_at', 
+          'balance_paid', 'balance_amount', 'balance_paid_at', 'paid_at', 
+          'updated_at', 'updatedAt', 'payment_method', 'payment_id', 'payments'
+        ])
+      );
       allow delete: if isAdmin();
     }
     

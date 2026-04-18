@@ -120,6 +120,7 @@ const POS = () => {
         const amountPaid = isDeposit ? finalItemTotal * 0.5 : finalItemTotal;
 
         return {
+          userId: user?.uid || 'pos-customer',
           user_id: user?.uid || 'pos-customer',
           service_id: item.serviceId,
           status: isDeposit ? 'confirmed' : 'completed',

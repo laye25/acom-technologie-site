@@ -1937,6 +1937,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       const designDocId = await firestoreService.add('designs', {
         name: templateName || `Commande - ${new Date().toLocaleDateString()}`,
         ownerId: user.uid,
+        userId: user.uid,
+        user_id: user.uid,
         thumbnail: firebaseThumbnailUrl,
         technicalSheet: firebaseTechnicalSheetUrl,
         createdAt: new Date(),
@@ -2017,6 +2019,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       // 5. Create real order
       const orderId = await dbService.orders.save({
         userId: user.uid,
+        user_id: user.uid,
         serviceId: serviceIdForOrder,
         serviceName: serviceNameForOrder,
         serviceImage: serviceImageForOrder,

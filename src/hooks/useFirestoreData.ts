@@ -114,21 +114,24 @@ export function useFirestoreData<T>({
     if (whereClauses && whereClauses.length > 0) {
       whereClauses.forEach(w => {
         const [column, operator, value] = w;
-        if (operator === '==') constraints.push(where(column, '==', value));
-        else if (operator === '!=') constraints.push(where(column, '!=', value));
-        else if (operator === '>') constraints.push(where(column, '>', value));
-        else if (operator === '>=') constraints.push(where(column, '>=', value));
-        else if (operator === '<') constraints.push(where(column, '<', value));
-        else if (operator === '<=') constraints.push(where(column, '<=', value));
-        else if (operator === 'in') constraints.push(where(column, 'in', value));
-        else if (operator === 'array-contains') constraints.push(where(column, 'array-contains', value));
+        const col = column === 'id' ? '__name__' : column;
+        if (operator === '==') constraints.push(where(col, '==', value));
+        else if (operator === '!=') constraints.push(where(col, '!=', value));
+        else if (operator === '>') constraints.push(where(col, '>', value));
+        else if (operator === '>=') constraints.push(where(col, '>=', value));
+        else if (operator === '<') constraints.push(where(col, '<', value));
+        else if (operator === '<=') constraints.push(where(col, '<=', value));
+        else if (operator === 'in') constraints.push(where(col, 'in', value));
+        else if (operator === 'array-contains') constraints.push(where(col, 'array-contains', value));
       });
     } else if (filters && filters.length > 0) {
       filters.forEach(f => {
-        constraints.push(where(f.column, '==', f.value));
+        const col = f.column === 'id' ? '__name__' : f.column;
+        constraints.push(where(col, '==', f.value));
       });
     } else if (filter) {
-      constraints.push(where(filter.column, '==', filter.value));
+      const col = filter.column === 'id' ? '__name__' : filter.column;
+      constraints.push(where(col, '==', filter.value));
     }
 
     if (order) {

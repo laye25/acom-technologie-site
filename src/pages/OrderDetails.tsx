@@ -584,16 +584,33 @@ const OrderDetails = () => {
     );
   }
 
+  useEffect(() => {
+    if (orderError) {
+      console.error('Erreur chargement commande :', orderError);
+      console.log('orderId reçu depuis l’URL :', orderId);
+      console.log('Utilisateur connecté :', user?.uid);
+    }
+  }, [orderError, orderId, user]);
+
   if (orderError) {
+    const isPermissionError = orderError.message.includes('permission-denied') || (orderError as any).code === 'permission-denied' || (orderError as any).code === 'PERMISSION_DENIED';
+    const isNotFoundError = orderError.message.includes('not-found') || (orderError as any).code === 'not-found';
+    
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center">
         <div className="bg-white rounded-[2.5rem] border border-black/5 p-12 shadow-sm">
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <AlertCircle className="w-10 h-10 text-red-400" />
           </div>
-          <h2 className="text-3xl font-display font-bold text-ink mb-4">Erreur d'accès</h2>
+          <h2 className="text-3xl font-display font-bold text-ink mb-4">
+            {isPermissionError ? 'Accès refusé' : 'Erreur de chargement'}
+          </h2>
           <p className="text-gray-500 mb-10 max-w-md mx-auto leading-relaxed">
-            Une erreur est survenue lors de la récupération de votre commande. Vous n'avez peut-être pas les permissions nécessaires.
+            {isPermissionError 
+              ? 'Vous n’avez pas l’autorisation d’accéder à cette commande.' 
+              : isNotFoundError
+                ? 'Cette commande est introuvable.'
+                : 'Une erreur est survenue lors du chargement de la commande.'}
           </p>
           <button 
             onClick={() => navigate('/dashboard')}
