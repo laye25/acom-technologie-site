@@ -15,7 +15,7 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { handleFirestoreError, OperationType } from '../lib/firestore.utils';
+import { handleFirestoreError, OperationType, prepareForFirestore, restoreFromFirestore } from '../lib/firestore.utils';
 
 export { OperationType };
 
@@ -37,7 +37,8 @@ export const firestoreService = {
       const docRef = doc(db, collectionName, id);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as T;
+        const data = { id: docSnap.id, ...docSnap.data() };
+        return restoreFromFirestore(data) as T;
       }
       return null;
     } catch (error) {
@@ -51,7 +52,10 @@ export const firestoreService = {
       const colRef = collection(db, collectionName);
       const q = query(colRef, ...constraints);
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      return querySnapshot.docs.map(doc => {
+        const data = { id: doc.id, ...doc.data() };
+        return restoreFromFirestore(data) as T;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, collectionName);
       return [];
@@ -62,11 +66,11 @@ export const firestoreService = {
     try {
       const id = data.id || crypto.randomUUID();
       const docRef = doc(db, collectionName, id);
-      const dataToSave = { 
+      const dataToSave = prepareForFirestore({ 
         ...data, 
         id, 
         updated_at: serverTimestamp() 
-      };
+      });
       await setDoc(docRef, dataToSave, { merge: true });
       return id;
     } catch (error) {
@@ -78,11 +82,12 @@ export const firestoreService = {
   async add<T>(collectionName: string, data: T): Promise<string> {
     try {
       const colRef = collection(db, collectionName);
-      const docRef = await addDoc(colRef, {
+      const dataToSave = prepareForFirestore({
         ...data,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       });
+      const docRef = await addDoc(colRef, dataToSave);
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, collectionName);
@@ -93,10 +98,11 @@ export const firestoreService = {
   async update(collectionName: string, id: string, data: Partial<DocumentData>): Promise<void> {
     try {
       const docRef = doc(db, collectionName, id);
-      await updateDoc(docRef, {
+      const dataToUpdate = prepareForFirestore({
         ...data,
         updated_at: serverTimestamp()
       });
+      await updateDoc(docRef, dataToUpdate);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${collectionName}/${id}`);
     }
@@ -105,10 +111,11 @@ export const firestoreService = {
   async upsert(collectionName: string, id: string, data: Partial<DocumentData>): Promise<void> {
     try {
       const docRef = doc(db, collectionName, id);
-      await setDoc(docRef, {
+      const dataToUpsert = prepareForFirestore({
         ...data,
         updated_at: serverTimestamp()
-      }, { merge: true });
+      });
+      await setDoc(docRef, dataToUpsert, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${collectionName}/${id}`);
     }
@@ -132,7 +139,10 @@ export const firestoreService = {
     const q = query(colRef, ...constraints);
     
     return onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      const data = snapshot.docs.map(doc => {
+        const docData = { id: doc.id, ...doc.data() };
+        return restoreFromFirestore(docData) as T;
+      });
       callback(data);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, collectionName);
@@ -148,7 +158,8 @@ export const firestoreService = {
     
     return onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
-        callback({ id: docSnap.id, ...docSnap.data() } as T);
+        const data = { id: docSnap.id, ...docSnap.data() };
+        callback(restoreFromFirestore(data) as T);
       } else {
         callback(null);
       }

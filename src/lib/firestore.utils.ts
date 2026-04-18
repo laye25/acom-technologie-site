@@ -50,3 +50,54 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+
+/**
+ * Prepares data for Firestore by stripping undefined values 
+ * and stringifying properties that might contain nested arrays (like fabricData)
+ */
+export function prepareForFirestore(data: any): any {
+  if (data === undefined) return null;
+  if (data === null || typeof data !== 'object') return data;
+  
+  if (Array.isArray(data)) {
+    return data.map(item => prepareForFirestore(item));
+  }
+  
+  const prepared: any = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) continue;
+    
+    // Special handling for fabricData to bypass nested array restrictions
+    if (key === 'fabricData' && value !== null) {
+      prepared[key] = typeof value === 'string' ? value : JSON.stringify(value);
+    } else {
+      prepared[key] = prepareForFirestore(value);
+    }
+  }
+  return prepared;
+}
+
+/**
+ * Restores data from Firestore by parsing stringified properties (like fabricData)
+ */
+export function restoreFromFirestore(data: any): any {
+  if (data === null || typeof data !== 'object') return data;
+  
+  if (Array.isArray(data)) {
+    return data.map(item => restoreFromFirestore(item));
+  }
+  
+  const restored: any = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (key === 'fabricData' && typeof value === 'string') {
+      try {
+        restored[key] = JSON.parse(value);
+      } catch (e) {
+        restored[key] = value;
+      }
+    } else {
+      restored[key] = restoreFromFirestore(value);
+    }
+  }
+  return restored;
+}

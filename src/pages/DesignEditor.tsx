@@ -12,6 +12,7 @@ const DesignEditor = () => {
   
   // Try to get from state first (navigation), then fallback to URL params
   const initialDesign = location.state?.design || location.state?.svgContent;
+  const initialConfig = location.state?.config;
   const templateId = location.state?.templateId || searchParams.get('template_id');
   const autoOpenSelector = searchParams.get('select') === 'true';
 
@@ -19,6 +20,7 @@ const DesignEditor = () => {
     <div className="h-screen bg-white overflow-hidden">
       <CardEditor 
         initialTemplate={initialDesign} 
+        initialConfig={initialConfig}
         templateId={templateId || undefined} 
         autoOpenSelector={autoOpenSelector}
       />

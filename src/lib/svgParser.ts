@@ -124,7 +124,7 @@ export const parseSvgToElements = (svgString: string): Promise<ParseSvgResult> =
           fill: typeof obj.fill === 'string' ? obj.fill : 'transparent',
           stroke: typeof obj.stroke === 'string' ? obj.stroke : 'transparent',
           strokeWidth: obj.strokeWidth || 0,
-          fabricData: obj.toObject(), // Store the exact fabric representation
+          fabricData: JSON.parse(JSON.stringify(obj.toObject())), // Strip undefined values for Firestore
         };
 
         // Extract color from gradients for the properties panel

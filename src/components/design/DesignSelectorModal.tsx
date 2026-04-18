@@ -33,7 +33,7 @@ const MiniPreview = ({ elements, bgColor }: { elements: any[], bgColor: string }
       className="relative w-full h-full overflow-hidden pointer-events-none" 
       style={{ backgroundColor: bgColor, containerType: 'inline-size' }}
     >
-      {elements.filter(el => !el.hidden).map((el: any) => {
+      {(elements || []).filter(el => !el.hidden).map((el: any) => {
         // Ensure coordinates and dimensions are numbers
         const x = Number(el.x) || 0;
         const y = Number(el.y) || 0;
@@ -567,9 +567,10 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     }
   };
 
-  const handlePersonalize = (variant: Variant) => {
+  const handlePersonalize = (variant: Variant, userConfig?: { quantity: number, customizations: { paperType: string }, totalPrice: string }) => {
+    const product = allProducts.find(p => p.variants.some(v => v.id === variant.id));
+
     if (onSelect) {
-      const product = allProducts.find(p => p.variants.some(v => v.id === variant.id));
       onSelect({ ...variant, subCategory: product?.name });
       onClose();
       return;
@@ -587,14 +588,17 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
     
     navigate(`/design-editor?${params.toString()}`, { 
       state: { 
+        design: { ...variant, subCategory: product?.name, minQuantityPrice: userConfig ? parseFloat(userConfig.totalPrice) : undefined },
         templateId: variant.templateId || variant.id,
         svgContent: variant.templateSvg,
         config: {
+          productId: product?.id,
           size: variant.size,
           color: variant.color,
           format: variant.format,
           material: variant.finish,
-          quantity: variant.minQuantity || 100 // Default to minQuantity or 100
+          paperType: userConfig?.customizations?.paperType || 'Standard',
+          quantity: userConfig?.quantity || variant.minQuantity || 100 // Use user selected quantity first
         }
       } 
     });

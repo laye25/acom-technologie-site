@@ -29,6 +29,8 @@ import { geminiService } from '../../services/geminiService';
 import { bus } from '../../lib/events/EventBus';
 import '../../lib/events/SyncEngine'; // Initialize SyncEngine
 import { trackUsage } from '../../lib/billing/usageTracker';
+import { handleFirestoreError, OperationType, prepareForFirestore, restoreFromFirestore } from '../../lib/firestore.utils';
+import { storageService } from '../../services/storageService';
 import { AssetLibrary } from './AssetLibrary';
 import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
 import { OptimizedImage } from '../OptimizedImage';
@@ -36,6 +38,7 @@ import { CanvasElement, Design, Template, DesignBlock } from '../../types';
 
 interface CardEditorProps {
   initialTemplate?: any; // SVG string, URL, or design object
+  initialConfig?: any; // Variant configuration (format, options, quantity)
   templateId?: string;
   onExport?: (dataUrl: string) => void;
   autoOpenSelector?: boolean;
@@ -127,7 +130,7 @@ const MiniPreview = ({ elements, bgColor, profile, contextElements, width = 1050
       className="relative w-full h-full overflow-hidden pointer-events-none" 
       style={{ backgroundColor: bgColor, containerType: 'inline-size' }}
     >
-      {elements.filter(el => !el.hidden).map((el) => {
+      {(elements || []).filter(el => !el.hidden).map((el) => {
         const style: React.CSSProperties = {
           position: 'absolute',
           left: `${(el.x / width) * 100}%`,
@@ -409,13 +412,14 @@ const FONTS = [
   'Dancing Script', 'Space Grotesk', 'Anton', 'JetBrains Mono'
 ];
 
-export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templateId, onExport, autoOpenSelector }) => {
+export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initialConfig, templateId, onExport, autoOpenSelector }) => {
   const { isAdmin, isManager, profile, user } = useAuth();
   const navigate = useNavigate();
   const stageRef = useRef<any>(null);
 
   const [isOrdering, setIsOrdering] = useState(false);
   const [selectedServiceId, setSelectedServiceId] = useState<string>('business-cards');
+  const [selectedVariant, setSelectedVariant] = useState<any>(null); // Holds the exact variant ordered
   const [selectedQuantity, setSelectedQuantity] = useState<number>(100);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -465,12 +469,16 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       setPages(prevPages => {
         const nextPages = [...prevPages];
         blocks.forEach(block => {
-          const pageIdx = block.pageIndex;
+          const pageIdx = block.pageIndex || 0;
           if (pageIdx >= nextPages.length) {
             // Add missing pages if necessary
             for (let i = nextPages.length; i <= pageIdx; i++) {
               nextPages.push({ elements: [], bgColor: '#ffffff' });
             }
+          }
+          
+          if (!nextPages[pageIdx]) {
+            nextPages[pageIdx] = { elements: [], bgColor: '#ffffff' };
           }
           
           const element: CanvasElement = {
@@ -570,34 +578,43 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const [history, setHistory] = useState<typeof pages[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Initialize history once
-  useEffect(() => {
-    if (history.length === 0) {
-      setHistory([pages]);
-      setHistoryIndex(0);
-    }
-  }, []);
+  // Initialize history once - removed as logic is now in useEffect [pages]
 
   const setPages = (updater: typeof pages | ((prev: typeof pages) => typeof pages)) => {
     _setPages(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      
-      // Update history in a separate state update to avoid stale closures
-      setHistory(prevHistory => {
-        const newHistory = prevHistory.slice(0, historyIndex + 1);
-        // Only push if the state actually changed to avoid redundant history entries
-        if (JSON.stringify(newHistory[newHistory.length - 1]) === JSON.stringify(next)) {
-          return prevHistory;
-        }
-        if (newHistory.length >= 50) newHistory.shift();
-        newHistory.push(next);
-        setHistoryIndex(newHistory.length - 1);
-        return newHistory;
-      });
-      
       return next;
     });
   };
+
+  // History management
+  useEffect(() => {
+    if (pages.length === 0) return;
+
+    setHistory(prevHistory => {
+      // Don't add to history if we are currently "undoing/redoing" 
+      // check if pages matches the current history at historyIndex
+      if (historyIndex >= 0 && JSON.stringify(prevHistory[historyIndex]) === JSON.stringify(pages)) {
+        return prevHistory;
+      }
+
+      const newHistory = prevHistory.slice(0, historyIndex + 1);
+      
+      // Only push if the state actually changed to avoid redundant history entries
+      if (newHistory.length > 0 && JSON.stringify(newHistory[newHistory.length - 1]) === JSON.stringify(pages)) {
+        return prevHistory;
+      }
+      
+      const nextHistory = [...newHistory];
+      if (nextHistory.length >= 50) nextHistory.shift();
+      nextHistory.push(pages);
+      
+      // We'll update historyIndex in the next tick to avoid warning
+      setTimeout(() => setHistoryIndex(nextHistory.length - 1), 0);
+      
+      return nextHistory;
+    });
+  }, [pages]);
 
   const undo = () => {
     if (historyIndex > 0) {
@@ -901,14 +918,17 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     setSelectedIds(elements.map(el => el.id));
   };
 
-  const elements = pages[currentPageIndex].elements;
-  const bgColor = pages[currentPageIndex].bgColor;
+  const currentPage = pages[currentPageIndex] || pages[0] || { elements: [], bgColor: '#ffffff' };
+  const elements = currentPage.elements;
+  const bgColor = currentPage.bgColor;
 
   const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
 
   const setElements = (newElements: CanvasElement[] | ((prev: CanvasElement[]) => CanvasElement[])) => {
     setPages(prev => {
-      const currentElements = prev[currentPageIndex].elements;
+      const activeIdx = prev[currentPageIndex] ? currentPageIndex : 0;
+      const currentPageToUpdate = prev[activeIdx] || { elements: [], bgColor: '#ffffff' };
+      const currentElements = currentPageToUpdate.elements;
       const nextElements = typeof newElements === 'function' ? newElements(currentElements) : newElements;
       
       // Sanitize to prevent NaN coordinates and other invalid values
@@ -922,8 +942,11 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       }));
 
       const nextPages = [...prev];
-      nextPages[currentPageIndex] = {
-        ...nextPages[currentPageIndex],
+      if (!nextPages[activeIdx]) {
+        nextPages[activeIdx] = { elements: [], bgColor: '#ffffff' };
+      }
+      nextPages[activeIdx] = {
+        ...nextPages[activeIdx],
         elements: sanitizedElements
       };
       return nextPages;
@@ -936,7 +959,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
 
     const timer = setTimeout(() => {
       // Find elements that are different from blocks
-      const currentElements = pages.flatMap((p, pi) => p.elements.map(el => ({ ...el, pageIndex: pi })));
+      const currentElements = pages.flatMap((p, pi) => (p.elements || []).map(el => ({ ...el, pageIndex: pi })));
       
       // Optimistic update for blocks (local state)
       mutateBlocks(prev => {
@@ -952,8 +975,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             width: el.width || 0,
             height: el.height || 0,
             rotation: el.rotation || 0,
-            content: { ...el },
-            zIndex: pages[(el as any).pageIndex].elements.indexOf(el as any),
+            content: prepareForFirestore(el),
+            zIndex: pages[(el as any).pageIndex] ? pages[(el as any).pageIndex].elements.indexOf(el as any) : 0,
             updatedAt: new Date().toISOString(),
             ...existing
           } as DesignBlock;
@@ -978,8 +1001,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
               width: el.width,
               height: el.height,
               rotation: el.rotation || 0,
-              content: { ...el },
-              zIndex: pages[(el as any).pageIndex].elements.indexOf(el as any)
+              content: prepareForFirestore(el),
+              zIndex: pages[(el as any).pageIndex] ? pages[(el as any).pageIndex].elements.indexOf(el as any) : 0
             },
             userId: user.uid,
             timestamp: Date.now()
@@ -1010,8 +1033,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
   const setBgColor = (newColor: string) => {
     setPages(prev => {
       const nextPages = [...prev];
-      nextPages[currentPageIndex] = {
-        ...nextPages[currentPageIndex],
+      const activeIdx = nextPages[currentPageIndex] ? currentPageIndex : 0;
+      if (!nextPages[activeIdx]) {
+        nextPages[activeIdx] = { elements: [], bgColor: '#ffffff' };
+      }
+      nextPages[activeIdx] = {
+        ...nextPages[activeIdx],
         bgColor: newColor
       };
       return nextPages;
@@ -1049,7 +1076,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       // Save blocks (elements)
       if (currentDesignId) {
         const savePromises = pages.flatMap((page, pageIndex) => 
-          page.elements.map((el, zIndex) => {
+          (page.elements || []).map((el, zIndex) => {
             const blockData = {
               id: el.id,
               designId: currentDesignId,
@@ -1060,7 +1087,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
               width: el.width,
               height: el.height,
               rotation: el.rotation || 0,
-              content: { ...el }, // Store all properties in content for now
+              content: prepareForFirestore(el), // Store all properties without undefined values and handle nested arrays
               zIndex,
               updatedAt: new Date()
             };
@@ -1113,7 +1140,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         const parsed = JSON.parse(saved);
         // Only prompt if the saved design is relatively recent (e.g., last 24h) 
         // or if it's a different design than what's currently loading
-        if (parsed && parsed.pages && parsed.pages[0].elements.length > 0) {
+        if (parsed && parsed.pages && parsed.pages[0] && parsed.pages[0].elements && parsed.pages[0].elements.length > 0) {
           setSavedDesign(parsed);
           // We'll show the prompt after the initial load logic runs
           setTimeout(() => setShowRestorePrompt(true), 1000);
@@ -1255,20 +1282,71 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
       // Default to business card if unknown
       setCanvasDimensions({ width: 1050, height: 600 });
     }
-
     const hydrateElements = (elements: CanvasElement[]) => {
+      if (!elements) return [];
       return elements.map(el => {
-        if (el.type === 'text') {
-          return { ...el, text: hydrateText(el.text, profile, elements, el.fontSize) };
+        const restored = restoreFromFirestore(el);
+        if (restored.type === 'text') {
+          return { ...restored, text: hydrateText(restored.text, profile, elements, restored.fontSize) };
         }
-        if (el.type === 'image') {
-          return { ...el, src: hydrateImage(el, profile, elements) };
+        if (restored.type === 'image') {
+          return { ...restored, src: hydrateImage(restored, profile, elements) };
         }
-        return el;
+        return restored;
       });
     };
 
+    // If template has an ID and no pages/elements, try fetching from blocks subcollection
+    let loadedPages = template.pages;
+    let loadedElements = template.elements;
+
+    if (template.id && !loadedPages && !loadedElements && !template.templateSvg && !template.sides) {
+      try {
+        const blocks = await firestoreService.getAll(`designs/${template.id}/blocks`);
+        if (blocks.length > 0) {
+          // Group by pageIndex and sort by zIndex
+          const pagesMap: Record<number, any[]> = {};
+          blocks.forEach((b: any) => {
+            const pageIdx = b.pageIndex || 0;
+            if (!pagesMap[pageIdx]) pagesMap[pageIdx] = [];
+            pagesMap[pageIdx].push(b.content || b);
+          });
+
+          const maxPage = Math.max(...Object.keys(pagesMap).map(Number), 0);
+          loadedPages = [];
+          for (let i = 0; i <= maxPage; i++) {
+            loadedPages.push({
+              elements: pagesMap[i] || [],
+              bgColor: template.bg_color || template.bgColor || '#ffffff'
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Error loading design blocks:", e);
+      }
+    }
+
     if (template.templateSvg) {
+      if (template.subCategory) setCurrentProductContext(template.subCategory);
+
+      // Try to match with a service to pre-select it in the order modal
+      const pid = template.productId?.toLowerCase() || '';
+      const mS = SERVICES.find(s => 
+        s.isPrintProduct && 
+        (s.id === pid ||
+         s.id === template.serviceId || 
+         s.id === template.productId ||
+         s.templateId === template.id ||
+         s.templateId === template.templateId ||
+         s.name.toLowerCase() === (template.subCategory?.toLowerCase() || ''))
+      );
+      if (mS) {
+        setSelectedServiceId(mS.id);
+        if (mS.quantityTiers && mS.quantityTiers.length > 0) {
+          setSelectedQuantity(mS.quantityTiers[0].quantity);
+        }
+      }
+
       // Handle Variant from studioAcom
       try {
         const { parseSvgToElements } = await import('../../lib/svgParser');
@@ -1282,7 +1360,6 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
             svgStrings = [template.templateSvg];
           }
         } catch (e) {
-          // If JSON parse fails, assume it's a raw SVG string
           svgStrings = [template.templateSvg];
         }
 
@@ -1302,99 +1379,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
           });
         }
         
-        // Update canvas dimensions based on SVG parsing instead of defaults
         setCanvasDimensions({ width: Math.round(firstWidth), height: Math.round(firstHeight) });
-
         setPages(newPages);
         if (template.name) setDesignTitle(template.name);
-        if (template.subCategory) setCurrentProductContext(template.subCategory);
-
-        // Try to match with a service to pre-select it in the order modal
-        console.log("Matching template full object:", JSON.stringify(template));
-        console.log("Matching template productId:", template.productId);
-        console.log("Matching template subCategory:", template.subCategory);
-        const pid = template.productId?.toLowerCase() || '';
-        const matchingService = SERVICES.find(s => 
-          s.isPrintProduct && 
-          (s.id === pid || 
-           s.id === template.serviceId || 
-           s.id === template.productId ||
-           s.templateId === template.id ||
-           s.templateId === template.templateId ||
-           s.name.toLowerCase() === (template.subCategory?.toLowerCase() || ''))
-        );
-        console.log("Matching service found:", matchingService);
-
-        if (matchingService) {
-          setSelectedServiceId(matchingService.id);
-          if (matchingService.quantityTiers && matchingService.quantityTiers.length > 0) {
-            setSelectedQuantity(matchingService.quantityTiers[0].quantity);
-          }
-        } else {
-          // Fallback: If not found, try to keep current but ensure it's a valid print product
-          console.warn("No matching service found for template, keeping default if it's a print product");
-        }
       } catch (error) {
         console.error("Error parsing variant SVG:", error);
       }
-    } else if (template.pages) {
-      if (template.subCategory) setCurrentProductContext(template.subCategory);
-      
-      // Try to match with a service to pre-select it in the order modal
-      const pid = template.productId?.toLowerCase() || '';
-      const mS = SERVICES.find(s => 
-        s.isPrintProduct && 
-        (s.id === pid ||
-         s.id === template.serviceId || 
-         s.id === template.productId ||
-         s.templateId === template.id ||
-         s.templateId === template.templateId ||
-         s.name.toLowerCase() === (template.subCategory?.toLowerCase() || ''))
-      );
-      if (mS) {
-        setSelectedServiceId(mS.id);
-        if (mS.quantityTiers && mS.quantityTiers.length > 0) {
-          setSelectedQuantity(mS.quantityTiers[0].quantity);
-        }
-      }
-
-      setPages(template.pages.map((p: any) => ({
-        ...p,
-        elements: hydrateElements(p.elements),
-        bgColor: p.bgColor || p.bg_color || '#ffffff'
-      })));
-    } else if (template.sides) {
-      if (template.subCategory) setCurrentProductContext(template.subCategory);
-
-      // Try to match with a service to pre-select it in the order modal
-      const pid = template.productId?.toLowerCase() || '';
-      const mS = SERVICES.find(s => 
-        s.isPrintProduct && 
-        (s.id === pid ||
-         s.id === template.serviceId || 
-         s.id === template.productId ||
-         s.templateId === template.id ||
-         s.templateId === template.templateId ||
-         s.name.toLowerCase() === (template.subCategory?.toLowerCase() || ''))
-      );
-      if (mS) {
-        setSelectedServiceId(mS.id);
-        if (mS.quantityTiers && mS.quantityTiers.length > 0) {
-          setSelectedQuantity(mS.quantityTiers[0].quantity);
-        }
-      }
-
-      setPages([
-        { 
-          elements: hydrateElements(template.sides.front.elements), 
-          bgColor: template.sides.front.bgColor || template.sides.front.bg_color || '#ffffff'
-        },
-        { 
-          elements: hydrateElements(template.sides.back.elements), 
-          bgColor: template.sides.back.bgColor || template.sides.back.bg_color || '#ffffff'
-        }
-      ]);
-    } else {
+    } else if (loadedPages) {
       if (template.subCategory) setCurrentProductContext(template.subCategory);
 
       // Try to match with a service to pre-select it in the order modal
@@ -1414,7 +1405,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         }
       }
 
-      const elements = template.elements || [];
+      const elements = loadedElements || [];
       const bgColor = template.bgColor || template.bg_color || '#ffffff';
       
       setPages([
@@ -1440,6 +1431,15 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         if (initialTemplate.id) setDesignId(initialTemplate.id);
         if (initialTemplate.name) setDesignTitle(initialTemplate.name);
         loadTemplate(initialTemplate);
+        
+        // Apply configuration if passed from the variant configurator
+        if (initialConfig) {
+          if (initialConfig.quantity) setSelectedQuantity(initialConfig.quantity);
+          const initialOpts: any = {};
+          if (initialConfig.material) initialOpts['finish'] = initialConfig.material;
+          setSelectedOptions(initialOpts);
+        }
+        
         hasLoaded.current = true;
       } else if (initialTemplate && typeof initialTemplate === 'string' && initialTemplate.toLowerCase().includes('<svg')) {
         try {
@@ -1526,12 +1526,38 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     
     if (!loadingTemplates || !templateId) {
       loadInitial();
+
+      // Ensure initial configuration is applied globally after load
+      if (initialConfig && hasLoaded.current) {
+        if (initialConfig.quantity) setSelectedQuantity(initialConfig.quantity);
+        const initialOpts: any = {};
+        if (initialConfig.material) initialOpts['finish'] = initialConfig.material;
+        // Ensure not to obliterate existing options if somehow set
+        setSelectedOptions(prev => ({ ...prev, ...initialOpts }));
+        
+        // If we have an initialTemplate and it's an object with variant data, set it as selectedVariant
+        if (initialTemplate && typeof initialTemplate === 'object' && initialTemplate.id) {
+          setSelectedVariant({
+            ...initialTemplate,
+            ...initialConfig
+          });
+        }
+        
+        // Also force selectedServiceId matching from the initialConfig if present
+        if (initialConfig.productId) {
+          const matchingService = SERVICES.find(s => s.isPrintProduct && s.id === initialConfig.productId);
+          if (matchingService) {
+            setSelectedServiceId(matchingService.id);
+          }
+        }
+      }
     }
-  }, [initialTemplate, templateId, dbTemplates, loadingTemplates]);
+  }, [initialTemplate, initialConfig, templateId, dbTemplates, loadingTemplates]);
 
   const [isSvgModalOpen, setIsSvgModalOpen] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [technicalSheetUrl, setTechnicalSheetUrl] = useState<string | null>(null);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [contactInfo, setContactInfo] = useState({ name: '', email: '', phone: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1770,50 +1796,230 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     }
 
     setIsPlacingOrder(true);
-    const toastId = toast.loading("Préparation de votre commande...");
+    const toastId = toast.loading("Capture du design en cours...");
     
     try {
-      // 1. Capture design thumbnail
+      // 1. Capture design thumbnail - Use 1.25 for balance between speed and quality
       if (!stageRef.current) throw new Error("Canvas non initialisé");
-      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 2 });
+      console.log("Capturing canvas...");
+      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1.25 });
       
-      // 2. Save design to Firestore
+      // 2. Add PDF generation (fiche technique)
+      toast.loading("Génération de la fiche technique...", { id: toastId });
+      console.log("Importing jsPDF...");
+      const { jsPDF } = await import('jspdf');
+      
+      console.log("Generating PDF...");
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        compress: true // Enable compression
+      });
+
+      // En-tête
+      doc.setFontSize(22);
+      doc.setTextColor(0, 0, 0);
+      doc.text("FICHE TECHNIQUE DE PRODUCTION", 20, 20);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Acom Technologie - Commande du ${new Date().toLocaleDateString('fr-FR')}`, 20, 30);
+      doc.line(20, 35, 190, 35);
+      
+      // Informations produit
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Détails du Produit", 20, 45);
+      
+      const serviceName = selectedVariant && selectedVariant.productId 
+        ? (selectedVariant.name || selectedVariant.title) 
+        : (SERVICES.find(s => s.id === selectedServiceId)?.name || 'Produit non spécifié');
+        
+      const serviceSubCategory = selectedVariant && selectedVariant.productId 
+        ? (selectedVariant.subCategory || 'Impression') 
+        : (SERVICES.find(s => s.id === selectedServiceId)?.subCategory || '');
+
+      doc.setFontSize(12);
+      doc.text(`Produit : ${serviceName} (${serviceSubCategory})`, 25, 55);
+      doc.text(`Nom de la conception : ${templateName || designTitle || 'Design sans titre'}`, 25, 62);
+      doc.text(`Quantité à produire : ${selectedQuantity} ex.`, 25, 69);
+      doc.text(`Dimensions de travail : ${selectedVariant?.size || `${Math.round(canvasDimensions.width)}x${Math.round(canvasDimensions.height)} px`}`, 25, 76);
+      
+      // Options techniques choisies
+      doc.setFontSize(14);
+      doc.text("Spécifications Techniques et Variantes", 20, 90);
+      let yOffset = 100;
+      
+      const optionsToPrint = selectedVariant && selectedVariant.productId
+        ? Object.entries(selectedOptions).concat(
+            [
+              ['Format', selectedVariant.format],
+              ['Couleur', selectedVariant.color],
+              ['Matière', selectedVariant.material || selectedVariant.finish],
+              ['Type de papier', selectedVariant.paperType]
+            ].filter(([, v]) => v) as [string, string][]
+          )
+        : Object.entries(selectedOptions);
+
+      if (optionsToPrint.length > 0) {
+        optionsToPrint.forEach(([key, value]) => {
+          doc.text(`- ${key.toUpperCase()} : ${value}`, 25, yOffset);
+          yOffset += 7;
+        });
+      } else {
+        doc.text(`- Aucune option supplémentaire spécifique`, 25, yOffset);
+        yOffset += 7;
+      }
+      
+      // Consignes de Production / Gabarit
+      yOffset += 10;
+      doc.setFontSize(14);
+      doc.text("Rendu Final et BAT", 20, yOffset);
+      yOffset += 5;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(220, 38, 38);
+      doc.text("*ATTENTION: Les marges de coupe et fonds perdus varient selon le support.", 20, yOffset + 5);
+      
+      // Ajouter l'image (Aperçu du design)
+      try {
+        // Calculer les dimensions pour faire tenir l'aperçu dans le A4
+        const ratio = canvasDimensions.width / canvasDimensions.height;
+        const imgWidth = 150;
+        const imgHeight = imgWidth / ratio;
+        
+        doc.rect(19, yOffset + 14, imgWidth + 2, imgHeight + 2); // Bordure
+        doc.addImage(dataUrl, 'PNG', 20, yOffset + 15, imgWidth, imgHeight);
+      } catch (e) {
+        console.error("Failed to add image to PDF", e);
+      }
+      
+      // Output to Data URL
+      console.log("Outputting PDF...");
+      const pdfDataUrl = doc.output('datauristring');
+      setTechnicalSheetUrl(pdfDataUrl);
+
+      // 3. Upload large assets to Storage
+      toast.loading("Transfert des fichiers vers le cloud...", { id: toastId });
+      let firebaseThumbnailUrl = dataUrl;
+      let firebaseTechnicalSheetUrl = pdfDataUrl;
+
+      try {
+        console.log("Uploading assets to Storage...");
+        const timestamp = Date.now();
+        const thumbnailPath = `designs/${user.uid}/thumbnails/${timestamp}.png`;
+        const pdfPath = `designs/${user.uid}/technical-sheets/${timestamp}.pdf`;
+
+        // Parallel upload with timeout protection
+        const uploadPromises = [
+          storageService.uploadFile('designs', thumbnailPath, dataUrl).catch(e => {
+            console.warn("Storage upload failed for thumbnail:", e);
+            return dataUrl;
+          }),
+          storageService.uploadFile('designs', pdfPath, pdfDataUrl).catch(e => {
+            console.warn("Storage upload failed for PDF:", e);
+            return pdfDataUrl;
+          })
+        ];
+
+        const [thumbUrl, sheetUrl] = await Promise.all(uploadPromises);
+
+        firebaseThumbnailUrl = thumbUrl;
+        firebaseTechnicalSheetUrl = sheetUrl;
+      } catch (storageError) {
+        console.error("Storage upload error:", storageError);
+      }
+
+      // 4. Save design to Firestore
+      toast.loading("Enregistrement du design...", { id: toastId });
+      console.log("Saving design metadata...");
       const designDocId = await firestoreService.add('designs', {
         name: templateName || `Commande - ${new Date().toLocaleDateString()}`,
         ownerId: user.uid,
-        pages: JSON.parse(JSON.stringify(pages)),
-        thumbnail: dataUrl,
+        thumbnail: firebaseThumbnailUrl,
+        technicalSheet: firebaseTechnicalSheetUrl,
         createdAt: new Date(),
         updatedAt: new Date(),
-        isTemplate: false
+        isTemplate: false,
+        pagesCount: pages.length
       });
 
-      // 3. Find selected service info
-      const service = SERVICES.find(s => s.id === selectedServiceId);
-      if (!service) throw new Error("Service non trouvé");
-
-      // 4. Calculate prices
-      let basePrice = service.price;
-      if (service.isPrintProduct && service.quantityTiers) {
-        const tier = service.quantityTiers.find(t => t.quantity === selectedQuantity);
-        if (tier) basePrice = tier.price / selectedQuantity;
+      // Save blocks to subcollection
+      if (designDocId) {
+        console.log(`Saving ${pages.reduce((acc, p) => acc + (p.elements?.length || 0), 0)} elements...`);
+        const blockPromises = pages.flatMap((page, pageIndex) => 
+          (page.elements || []).map((el, zIndex) => {
+            const blockData = {
+              id: el.id,
+              designId: designDocId,
+              pageIndex,
+              type: el.type,
+              x: el.x,
+              y: el.y,
+              width: el.width,
+              height: el.height,
+              rotation: el.rotation || 0,
+              content: prepareForFirestore(el),
+              zIndex,
+              updatedAt: new Date()
+            };
+            return firestoreService.add(`designs/${designDocId}/blocks`, blockData);
+          })
+        );
+        
+        // Use sequential execution if there are many blocks to avoid hitting rate limits
+        if (blockPromises.length > 20) {
+          for (const promise of blockPromises) {
+            await promise;
+          }
+        } else {
+          await Promise.all(blockPromises);
+        }
       }
 
-      let optionsModifier = 0;
-      Object.entries(selectedOptions).forEach(([optId, value]) => {
-        const optGroup = service.printOptions?.find(g => g.id === optId);
-        const opt = optGroup?.options.find(o => o.label === value);
-        if (opt) optionsModifier += opt.priceModifier;
-      });
-
-      const total = (basePrice * selectedQuantity) + optionsModifier;
+      // 5. Calculate prices
+      toast.loading("Finalisation de la commande...", { id: toastId });
+      console.log("Calculating prices...");
+      let total = 0;
+      let serviceIdForOrder = selectedServiceId;
+      let serviceNameForOrder = serviceName;
+      let serviceImageForOrder = '';
+      
+      if (selectedVariant && selectedVariant.productId) {
+        // Option 1: Pricing from custom variant
+        const p = selectedVariant.minQuantityPrice || selectedVariant.price || selectedVariant.unitPrice || 0;
+        total = p;
+        serviceIdForOrder = selectedVariant.productId;
+        serviceImageForOrder = selectedVariant.thumbnail || '';
+      } else {
+        // Option 2: Pricing from SERVICES
+        const service = SERVICES.find(s => s.id === selectedServiceId);
+        if (service) {
+          let basePrice = service.price;
+          if (service.isPrintProduct && service.quantityTiers) {
+            const tier = service.quantityTiers.find(t => t.quantity === selectedQuantity);
+            if (tier) basePrice = tier.price / selectedQuantity;
+          }
+  
+          let optionsModifier = 0;
+          Object.entries(selectedOptions).forEach(([optId, value]) => {
+            const optGroup = service.printOptions?.find(g => g.id === optId);
+            const opt = optGroup?.options.find(o => o.label === value);
+            if (opt) optionsModifier += opt.priceModifier;
+          });
+          
+          total = (basePrice * selectedQuantity) + optionsModifier;
+          serviceImageForOrder = service.image;
+        }
+      }
 
       // 5. Create real order
       const orderId = await dbService.orders.save({
         userId: user.uid,
-        serviceId: service.id,
-        serviceName: service.name,
-        serviceImage: service.image,
+        serviceId: serviceIdForOrder,
+        serviceName: serviceNameForOrder,
+        serviceImage: serviceImageForOrder,
         clientName: profile?.displayName || user.displayName || 'Client',
         clientEmail: user.email,
         status: 'pending',
@@ -1822,10 +2028,18 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
         designId: designDocId,
         details: {
           quantity: selectedQuantity,
-          customOptions: selectedOptions,
-          designThumbnail: dataUrl,
+          customOptions: selectedVariant && selectedVariant.productId ? {
+            ...selectedOptions,
+            format: selectedVariant.format,
+            material: selectedVariant.material || selectedVariant.finish,
+            size: selectedVariant.size,
+            paperType: selectedVariant.paperType
+          } : selectedOptions,
+          designThumbnail: firebaseThumbnailUrl,
+          technicalSheetUrl: firebaseTechnicalSheetUrl,
           description: `Commande directe via Acom Studio - Modèle: ${templateName || 'Standard'}`
         },
+        files: [],
         createdAt: new Date(),
         updatedAt: new Date()
       });
@@ -1850,15 +2064,25 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
     setIsSubmitting(true);
     try {
       // Capture a preview of the front side
-      const dataUrl = stageRef.current.toDataURL();
+      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1.5 });
+      
+      let firebasePreviewUrl = dataUrl;
+      try {
+        const timestamp = Date.now();
+        const path = `design_requests/${user?.uid || 'guest'}_${timestamp}.png`;
+        firebasePreviewUrl = await storageService.uploadFile('design_requests', path, dataUrl);
+      } catch (e) {
+        console.warn("Storage upload failed for request preview, using data URL:", e);
+      }
       
       await firestoreService.add('design_requests', {
         user_id: user?.uid || null,
+        userId: user?.uid || null,
         user_email: user?.email || contactInfo.email,
         user_name: profile?.displayName || contactInfo.name || 'Client',
         user_phone: contactInfo.phone || null,
         pages: pages,
-        preview_url: dataUrl,
+        preview_url: firebasePreviewUrl,
         status: 'pending'
       });
 
@@ -3851,11 +4075,31 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <h3 className="text-2xl font-black text-gray-900 mb-2">Design Envoyé !</h3>
-              <p className="text-gray-500 mb-8">
+              <p className="text-gray-500 mb-6">
                 Votre personnalisation a été transmise à notre équipe technique. Nous reviendrons vers vous très prochainement pour la validation finale et le tirage.
               </p>
+              
+              {technicalSheetUrl && (
+                <div className="mb-8">
+                  <a 
+                    href={technicalSheetUrl} 
+                    download="fiche-technique-production.pdf"
+                    className="w-full inline-flex items-center justify-center p-4 bg-primary/10 text-primary rounded-2xl font-bold hover:bg-primary/20 transition-all gap-2 border border-primary/20"
+                  >
+                    <Download className="w-5 h-5" />
+                    Télécharger la fiche PDF de BAT
+                  </a>
+                  <p className="text-[10px] text-gray-500 mt-2 italic px-4">
+                    Cette fiche technique contient toutes les indications précises sélectionnées pour la production (Dimensions, Options).
+                  </p>
+                </div>
+              )}
+
               <button
-                onClick={() => setIsSuccessModalOpen(false)}
+                onClick={() => {
+                  setIsSuccessModalOpen(false);
+                  setTechnicalSheetUrl(null);
+                }}
                 className="w-full p-4 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all"
               >
                 Fermer
@@ -3949,7 +4193,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       <div>
                         <h3 className="text-3xl font-black text-ink">Finaliser ma commande</h3>
                         <p className="text-gray-500 font-medium tracking-tight">
-                          {SERVICES.find(s => s.id === selectedServiceId)?.name || 'Produit'} - Configuration Impression
+                          {selectedVariant && selectedVariant.productId 
+                            ? (selectedVariant.name || selectedVariant.title) 
+                            : (SERVICES.find(s => s.id === selectedServiceId)?.name || 'Produit')} - Configuration {selectedVariant && selectedVariant.subCategory ? selectedVariant.subCategory : 'Impression'}
                         </p>
                       </div>
                       <button onClick={() => setIsSaveModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -3961,39 +4207,73 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       {/* Service Selection */}
                       <div>
                         <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Produit d'impression</label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {SERVICES.filter(s => s.isPrintProduct).map(s => (
-                            <button
-                              key={s.id}
-                              onClick={() => {
-                                setSelectedServiceId(s.id);
-                                if (s.quantityTiers && s.quantityTiers.length > 0) {
-                                  setSelectedQuantity(s.quantityTiers[0].quantity);
-                                }
-                                setSelectedOptions({});
-                              }}
-                              className={`p-4 rounded-2xl border-2 text-left transition-all ${
-                                selectedServiceId === s.id 
-                                  ? 'border-primary bg-primary/5 ring-4 ring-primary/10' 
-                                  : 'border-gray-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 flex items-center justify-center">
-                                  <Printer className="w-4 h-4 text-primary" />
-                                </div>
-                                <div>
-                                  <p className="font-black text-sm">{s.name}</p>
-                                  <p className="text-[10px] text-gray-500 uppercase tracking-tight">{s.subCategory}</p>
-                                </div>
+                        {selectedVariant && selectedVariant.productId ? (
+                          <div className="p-4 rounded-2xl border-2 border-primary bg-primary/5 ring-4 ring-primary/10 text-left transition-all">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                                {selectedVariant.thumbnail ? (
+                                  <img src={selectedVariant.thumbnail} alt={selectedVariant.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <Printer className="w-6 h-6 text-primary" />
+                                )}
                               </div>
-                            </button>
-                          ))}
-                        </div>
+                              <div className="flex-1">
+                                <p className="font-black text-base text-gray-900">{selectedVariant.name || selectedVariant.title}</p>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest">{selectedVariant.subCategory}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Dimensions</p>
+                                <p className="text-sm font-mono font-bold text-gray-900 bg-white px-2 py-1 rounded border border-gray-100">
+                                  {selectedVariant.size || `${Math.round(canvasDimensions.width)}x${Math.round(canvasDimensions.height)} px`}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3">
+                            {SERVICES.filter(s => s.isPrintProduct).map(s => (
+                              <button
+                                key={s.id}
+                                onClick={() => {
+                                  setSelectedServiceId(s.id);
+                                  if (s.quantityTiers && s.quantityTiers.length > 0) {
+                                    setSelectedQuantity(s.quantityTiers[0].quantity);
+                                  }
+                                  setSelectedOptions({});
+                                }}
+                                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                  selectedServiceId === s.id 
+                                    ? 'border-primary bg-primary/5 ring-4 ring-primary/10' 
+                                    : 'border-gray-100 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 flex items-center justify-center">
+                                    <Printer className="w-4 h-4 text-primary" />
+                                  </div>
+                                  <div>
+                                    <p className="font-black text-sm">{s.name}</p>
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-tight">{s.subCategory}</p>
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Quantity Selection */}
-                      {selectedServiceId && (
+                      {selectedVariant && selectedVariant.productId ? (
+                        <div>
+                          <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Quantité souhaitée</label>
+                          <div className="flex flex-wrap gap-2">
+                             <div className="px-6 py-3 rounded-xl font-bold bg-primary text-white shadow-lg">
+                               {selectedQuantity} ex.
+                             </div>
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-2 italic">* Quantité validée via le configurateur</p>
+                        </div>
+                      ) : selectedServiceId && (
                         <div>
                           <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Quantité souhaitée</label>
                           <div className="flex flex-wrap gap-2">
@@ -4016,7 +4296,26 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       )}
 
                       {/* Options Selection */}
-                      {selectedServiceId && SERVICES.find(s => s.id === selectedServiceId)?.printOptions?.map(optGroup => (
+                      {selectedVariant && selectedVariant.productId ? (
+                        <div>
+                          <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Options sélectionnées</label>
+                          <div className="grid grid-cols-2 gap-3">
+                            {Object.entries(selectedOptions).concat(
+                              [
+                                ['Format', selectedVariant.format],
+                                ['Couleur', selectedVariant.color],
+                                ['Matière', selectedVariant.material || selectedVariant.finish],
+                                ['Type de papier', selectedVariant.paperType]
+                              ].filter(([, v]) => v) as [string, string][]
+                            ).map(([key, value]) => (
+                               <div key={key} className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{key}</p>
+                                  <p className="text-sm font-bold text-gray-900">{value}</p>
+                               </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : selectedServiceId && SERVICES.find(s => s.id === selectedServiceId)?.printOptions?.map(optGroup => (
                         <div key={optGroup.id}>
                           <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">{optGroup.label}</label>
                           <div className="flex flex-wrap gap-2">
@@ -4032,7 +4331,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                               >
                                 {opt.label}
                                 {opt.priceModifier > 0 && (
-                                  <span className="ml-1 text-[8px] opacity-70">+{opt.priceModifier} FCFA</span>
+                                  <span className="ml-1 text-[8px] opacity-70">+{opt.priceModifier} €</span>
                                 )}
                               </button>
                             ))}
@@ -4050,8 +4349,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                       <div className="aspect-[3/2] bg-white rounded-2xl border border-gray-100 overflow-hidden mb-6 shadow-sm p-4 ring-1 ring-black/5">
                          <div className="w-full h-full rounded-lg overflow-hidden flex items-center justify-center bg-gray-50 relative group">
                             <MiniPreview 
-                              elements={pages[currentPageIndex].elements} 
-                              bgColor={pages[currentPageIndex].bgColor} 
+                              elements={currentPage.elements} 
+                              bgColor={currentPage.bgColor} 
                               width={canvasDimensions.width}
                               height={canvasDimensions.height}
                             />
@@ -4066,16 +4365,21 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                           <span className="text-gray-400 font-bold uppercase tracking-wider">Prix de base</span>
                           <span className="font-mono font-bold text-gray-900">
                             {(() => {
+                               if (selectedVariant && selectedVariant.productId) {
+                                 const p = selectedVariant.minQuantityPrice || selectedVariant.price || selectedVariant.unitPrice || 0;
+                                 return p.toLocaleString();
+                               }
                                const s = SERVICES.find(s => s.id === selectedServiceId);
                                const tier = s?.quantityTiers?.find(t => t.quantity === selectedQuantity);
                                return (tier?.price || 0).toLocaleString();
-                            })()} FCFA
+                            })()} €
                           </span>
                         </div>
                         <div className="flex justify-between text-[11px]">
                           <span className="text-gray-400 font-bold uppercase tracking-wider">Options</span>
                           <span className="font-mono font-bold text-gray-900">
                             {(() => {
+                              if (selectedVariant && selectedVariant.productId) return "0";
                               const s = SERVICES.find(s => s.id === selectedServiceId);
                               let mod = 0;
                               Object.entries(selectedOptions).forEach(([id, val]) => {
@@ -4084,7 +4388,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                                 if (o) mod += o.priceModifier;
                               });
                               return mod.toLocaleString();
-                            })()} FCFA
+                            })()} €
                           </span>
                         </div>
                         <div className="pt-4 border-t border-gray-200">
@@ -4092,6 +4396,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                             <span className="text-[10px] font-black text-ink uppercase tracking-wider">Total Final</span>
                             <span className="text-2xl font-black text-primary">
                               {(() => {
+                                if (selectedVariant && selectedVariant.productId) {
+                                 const p = selectedVariant.minQuantityPrice || selectedVariant.price || selectedVariant.unitPrice || 0;
+                                 return p.toLocaleString();
+                               }
                                 const s = SERVICES.find(s => s.id === selectedServiceId);
                                 const tier = s?.quantityTiers?.find(t => t.quantity === selectedQuantity);
                                 let mod = 0;
@@ -4101,7 +4409,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, templat
                                   if (o) mod += o.priceModifier;
                                 });
                                 return ((tier?.price || 0) + mod).toLocaleString();
-                              })()} FCFA
+                              })()} €
                             </span>
                           </div>
                         </div>

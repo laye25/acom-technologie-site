@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { subscriptionEngine } from '../services/subscription.engine';
-import { handleFirestoreError, OperationType } from '../../lib/firestore.utils';
+import { handleFirestoreError, OperationType, prepareForFirestore, restoreFromFirestore } from '../../lib/firestore.utils';
 
 export abstract class BaseRepository<T extends { id?: string }> {
   protected abstract collectionName: string;
@@ -28,7 +28,8 @@ export abstract class BaseRepository<T extends { id?: string }> {
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as T;
+        const data = { id: docSnap.id, ...docSnap.data() };
+        return restoreFromFirestore(data) as T;
       }
       return null;
     } catch (error) {
@@ -46,7 +47,10 @@ export abstract class BaseRepository<T extends { id?: string }> {
       const q = query(colRef, ...constraints);
       const querySnapshot = await getDocs(q);
       
-      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      return querySnapshot.docs.map(doc => {
+        const data = { id: doc.id, ...doc.data() };
+        return restoreFromFirestore(data) as T;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, this.collectionName);
       return [];
@@ -59,11 +63,12 @@ export abstract class BaseRepository<T extends { id?: string }> {
   async create(data: Omit<T, 'id'>): Promise<string> {
     try {
       const colRef = collection(db, this.collectionName);
-      const docRef = await addDoc(colRef, {
+      const dataToSave = prepareForFirestore({
         ...data,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       });
+      const docRef = await addDoc(colRef, dataToSave);
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, this.collectionName);
@@ -77,10 +82,11 @@ export abstract class BaseRepository<T extends { id?: string }> {
   async update(id: string, data: Partial<T>): Promise<void> {
     try {
       const docRef = doc(db, this.collectionName, id);
-      await updateDoc(docRef, {
+      const dataToUpdate = prepareForFirestore({
         ...data,
         updated_at: serverTimestamp()
       });
+      await updateDoc(docRef, dataToUpdate);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${this.collectionName}/${id}`);
     }
@@ -106,7 +112,10 @@ export abstract class BaseRepository<T extends { id?: string }> {
     const q = query(colRef, ...constraints);
 
     return subscriptionEngine.subscribe(key, q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      const data = snapshot.docs.map(doc => {
+        const docData = { id: doc.id, ...doc.data() };
+        return restoreFromFirestore(docData) as T;
+      });
       callback(data);
     });
   }

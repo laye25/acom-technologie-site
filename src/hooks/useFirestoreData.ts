@@ -12,6 +12,7 @@ import {
 import { db } from '../firebase';
 import { useDataCache } from '../context/CacheContext';
 import { subscriptionEngine } from '../data/services/subscription.engine';
+import { restoreFromFirestore } from '../lib/firestore.utils';
 
 export type TableName = 
   | 'services' 
@@ -144,7 +145,10 @@ export function useFirestoreData<T>({
 
     if (realtime) {
       const unsubscribe = subscriptionEngine.subscribe(cacheKey, q, (snapshot) => {
-        const result = snapshot.docs.map(doc => mapperRef.current({ id: doc.id, ...doc.data() }));
+        const result = snapshot.docs.map(doc => {
+          const rawData = { id: doc.id, ...doc.data() };
+          return mapperRef.current(restoreFromFirestore(rawData));
+        });
         setCachedData(cacheKey, result);
         setData(result);
         setLoading(false);
@@ -154,7 +158,10 @@ export function useFirestoreData<T>({
     } else {
       // One-time fetch
       getDocs(q).then((snapshot) => {
-        const result = snapshot.docs.map(doc => mapperRef.current({ id: doc.id, ...doc.data() }));
+        const result = snapshot.docs.map(doc => {
+          const rawData = { id: doc.id, ...doc.data() };
+          return mapperRef.current(restoreFromFirestore(rawData));
+        });
         setCachedData(cacheKey, result);
         setData(result);
         setLoading(false);
@@ -170,7 +177,8 @@ export function useFirestoreData<T>({
   const mutate = useCallback((updater: T[] | ((prev: T[]) => T[])) => {
     setData(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      setCachedData(cacheKey, next);
+      // Use setTimeout to avoid synchronous state updates of other components during render/update cycles
+      setTimeout(() => setCachedData(cacheKey, next), 0);
       return next;
     });
   }, [cacheKey, setCachedData]);

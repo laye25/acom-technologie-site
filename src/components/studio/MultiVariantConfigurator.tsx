@@ -8,7 +8,7 @@ interface MultiVariantConfiguratorProps {
   product: Product;
   initialVariantId?: string;
   onAddToCart?: (config: any) => void;
-  onPersonalize?: (variant: Variant) => void;
+  onPersonalize?: (variant: Variant, config: { quantity: number, customizations: { paperType: string }, totalPrice: string }) => void;
 }
 
 const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ product, initialVariantId, onAddToCart, onPersonalize }) => {
@@ -196,7 +196,7 @@ const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ pro
                 )}
                 {onPersonalize && (
                   <button 
-                    onClick={() => onPersonalize(activeVariant)}
+                    onClick={() => onPersonalize(activeVariant, { ...currentConfig, totalPrice })}
                     className="flex-1 py-3.5 lg:py-4 bg-gray-900 text-white rounded-xl font-black flex items-center justify-center text-sm lg:text-base"
                   >
                     <PenTool className="w-4 h-4 lg:w-5 lg:h-5 mr-2 lg:mr-3" /> Personnaliser
