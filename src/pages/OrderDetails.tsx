@@ -575,6 +575,14 @@ const OrderDetails = () => {
     }
   };
 
+  useEffect(() => {
+    if (orderError) {
+      console.error('Erreur chargement commande :', orderError);
+      console.log('orderId reçu depuis l’URL :', orderId);
+      console.log('Utilisateur connecté :', user?.uid);
+    }
+  }, [orderError, orderId, user]);
+
   if (authLoading || orderLoading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center">
@@ -583,14 +591,6 @@ const OrderDetails = () => {
       </div>
     );
   }
-
-  useEffect(() => {
-    if (orderError) {
-      console.error('Erreur chargement commande :', orderError);
-      console.log('orderId reçu depuis l’URL :', orderId);
-      console.log('Utilisateur connecté :', user?.uid);
-    }
-  }, [orderError, orderId, user]);
 
   if (orderError) {
     const isPermissionError = orderError.message.includes('permission-denied') || (orderError as any).code === 'permission-denied' || (orderError as any).code === 'PERMISSION_DENIED';
