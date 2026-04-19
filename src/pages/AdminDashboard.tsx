@@ -673,7 +673,8 @@ const AdminDashboard = () => {
     const getIsoDate = (date: any) => {
       if (!date) return '';
       if (typeof date === 'string') return date;
-      if (date.toDate) return date.toDate().toISOString();
+      if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
+      if (date && typeof date === 'object' && date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
       if (date instanceof Date) return date.toISOString();
       return '';
     };
@@ -778,7 +779,8 @@ const AdminDashboard = () => {
     const getIsoDate = (date: any) => {
       if (!date) return null;
       if (typeof date === 'string') return new Date(date);
-      if (date.toDate) return date.toDate();
+      if (date && typeof date.toDate === 'function') return date.toDate();
+      if (date && typeof date === 'object' && date.seconds !== undefined) return new Date(date.seconds * 1000);
       if (date instanceof Date) return date;
       return null;
     };

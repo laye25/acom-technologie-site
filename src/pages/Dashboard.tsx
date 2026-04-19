@@ -140,8 +140,29 @@ const Dashboard = () => {
 
   const formatDate = (date: any) => {
     if (!date) return '...';
-    const d = typeof date === 'string' ? new Date(date) : (date.toDate ? date.toDate() : date);
-    return format(d, 'dd MMMM yyyy', { locale: fr });
+    try {
+      let d;
+      // Handle Firebase Timestamp object (with or without class prototype)
+      if (date && typeof date.toDate === 'function') {
+        d = date.toDate();
+      } else if (date && typeof date === 'object' && date.seconds !== undefined) {
+        d = new Date(date.seconds * 1000);
+      } else if (date instanceof Date) {
+        d = date;
+      } else if (typeof date === 'string' || typeof date === 'number') {
+        d = new Date(date);
+      } else {
+        return '...';
+      }
+      
+      // Additional safety check
+      if (!d || isNaN(d.getTime())) return '...';
+      
+      return format(d, 'dd MMMM yyyy', { locale: fr });
+    } catch (e) {
+      console.warn("Date formatting error:", e, date);
+      return '...';
+    }
   };
 
   if (authLoading || (loading && orders.length === 0)) {
