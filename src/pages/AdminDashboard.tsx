@@ -674,8 +674,12 @@ const AdminDashboard = () => {
       if (!date) return '';
       if (typeof date === 'string') return date;
       if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
-      if (date && typeof date === 'object' && date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000).toISOString();
+      }
       if (date instanceof Date) return date.toISOString();
+      if (typeof date === 'number') return new Date(date).toISOString();
       return '';
     };
 
@@ -713,8 +717,13 @@ const AdminDashboard = () => {
     const getIsoDate = (date: any) => {
       if (!date) return '';
       if (typeof date === 'string') return date;
-      if (date.toDate) return date.toDate().toISOString();
+      if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000).toISOString();
+      }
       if (date instanceof Date) return date.toISOString();
+      if (typeof date === 'number') return new Date(date).toISOString();
       return '';
     };
 
@@ -780,8 +789,12 @@ const AdminDashboard = () => {
       if (!date) return null;
       if (typeof date === 'string') return new Date(date);
       if (date && typeof date.toDate === 'function') return date.toDate();
-      if (date && typeof date === 'object' && date.seconds !== undefined) return new Date(date.seconds * 1000);
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000);
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000);
+      }
       if (date instanceof Date) return date;
+      if (typeof date === 'number') return new Date(date);
       return null;
     };
 
@@ -838,8 +851,13 @@ const AdminDashboard = () => {
     const getIsoDate = (date: any) => {
       if (!date) return '';
       if (typeof date === 'string') return date;
-      if (date.toDate) return date.toDate().toISOString();
+      if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000).toISOString();
+      }
       if (date instanceof Date) return date.toISOString();
+      if (typeof date === 'number') return new Date(date).toISOString();
       return '';
     };
 
@@ -937,8 +955,13 @@ const AdminDashboard = () => {
     const getIsoDate = (date: any) => {
       if (!date) return '';
       if (typeof date === 'string') return date;
-      if (date.toDate) return date.toDate().toISOString();
+      if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000).toISOString();
+      }
       if (date instanceof Date) return date.toISOString();
+      if (typeof date === 'number') return new Date(date).toISOString();
       return '';
     };
 
@@ -994,8 +1017,13 @@ const AdminDashboard = () => {
     const getIsoDate = (date: any) => {
       if (!date) return '';
       if (typeof date === 'string') return date;
-      if (date.toDate) return date.toDate().toISOString();
+      if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000).toISOString();
+      }
       if (date instanceof Date) return date.toISOString();
+      if (typeof date === 'number') return new Date(date).toISOString();
       return '';
     };
 
@@ -1081,8 +1109,13 @@ const AdminDashboard = () => {
     const getIsoDate = (date: any) => {
       if (!date) return '';
       if (typeof date === 'string') return date;
-      if (date.toDate) return date.toDate().toISOString();
+      if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000).toISOString();
+      }
       if (date instanceof Date) return date.toISOString();
+      if (typeof date === 'number') return new Date(date).toISOString();
       return '';
     };
 
@@ -2082,7 +2115,26 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {orders
+                        {[...orders]
+                          .sort((a, b) => {
+                            const getTime = (val: any) => {
+                              if (!val) return 0;
+                              if (typeof val === 'object') {
+                                if (val.seconds !== undefined) return val.seconds * 1000;
+                                if (val._seconds !== undefined) return val._seconds * 1000;
+                              }
+                              if (typeof val.toMillis === 'function') return val.toMillis();
+                              if (typeof val === 'string' || typeof val === 'number') {
+                                const d = new Date(val);
+                                if (!isNaN(d.getTime())) return d.getTime();
+                              }
+                              if (val instanceof Date) return val.getTime();
+                              return 0;
+                            };
+                            const timeA = getTime(a.createdAt || a.created_at || a.updated_at || a.updatedAt);
+                            const timeB = getTime(b.createdAt || b.created_at || b.updated_at || b.updatedAt);
+                            return timeB - timeA;
+                          })
                           .filter(order => {
                             const service = allServices.find(s => s.id === order.serviceId);
                             
@@ -2128,7 +2180,7 @@ const AdminDashboard = () => {
                                   <div>
                                     <div className="flex items-center gap-2">
                                       <p className="text-sm font-bold text-gray-900">
-                                        {order.details?.fullName || client?.displayName || 'Client Inconnu'}
+                                        {order.clientName || order.details?.clientName || order.details?.fullName || client?.displayName || 'Client Inconnu'}
                                       </p>
                                       {isPos && (
                                         <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase tracking-widest rounded-md border border-emerald-100">
@@ -2137,13 +2189,25 @@ const AdminDashboard = () => {
                                       )}
                                     </div>
                                     <Link to={`/order-details/${order.id}`} className="text-xs text-gray-400 hover:text-primary transition-colors">
-                                    {service?.name || order.details?.projectType || 'Service Inconnu'}
+                                    {service?.name || order.serviceName || order.details?.serviceName || order.details?.projectType || 'Service Inconnu'}
                                     </Link>
                                   </div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-sm text-gray-500">
-                                {order.createdAt?.toDate ? format(order.createdAt.toDate(), 'dd/MM/yyyy', { locale: fr }) : '...'}
+                                {(() => {
+                                  const cDate = order.createdAt || order.created_at || order.updated_at || order.updatedAt;
+                                  if (!cDate) return '...';
+                                  if (cDate.toDate) return format(cDate.toDate(), 'dd/MM/yyyy', { locale: fr });
+                                  if (cDate.seconds !== undefined) return format(new Date(cDate.seconds * 1000), 'dd/MM/yyyy', { locale: fr });
+                                  if (cDate._seconds !== undefined) return format(new Date(cDate._seconds * 1000), 'dd/MM/yyyy', { locale: fr });
+                                  if (typeof cDate === 'string' || typeof cDate === 'number') {
+                                    const d = new Date(cDate);
+                                    if (!isNaN(d.getTime())) return format(d, 'dd/MM/yyyy', { locale: fr });
+                                  }
+                                  if (cDate instanceof Date) return format(cDate, 'dd/MM/yyyy', { locale: fr });
+                                  return '...';
+                                })()}
                               </td>
                             <td className="px-6 py-4">
                               <div className="flex flex-col">
