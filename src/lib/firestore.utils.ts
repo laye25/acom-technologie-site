@@ -72,8 +72,8 @@ export function prepareForFirestore(data: any): any {
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) continue;
     
-    // Force stringification for 'content' to drastically reduce document size
-    if (key === 'content' && value !== null && typeof value === 'object') {
+    // Force stringification for 'content', 'details' and 'files' to drastically reduce document size
+    if ((key === 'content' || key === 'details' || key === 'files') && value !== null && typeof value === 'object') {
        prepared[key] = JSON.stringify(value);
     } else if (key === 'fabricData' && value !== null) {
        prepared[key] = typeof value === 'string' ? value : JSON.stringify(value);
@@ -96,7 +96,7 @@ export function restoreFromFirestore(data: any): any {
   
   const restored: any = {};
   for (const [key, value] of Object.entries(data)) {
-    if ((key === 'fabricData' || key === 'content') && typeof value === 'string') {
+    if ((key === 'fabricData' || key === 'content' || key === 'details' || key === 'files') && typeof value === 'string') {
       try {
         restored[key] = JSON.parse(value);
       } catch (e) {

@@ -39,7 +39,7 @@ const Dashboard = () => {
   
   const { data: rawOrders, loading, error: ordersError } = useFirestoreData<Order>({
     tableName: 'orders',
-    where: (isManager || isAdmin) ? undefined : [['userId', '==', user?.uid]],
+    where: (isManager || isAdmin) ? undefined : [['user_id', '==', user?.uid]],
     order: (isManager || isAdmin) ? { column: 'created_at', direction: 'desc' } : undefined,
     limit: 50,
     realtime: true,
