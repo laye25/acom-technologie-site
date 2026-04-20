@@ -249,12 +249,6 @@ const OrderDetails = () => {
   const handleAcceptContract = async () => {
     if (!order) return;
 
-    // Restriction: Cannot confirm without AI analysis
-    if (!order.adminAnalysis) {
-      toast.error("Le projet est en cours de préparation. Veuillez patienter que l'analyse soit terminée.");
-      return;
-    }
-
     setAccepting(true);
     try {
       await dbService.orders.save({
@@ -263,6 +257,10 @@ const OrderDetails = () => {
         clientAccepted: true,
         acceptedAt: new Date()
       });
+      // Force sync
+      if (user?.uid) {
+        await syncService.syncOrders(user.uid);
+      }
       toast.success('Contrat accepté ! Vous pouvez maintenant procéder au paiement pour lancer la production.');
     } catch (error) {
       console.error('Error accepting contract:', error);
@@ -274,12 +272,6 @@ const OrderDetails = () => {
 
   const handleAcceptAndPay = async () => {
     if (!order) return;
-
-    // Restriction: Cannot confirm without AI analysis
-    if (!order.adminAnalysis) {
-      toast.error("Le projet est en cours de préparation. Veuillez patienter que l'analyse soit terminée.");
-      return;
-    }
 
     setAccepting(true);
     try {

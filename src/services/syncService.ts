@@ -65,10 +65,13 @@ export const syncService = {
   async syncOrders(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      // Allow syncing all orders without restrictive merchant_id for now 
-      // since the current order creation logic does not seem to attach merchant_id
+      console.log('Syncing orders from Firebase...');
       const remoteOrders = await orderRepository.getAll();
-      if (remoteOrders) await db.orders.bulkPut(remoteOrders);
+      console.log('Orders fetched from Firebase:', remoteOrders?.length || 0);
+      if (remoteOrders) {
+        await db.orders.bulkPut(remoteOrders);
+        console.log('Orders synced to Dexie successfully');
+      }
     } catch (error) {
       console.error('Sync orders failed:', error);
     }

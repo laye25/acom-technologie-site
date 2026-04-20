@@ -27,6 +27,7 @@ export const OrderAIAnalysis: React.FC<OrderAIAnalysisProps> = ({ order, service
     setError(null);
     try {
       const result = await analyzeOrder(order, service);
+      console.log('DEBUG: Analysis result:', result);
       if (result) {
         // Also generate client draft if missing to fulfill user request
         let draft = order.aiDraft;
@@ -43,10 +44,12 @@ export const OrderAIAnalysis: React.FC<OrderAIAnalysisProps> = ({ order, service
         setAnalysis(result);
         toast.success('Analyse générée et enregistrée définitivement !');
       } else {
-        setError('Impossible de générer l\'analyse.');
+        console.error('DEBUG: Analysis returned null/undefined');
+        setError('Impossible de générer l\'analyse (résultat vide).');
       }
     } catch (err) {
-      setError('Une erreur est survenue lors de l\'analyse.');
+      console.error('DEBUG: Analysis error details:', err);
+      setError(`Une erreur est survenue lors de l'analyse : ${err instanceof Error ? err.message : 'inconnue'}`);
       toast.error("Erreur lors de l'enregistrement de l'analyse.");
     } finally {
       setLoading(false);

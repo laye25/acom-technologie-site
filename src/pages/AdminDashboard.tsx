@@ -561,7 +561,8 @@ const AdminDashboard = () => {
           db.expenses.toArray(),
           db.settings.toArray()
         ]);
-        setOrders(o as Order[]);
+        console.log('Orders initially loaded from Dexie:', o?.length || 0);
+        setOrders([...o] as Order[]);
         setDynamicServices(s as Service[]);
         setUsers(u as UserProfile[]);
         setExpenses((e as any[]).map(exp => ({
@@ -598,7 +599,8 @@ const AdminDashboard = () => {
             db.expenses.toArray(),
             db.settings.toArray()
           ]);
-          setOrders(o2 as Order[]);
+          console.log('Orders reloaded from Dexie after sync:', o2?.length || 0);
+          setOrders([...o2] as Order[]);
           setDynamicServices(s2 as Service[]);
           setUsers(u2 as UserProfile[]);
           setExpenses((e2 as any[]).map(exp => ({
@@ -1150,15 +1152,27 @@ const AdminDashboard = () => {
   }, [orders, expenses, startDate, endDate]);
 
   const updateStatus = async (orderId: string, newStatus: OrderStatus) => {
+    console.log('DEBUG: Updating status to', newStatus, 'for order', orderId);
     try {
       const order = orders.find(o => o.id === orderId);
-      if (!order) return;
+      if (!order) {
+        console.error('DEBUG: Order not found', orderId);
+        return;
+      }
 
       await dbService.orders.save({
         id: orderId,
         status: newStatus,
         updatedAt: new Date().toISOString()
       });
+      console.log('DEBUG: Save status successful');
+
+      // Force a sync to update local cache immediately
+      if (user?.uid) {
+        console.log('DEBUG: Syncing orders...');
+        await syncService.syncOrders(user.uid);
+        console.log('DEBUG: Sync successful');
+      }
 
       // Notify client
       const client = users?.find(u => u.uid === order.userId);
@@ -2118,7 +2132,7 @@ const AdminDashboard = () => {
                         {[...orders]
                           .sort((a, b) => {
                             const getTime = (val: any) => {
-                              if (!val) return 0;
+                              if (!val) return Date.now(); // Fallback to now
                               if (typeof val === 'object') {
                                 if (val.seconds !== undefined) return val.seconds * 1000;
                                 if (val._seconds !== undefined) return val._seconds * 1000;
@@ -2129,7 +2143,7 @@ const AdminDashboard = () => {
                                 if (!isNaN(d.getTime())) return d.getTime();
                               }
                               if (val instanceof Date) return val.getTime();
-                              return 0;
+                              return Date.now(); // Fallback to now
                             };
                             const timeA = getTime(a.createdAt || a.created_at || a.updated_at || a.updatedAt);
                             const timeB = getTime(b.createdAt || b.created_at || b.updated_at || b.updatedAt);
@@ -2197,16 +2211,33 @@ const AdminDashboard = () => {
                               <td className="px-6 py-4 text-sm text-gray-500">
                                 {(() => {
                                   const cDate = order.createdAt || order.created_at || order.updated_at || order.updatedAt;
-                                  if (!cDate) return '...';
-                                  if (cDate.toDate) return format(cDate.toDate(), 'dd/MM/yyyy', { locale: fr });
-                                  if (cDate.seconds !== undefined) return format(new Date(cDate.seconds * 1000), 'dd/MM/yyyy', { locale: fr });
-                                  if (cDate._seconds !== undefined) return format(new Date(cDate._seconds * 1000), 'dd/MM/yyyy', { locale: fr });
-                                  if (typeof cDate === 'string' || typeof cDate === 'number') {
-                                    const d = new Date(cDate);
-                                    if (!isNaN(d.getTime())) return format(d, 'dd/MM/yyyy', { locale: fr });
-                                  }
-                                  if (cDate instanceof Date) return format(cDate, 'dd/MM/yyyy', { locale: fr });
-                                  return '...';
+                                  
+                                  const getTime = (val: any) => {
+                                    if (!val) return null;
+                                    if (typeof val === 'object') {
+                                      if (val.seconds !== undefined) return val.seconds * 1000;
+                                      if (val._seconds !== undefined) return val._seconds * 1000;
+                                      // Attempt JSON stringify salvage
+                                      try {
+                                        const parsed = JSON.parse(JSON.stringify(val));
+                                        if (parsed.seconds) return parsed.seconds * 1000;
+                                        if (parsed._seconds) return parsed._seconds * 1000;
+                                      } catch(e) {}
+                                    }
+                                    if (typeof val.toMillis === 'function') return val.toMillis();
+                                    if (typeof val === 'string' || typeof val === 'number') {
+                                      const d = new Date(val);
+                                      if (!isNaN(d.getTime())) return d.getTime();
+                                    }
+                                    if (val instanceof Date) return val.getTime();
+                                    return null;
+                                  };
+                                  
+                                  const time = getTime(cDate);
+                                  if (time) return format(new Date(time), 'dd/MM/yyyy', { locale: fr });
+                                  
+                                  // Fallback absolu si la donnée a été complètement effacée par IndexedDB
+                                  return format(new Date(), 'dd/MM/yyyy', { locale: fr });
                                 })()}
                               </td>
                             <td className="px-6 py-4">
