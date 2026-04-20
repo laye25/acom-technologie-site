@@ -12,6 +12,7 @@ export const payDunyaService = {
     amount: number;
     description: string;
     orderId: string;
+    paymentType?: 'deposit' | 'balance' | 'full';
     returnUrl?: string;
     cancelUrl?: string;
   }): Promise<string> {

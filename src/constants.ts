@@ -1,6 +1,17 @@
 import { Service, BlogPost } from './types';
 
 export const SERVICES: Service[] = [
+  // Test Service
+  {
+    id: 'test-service-1',
+    name: 'Service Test (Paiement)',
+    description: 'Service de test pour valider l\'intégration des paiements mobiles (Orange Money, Wave).',
+    price: 50,
+    category: 'digital',
+    pillar: 'saas',
+    image: 'https://picsum.photos/seed/test/800/600',
+    features: ['Test de paiement', 'Validation Webhook']
+  },
   // Acom SaaS (Digital)
   {
     id: 'web-dev-basic',

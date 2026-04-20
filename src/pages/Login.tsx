@@ -61,7 +61,8 @@ const Login = () => {
     try {
       await signInWithGoogle();
       const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
-      navigate(isSaaSDomain ? '/' : '/dashboard');
+      const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
+      navigate(targetUrl);
     } catch (error: any) {
       console.error('Google Auth error:', error);
       if (error.code === 'auth/popup-closed-by-user') {
@@ -108,14 +109,16 @@ const Login = () => {
 
     try {
       const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+      const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
+      
       if (isLogin) {
         await signInWithEmail(formData.email, formData.password);
-        navigate(isSaaSDomain ? '/' : '/dashboard');
+        navigate(targetUrl);
       } else {
         await signUpWithEmail(formData.email, formData.password, formData.fullName);
         setSuccess('Compte créé avec succès !');
-        // Navigate to dashboard immediately after signup since Firebase auto-logs in
-        setTimeout(() => navigate(isSaaSDomain ? '/' : '/dashboard'), 1500);
+        // Navigate immediately after signup since Firebase auto-logs in
+        setTimeout(() => navigate(targetUrl), 1500);
       }
     } catch (error: any) {
       console.error('Auth error:', error);

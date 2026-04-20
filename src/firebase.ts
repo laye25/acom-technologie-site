@@ -13,5 +13,7 @@ export const db = initializeFirestore(app, {
   })
 }, firebaseConfig.firestoreDatabaseId);
 
+console.log('Firebase Firestore initialized:', !!db);
+
 export const auth = getAuth();
 export const storage = getStorage(app);

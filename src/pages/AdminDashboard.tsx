@@ -160,16 +160,20 @@ const AdminDashboard = () => {
         transactionId: 'MANUAL_ADMIN_' + Date.now()
       };
 
-      await dbService.orders.save({
+      const newOrderState = {
         id: order.id,
         paid: true,
         depositPaid: true,
         balancePaid: true,
         paidAt: new Date(),
-        status: 'delivered',
+        status: 'delivered' as const,
         updatedAt: new Date(),
         payments: [...(order.payments || []), newPayment]
-      });
+      };
+
+      await dbService.orders.save(newOrderState);
+      
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...newOrderState } : o));
 
       toast.success("Commande marquée comme payée !");
     } catch (error) {
@@ -237,16 +241,19 @@ const AdminDashboard = () => {
         transactionId: 'MANUAL_BALANCE_ADMIN_' + Date.now()
       };
 
-      await dbService.orders.save({
+      const newOrderState = {
         id: order.id,
         paid: true,
         balancePaid: true,
         balanceAmount: balanceAmount,
         balancePaidAt: new Date(),
-        status: 'delivered',
+        status: 'delivered' as const,
         updatedAt: new Date(),
         payments: [...(order.payments || []), newPayment]
-      });
+      };
+
+      await dbService.orders.save(newOrderState);
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...newOrderState } : o));
 
       toast.success("Reliquat marqué comme payé !");
     } catch (error) {
@@ -1166,6 +1173,9 @@ const AdminDashboard = () => {
         updatedAt: new Date().toISOString()
       });
       console.log('DEBUG: Save status successful');
+
+      // Update local state immediately for fast UI feedback
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, updatedAt: new Date().toISOString() } : o));
 
       // Force a sync to update local cache immediately
       if (user?.uid) {
@@ -2234,7 +2244,20 @@ const AdminDashboard = () => {
                                   };
                                   
                                   const time = getTime(cDate);
-                                  if (time) return format(new Date(time), 'dd/MM/yyyy', { locale: fr });
+                                  try {
+                                    if (time && !isNaN(time)) {
+                                      const d = new Date(time);
+                                      if (!isNaN(d.getTime())) {
+                                        const formatted = format(d, 'dd/MM/yyyy', { locale: fr });
+                                        if (formatted.toLowerCase().includes('invalid')) {
+                                          return format(new Date(), 'dd/MM/yyyy', { locale: fr });
+                                        }
+                                        return formatted;
+                                      }
+                                    }
+                                  } catch (e) {
+                                    console.error("FORMAT ERROR FOR DATE", cDate, e);
+                                  }
                                   
                                   // Fallback absolu si la donnée a été complètement effacée par IndexedDB
                                   return format(new Date(), 'dd/MM/yyyy', { locale: fr });

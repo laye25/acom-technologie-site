@@ -373,6 +373,7 @@ const OrderDetails = () => {
         amount,
         description,
         orderId: order.id,
+        paymentType: type,
         returnUrl: `${window.location.origin}/order-details/${order.id}?payment_success=true&payment_type=${type}`,
         cancelUrl: window.location.href
       });

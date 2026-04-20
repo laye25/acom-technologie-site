@@ -179,12 +179,14 @@ async function startServer() {
   // PayDunya Invoice Creation
   app.post("/api/paydunya/create-invoice", async (req, res) => {
     try {
-      const { amount, description, orderId, returnUrl, cancelUrl } = req.body;
+      const { amount, description, orderId, paymentType, returnUrl, cancelUrl } = req.body;
 
       const masterKey = process.env.PAYDUNYA_MASTER_KEY?.trim();
       const privateKey = process.env.PAYDUNYA_PRIVATE_KEY?.trim();
       const token = process.env.PAYDUNYA_TOKEN?.trim();
       const mode = (process.env.PAYDUNYA_MODE || 'test').toLowerCase().trim();
+
+      console.log('DEBUG PAYDUNYA: received returnUrl:', returnUrl); // Debug log
 
       // Choisir l'URL en fonction du mode (sandbox pour test, app pour live)
       const baseUrl = mode === 'live' 
@@ -221,7 +223,8 @@ async function startServer() {
           logo_url: process.env.APP_LOGO_URL || "https://picsum.photos/seed/acom/400/100"
         },
         custom_data: {
-          order_id: orderId
+          order_id: orderId,
+          payment_type: paymentType || 'full'
         },
         actions: {
           cancel_url: cancelUrl || "https://ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app/merchant/saas",
@@ -269,15 +272,23 @@ async function startServer() {
       // Update order/merchant status in firestore
       if (status === 'completed' && custom_data?.order_id) {
         const orderId = custom_data.order_id;
-        // Find if it's an order or a merchant (SaaS instance)
-        // Simulated: Update your firestore document
-        /*
-        await admin.firestore().collection('orders').doc(orderId).set({
-          paid: true,
-          status: 'processing',
-          paidAt: new Date().toISOString()
-        }, { merge: true });
-        */
+        console.log(`Updating order ${orderId} as paid via webhook`);
+        
+        try {
+          const db = admin.firestore();
+          // Update order status and payment fields
+          await db.collection('orders').doc(orderId).set({
+            paid: true,
+            depositPaid: true,
+            balancePaid: true,
+            status: 'confirmed',
+            paidAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+          console.log(`Order ${orderId} successfully updated to paid`);
+        } catch (dbError) {
+          console.error(`Error updating Firestore for order ${orderId}:`, dbError);
+        }
       }
 
       res.status(200).send("Webhook handled successfully");
