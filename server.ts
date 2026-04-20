@@ -18,6 +18,18 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Log all requests
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    
+    // EXEMPTION FOR PAYDUNYA
+    if (req.url === '/api/paydunya/create-invoice') {
+      return next();
+    }
+    
+    next();
+  });
+
   // Stripe Webhook MUST be before express.json() to keep the raw body for signature verification
   app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -177,7 +189,8 @@ async function startServer() {
   });
 
   // PayDunya Invoice Creation
-  app.post("/api/paydunya/create-invoice", async (req, res) => {
+  app.post("/api/paydunya/create-invoice", express.json(), async (req, res) => {
+    console.log("PAYDUNYA API: Requête reçue POST /api/paydunya/create-invoice");
     try {
       const { amount, description, orderId, paymentType, returnUrl, cancelUrl } = req.body;
 
@@ -253,7 +266,7 @@ async function startServer() {
       res.json(data);
     } catch (error: any) {
       console.error("PayDunya invoice creation error:", error);
-      res.status(500).json({ error: "Erreur technique lors de la communication avec PayDunya: " + error.message });
+      res.status(500).json({ error: "Erreur techniquePayDunya", details: error.message });
     }
   });
 
