@@ -2166,6 +2166,9 @@ const AdminDashboard = () => {
                             if (categoryFilter !== 'Tous') {
                               if (service?.category?.toLowerCase() !== categoryFilter.toLowerCase()) return false;
                             }
+
+                            // Studio ACOM filter: exclude from general orders list
+                            if (service?.pillar === 'studio') return false;
                             
                             // Product filter
                             if (productFilter !== 'Tous') {

@@ -22,14 +22,45 @@ interface DesignRequest {
 
 const DesignRequestManager = () => {
   const navigate = useNavigate();
-  const { data: requests, loading, refresh } = useFirestoreData<DesignRequest>({
+  const { data: requests, loading: loadingRequests, refresh: refreshRequests } = useFirestoreData<DesignRequest>({
     tableName: 'design_requests',
     order: { column: 'createdAt', direction: 'desc' }
   });
 
-  const updateStatus = async (id: string, status: string) => {
+  const { data: studioOrders, loading: loadingOrders, refresh: refreshOrders } = useFirestoreData<any>({
+    tableName: 'orders',
+    // We can't filter by pillar in useFirestoreData directly if it's not a root query, 
+    // we'll filter them client-side based on the structure.
+  });
+
+  const loading = loadingRequests || loadingOrders;
+
+  const allRequests = [
+    ...requests.map(r => ({ ...r, origin: 'design_request' })),
+    ...studioOrders
+      .filter((o: any) => o.pillar === 'studio')
+      .map((o: any) => ({
+        id: o.id,
+        userId: o.userId,
+        userEmail: o.clientEmail,
+        userName: o.clientName,
+        sides: o.details?.customOptions?.sides || {},
+        previewUrl: o.serviceImage || '',
+        status: o.status === 'pending' ? 'pending' : (o.status === 'confirmed' ? 'approved' : 'rejected'),
+        createdAt: o.createdAt || o.updatedAt,
+        origin: 'studio_order'
+      }))
+  ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const refresh = () => { refreshRequests(); refreshOrders(); };
+
+  const updateStatus = async (id: string, status: string, origin: 'design_request' | 'studio_order') => {
     try {
-      await firestoreService.update('design_requests', id, { status });
+      if (origin === 'design_request') {
+        await firestoreService.update('design_requests', id, { status });
+      } else {
+        await firestoreService.update('orders', id, { status: status === 'approved' ? 'confirmed' : 'pending' });
+      }
       toast.success(`Statut mis à jour : ${status}`);
       refresh();
     } catch (error) {
@@ -58,11 +89,11 @@ const DesignRequestManager = () => {
           <p className="text-gray-500 mt-1">Gérez les personnalisations envoyées par les clients pour tirage.</p>
         </div>
         <div className="bg-primary/10 px-4 py-2 rounded-xl">
-          <span className="text-primary font-bold">{requests.length} demandes</span>
+          <span className="text-primary font-bold">{allRequests.length} demandes</span>
         </div>
       </div>
 
-      {requests.length === 0 ? (
+      {allRequests.length === 0 ? (
         <div className="bg-white p-20 rounded-[2.5rem] border border-dashed border-gray-200 text-center">
           <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <Palette className="w-10 h-10 text-gray-300" />
@@ -72,7 +103,7 @@ const DesignRequestManager = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {requests.map((request) => (
+          {allRequests.map((request: any) => (
             <motion.div
               key={request.id}
               initial={{ opacity: 0, y: 20 }}
@@ -86,7 +117,12 @@ const DesignRequestManager = () => {
                   width={600}
                   className="w-full h-full object-contain"
                 />
-                <div className="absolute top-4 right-4">
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                    request.origin === 'studio_order' ? 'bg-primary text-white' : 'bg-gray-200 text-gray-800'
+                  }`}>
+                    {request.origin === 'studio_order' ? 'Studio' : 'Design'}
+                  </span>
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${
                     request.status === 'pending' ? 'bg-amber-100 text-amber-600' :
                     request.status === 'approved' ? 'bg-emerald-100 text-emerald-600' :
@@ -111,19 +147,27 @@ const DesignRequestManager = () => {
 
                 <div className="flex items-center text-xs text-gray-400 mb-6">
                   <Calendar className="w-3 h-3 mr-1" />
-                  {request.createdAt?.toDate ? format(request.createdAt.toDate(), 'dd MMMM yyyy HH:mm', { locale: fr }) : 'Date inconnue'}
+                  {(() => {
+                    let d: Date | null = null;
+                    if (request.createdAt?.toDate) d = request.createdAt.toDate();
+                    else if (request.createdAt) {
+                      const parsed = new Date(request.createdAt);
+                      if (!isNaN(parsed.getTime())) d = parsed;
+                    }
+                    return d ? format(d, 'dd MMMM yyyy HH:mm', { locale: fr }) : 'Date invalide';
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-2 pt-4 border-t border-gray-50">
                   <button
-                    onClick={() => updateStatus(request.id, 'approved')}
+                    onClick={() => updateStatus(request.id, 'approved', request.origin)}
                     className="flex-1 flex items-center justify-center space-x-1 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all text-xs font-bold"
                   >
                     <CheckCircle className="w-4 h-4" />
                     <span>Approuver</span>
                   </button>
                   <button
-                    onClick={() => updateStatus(request.id, 'rejected')}
+                    onClick={() => updateStatus(request.id, 'rejected', request.origin)}
                     className="flex-1 flex items-center justify-center space-x-1 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-all text-xs font-bold"
                   >
                     <XCircle className="w-4 h-4" />
