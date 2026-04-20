@@ -43,6 +43,7 @@ import { payDunyaService } from '../services/payDunyaService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { dbService } from '../services/dbService';
+import { syncService } from '../services/syncService';
 import { toast } from 'react-hot-toast';
 import { getOrderDiscountedTotal, isPromotionActive } from '../lib/promotions';
 import { OrderAIAnalysis } from '../components/admin/OrderAIAnalysis';
@@ -50,6 +51,7 @@ import { OrderDraftDisplay } from '../components/OrderDraftDisplay';
 import { OptimizedImage } from '../components/OptimizedImage';
 
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+console.log('DEBUG STRIPE KEY:', stripeKey ? 'DEFINED' : 'UNDEFINED');
 const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 const OrderDetails = () => {

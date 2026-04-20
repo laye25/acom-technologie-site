@@ -25,8 +25,14 @@ export const payDunyaService = {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erreur lors de la communication avec le serveur de paiement.');
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erreur lors de la communication avec le serveur de paiement.');
+        } else {
+          const text = await response.text();
+          throw new Error(`Erreur inattendue du serveur: ${response.status} - L'API a retourné du HTML. Veuillez vérifier la connexion ou les logs du serveur.`);
+        }
       }
 
       const data = await response.json();
