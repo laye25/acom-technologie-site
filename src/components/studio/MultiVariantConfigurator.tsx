@@ -62,20 +62,22 @@ const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ pro
     }
   };
 
-  const totalPrice = useMemo(() => {
-    // Logic for "Prix dégressif": Calculate total quantity and apply discount
-    const totalQty = Object.values(configs).reduce((acc, c) => acc + c.quantity, 0);
+  const totalPriceNum = useMemo(() => {
+    // Logic for "Prix dégressif": Calculate discount based on current variant's quantity
+    const totalQty = currentConfig.quantity || 100;
     let discount = 0;
     if (totalQty >= 500) discount = 0.20; // 20% off for 500+
     else if (totalQty >= 250) discount = 0.10; // 10% off for 250+
     
-    const basePrice = Object.values(configs).reduce((acc, c) => {
-      const variant = product.variants.find(v => v.id === activeVariantId) || product.variants[0];
-      return acc + (variant.price * c.quantity / 100);
-    }, 0);
+    // Calculate base price determining the unit price first (variant.price is for minQuantity)
+    const minQty = activeVariant?.minQuantity || 1;
+    const unitPrice = activeVariant ? (activeVariant.price / minQty) : 0;
+    const basePrice = unitPrice * totalQty;
     
-    return (basePrice * (1 - discount)).toFixed(2);
-  }, [configs, product.variants, activeVariantId]);
+    return Math.round(basePrice * (1 - discount));
+  }, [currentConfig.quantity, activeVariant]);
+
+  const totalPrice = totalPriceNum.toLocaleString();
 
   return (
     <div className="flex flex-col lg:flex-row h-full lg:h-screen bg-white">
@@ -111,7 +113,7 @@ const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ pro
             </div>
             <div className="md:text-right bg-primary/5 p-4 rounded-2xl md:bg-transparent md:p-0">
               <p className="text-[10px] lg:text-xs font-black text-gray-400 uppercase tracking-widest">Prix Total</p>
-              <p className="text-2xl lg:text-3xl font-black text-primary">{totalPrice} €</p>
+              <p className="text-2xl lg:text-3xl font-black text-primary">{totalPrice} FCFA</p>
             </div>
           </div>
           
@@ -196,7 +198,7 @@ const MultiVariantConfigurator: React.FC<MultiVariantConfiguratorProps> = ({ pro
                 )}
                 {onPersonalize && (
                   <button 
-                    onClick={() => onPersonalize(activeVariant, { ...currentConfig, totalPrice })}
+                    onClick={() => onPersonalize(activeVariant, { ...currentConfig, totalPrice: totalPriceNum.toString() })}
                     className="flex-1 py-3.5 lg:py-4 bg-gray-900 text-white rounded-xl font-black flex items-center justify-center text-sm lg:text-base"
                   >
                     <PenTool className="w-4 h-4 lg:w-5 lg:h-5 mr-2 lg:mr-3" /> Personnaliser

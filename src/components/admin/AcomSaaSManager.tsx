@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { Store, Search, Edit2, AlertCircle, TrendingUp, Copy, CheckCircle2, CreditCard, Power, Lock, Unlock, Receipt, X, Calendar, MoreVertical, Layout, Settings as SettingsIcon, Link as LinkIcon, Loader2 } from 'lucide-react';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
+import { db } from '../../db/db';
 import { Merchant } from '../../types';
 import { dbService } from '../../services/dbService';
 import { payDunyaService } from '../../services/payDunyaService';
@@ -15,11 +16,9 @@ export const AcomSaaSManager = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState<string | null>(null);
   
-  const { data: merchants, loading } = useFirestoreData<Merchant>({
-    tableName: 'merchants',
-    order: { column: 'createdAt', direction: 'desc' },
-    limit: 100
-  });
+  // Remplacé useFirestoreData par useLiveQuery pour la réactivité automatique via Dexie
+  const merchants = useLiveQuery(() => db.merchants.toArray()) || [];
+  const loading = merchants.length === 0; // Utilisation simplifiée du chargement
 
   const filteredMerchants = merchants.filter(merchant => 
     merchant.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||

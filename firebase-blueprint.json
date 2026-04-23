@@ -238,6 +238,32 @@
       },
       "required": ["id", "merchant_id", "name"]
     },
+    "Partner": {
+      "title": "ProductionPartner",
+      "description": "Production partner for Studio Acom",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant_id": { "type": "string" },
+        "name": { "type": "string" },
+        "reputation_score": { "type": "number" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "merchant_id", "name"]
+    },
+    "Rating": {
+      "title": "PartnerRating",
+      "description": "Rating for a partner's work on an order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "order_id": { "type": "string" },
+        "partner_id": { "type": "string" },
+        "score": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "order_id", "partner_id", "score"]
+    },
     "StockMovement": {
       "title": "StockMovement",
       "description": "Stock movement record",
@@ -473,6 +499,8 @@
     "/merchant_sales/{saleId}": { "schema": "MerchantSale", "description": "Merchant sales collection" },
     "/merchant_expenses/{expenseId}": { "schema": "MerchantExpense", "description": "Merchant expenses collection" },
     "/merchant_suppliers/{supplierId}": { "schema": "MerchantSupplier", "description": "Merchant suppliers collection" },
+    "/partners/{partnerId}": { "schema": "Partner", "description": "Production partners collection" },
+    "/ratings/{ratingId}": { "schema": "Rating", "description": "Partner ratings collection" },
     "/stock_movements/{movementId}": { "schema": "StockMovement", "description": "Stock movements collection" },
     "/interventions/{interventionId}": { "schema": "Intervention", "description": "Interventions collection" },
     "/projects/{projectId}": { "schema": "Project", "description": "Projects collection" },

@@ -12,7 +12,7 @@ import { OptimizedImage } from './OptimizedImage';
 
 
 const Navbar = () => {
-  const { user, profile, isAdmin, isManager, isSuperAdmin, signOut } = useAuth();
+  const { user, profile, isAdmin, isManager, isSuperAdmin, isPartner, signOut } = useAuth();
   const { prefetchCollection } = useDataCache();
   const hasAdminAccess = isAdmin || isManager;
   const [isOpen, setIsOpen] = useState(false);
@@ -89,6 +89,7 @@ const Navbar = () => {
     { name: 'Design', path: '/design-editor' },
     { name: 'Portfolio', path: '/portfolio' },
     { name: 'Tarifs', path: '/prix' },
+    { name: 'Partenaires', path: '/devenir-partenaire' },
     { name: 'Blog', path: '/blog' },
     { name: 'Contact', path: '/contact' },
   ];
@@ -96,6 +97,7 @@ const Navbar = () => {
   const authLinks = user ? [
     { name: 'Commandes', path: (isAdmin || isManager) ? '/admin?tab=orders' : '/dashboard?tab=orders', icon: ShoppingBag },
     { name: 'Messages', path: (isAdmin || isManager) ? '/admin?tab=messages' : '/dashboard?tab=messages', icon: MessageSquare },
+    ...(isPartner ? [{ name: 'Portail Partenaire', path: '/partner-portal', icon: Palette }] : []),
     ...(hasMerchantAccount || isAdmin || isManager ? [{ name: 'Ma Boutique', path: '/merchant/saas', icon: Store }] : []),
     ...(isManager || isSuperAdmin ? [{ name: 'Caisse', path: '/manager/pos', icon: Calculator }] : []),
     ...(hasAdminAccess ? [{ name: 'Admin', path: '/admin', icon: LayoutDashboard }] : []),

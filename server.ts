@@ -5,6 +5,8 @@ import { fileURLToPath } from "url";
 import Stripe from "stripe";
 import { Resend } from "resend";
 import admin from "firebase-admin";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
@@ -160,9 +162,16 @@ async function startServer() {
       // Calculate amount in the smallest unit (cents for most, full amount for zero-decimal)
       const stripeAmount = isZeroDecimal ? Math.round(amount) : Math.round(amount * 100);
 
+      // Ensure amount is at least 0.50 EUR equivalent (approx 328 XOF)
+      // Stripe requires a minimum amount, let's enforce a minimum of 500 XOF for safety
+      const minAmount = 500;
+      const finalAmount = Math.max(stripeAmount, minAmount);
+      
+      console.log('DEBUG: Stripe amount calculation', { originalAmount: amount, stripeAmount, finalAmount });
+
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: stripeAmount,
-        currency: currency.toLowerCase(),
+        amount: finalAmount,
+        currency: 'xof', // Force XOF for all payments
         metadata: { orderId },
         automatic_payment_methods: {
           enabled: true,
@@ -337,7 +346,53 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const httpServer = createServer(app);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"]
+    }
+  });
+
+  io.on("connection", (socket) => {
+    console.log("New client connected:", socket.id);
+
+    socket.on("join", (room) => {
+      socket.join(room);
+      console.log(`Socket ${socket.id} joined room: ${room}`);
+    });
+
+    socket.on("sendMessage", async (data) => {
+      // data: { senderId, receiverId, text, chatId }
+      const { senderId, receiverId, text, chatId } = data;
+      
+      const message = {
+        senderId,
+        receiverId,
+        text,
+        chatId,
+        timestamp: new Date().toISOString(),
+        read: false
+      };
+
+      // 1. Save to Firestore for persistence
+      try {
+        await admin.firestore().collection('messages').add(message);
+      } catch (error) {
+        console.error("Error saving message:", error);
+      }
+
+      // 2. Broadcast to the room
+      io.to(chatId).emit("message", message);
+      console.log(`Message sent in room ${chatId}`);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Client disconnected:", socket.id);
+    });
+  });
+
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

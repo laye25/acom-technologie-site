@@ -1,5 +1,5 @@
 import { where, orderBy, limit } from 'firebase/firestore';
-import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment } from '../types';
+import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment, PartnerRating } from '../types';
 import { serviceRepository } from '../data/repositories/service.repository';
 import { orderRepository } from '../data/repositories/order.repository';
 import { portfolioRepository } from '../data/repositories/portfolio.repository';
@@ -26,6 +26,7 @@ import { designBlockRepository } from '../data/repositories/design-block.reposit
 import { categoryRepository } from '../data/repositories/category.repository';
 import { studioAcomProductRepository } from '../data/repositories/studio-acom-product.repository';
 import { variantRepository } from '../data/repositories/variant.repository';
+import { partnerRatingRepository } from '../data/repositories/partner-rating.repository';
 import { activityService } from './activityService';
 
 export const dbService = {
@@ -121,6 +122,15 @@ export const dbService = {
   messages: {
     async save(message: any) {
       return messageRepository.create(message);
+    },
+    async list(options: any) {
+      if (options.where) {
+        const filters = options.where.map((f: any) => where(f[0], f[1], f[2]));
+        const sorts = options.orderBy ? options.orderBy.map((s: any) => orderBy(s[0], s[1])) : [];
+        const limitRes = options.limit ? [limit(options.limit)] : [];
+        return messageRepository.getAll([...filters, ...sorts, ...limitRes]);
+      }
+      return messageRepository.getAll();
     }
   },
   contactMessages: {
@@ -244,6 +254,9 @@ export const dbService = {
     }
   },
   users: {
+    async getById(id: string) {
+      return userRepository.getById(id);
+    },
     async save(user: Partial<UserProfile>) {
       if (user.uid) {
         // For users, we use uid as doc id
@@ -252,9 +265,6 @@ export const dbService = {
         if (exists) {
           return repo.update(user.uid, user);
         } else {
-          // Use setDoc logic via repository if possible, or direct for now
-          // BaseRepository uses addDoc for create, which generates random ID.
-          // We need a way to set ID.
           const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
           const { db } = await import('../firebase');
           await setDoc(doc(db, 'users', user.uid), {
@@ -266,6 +276,9 @@ export const dbService = {
         }
       }
       return '';
+    },
+    async update(id: string, user: Partial<UserProfile>) {
+      return userRepository.update(id, user);
     },
     async delete(id: string) {
       return userRepository.delete(id);
@@ -514,6 +527,18 @@ export const dbService = {
     },
     async delete(id: string) {
       return designRepository.delete(id);
+    }
+  },
+  partnerRatings: {
+    async save(rating: Partial<PartnerRating>) {
+      if (rating.id) {
+        return partnerRatingRepository.update(rating.id, rating);
+      }
+      return partnerRatingRepository.create(rating as any);
+    },
+    async getByOrder(orderId: string) {
+      const { where } = await import('firebase/firestore');
+      return partnerRatingRepository.getAll([where('orderId', '==', orderId)]);
     }
   }
 };

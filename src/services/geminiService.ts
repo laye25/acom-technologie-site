@@ -102,5 +102,100 @@ export const geminiService = {
       console.error("Failed to parse Gemini response", e);
       return [];
     }
+  },
+
+  chatBusinessPerformance: async (orders: any[], expenses: any[], newMessage: string, chatSessionId: string): Promise<string> => {
+    try {
+      const ai = getAiClient();
+      if (!ai) return "L'assistant IA n'est pas configuré.";
+
+      // In a real app, you'd manage chat sessions in memory or storage
+      // For this implementation, we initialize a chat session if it doesn't exist
+      // Since ai.chats is not imported in the current structure, I'll use a functional approach as per SKILL.md
+      
+      const promptContext = `
+        Tu es un analyste financier expert pour Acom Technologie. Utilise les données suivantes comme base de connaissance pour répondre aux questions de l'administrateur.
+        
+        Commandes (historique complet) :
+        ${JSON.stringify(orders.slice(-50), null, 2)}
+
+        Dépenses (historique complet) :
+        ${JSON.stringify(expenses.slice(-50), null, 2)}
+
+        Réponds de manière concise, professionnelle et orientée action.
+      `;
+
+      // Simplified chat approach:
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: [
+            { role: 'user', parts: [{ text: `CONTEXT:\n${promptContext}\n\nUSER MESSAGE:\n${newMessage}` }] }
+        ],
+      });
+
+      return response.text || "Impossible de générer la réponse.";
+    } catch (e) {
+      console.error("Failed to chat with business data", e);
+      return "Une erreur est survenue lors de la conversation.";
+    }
+  },
+
+  adjustElementProperty: async (elements: any[], targetElementId: string, instruction: string): Promise<LayoutSuggestion[]> => {
+    try {
+      const ai = getAiClient();
+      if (!ai) return [];
+
+      const prompt = `
+        Tu es un co-pilote AI expert en design dans une application de création graphique.
+        Analyse la scène et l'instruction demandée, et ajuste uniquement la propriété de l'élément cible nécessaire.
+        
+        Scène : ${JSON.stringify(elements)}
+        Élément cible : ${targetElementId}
+        Instruction utilisateur : "${instruction}"
+        
+        Retourne un JSON avec les modifications nécessaires. Si aucune modification n'est nécessaire, retourne [].
+        Format attendu : [{ "id": "${targetElementId}", "property": "value" }]
+        Exemple : [{ "id": "text-1", "fontSize": 24 }]
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        }
+      });
+
+      return JSON.parse(response.text || "[]");
+    } catch (e) {
+      console.error("Failed to adjust element property", e);
+      return [];
+    }
+  },
+
+  analyzeBusinessPerformance: async (orders: any[], expenses: any[]): Promise<string> => {
+    const prompt = `
+      Tu es un analyste financier expert. Analyse les performances suivantes (Dernières commandes et dépenses) pour Acom Technologie.
+      Fournis un résumé concis comprenant:
+      - Tendance globale du CA
+      - Analyse de la rentabilité (par rapport aux dépenses)
+      - Points d'attention ou opportunités.
+      
+      Données :
+      Commandes : ${JSON.stringify(orders.slice(-30))}
+      Dépenses : ${JSON.stringify(expenses.slice(-30))}
+    `;
+    
+    try {
+      const ai = getAiClient();
+      if (!ai) return "Assistant IA indisponible.";
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite-preview",
+        contents: prompt
+      });
+      return response.text || "";
+    } catch (e) {
+      return "Analyse impossible pour le moment.";
+    }
   }
 };

@@ -45,6 +45,7 @@ export type TableName =
   | 'templates'
   | 'expenses'
   | 'studio_acom_products'
+  | 'partner_ratings'
   | 'variants'
   | 'assets';
 
@@ -79,7 +80,8 @@ export function useFirestoreData<T>({
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(!skip);
   const [error, setError] = useState<Error | null>(null);
-
+  const [isVisible, setIsVisible] = useState(true);
+  
   // Use a ref for the mapper to avoid re-triggering the effect if the mapper changes
   const mapperRef = useRef(mapper);
   useEffect(() => {
@@ -96,8 +98,21 @@ export function useFirestoreData<T>({
   });
 
   useEffect(() => {
-    if (skip) {
-      setLoading(false);
+    if (realtime) {
+      const observer = new IntersectionObserver(([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      }, { threshold: 0.1 });
+      
+      // We assume this hook is used within a component that can be observed. 
+      // Attaching to document.body or a specific container might be needed if component ref isn't available.                
+      // For now, simple document-level visibility might suffice, or we pass a ref.
+      return () => observer.disconnect();
+    }
+  }, [realtime]);
+
+  useEffect(() => {
+    if (skip || (realtime && !isVisible)) {
+      if (skip) setLoading(false);
       return;
     }
 
@@ -175,7 +190,7 @@ export function useFirestoreData<T>({
         setLoading(false);
       });
     }
-  }, [tableName, cacheKey, skip, realtime, JSON.stringify(whereClauses), JSON.stringify(filters), filter?.column, filter?.value, order?.column, order?.ascending, order?.direction, limitCount, getCachedData, setCachedData]);
+  }, [tableName, cacheKey, skip, realtime, isVisible, JSON.stringify(whereClauses), JSON.stringify(filters), filter?.column, filter?.value, order?.column, order?.ascending, order?.direction, limitCount, getCachedData, setCachedData]);
 
   const mutate = useCallback((updater: T[] | ((prev: T[]) => T[])) => {
     setData(prev => {

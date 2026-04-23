@@ -6,6 +6,7 @@ export class StudioAcomDB extends Dexie {
   products!: Table<MerchantProduct>;
   sales!: Table<MerchantSale>;
   expenses!: Table<MerchantExpense>;
+  merchants!: Table<any>;
   orders!: Table<any>;
   services!: Table<any>;
   users!: Table<any>;
@@ -18,6 +19,7 @@ export class StudioAcomDB extends Dexie {
       products: 'id, merchantId, name, category',
       sales: 'id, merchantId, createdAt',
       expenses: 'id, merchantId, date, category',
+      merchants: 'id, owner_id, name',
       orders: 'id, merchantId, createdAt, status',
       services: 'id, merchantId, name',
       users: 'id, merchantId, email',

@@ -66,6 +66,7 @@ export interface Order {
   couponDiscount?: number;
   promotionStartDate?: string;
   promotionEndDate?: string;
+  pillar?: 'saas' | 'studio';
   details: Record<string, any>;
   customOptions?: Record<string, any>;
   files: string[];
@@ -77,7 +78,15 @@ export interface Order {
   printPdfUrl?: string;
   trackingNumber?: string;
   supplierStatus?: 'pending' | 'in_production' | 'shipped' | 'delivered';
+  partnerId?: string;
   supplierId?: string;
+  partnerEarnings?: number; // The amount Acom owes the partner for this order
+  isPartnerPaid?: boolean; // Whether Acom has paid the partner for this order
+  partnerPaidAt?: any;
+  partnerInvoiceUrl?: string; // URL of the stamped invoice uploaded by partner
+  partnerInvoiceStatus?: 'pending' | 'rejected' | 'paid';
+  productionDeadline?: any; // New: Expected delivery date from partner
+  deadlineAlertSent?: boolean; // Flag to avoid duplicate alerts
   paid?: boolean;
   depositPaid?: boolean;
   depositAmount?: number;
@@ -131,13 +140,46 @@ export interface Message {
   isAdmin?: boolean;
 }
 
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  text: string;
+  chatId: string;
+  timestamp: string;
+  read: boolean;
+}
+
 export interface UserProfile {
   id?: string;
   uid: string;
   email: string;
   displayName: string;
   photoURL: string;
-  role: 'client' | 'admin' | 'manager';
+  role: 'client' | 'admin' | 'manager' | 'printer' | 'designer';
+  partnerStatus?: 'pending' | 'approved' | 'rejected' | 'none';
+  partnerDetails?: {
+    managerName: string;
+    companyName: string;
+    companyFiliations: string;
+    phone: string;
+    address: string;
+    website?: string;
+    facebook?: string;
+    instagram?: string;
+    linkedin?: string;
+    twitter?: string;
+    workshopPhotos?: string[];
+    termsAccepted: boolean;
+    signatureInfo?: {
+      ip?: string;
+      userAgent: string;
+      signedAt: any;
+      version: string;
+    };
+    appliedAt: any;
+    commissionPercentage?: number; // Custom commission for this partner (e.g., 85 for 85%)
+  };
   merchantId?: string;
   phoneNumber?: string;
   address?: string;
@@ -146,6 +188,7 @@ export interface UserProfile {
   website?: string;
   phone?: string;
   logoUrl?: string;
+  lastWeeklyRecapSent?: any; // Timestamp of the last Monday recap sent
   createdAt: any;
   created_at?: any;
 }
@@ -442,6 +485,7 @@ export interface SiteSettings {
   primaryColor?: string;
   taxRate?: number;
   cashThreshold?: number;
+  defaultPartnerCommission?: number; // New: Global default commission rate (e.g., 80)
   aboutContent?: AboutContent;
   faqContent?: FAQItem[];
   termsContent?: PageSection[];
@@ -492,6 +536,7 @@ export interface MerchantProduct {
   costPrice?: number;
   stockQuantity: number;
   minStockLevel?: number;
+  supplierId?: string;
   category: string;
   image?: string;
   createdAt: any;
@@ -529,6 +574,7 @@ export interface MerchantExpense {
   description?: string;
   createdAt: any;
   created_at?: any;
+  updatedAt?: any;
 }
 
 export interface MerchantSupplier {
@@ -542,6 +588,31 @@ export interface MerchantSupplier {
   category?: string;
   createdAt: any;
   updatedAt: any;
+}
+
+export interface ProductionPartner {
+  id: string;
+  merchantId: string;
+  name: string;
+  specialties: string[];
+  capacity: number; // Max orders per day
+  reputationScore: number;
+  location: string;
+  contactPhone: string;
+  contactEmail: string;
+  totalOrders: number;
+  onTimeDeliveries: number;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface PartnerRating {
+  id: string;
+  orderId: string;
+  partnerId: string;
+  score: number; // 1-5
+  comment?: string;
+  createdAt: any;
 }
 
 export interface StockMovement {

@@ -16,9 +16,36 @@ interface DesignRequest {
   userName: string;
   sides: any;
   previewUrl: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: string;
   createdAt: any;
 }
+
+const DESIGN_STATUSES = [
+  { id: 'pending', label: 'En attente', color: 'bg-amber-100 text-amber-600' },
+  { id: 'approved', label: 'Approuvé', color: 'bg-blue-100 text-blue-600' },
+  { id: 'in_progress', label: 'En production', color: 'bg-purple-100 text-purple-600' },
+  { id: 'shipped', label: 'Expédié', color: 'bg-indigo-100 text-indigo-600' },
+  { id: 'delivered', label: 'Livré', color: 'bg-emerald-100 text-emerald-600' },
+  { id: 'rejected', label: 'Rejeté', color: 'bg-red-100 text-red-600' }
+];
+
+const ORDER_TO_DESIGN_STATUS: Record<string, string> = {
+  'pending': 'pending',
+  'confirmed': 'approved',
+  'in_progress': 'in_progress',
+  'completed': 'shipped',
+  'delivered': 'delivered',
+  'cancelled': 'rejected'
+};
+
+const DESIGN_TO_ORDER_STATUS: Record<string, string> = {
+  'pending': 'pending',
+  'approved': 'confirmed',
+  'in_progress': 'in_progress',
+  'shipped': 'completed',
+  'delivered': 'delivered',
+  'rejected': 'cancelled'
+};
 
 const DesignRequestManager = () => {
   const navigate = useNavigate();
@@ -29,8 +56,7 @@ const DesignRequestManager = () => {
 
   const { data: studioOrders, loading: loadingOrders, refresh: refreshOrders } = useFirestoreData<any>({
     tableName: 'orders',
-    // We can't filter by pillar in useFirestoreData directly if it's not a root query, 
-    // we'll filter them client-side based on the structure.
+    where: [['pillar', '==', 'studio']]
   });
 
   const loading = loadingRequests || loadingOrders;
@@ -38,15 +64,14 @@ const DesignRequestManager = () => {
   const allRequests = [
     ...requests.map(r => ({ ...r, origin: 'design_request' })),
     ...studioOrders
-      .filter((o: any) => o.pillar === 'studio')
       .map((o: any) => ({
         id: o.id,
         userId: o.userId,
         userEmail: o.clientEmail,
         userName: o.clientName,
         sides: o.details?.customOptions?.sides || {},
-        previewUrl: o.serviceImage || '',
-        status: o.status === 'pending' ? 'pending' : (o.status === 'confirmed' ? 'approved' : 'rejected'),
+        previewUrl: o.details?.designThumbnail || o.serviceImage || '',
+        status: ORDER_TO_DESIGN_STATUS[o.status] || 'pending',
         createdAt: o.createdAt || o.updatedAt,
         origin: 'studio_order'
       }))
@@ -59,9 +84,10 @@ const DesignRequestManager = () => {
       if (origin === 'design_request') {
         await firestoreService.update('design_requests', id, { status });
       } else {
-        await firestoreService.update('orders', id, { status: status === 'approved' ? 'confirmed' : 'pending' });
+        const orderStatus = DESIGN_TO_ORDER_STATUS[status] || 'pending';
+        await firestoreService.update('orders', id, { status: orderStatus });
       }
-      toast.success(`Statut mis à jour : ${status}`);
+      toast.success(`Statut mis à jour !`);
       refresh();
     } catch (error) {
       console.error("Error updating status:", error);
@@ -124,12 +150,9 @@ const DesignRequestManager = () => {
                     {request.origin === 'studio_order' ? 'Studio' : 'Design'}
                   </span>
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                    request.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                    request.status === 'approved' ? 'bg-emerald-100 text-emerald-600' :
-                    'bg-red-100 text-red-600'
+                    DESIGN_STATUSES.find(s => s.id === request.status)?.color || 'bg-gray-100 text-gray-600'
                   }`}>
-                    {request.status === 'pending' ? 'En attente' :
-                     request.status === 'approved' ? 'Approuvé' : 'Rejeté'}
+                    {DESIGN_STATUSES.find(s => s.id === request.status)?.label || 'Inconnu'}
                   </span>
                 </div>
               </div>
@@ -159,32 +182,24 @@ const DesignRequestManager = () => {
                 </div>
 
                 <div className="flex items-center gap-2 pt-4 border-t border-gray-50">
-                  <button
-                    onClick={() => updateStatus(request.id, 'approved', request.origin)}
-                    className="flex-1 flex items-center justify-center space-x-1 py-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all text-xs font-bold"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Approuver</span>
-                  </button>
-                  <button
-                    onClick={() => updateStatus(request.id, 'rejected', request.origin)}
-                    className="flex-1 flex items-center justify-center space-x-1 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-all text-xs font-bold"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    <span>Rejeter</span>
-                  </button>
+                  <div className="flex-1">
+                    <select
+                      value={request.status}
+                      onChange={(e) => updateStatus(request.id, e.target.value, request.origin)}
+                      className="w-full text-xs font-bold bg-gray-50 text-gray-700 py-2.5 px-3 rounded-xl border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                    >
+                      {DESIGN_STATUSES.map(status => (
+                        <option key={status.id} value={status.id}>{status.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
                   <button
                     onClick={() => openInEditor(request)}
-                    className="p-2 bg-primary/10 text-primary rounded-xl hover:bg-primary/20 transition-all"
+                    className="p-2.5 bg-primary/10 text-primary rounded-xl hover:bg-primary/20 transition-all"
                     title="Ouvrir dans l'éditeur"
                   >
                     <ExternalLink className="w-4 h-4" />
-                  </button>
-                  <button
-                    className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-gray-100 transition-all"
-                    title="Voir les détails"
-                  >
-                    <Eye className="w-4 h-4" />
                   </button>
                 </div>
               </div>

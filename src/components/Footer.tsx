@@ -43,6 +43,8 @@ const Footer = () => {
       { name: t('Blog'), path: '/blog' },
     ],
     support: [
+      { name: t('Devenir Partenaire'), path: '/devenir-partenaire' },
+      { name: t('Conditions Partenaires'), path: '/conditions-partenaires' },
       { name: t('Contact'), path: '/contact' },
       { name: t('FAQ'), path: settings?.faqUrl || '/faq' },
       { name: t('Notes de mise à jour'), path: '/release-notes' },

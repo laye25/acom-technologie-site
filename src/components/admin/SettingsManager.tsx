@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dbService as db } from '../../services/dbService';
-import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock } from 'lucide-react';
+import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock, Percent } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ConfirmModal } from './ConfirmModal';
 import { OptimizedImage } from '../OptimizedImage';
@@ -798,6 +798,28 @@ const SettingsManager = () => {
                 <span className="text-gray-500 font-medium">% appliqué sur le montant HT</span>
               </div>
               <p className="mt-4 text-xs text-gray-400 italic">Ce taux sera utilisé pour calculer le HT et le TTC dans vos rapports financiers.</p>
+            </div>
+
+            <h4 className="text-sm font-bold text-gray-900 flex items-center pt-4">
+              <Percent className="w-4 h-4 mr-2 text-primary/40" />
+              Rémunération Partenaire
+            </h4>
+            <div className="p-6 rounded-2xl bg-indigo-50 border border-indigo-100">
+              <label className="block text-xs font-black text-indigo-900 uppercase tracking-widest mb-2">Commission Partenaire par défaut (%)</label>
+              <div className="flex items-center space-x-4">
+                <input
+                  type="number"
+                  max="100"
+                  min="0"
+                  value={settings.defaultPartnerCommission || 80}
+                  onChange={(e) => setSettings({ ...settings, defaultPartnerCommission: Number(e.target.value) })}
+                  className="w-32 px-4 py-3 rounded-xl border border-indigo-200 focus:ring-2 focus:ring-indigo-200 outline-none transition-all font-black text-lg text-indigo-900"
+                />
+                <span className="text-indigo-700 font-bold">% reversé au partenaire par défaut</span>
+              </div>
+              <p className="mt-4 text-xs text-indigo-600/70 italic font-medium leading-relaxed">
+                Ce pourcentage est utilisé automatiquement pour calculer les revenus des nouveaux partenaires et lors des synchronisations automatiques si aucun taux spécifique n'est défini dans le profil du partenaire.
+              </p>
             </div>
 
             <div className="p-6 rounded-2xl bg-gray-50 border border-gray-100">

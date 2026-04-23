@@ -1,3 +1,4 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dbService } from '../services/dbService';
@@ -32,14 +33,18 @@ import { SERVICES as STATIC_SERVICES } from '../constants';
 import { notificationService } from '../services/notificationService';
 import { GlobalActivityFeed } from '../components/GlobalActivityFeed';
 import { DailyBriefing } from '../components/DailyBriefing';
+import { automationService } from '../services/automationService';
 import { PrintingManager } from '../components/admin/PrintingManager';
+import { BusinessInsights } from '../components/admin/BusinessInsights';
+import { AdminChat } from '../components/admin/AdminChat';
+import { PartnerMessageManager } from '../components/admin/PartnerMessageManager';
 
-type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom' | 'printing' | 'saas_subscriptions' | 'saas_appearance';
+type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'partner_messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom' | 'printing' | 'saas_subscriptions' | 'saas_appearance';
 
 // import { isSupabaseConfigured } from '../lib/supabase';
 
 const AdminDashboard = () => {
-  const { user, isAdmin, isManager, isSuperAdmin, syncCustomClaims, loading: authLoading } = useAuth();
+  const { user, profile, isAdmin, isManager, isSuperAdmin, syncCustomClaims, loading: authLoading } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialTab = (searchParams.get('tab') as Tab) || (user?.email === 'contact.acomtechnologie@gmail.com' ? 'services' : 'overview');
@@ -173,8 +178,6 @@ const AdminDashboard = () => {
 
       await dbService.orders.save(newOrderState);
       
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...newOrderState } : o));
-
       toast.success("Commande marquée comme payée !");
     } catch (error) {
       console.error("Error marking as paid:", error);
@@ -253,7 +256,6 @@ const AdminDashboard = () => {
       };
 
       await dbService.orders.save(newOrderState);
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...newOrderState } : o));
 
       toast.success("Reliquat marqué comme payé !");
     } catch (error) {
@@ -547,37 +549,29 @@ const AdminDashboard = () => {
     limit: 20
   }), [hasAccess]);
 
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [dynamicServices, setDynamicServices] = useState<Service[]>([]);
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [settingsData, setSettingsData] = useState<any[]>([]);
+  // Replace manual loading with useLiveQuery
+  const orders = useLiveQuery(() => db.orders.toArray()) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+  const users = useLiveQuery(() => db.users.toArray()) || [];
+  const rawExpenses = useLiveQuery(() => db.expenses.toArray()) || [];
+  const expenses = useMemo(() => rawExpenses.map(exp => ({
+    ...exp,
+    updatedAt: exp.updatedAt || exp.created_at || exp.createdAt || new Date()
+  })) as Expense[], [rawExpenses]);
+  const settingsData = useLiveQuery(() => db.settings.toArray()) || [];
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Load from Dexie
-        const [o, s, u, e, st] = await Promise.all([
-          db.orders.toArray(),
-          db.services.toArray(),
-          db.users.toArray(),
-          db.expenses.toArray(),
-          db.settings.toArray()
-        ]);
-        console.log('Orders initially loaded from Dexie:', o?.length || 0);
-        setOrders([...o] as Order[]);
-        setDynamicServices(s as Service[]);
-        setUsers(u as UserProfile[]);
-        setExpenses((e as any[]).map(exp => ({
-          ...exp,
-          updatedAt: exp.updatedAt || exp.created_at || exp.createdAt || new Date()
-        })) as Expense[]);
-        setSettingsData(st);
+    // Only manage initial loading state for the dashboard overall
+    if (orders.length > 0 || dynamicServices.length > 0) {
+      setLoading(false);
+    }
+  }, [orders, dynamicServices]);
 
+  useEffect(() => {
+    const backgroundSync = async () => {
         // Sync in background (séquentiel pour lisser la charge IO)
         if (user?.uid) {
           const syncTasks = [
@@ -591,40 +585,23 @@ const AdminDashboard = () => {
           for (const task of syncTasks) {
             try {
               await task();
-              // Petit délai pour laisser le disque respirer
               await new Promise(resolve => setTimeout(resolve, 500)); 
             } catch (e) {
               console.error("Sync task failed", e);
             }
           }
           
-          // Refresh from Dexie
-          const [o2, s2, u2, e2, st2] = await Promise.all([
-            db.orders.toArray(),
-            db.services.toArray(),
-            db.users.toArray(),
-            db.expenses.toArray(),
-            db.settings.toArray()
-          ]);
-          console.log('Orders reloaded from Dexie after sync:', o2?.length || 0);
-          setOrders([...o2] as Order[]);
-          setDynamicServices(s2 as Service[]);
-          setUsers(u2 as UserProfile[]);
-          setExpenses((e2 as any[]).map(exp => ({
-            ...exp,
-            updatedAt: exp.updatedAt || exp.created_at || exp.createdAt || new Date()
-          })) as Expense[]);
-          setSettingsData(st2);
+          // Run Proactive Checks
+          try {
+            await automationService.runProactiveChecks(orders, users);
+          } catch(e) {
+            console.error("Proactive checks failed", e);
+          }
         }
-      } catch (err: any) {
-        console.error('Error loading dashboard data:', err);
-        setError(err);
-      } finally {
-        setLoading(false);
-      }
     };
-    loadData();
+    backgroundSync();
   }, [user?.uid]);
+
   
   // Point 6: Aggregation - Fetch global stats
   const globalStats = settingsData?.find((s: any) => s.id === 'stats') || {};
@@ -1174,9 +1151,6 @@ const AdminDashboard = () => {
       });
       console.log('DEBUG: Save status successful');
 
-      // Update local state immediately for fast UI feedback
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus, updatedAt: new Date().toISOString() } : o));
-
       // Force a sync to update local cache immediately
       if (user?.uid) {
         console.log('DEBUG: Syncing orders...');
@@ -1291,18 +1265,19 @@ const AdminDashboard = () => {
     { id: 'blog', label: 'Blog', icon: FileText, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'settings', label: 'Réglages', icon: Settings, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'messages', label: 'Messages', icon: MessageSquare, adminOnly: false, superAdminOnly: false, allowManager: true },
+    { id: 'partner_messages', label: 'Messages Partenaires', icon: MessageSquare, adminOnly: true, superAdminOnly: false, allowManager: true },
     { id: 'pos', label: 'Caisse', icon: Calculator, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'expenses', label: 'Dépenses', icon: Receipt, adminOnly: false, superAdminOnly: false, allowManager: true },
-    { id: 'design_requests', label: 'Demandes Design', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: true },
-    { id: 'printing', label: 'Impression', icon: Printer, adminOnly: true, superAdminOnly: false, allowManager: true },
+    { id: 'design_requests', label: 'Demandes Design', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: true, allowRole: 'designer' },
+    { id: 'printing', label: 'Impression', icon: Printer, adminOnly: true, superAdminOnly: false, allowManager: true, allowRole: 'printer' },
     { id: 'studio_acom', label: 'Studio ACOM', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_subscriptions', label: 'Souscriptions', icon: Store, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_appearance', label: 'Apparence', icon: Layout, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'design', label: 'Éditeur Design', icon: LayoutGrid, adminOnly: true, superAdminOnly: false, allowManager: false },
   ].filter(tab => {
     if (tab.superAdminOnly && !isSuperAdmin) return false;
-    if (tab.adminOnly && !isAdmin && !(tab.allowManager && isManager)) return false;
-    if (!tab.adminOnly && !isAdmin && !isManager && tab.id !== 'messages') return false; // Basic user check
+    if (tab.adminOnly && !isAdmin && !(tab.allowManager && isManager) && !(tab.allowRole && profile?.role === tab.allowRole)) return false;
+    if (!tab.adminOnly && !isAdmin && !isManager && tab.id !== 'messages' && !(tab.allowRole && profile?.role === tab.allowRole)) return false; 
     if ((tab.id === 'orders' || tab.id === 'overview') && isRestrictedAdmin) return false;
     return true;
   });
@@ -1310,7 +1285,7 @@ const AdminDashboard = () => {
   const tabGroups = [
     {
       title: "Statistiques & Commercial",
-      tabs: ['overview', 'orders', 'users', 'messages']
+      tabs: ['overview', 'orders', 'users', 'messages', 'partner_messages']
     },
     {
       title: "Gestion du Site",
@@ -1410,6 +1385,8 @@ const AdminDashboard = () => {
                   services={dynamicServices}
                   expenses={expenses}
                 />
+                <BusinessInsights />
+                <AdminChat />
                 {/* Maintenance & Tools */}
               {(isSuperAdmin || isManager) && (
                 <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm">
@@ -1706,7 +1683,7 @@ const AdminDashboard = () => {
                         Évolution Financière
                       </h2>
                       <div className="h-[400px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                           <AreaChart data={chartData}>
                             <defs>
                               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -1765,7 +1742,7 @@ const AdminDashboard = () => {
                         Répartition des Revenus
                       </h2>
                       <div className="h-[400px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                           <BarChart data={paymentMethodStats.map(s => ({ name: s.label, value: parseInt(s.value.replace(/\D/g, '')) }))}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                             <XAxis 
@@ -1954,7 +1931,7 @@ const AdminDashboard = () => {
                         <TrendingUp className="w-4 h-4 text-primary" />
                       </div>
                       <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                           <AreaChart data={overviewChartData.daily}>
                             <defs>
                               <linearGradient id="colorOnline" x1="0" y1="0" x2="0" y2="1">
@@ -1987,7 +1964,7 @@ const AdminDashboard = () => {
                         <LayoutGrid className="w-4 h-4 text-primary" />
                       </div>
                       <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minHeight={1} minWidth={1}>
                           <AreaChart data={overviewChartData.monthly}>
                             <defs>
                               <linearGradient id="colorOnlineM" x1="0" y1="0" x2="0" y2="1">
@@ -2451,6 +2428,17 @@ const AdminDashboard = () => {
             exit={{ opacity: 0, y: -20 }}
           >
             <MessageManager />
+          </motion.div>
+        )}
+
+        {activeTab === 'partner_messages' && (
+          <motion.div
+            key="partner_messages"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <PartnerMessageManager />
           </motion.div>
         )}
 

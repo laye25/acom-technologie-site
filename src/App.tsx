@@ -8,6 +8,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ErrorBoundary from './components/ErrorBoundary';
 import { NetworkStatusIndicator } from './components/NetworkStatusIndicator';
+import { PartnerPortal } from './pages/PartnerPortal';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import OrderForm from './pages/OrderForm';
@@ -31,6 +32,8 @@ import DesignEditor from './pages/DesignEditor';
 import EmailPreview from './pages/EmailPreview';
 import ReleaseNotes from './pages/ReleaseNotes';
 import About from './pages/About';
+import BecomePartner from './pages/BecomePartner';
+import PartnerTerms from './pages/PartnerTerms';
 import FAQ from './pages/FAQ';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
@@ -81,6 +84,8 @@ function AppContent() {
           <Route path="/blog/:postId" element={<BlogPost />} />
           <Route path="/service/:serviceId" element={<ServiceDetails />} />
           <Route path="/about" element={<About />} />
+          <Route path="/devenir-partenaire" element={<BecomePartner />} />
+          <Route path="/conditions-partenaires" element={<PartnerTerms />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
@@ -92,6 +97,7 @@ function AppContent() {
           <Route path="/admin/email-preview" element={<ProtectedRoute adminOnly><EmailPreview /></ProtectedRoute>} />
           <Route path="/manager/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
           <Route path="/merchant/saas" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
+          <Route path="/partner-portal" element={<ProtectedRoute><PartnerPortal /></ProtectedRoute>} />
           <Route path="/solutions-saas" element={<SaaSSolutions />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/prix" element={<Pricing />} />

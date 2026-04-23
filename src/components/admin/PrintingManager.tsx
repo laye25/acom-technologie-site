@@ -7,7 +7,7 @@ import {
   Printer, Package, Truck, CheckCircle, Clock, Search, 
   FileText, Upload, ExternalLink, Filter, ChevronDown,
   AlertCircle, MoreVertical, Download, Send, User,
-  Globe, MapPin, Hash, Loader2, Settings
+  Globe, MapPin, Hash, Loader2, Settings, Check, X as XIcon, Banknote
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -31,23 +31,87 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
     return orders.filter(order => {
       const service = services.find(s => s.id === order.serviceId);
       const isPrintingService = service?.category === 'Impression' || 
-                               ['business-cards', 'flyers', 'posters', 'stickers'].includes(order.serviceId);
+                               ['business-cards', 'flyers', 'posters', 'stickers'].includes(order.serviceId) ||
+                               order.pillar === 'studio';
+      
+      // En impression, on ne gère que ce qui a été approuvé/payé (pas les pending Studio)
+      if (order.pillar === 'studio' && order.status === 'pending') {
+        return false;
+      }
       
       const matchesSearch = order.id.toLowerCase().includes(search.toLowerCase()) ||
                            order.clientName?.toLowerCase().includes(search.toLowerCase()) ||
                            order.details?.fullName?.toLowerCase().includes(search.toLowerCase());
       
-      const matchesStatus = statusFilter === 'Tous' || order.supplierStatus === statusFilter;
+      const mappedStatus = order.status === 'confirmed' ? 'pending' 
+                         : order.status === 'in_progress' ? 'in_production'
+                         : order.status === 'completed' ? 'shipped'
+                         : order.status === 'delivered' ? 'delivered'
+                         : 'pending';
+
+      const matchesStatus = statusFilter === 'Tous' || mappedStatus === statusFilter;
 
       return isPrintingService && matchesSearch && matchesStatus;
     }).sort((a, b) => {
-      const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
-      const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      const getMs = (val: any) => {
+        if (!val) return 0;
+        if (typeof val.toDate === 'function') return val.toDate().getTime();
+        if (val.seconds) return val.seconds * 1000;
+        if (val._seconds) return val._seconds * 1000;
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+      };
+      const dateA = getMs(a.updatedAt || a.createdAt);
+      const dateB = getMs(b.updatedAt || b.createdAt);
       return dateB - dateA;
     });
   }, [orders, services, search, statusFilter]);
 
-  const handleUpdateSupplierStatus = async (orderId: string, status: Order['supplierStatus'], tracking?: string) => {
+  const handleUpdateSupplierStatus = async (orderId: string, status: string, tracking?: string) => {
+    setIsUpdating(true);
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const newOrderStatus = status === 'pending' ? 'confirmed' :
+                             status === 'in_production' ? 'in_progress' :
+                             status === 'shipped' ? 'completed' :
+                             status === 'delivered' ? 'delivered' :
+                             order.status;
+
+      const typedStatus = status as 'pending' | 'in_production' | 'shipped' | 'delivered';
+
+      await dbService.orders.save({
+        id: orderId,
+        status: newOrderStatus,
+        supplierStatus: typedStatus, // Keeping this for backwards compatibility if needed
+        trackingNumber: tracking || undefined,
+        updatedAt: new Date()
+      });
+
+      // Trigger notification if status changed
+      if (order.status !== newOrderStatus) {
+        const client = users.find(u => u.uid === order.userId || u.uid === order.user_id) || null;
+        await notificationService.notifyPrintingStatusChange(
+          { ...order, status: newOrderStatus, supplierStatus: typedStatus, trackingNumber: tracking }, 
+          newOrderStatus, 
+          client
+        );
+      }
+
+      toast.success('Statut mis à jour et client notifié');
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, status: newOrderStatus, trackingNumber: tracking } : null);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Erreur lors de la mise à jour');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleUpdatePartnerInvoiceStatus = async (orderId: string, status: 'paid' | 'rejected') => {
     setIsUpdating(true);
     try {
       const order = orders.find(o => o.id === orderId);
@@ -55,28 +119,24 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
 
       await dbService.orders.save({
         id: orderId,
-        supplierStatus: status,
-        trackingNumber: tracking || undefined,
+        partnerInvoiceStatus: status,
+        isPartnerPaid: status === 'paid',
+        partnerPaidAt: status === 'paid' ? new Date() : null,
         updatedAt: new Date()
       });
 
-      // Trigger notification if status changed
-      if (order.supplierStatus !== status) {
-        const client = users.find(u => u.uid === order.userId || u.uid === order.user_id) || null;
-        await notificationService.notifyPrintingStatusChange(
-          { ...order, supplierStatus: status, trackingNumber: tracking }, 
-          status || 'pending', 
-          client
-        );
+      if (status === 'paid') {
+        toast.success('Facture validée et marquée comme payée !');
+      } else {
+        toast.success('Facture rejetée. Le partenaire en sera informé.');
       }
 
-      toast.success('Statut mis à jour et client notifié');
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder(prev => prev ? { ...prev, supplierStatus: status, trackingNumber: tracking } : null);
-      }
+      // Notify Partner
+      const partner = users.find(u => u.uid === order.partnerId || u.uid === order.userId) || null;
+      await notificationService.notifyPartnerInvoiceStatusChange(order, status, partner);
     } catch (error) {
       console.error(error);
-      toast.error('Erreur lors de la mise à jour');
+      toast.error('Erreur lors de la validation de la facture');
     } finally {
       setIsUpdating(false);
     }
@@ -136,7 +196,7 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
             <span className="text-sm font-bold text-gray-500">À traiter</span>
           </div>
           <p className="text-2xl font-black text-gray-900">
-            {printingOrders.filter(o => !o.supplierStatus || o.supplierStatus === 'pending').length}
+            {printingOrders.filter(o => o.status === 'confirmed' || (o.status !== 'in_progress' && o.status !== 'completed' && o.status !== 'delivered' && o.status !== 'cancelled' && o.pillar !== 'studio')).length}
           </p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
@@ -147,7 +207,7 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
             <span className="text-sm font-bold text-gray-500">En production</span>
           </div>
           <p className="text-2xl font-black text-gray-900">
-            {printingOrders.filter(o => o.supplierStatus === 'in_production').length}
+            {printingOrders.filter(o => o.status === 'in_progress').length}
           </p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
@@ -158,7 +218,7 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
             <span className="text-sm font-bold text-gray-500">En transit</span>
           </div>
           <p className="text-2xl font-black text-gray-900">
-            {printingOrders.filter(o => o.supplierStatus === 'shipped').length}
+            {printingOrders.filter(o => o.status === 'completed').length}
           </p>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
@@ -166,10 +226,10 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
             <div className="p-2 bg-emerald-50 rounded-xl">
               <CheckCircle className="w-5 h-5 text-emerald-600" />
             </div>
-            <span className="text-sm font-bold text-gray-500">Livrés</span>
+            <span className="text-sm font-bold text-gray-500">Livrée</span>
           </div>
           <p className="text-2xl font-black text-gray-900">
-            {printingOrders.filter(o => o.supplierStatus === 'delivered').length}
+            {printingOrders.filter(o => o.status === 'delivered').length}
           </p>
         </div>
       </div>
@@ -214,6 +274,7 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Client</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Produit</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Statut Imprimeur</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Facture Partenaire</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Actions</th>
               </tr>
             </thead>
@@ -228,7 +289,19 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
                       <div className="flex flex-col">
                         <span className="font-bold text-gray-900">#{order.id.slice(0, 8).toUpperCase()}</span>
                         <span className="text-[10px] text-gray-400 font-medium">
-                          {format(new Date(order.createdAt || 0), 'dd MMM yyyy', { locale: fr })}
+                          {(() => {
+                            let d: Date | null = null;
+                            const dt = order.createdAt;
+                            if (!dt) return '-';
+                            if (dt.toDate) d = dt.toDate();
+                            else if (dt.seconds) d = new Date(dt.seconds * 1000);
+                            else if (dt._seconds) d = new Date(dt._seconds * 1000);
+                            else {
+                              const parsed = new Date(dt);
+                              if (!isNaN(parsed.getTime())) d = parsed;
+                            }
+                            return d ? format(d, 'dd MMM yyyy', { locale: fr }) : 'Inconnu';
+                          })()}
                         </span>
                       </div>
                     </td>
@@ -255,6 +328,61 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
                       <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${getSupplierStatusColor(order.supplierStatus)}`}>
                         {getSupplierStatusLabel(order.supplierStatus)}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {order.partnerInvoiceUrl ? (
+                         <div className="flex flex-col gap-1.5">
+                            <a 
+                               href={order.partnerInvoiceUrl} 
+                               target="_blank" 
+                               rel="noreferrer"
+                               className="flex items-center gap-1.5 text-primary hover:text-primary-hover transition-colors"
+                            >
+                               <div className="p-1 bg-primary/5 rounded-lg">
+                                  <FileText size={14} className="text-primary" />
+                               </div>
+                               <span className="text-[10px] font-black uppercase tracking-widest underline italic">Facture Officielle</span>
+                            </a>
+                            <div className="flex items-center gap-2">
+                               <button
+                                  onClick={() => handleUpdatePartnerInvoiceStatus(order.id, 'paid')}
+                                  disabled={isUpdating || order.partnerInvoiceStatus === 'paid'}
+                                  className={`p-1.5 rounded-lg transition-all ${
+                                     order.partnerInvoiceStatus === 'paid' 
+                                     ? 'bg-emerald-50 text-emerald-300' 
+                                     : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                  }`}
+                                  title="Valider et Marquer Payé"
+                               >
+                                  <Check size={14} />
+                               </button>
+                               <button
+                                  onClick={() => handleUpdatePartnerInvoiceStatus(order.id, 'rejected')}
+                                  disabled={isUpdating || order.partnerInvoiceStatus === 'paid'}
+                                  className={`p-1.5 rounded-lg transition-all ${
+                                     order.partnerInvoiceStatus === 'paid'
+                                     ? 'bg-red-50 text-red-200'
+                                     : 'bg-red-50 text-red-600 hover:bg-red-100'
+                                  }`}
+                                  title="Rejeter"
+                               >
+                                  <XIcon size={14} />
+                               </button>
+                               <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                  order.partnerInvoiceStatus === 'paid' ? 'bg-emerald-100 text-emerald-700' : 
+                                  order.partnerInvoiceStatus === 'rejected' ? 'bg-red-100 text-red-700' : 
+                                  'bg-blue-100 text-blue-700'
+                               }`}>
+                                  {order.partnerInvoiceStatus === 'paid' ? 'Réglée' : order.partnerInvoiceStatus === 'rejected' ? 'Rejetée' : 'Reçue'}
+                               </span>
+                            </div>
+                         </div>
+                      ) : (
+                         <div className="flex items-center gap-2 text-gray-300">
+                            <Clock size={14} />
+                            <span className="text-[10px] font-bold uppercase italic">En attente partenaire</span>
+                         </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -330,7 +458,8 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
                   <h3 className="text-sm font-black uppercase tracking-widest text-gray-400">Mettre à jour le statut</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {(['pending', 'in_production', 'shipped', 'delivered'] as const).map((status) => (
-                      <button
+                      <motion.button
+                        layout
                         key={status}
                         onClick={() => handleUpdateSupplierStatus(selectedOrder.id, status)}
                         disabled={isUpdating}
@@ -345,7 +474,7 @@ export const PrintingManager: React.FC<PrintingManagerProps> = ({ orders, servic
                         {status === 'shipped' && <Truck className="w-5 h-5" />}
                         {status === 'delivered' && <CheckCircle className="w-5 h-5" />}
                         <span className="text-[10px] font-bold uppercase">{getSupplierStatusLabel(status)}</span>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 </div>

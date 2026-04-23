@@ -1995,8 +1995,16 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       
       if (selectedVariant && selectedVariant.productId) {
         // Option 1: Pricing from custom variant
-        const p = selectedVariant.minQuantityPrice || selectedVariant.price || selectedVariant.unitPrice || 0;
-        total = p;
+        const minQty = selectedVariant.minQuantity || 1;
+        const unitPrice = (selectedVariant.price || selectedVariant.unitPrice || 0) / minQty;
+        
+        // Apply tiered discount
+        let discount = 0;
+        if (selectedQuantity >= 500) discount = 0.20;
+        else if (selectedQuantity >= 250) discount = 0.10;
+        
+        total = Math.round(unitPrice * selectedQuantity * (1 - discount));
+        
         serviceIdForOrder = selectedVariant.productId;
         serviceImageForOrder = selectedVariant.thumbnail || '';
       } else {
@@ -2028,6 +2036,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         serviceId: serviceIdForOrder,
         serviceName: serviceNameForOrder,
         serviceImage: serviceImageForOrder,
+        pillar: 'studio',
         clientName: profile?.displayName || user.displayName || 'Client',
         clientEmail: user.email,
         status: 'pending',
@@ -2550,6 +2559,39 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     }
   }, [editingTextId]);
 
+  const handleAiAdjustElement = async (instruction: string) => {
+    if (selectedIds.length !== 1) {
+      toast.error("Veuillez sélectionner un seul élément.");
+      return;
+    }
+    const targetElementId = selectedIds[0];
+    
+    setIsAiWriting(true);
+    try {
+      const suggestions = await geminiService.adjustElementProperty(elements, targetElementId, instruction);
+      
+      if (suggestions && suggestions.length > 0) {
+        setElements(prevElements => 
+          prevElements.map(el => {
+            const suggestion = suggestions.find(s => s.id === el.id);
+            if (suggestion) {
+              return { ...el, ...suggestion };
+            }
+            return el;
+          })
+        );
+        toast.success('Design ajusté par l\'IA !');
+      } else {
+        toast('L\'IA n\'a pas trouvé d\'ajustements nécessaires.', { icon: 'ℹ️' });
+      }
+    } catch (error) {
+      console.error("Error adjusting with AI:", error);
+      toast.error("Erreur lors de l'ajustement.");
+    } finally {
+      setIsAiWriting(false);
+    }
+  };
+
   const handleAiRewrite = async (action: 'improve' | 'professional' | 'translate') => {
     if (selectedIds.length !== 1) return;
     const selectedElement = elements.find(el => el.id === selectedIds[0]);
@@ -2930,67 +2972,38 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
           )}
           {activeTab === 'ai' && (
             <div className="space-y-6">
-              <h3 className="font-bold text-gray-900">Assistant IA</h3>
-              <p className="text-sm text-gray-500">Générez un design unique à partir d'une description textuelle.</p>
-              
-              {/* Prompt Area */}
-              <div className="bg-white border-2 border-primary/20 rounded-2xl p-4 shadow-sm focus-within:border-primary transition-all">
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Décrivez votre design de rêve"
-                  className="w-full h-24 bg-transparent border-none outline-none resize-none text-sm font-medium placeholder:text-gray-400"
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`p-2 transition-colors ${uploadedImage ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}
-                  >
-                    <ImageIcon className="w-5 h-5" />
-                  </button>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handlePromptImageUpload} 
-                    className="hidden" 
-                    accept="image/*" 
-                  />
-                  <button className="p-2 text-gray-400 hover:text-primary transition-colors">
-                    <Mic className="w-5 h-5" />
-                  </button>
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900">Assistant IA</h3>
+                <button onClick={() => setActiveTab('templates')} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
               </div>
 
-              <button 
-                onClick={async () => {
-                  if (!prompt) return;
-                  setIsSubmitting(true);
-                  try {
-                    const generatedElements = await generateDesign(prompt, uploadedImage || undefined);
-                    setElements(generatedElements);
-                    setUploadedImage(null); // Clear image after generation
-                    setIsMobileSidebarOpen(false);
-                    
-                    // Track AI usage for the current user's tenant
-                    if (user) {
-                      // In a real SaaS, you'd get the actual tenantId from the user's context
-                      // For now, we use the user's UID as their personal tenant ID
-                      trackUsage(user.uid, 'ai_generations');
-                    }
-                  } finally {
-                    setIsSubmitting(false);
-                  }
-                }}
-                disabled={isSubmitting}
-                className="w-full py-3.5 bg-white border-2 border-gray-100 rounded-xl flex items-center justify-center space-x-2 hover:border-primary hover:text-primary transition-all group font-bold text-sm shadow-sm disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4 text-primary group-hover:animate-pulse" />
-                )}
-                <span>{isSubmitting ? 'Génération...' : 'Générer le design'}</span>
-              </button>
+              {/* Ajustement Élément (Nouveau) */}
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1 ml-1">Ajuster l'élément sélectionné</label>
+                <input
+                  type="text"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="ex: rend ce texte plus grand..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 outline-none font-bold text-sm"
+                />
+                <button
+                  onClick={() => handleAiAdjustElement(prompt)}
+                  disabled={isAiWriting || selectedIds.length !== 1}
+                  className="w-full py-3 bg-purple-600 text-white rounded-xl font-black text-sm hover:bg-purple-700 transition-all disabled:opacity-50"
+                >
+                  {isAiWriting ? 'Analyse...' : 'Appliquer l\'ajustement'}
+                </button>
+              </div>
+
+              {/* Réécriture Texte (Existant mais déplacé/intégré) */}
+              <div className="pt-4 border-t border-gray-100 space-y-4">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Réécriture de texte</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => handleAiRewrite('improve')} disabled={isAiWriting} className="p-2 bg-gray-50 rounded-lg hover:bg-gray-100 font-bold text-xs">Améliorer</button>
+                  <button onClick={() => handleAiRewrite('professional')} disabled={isAiWriting} className="p-2 bg-gray-50 rounded-lg hover:bg-gray-100 font-bold text-xs">Pro</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -4339,7 +4352,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
                               >
                                 {opt.label}
                                 {opt.priceModifier > 0 && (
-                                  <span className="ml-1 text-[8px] opacity-70">+{opt.priceModifier} €</span>
+                                  <span className="ml-1 text-[8px] opacity-70">+{opt.priceModifier} FCFA</span>
                                 )}
                               </button>
                             ))}
@@ -4374,13 +4387,14 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
                           <span className="font-mono font-bold text-gray-900">
                             {(() => {
                                if (selectedVariant && selectedVariant.productId) {
-                                 const p = selectedVariant.minQuantityPrice || selectedVariant.price || selectedVariant.unitPrice || 0;
-                                 return p.toLocaleString();
+                                 const minQty = selectedVariant.minQuantity || 1;
+                                 const unitPrice = (selectedVariant.price || selectedVariant.unitPrice || 0) / minQty;
+                                 return Math.round(unitPrice * selectedQuantity).toLocaleString();
                                }
                                const s = SERVICES.find(s => s.id === selectedServiceId);
                                const tier = s?.quantityTiers?.find(t => t.quantity === selectedQuantity);
                                return (tier?.price || 0).toLocaleString();
-                            })()} €
+                            })()} FCFA
                           </span>
                         </div>
                         <div className="flex justify-between text-[11px]">
@@ -4396,7 +4410,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
                                 if (o) mod += o.priceModifier;
                               });
                               return mod.toLocaleString();
-                            })()} €
+                            })()} FCFA
                           </span>
                         </div>
                         <div className="pt-4 border-t border-gray-200">
@@ -4405,9 +4419,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
                             <span className="text-2xl font-black text-primary">
                               {(() => {
                                 if (selectedVariant && selectedVariant.productId) {
-                                 const p = selectedVariant.minQuantityPrice || selectedVariant.price || selectedVariant.unitPrice || 0;
-                                 return p.toLocaleString();
-                               }
+                                  const minQty = selectedVariant.minQuantity || 1;
+                                  const unitPrice = (selectedVariant.price || selectedVariant.unitPrice || 0) / minQty;
+                                  let discount = 0;
+                                  if (selectedQuantity >= 500) discount = 0.20;
+                                  else if (selectedQuantity >= 250) discount = 0.10;
+                                  return Math.round(unitPrice * selectedQuantity * (1 - discount)).toLocaleString();
+                                }
                                 const s = SERVICES.find(s => s.id === selectedServiceId);
                                 const tier = s?.quantityTiers?.find(t => t.quantity === selectedQuantity);
                                 let mod = 0;
@@ -4417,7 +4435,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
                                   if (o) mod += o.priceModifier;
                                 });
                                 return ((tier?.price || 0) + mod).toLocaleString();
-                              })()} €
+                              })()} FCFA
                             </span>
                           </div>
                         </div>

@@ -485,8 +485,6 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
                 className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink appearance-none bg-white"
               >
                 <option value="FCFA">FCFA</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="USD">USD ($)</option>
               </select>
             </div>
             
@@ -1157,7 +1155,7 @@ const MerchantDashboard = ({
           </div>
           
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">

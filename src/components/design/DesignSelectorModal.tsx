@@ -387,7 +387,7 @@ const TemplateCard = ({
         )}
         {item.price && (
           <p className="text-sm font-black text-primary mt-1">
-            À partir de {item.price}€
+            À partir de {item.price} FCFA
           </p>
         )}
       </div>

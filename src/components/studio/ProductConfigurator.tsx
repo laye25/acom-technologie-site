@@ -25,9 +25,13 @@ const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 }) => {
   const [quantity, setQuantity] = useState(100);
 
-  const totalPrice = useMemo(() => {
-    return (variant.price * quantity / 100).toFixed(2); // Simple pricing logic for demo
+  const totalPriceNum = useMemo(() => {
+    const minQty = variant.minQuantity || 1;
+    const unitPrice = variant.price / minQty;
+    return Math.round(unitPrice * quantity);
   }, [quantity, variant]);
+  
+  const totalPrice = totalPriceNum.toLocaleString();
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -44,7 +48,7 @@ const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         <div className="flex items-center space-x-3 md:space-x-4">
           <div className="text-right">
             <p className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest">Prix Total</p>
-            <p className="text-lg md:text-2xl font-black text-primary">{totalPrice} €</p>
+            <p className="text-lg md:text-2xl font-black text-primary">{totalPrice} FCFA</p>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -151,7 +155,7 @@ const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
                     }`}
                   >
                     <span>{q}</span>
-                    <span className="text-[9px] opacity-60">{(variant.price * q / 100).toFixed(0)}€</span>
+                    <span className="text-[9px] opacity-60">{(variant.price * q).toFixed(0)} FCFA</span>
                   </button>
                 ))}
               </div>

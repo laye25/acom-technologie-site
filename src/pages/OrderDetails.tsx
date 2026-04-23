@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
-import { Order, Service, UserProfile, OrderStatus, PaymentRecord } from '../types';
+import { Order, Service, UserProfile, OrderStatus, PaymentRecord, PartnerRating } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { loadStripe } from '@stripe/stripe-js';
@@ -36,6 +36,9 @@ import {
   Banknote,
   Sparkles,
   Settings,
+  Search,
+  Printer,
+  Star,
   Smartphone,
   Lock as LockIcon
 } from 'lucide-react';
@@ -49,6 +52,7 @@ import { getOrderDiscountedTotal, isPromotionActive } from '../lib/promotions';
 import { OrderAIAnalysis } from '../components/admin/OrderAIAnalysis';
 import { OrderDraftDisplay } from '../components/OrderDraftDisplay';
 import { OptimizedImage } from '../components/OptimizedImage';
+import { PartnerRatingComponent } from '../components/PartnerRatingComponent';
 
 const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 console.log('DEBUG STRIPE KEY:', stripeKey ? 'DEFINED' : 'UNDEFINED');
@@ -68,10 +72,53 @@ const OrderDetails = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showAddDeliverable, setShowAddDeliverable] = useState(false);
   const [isEditingFinance, setIsEditingFinance] = useState(false);
+  const [isEditingPartnerPayout, setIsEditingPartnerPayout] = useState(false);
   const [tempPrice, setTempPrice] = useState<number>(0);
   const [tempCoupon, setTempCoupon] = useState<number>(0);
+  const [tempPartnerEarnings, setTempPartnerEarnings] = useState<number>(0);
+  const [tempProductionDeadline, setTempProductionDeadline] = useState<string>('');
   const [newDeliverable, setNewDeliverable] = useState({ title: '', description: '', fileUrl: '' });
   const [isSubmittingDeliverable, setIsSubmittingDeliverable] = useState(false);
+  const [isAssigningPartner, setIsAssigningPartner] = useState(false);
+  const [partnerSearch, setPartnerSearch] = useState('');
+
+  const { data: allPartners } = useFirestoreData<UserProfile>({
+    tableName: 'users',
+    skip: !isAdmin && !isManager
+  });
+
+  const { data: allRatings } = useFirestoreData<PartnerRating>({
+    tableName: 'partner_ratings',
+    skip: !isAdmin && !isManager
+  });
+
+  const partnerReputations = useMemo(() => {
+    if (!allPartners || !allRatings) return [];
+    return allPartners.filter(u => u.role === 'printer' || u.role === 'designer').map(p => {
+      const pRatings = allRatings.filter(r => r.partnerId === p.uid);
+      const avg = pRatings.length > 0 ? pRatings.reduce((acc, r) => acc + r.score, 0) / pRatings.length : 0;
+      return { ...p, avgScore: avg, totalRatings: pRatings.length };
+    }).sort((a, b) => b.avgScore - a.avgScore);
+  }, [allPartners, allRatings]);
+
+  const handleAssignPartner = async (pId: string) => {
+    try {
+      const partner = allPartners?.find(p => p.uid === pId);
+      const commission = partner?.partnerDetails?.commissionPercentage || 80;
+      const earnings = Math.round((order?.totalPrice || 0) * (commission / 100));
+
+      await dbService.orders.save({
+        id: orderId!,
+        partnerId: pId,
+        partnerEarnings: order?.partnerEarnings ? order.partnerEarnings : earnings,
+        updatedAt: new Date()
+      });
+      toast.success('Partenaire assigné et revenus calculés !');
+      setIsAssigningPartner(false);
+    } catch (err) {
+      toast.error('Erreur lors de l\'assignation.');
+    }
+  };
 
   const orderOptions = useMemo(() => ({
     tableName: 'orders' as TableName,
@@ -209,7 +256,15 @@ const OrderDetails = () => {
   const [accepting, setAccepting] = React.useState(false);
 
   const handleCreatePaymentIntent = async (amount: number, type: 'deposit' | 'balance' | 'full') => {
-    if (!order || !amount) return;
+    console.log('DEBUG: handleCreatePaymentIntent called', { orderId: order?.id, amount, type });
+    if (!order) {
+      console.error('DEBUG: No order');
+      return;
+    }
+    if (!amount) {
+       console.error('DEBUG: Amount is 0 or undefined', { amount, discountedTotal: getOrderDiscountedTotal(order, service) });
+       // Proceed anyway to see if it works or fails server-side
+    }
     
     if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
       toast.error('Le système de paiement n\'est pas encore configuré.');
@@ -220,6 +275,8 @@ const OrderDetails = () => {
     // If it's a full payment, we pay 100% of the discounted total
     const discountedTotal = getOrderDiscountedTotal(order, service);
     const amountToPay = type === 'full' ? discountedTotal : discountedTotal * 0.5;
+    
+    console.log('DEBUG: Calculated amountToPay', { discountedTotal, amountToPay });
 
     setPaymentType(type);
     setAmountToPay(amountToPay);
@@ -236,6 +293,7 @@ const OrderDetails = () => {
       });
 
       const data = await response.json();
+      console.log('DEBUG: server response', data);
       if (data.error) throw new Error(data.error);
       
       setClientSecret(data.clientSecret);
@@ -515,16 +573,55 @@ const OrderDetails = () => {
   const handleUpdateFinance = async () => {
     if (!order) return;
     try {
+      let updatedEarnings = order.partnerEarnings;
+      if (order.partnerId) {
+        const partner = allPartners?.find(p => p.uid === order.partnerId);
+        const commission = partner?.partnerDetails?.commissionPercentage || 80;
+        updatedEarnings = Math.round(tempPrice * (commission / 100));
+      }
+
       await dbService.orders.save({ 
         ...order, 
         totalPrice: tempPrice, 
         couponDiscount: tempCoupon,
+        partnerEarnings: updatedEarnings,
         updatedAt: new Date() 
       });
       setIsEditingFinance(false);
-      toast.success('Informations financières mises à jour !');
+      toast.success('Finances et revenus partenaires synchronisés !');
     } catch (err) {
       toast.error('Erreur lors de la mise à jour.');
+    }
+  };
+
+  const handleUpdatePartnerPayout = async () => {
+    if (!order) return;
+    try {
+      await dbService.orders.save({
+        id: order.id,
+        partnerEarnings: tempPartnerEarnings,
+        productionDeadline: tempProductionDeadline ? new Date(tempProductionDeadline) : null,
+        updatedAt: new Date()
+      });
+      setIsEditingPartnerPayout(false);
+      toast.success('Rémunération et délai mis à jour !');
+    } catch (err) {
+      toast.error('Erreur lors de la mise à jour.');
+    }
+  };
+
+  const handleMarkPartnerAsPaid = async () => {
+    if (!order || !order.id) return;
+    try {
+      await dbService.orders.save({
+        id: order.id,
+        isPartnerPaid: true,
+        partnerPaidAt: new Date(),
+        updatedAt: new Date()
+      });
+      toast.success('Partenaire marqué comme réglé !');
+    } catch (err) {
+      toast.error('Erreur lors de l\'opération.');
     }
   };
 
@@ -1055,26 +1152,57 @@ const OrderDetails = () => {
                     </div>
                   </a>
                 )}
-                {Object.entries(order.details || {}).map(([key, value]) => (
-                  <div key={key} className="p-4 sm:p-6 bg-gray-50 rounded-3xl border border-black/5">
-                    <span className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}
-                    </span>
-                    <p className="text-gray-900 font-bold text-sm sm:text-base break-all">
-                      {typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : String(value)}
-                    </p>
-                  </div>
-                ))}
-                {Object.entries(order.customOptions || {}).map(([key, value]) => (
-                  <div key={key} className="p-4 sm:p-6 bg-primary-light/30 rounded-3xl border border-primary/10">
-                    <span className="text-[9px] sm:text-[10px] font-black text-primary uppercase tracking-widest block mb-2">
-                      {key.replace(/([A-Z])/g, ' $1').trim()}
-                    </span>
-                    <p className="text-gray-900 font-bold text-sm sm:text-base break-all">
-                      {typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : String(value)}
-                    </p>
-                  </div>
-                ))}
+                {Object.entries(order.details || {}).map(([key, value]) => {
+                  const isFile = key.toLowerCase().includes('url') || key.toLowerCase().includes('thumbnail') || key.toLowerCase().includes('sheet');
+                  const isImage = typeof value === 'string' && (value.startsWith('data:image') || value.match(/\.(jpeg|jpg|png|gif)$/i));
+                  const isPdf = typeof value === 'string' && (value.startsWith('data:application/pdf') || value.toLowerCase().endsWith('.pdf'));
+
+                  return (
+                    <div key={key} className="p-4 sm:p-6 bg-gray-50 rounded-3xl border border-black/5">
+                      <span className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </span>
+                      {isImage ? (
+                        <div className="mt-2 text-center">
+                          <img src={value as string} alt={key} className="max-w-full h-auto max-h-32 rounded-lg" />
+                        </div>
+                      ) : isPdf ? (
+                        <a href={value as string} target="_blank" rel="noopener noreferrer" className="text-primary font-bold text-sm flex items-center gap-2">
+                          Voir le document
+                        </a>
+                      ) : (
+                        <p className="text-gray-900 font-bold text-sm sm:text-base break-all">
+                          {typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : String(value)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+                {Object.entries(order.customOptions || {}).map(([key, value]) => {
+                  const isImage = typeof value === 'string' && (value.startsWith('data:image') || value.match(/\.(jpeg|jpg|png|gif)$/i));
+                  const isPdf = typeof value === 'string' && (value.startsWith('data:application/pdf') || value.toLowerCase().endsWith('.pdf'));
+
+                  return (
+                    <div key={key} className="p-4 sm:p-6 bg-primary-light/30 rounded-3xl border border-primary/10">
+                      <span className="text-[9px] sm:text-[10px] font-black text-primary uppercase tracking-widest block mb-2">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </span>
+                      {isImage ? (
+                        <div className="mt-2 text-center">
+                          <img src={value as string} alt={key} className="max-w-full h-auto max-h-32 rounded-lg" />
+                        </div>
+                      ) : isPdf ? (
+                        <a href={value as string} target="_blank" rel="noopener noreferrer" className="text-primary font-bold text-sm flex items-center gap-2">
+                          Voir le document
+                        </a>
+                      ) : (
+                        <p className="text-gray-900 font-bold text-sm sm:text-base break-all">
+                          {typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : String(value)}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </section>
 
@@ -1439,17 +1567,153 @@ const OrderDetails = () => {
                 ) : (
                   <div className="space-y-3">
                     {(isAdmin || isManager) && (
-                      <button 
-                        onClick={handleMarkAsPaid}
-                        className="w-full py-3 bg-emerald-600/10 text-emerald-600 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center border border-emerald-600/20"
-                      >
-                        <Banknote className="w-3 h-3 mr-2" />
-                        Marquer comme Payé (Admin)
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => setIsAssigningPartner(true)}
+                          className="w-full py-3 bg-indigo-600/10 text-indigo-600 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center border border-indigo-600/20"
+                        >
+                          <Printer className="w-3 h-3 mr-2" />
+                          {order.partnerId ? 'Changer de Partenaire' : 'Assigner un Partenaire'}
+                        </button>
+
+                        {order.partnerId && (
+                          <div className="flex items-center gap-3 p-3 bg-white/5 rounded-2xl border border-white/10">
+                            <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                              <User className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">Assigné à</p>
+                              <p className="text-xs font-bold text-white truncate">
+                                {allPartners.find(p => p.uid === order.partnerId)?.displayName || 'Partenaire ID: ' + (order.partnerId?.slice(0, 8))}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        <button 
+                          onClick={handleMarkAsPaid}
+                          className="w-full py-3 bg-emerald-600/10 text-emerald-600 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center border border-emerald-600/20"
+                        >
+                          <Banknote className="w-3 h-3 mr-2" />
+                          Marquer comme Payé (Admin)
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
               </div>
+
+              {/* Partner Payout Management (Visible only if partner assigned and not paid) */}
+              {(isAdmin || isManager) && order?.partnerId && (
+                <div className="mt-8 p-6 bg-gray-900 rounded-[2rem] text-white shadow-xl shadow-black/10">
+                   <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-primary" />
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-white/50">Gestion Reversement Partenaire</h4>
+                      </div>
+                      {!order.isPartnerPaid && (
+                        <button 
+                          onClick={() => {
+                            setTempPartnerEarnings(order.partnerEarnings || 0);
+                            const deadlineDate = order.productionDeadline?.toDate ? order.productionDeadline.toDate() : (order.productionDeadline ? new Date(order.productionDeadline) : null);
+                            setTempProductionDeadline(deadlineDate ? deadlineDate.toISOString().split('T')[0] : '');
+                            setIsEditingPartnerPayout(!isEditingPartnerPayout);
+                          }}
+                          className="p-2 hover:bg-white/10 rounded-xl transition-all text-white/40 hover:text-white"
+                        >
+                           <Settings size={14} />
+                        </button>
+                      )}
+                   </div>
+
+                   {isEditingPartnerPayout ? (
+                     <div className="space-y-4 bg-white/5 p-4 rounded-2xl border border-white/10">
+                         <div>
+                            <div className="flex justify-between items-center mb-1">
+                               <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest">Gains du Partenaire (CFA)</label>
+                               <button 
+                                 type="button"
+                                 onClick={() => {
+                                   const partner = allPartners.find(p => p.uid === order?.partnerId);
+                                   const comm = partner?.partnerDetails?.commissionPercentage || 80;
+                                   setTempPartnerEarnings(Math.round((order?.totalPrice || 0) * (comm / 100)));
+                                   toast.success(`Calculé à ${comm}% du total`);
+                                 }}
+                                 className="text-[8px] font-black text-primary uppercase underline hover:text-primary-light"
+                               >
+                                 Auto-Sync
+                               </button>
+                            </div>
+                            <input 
+                              type="number"
+                              value={tempPartnerEarnings}
+                              onChange={(e) => setTempPartnerEarnings(Number(e.target.value))}
+                              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary/40 text-white"
+                            />
+                         </div>
+
+                         <div>
+                            <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Date Limite de Production</label>
+                            <input 
+                              type="date"
+                              value={tempProductionDeadline}
+                              onChange={(e) => setTempProductionDeadline(e.target.value)}
+                              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary/40 text-white"
+                            />
+                         </div>
+
+                        <div className="flex gap-2">
+                           <button 
+                             onClick={handleUpdatePartnerPayout}
+                             className="flex-1 py-2 bg-primary text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all"
+                           >
+                             Valider
+                           </button>
+                           <button 
+                             onClick={() => setIsEditingPartnerPayout(false)}
+                             className="flex-1 py-2 bg-white/10 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-white/20 transition-all"
+                           >
+                              Fermer
+                           </button>
+                        </div>
+                     </div>
+                   ) : (
+                     <div className="space-y-4">
+                        <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
+                           <div className="min-w-0">
+                              <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-1 text-left">
+                                Montant Estimé ({allPartners.find(p => p.uid === order.partnerId)?.partnerDetails?.commissionPercentage || 80}%)
+                              </p>
+                              <p className="text-lg font-black text-white truncate">
+                                {order.partnerEarnings ? `${order.partnerEarnings.toLocaleString()} CFA` : 'À définir'}
+                              </p>
+                           </div>
+                           <div className={`px-4 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex-shrink-0 ${order.isPartnerPaid ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                              {order.isPartnerPaid ? 'Virement Réglé' : 'En attente'}
+                           </div>
+                        </div>
+
+                        {order.partnerEarnings && !order.isPartnerPaid && (
+                           <button 
+                             onClick={handleMarkPartnerAsPaid}
+                             className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2"
+                           >
+                              <Banknote size={16} />
+                              Valider le virement effectué
+                           </button>
+                        )}
+                        
+                        {order.isPartnerPaid && (
+                           <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center">
+                              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">
+                                Paiement validé le {new Date(order.partnerPaidAt?.seconds * 1000).toLocaleDateString()}
+                              </p>
+                           </div>
+                        )}
+                     </div>
+                   )}
+                </div>
+              )}
             </div>
 
             <div className="p-6 bg-primary-light rounded-3xl border border-primary/10">
@@ -1500,10 +1764,109 @@ const OrderDetails = () => {
             </div>
           </div>
         </div>
+
+        {/* Rating Section - Intelligent Integration */}
+        {order.status === 'delivered' && !isAdmin && !isManager && (
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-12"
+          >
+            <PartnerRatingComponent order={order} />
+          </motion.div>
+        )}
       </div>
 
       {/* Payment Modal */}
       <AnimatePresence>
+        {isAssigningPartner && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Assigner un Partenaire</h3>
+                  <p className="text-sm text-gray-500">Choisissez le meilleur partenaire pour ce projet</p>
+                </div>
+                <button 
+                  onClick={() => setIsAssigningPartner(false)}
+                  className="p-3 hover:bg-white rounded-2xl shadow-sm border border-gray-200 transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    placeholder="Filtrer les partenaires..."
+                    value={partnerSearch}
+                    onChange={(e) => setPartnerSearch(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none font-bold transition-all"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  {partnerReputations
+                    .filter(p => !partnerSearch || p.displayName?.toLowerCase().includes(partnerSearch.toLowerCase()))
+                    .map((p, idx) => (
+                    <button
+                      key={p.uid}
+                      onClick={() => handleAssignPartner(p.uid!)}
+                      className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-4 group ${
+                        order.partnerId === p.uid 
+                          ? 'border-primary bg-primary-light/5' 
+                          : 'border-gray-50 bg-gray-50 hover:border-primary/30 hover:bg-white'
+                      }`}
+                    >
+                      <div className="relative">
+                        <div className="w-12 h-12 bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100">
+                          {p.photoURL ? (
+                            <img src={p.photoURL} alt={p.displayName} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-300">
+                              <Printer size={20} />
+                            </div>
+                          )}
+                        </div>
+                        {idx === 0 && (
+                          <div className="absolute -top-1 -right-1 bg-amber-400 text-white p-0.5 rounded-full border border-white">
+                            <Star size={10} fill="currentColor" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="text-left flex-1">
+                        <h4 className="font-bold text-gray-900 leading-tight">{p.displayName}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-black uppercase text-primary tracking-widest">{p.role === 'printer' ? 'Imprimeur' : 'Designer'}</span>
+                          <span className="text-[10px] text-gray-300">•</span>
+                          <div className="flex items-center gap-0.5">
+                            <Star size={10} className="text-amber-400 fill-amber-400" />
+                            <span className="text-[10px] font-bold text-gray-500">{p.avgScore.toFixed(1)} ({p.totalRatings})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {order.partnerId === p.uid && (
+                        <div className="p-2 bg-primary text-white rounded-lg">
+                          <CheckCircle size={16} />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {showPaymentModal && clientSecret && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
             <motion.div

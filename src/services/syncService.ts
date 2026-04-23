@@ -16,22 +16,22 @@ export const syncService = {
     if (!(await this.isOnline())) return;
 
     try {
-      const localSales = await db.sales.where('merchantId').equals(merchantId).toArray();
-      for (const sale of localSales) {
-        if (sale.id) {
-          await merchantSaleRepository.update(sale.id, sale as any);
-        } else {
-          await merchantSaleRepository.create(sale as any);
-        }
+      const lastSyncKey = `last_sync_sales_${merchantId}`;
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      const constraints: any[] = [where('merchant_id', '==', merchantId)];
+      
+      if (lastSyncStr) {
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
-      const remoteSales = await merchantSaleRepository.getAll([
-        where('merchant_id', '==', merchantId)
-      ]);
+      console.log(`Syncing sales... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      const remoteSales = await merchantSaleRepository.getAll(constraints);
 
-      if (remoteSales) {
+      if (remoteSales && remoteSales.length > 0) {
         await db.sales.bulkPut(remoteSales);
       }
+      
+      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync sales failed:', error);
     }
@@ -41,22 +41,22 @@ export const syncService = {
     if (!(await this.isOnline())) return;
 
     try {
-      const localExpenses = await db.expenses.where('merchantId').equals(merchantId).toArray();
-      for (const expense of localExpenses) {
-        if (expense.id) {
-          await merchantExpenseRepository.update(expense.id, expense as any);
-        } else {
-          await merchantExpenseRepository.create(expense as any);
-        }
+      const lastSyncKey = `last_sync_expenses_${merchantId}`;
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      const constraints: any[] = [where('merchant_id', '==', merchantId)];
+      
+      if (lastSyncStr) {
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
-      const remoteExpenses = await merchantExpenseRepository.getAll([
-        where('merchant_id', '==', merchantId)
-      ]);
+      console.log(`Syncing expenses... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      const remoteExpenses = await merchantExpenseRepository.getAll(constraints);
 
-      if (remoteExpenses) {
+      if (remoteExpenses && remoteExpenses.length > 0) {
         await db.expenses.bulkPut(remoteExpenses);
       }
+      
+      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync expenses failed:', error);
     }
@@ -65,13 +65,25 @@ export const syncService = {
   async syncOrders(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      console.log('Syncing orders from Firebase...');
-      const remoteOrders = await orderRepository.getAll();
+      const lastSyncKey = 'last_sync_orders';
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      const constraints: any[] = [];
+      
+      if (lastSyncStr) {
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      }
+      
+      console.log(`Syncing orders from Firebase... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      const remoteOrders = await orderRepository.getAll(constraints);
       console.log('Orders fetched from Firebase:', remoteOrders?.length || 0);
-      if (remoteOrders) {
+      
+      if (remoteOrders && remoteOrders.length > 0) {
         await db.orders.bulkPut(remoteOrders);
         console.log('Orders synced to Dexie successfully');
       }
+      
+      // Save sync time, subtract 1 minute to avoid missing edge-case writes during fetch
+      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync orders failed:', error);
     }
@@ -80,10 +92,20 @@ export const syncService = {
   async syncServices(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      const remoteServices = await serviceRepository.getAll([
-        where('merchant_id', '==', merchantId)
-      ]);
-      if (remoteServices) await db.services.bulkPut(remoteServices);
+      const lastSyncKey = `last_sync_services_${merchantId}`;
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      const constraints: any[] = [where('merchant_id', '==', merchantId)];
+      
+      if (lastSyncStr) {
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      }
+
+      console.log(`Syncing services... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      const remoteServices = await serviceRepository.getAll(constraints);
+      if (remoteServices && remoteServices.length > 0) {
+        await db.services.bulkPut(remoteServices);
+      }
+      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync services failed:', error);
     }
@@ -92,10 +114,20 @@ export const syncService = {
   async syncUsers(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
-      const remoteUsers = await userRepository.getAll([
-        where('merchant_id', '==', merchantId)
-      ]);
-      if (remoteUsers) await db.users.bulkPut(remoteUsers);
+      const lastSyncKey = `last_sync_users_${merchantId}`;
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      const constraints: any[] = [where('merchant_id', '==', merchantId)];
+      
+      if (lastSyncStr) {
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      }
+
+      console.log(`Syncing users... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      const remoteUsers = await userRepository.getAll(constraints);
+      if (remoteUsers && remoteUsers.length > 0) {
+        await db.users.bulkPut(remoteUsers);
+      }
+      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync users failed:', error);
     }
@@ -104,12 +136,20 @@ export const syncService = {
   async syncSettings(merchantId: string) {
     if (!(await this.isOnline())) return;
     try {
+      const lastSyncKey = `last_sync_settings_${merchantId}`;
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      const constraints: any[] = []; // settings are often global or limited, assuming global for repo
+
+      if (lastSyncStr) {
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      }
+
       const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
         protected collectionName = 'settings';
       })();
-      const remoteSettings = await repo.getAll();
+      const remoteSettings = await repo.getAll(constraints);
       
-      if (remoteSettings) {
+      if (remoteSettings && remoteSettings.length > 0) {
         // Map data if it's wrapped in a 'data' column
         const mappedSettings = remoteSettings.map((s: any) => {
           if (s.data && typeof s.data === 'object') {
@@ -119,6 +159,7 @@ export const syncService = {
         });
         await db.settings.bulkPut(mappedSettings);
       }
+      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync settings failed:', error);
     }

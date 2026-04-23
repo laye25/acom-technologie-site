@@ -19,6 +19,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isManager: boolean;
+  isPartner: boolean;
   isSuperAdmin: boolean;
   syncCustomClaims: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -34,6 +35,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isManager: false,
+  isPartner: false,
   isSuperAdmin: false,
   syncCustomClaims: async () => {},
   signInWithEmail: async () => {},
@@ -130,6 +132,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           displayName: data.display_name || currentUser.displayName || 'Utilisateur',
           photoURL: data.photo_url || currentUser.photoURL || '',
           role: data.role || expectedRole,
+          partnerStatus: data.partnerStatus,
+          partnerDetails: data.partnerDetails,
           createdAt: data.created_at?.toDate() || new Date()
         });
       } else {
@@ -238,6 +242,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     resetPassword,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const isPartner = profile?.role === 'printer' || profile?.role === 'designer';
+
+  return <AuthContext.Provider value={{ ...value, isPartner }}>{children}</AuthContext.Provider>;
 };
 

@@ -116,26 +116,31 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || hasAnyAdminRole();
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || hasAnyAdminRole();
     }
     
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || hasAnyAdminRole());
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || hasAnyAdminRole() || (isPartner() && (resource.data.partner_id == request.auth.uid || resource.data.partnerId == request.auth.uid)));
       // Règle assouplie pour le test
       allow create: if isAuthenticated(); 
       allow update: if hasAnyAdminRole() || (
         isAuthenticated() && 
-        (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid) &&
-        request.resource.data.user_id == resource.data.user_id &&
-        request.resource.data.userId == resource.data.userId &&
-        // Ensure created_at cannot be modified
-        (request.resource.data.created_at == resource.data.created_at || request.resource.data.createdAt == resource.data.createdAt) &&
-        // Restrict allowed modification fields
-        request.resource.data.diff(resource.data).changedKeys().hasOnly([
-          'status', 'paid', 'deposit_paid', 'deposit_amount', 'deposit_paid_at', 
-          'balance_paid', 'balance_amount', 'balance_paid_at', 'paid_at', 
-          'updated_at', 'updatedAt', 'payment_method', 'payment_id', 'payments'
-        ])
+        (
+            // Partner access: only allowed fields
+             (isPartner() && (resource.data.partner_id == request.auth.uid || resource.data.partnerId == request.auth.uid) && request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'supplierStatus', 'trackingNumber', 'updatedAt', 'updated_at'])) ||
+             // User/Owner access
+             ((resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid) &&
+              request.resource.data.user_id == resource.data.user_id &&
+              request.resource.data.userId == resource.data.userId &&
+              // Ensure created_at cannot be modified
+              (request.resource.data.created_at == resource.data.created_at || request.resource.data.createdAt == resource.data.createdAt) &&
+              // Restrict allowed modification fields
+              request.resource.data.diff(resource.data).changedKeys().hasOnly([
+                'status', 'paid', 'deposit_paid', 'deposit_amount', 'deposit_paid_at', 
+                'balance_paid', 'balance_amount', 'balance_paid_at', 'paid_at', 
+                'updated_at', 'updatedAt', 'payment_method', 'payment_id', 'payments'
+              ]))
+        )
       );
       allow delete: if isAdmin();
     }
@@ -160,8 +165,24 @@ service cloud.firestore {
     }
     
     match /messages/{messageId} {
-      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || hasAnyAdminRole());
-      allow create: if isAuthenticated() && (request.resource.data.user_id == request.auth.uid || request.resource.data.userId == request.auth.uid);
+      // Allow reading if the user is the sender, the client, an admin, or the partner assigned to the associated order
+      allow read: if isAuthenticated() && (
+        resource.data.user_id == request.auth.uid || 
+        resource.data.userId == request.auth.uid || 
+        resource.data.clientUid == request.auth.uid ||
+        resource.data.senderId == request.auth.uid ||
+        hasAnyAdminRole() ||
+        (resource.data.orderId != null && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.partner_id == request.auth.uid) ||
+        (resource.data.orderId != null && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.partnerId == request.auth.uid) ||
+        (resource.data.orderId != null && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.user_id == request.auth.uid) ||
+        (resource.data.orderId != null && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.userId == request.auth.uid)
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.user_id == request.auth.uid || 
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.clientUid == request.auth.uid ||
+        request.resource.data.senderId == request.auth.uid
+      );
       allow delete: if isAdmin();
     }
 
@@ -175,6 +196,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    function isPartner() {
+      return isAuthenticated() && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'printer' || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'designer' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'partner'));
+    }
+
     // Merchant SaaS Collections
     match /merchants/{merchantId} {
       allow read: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
@@ -185,6 +214,31 @@ service cloud.firestore {
         isAdmin()
       );
       allow delete: if isAdmin();
+    }
+
+    // Match /partners
+    match /partners/{partnerId} {
+      allow read: if isOwner(partnerId) || hasAnyAdminRole();
+      allow write: if hasAnyAdminRole();
+    }
+
+    // Match /ratings
+    // Match /partner_ratings
+    match /partner_ratings/{ratingId} {
+      allow read: if hasAnyAdminRole() || (isAuthenticated() && resource.data.partnerId == request.auth.uid);
+      allow create: if isAuthenticated() && 
+                      request.resource.data.keys().hasAll(['orderId', 'partnerId', 'score']) &&
+                      (request.resource.data.keys().hasAny(['createdAt', 'created_at'])) &&
+                      request.resource.data.keys().size() <= 10 && 
+                      request.resource.data.score >= 1 && request.resource.data.score <= 5 &&
+                      (request.resource.data.get('createdAt', request.resource.data.get('created_at', request.time)) == request.time);
+      allow update, delete: if isAdmin();
+    }
+
+    match /ratings/{ratingId} {
+      allow read: if hasAnyAdminRole() || (isAuthenticated() && resource.data.partner_id == request.auth.uid);
+      allow create: if isAuthenticated(); // Client can rate
+      allow write: if hasAnyAdminRole();
     }
 
     match /merchant_stats/{merchantId} {

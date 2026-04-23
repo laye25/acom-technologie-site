@@ -18,17 +18,37 @@ import { ImageService } from '../../data/services/image.service';
 import { OptimizedImage } from '../OptimizedImage';
 import { ConfirmModal } from './ConfirmModal';
 import { useStudioAcom } from '../../hooks/useStudioAcom';
+import DesignRequestManager from './DesignRequestManager';
+import { PrintingManager } from './PrintingManager';
+import { PartnerReputationManager } from './PartnerReputationManager';
+import { UserManager } from './UserManager';
+import { Order, Service, UserProfile } from '../../types';
 
 const StudioAcomManager = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'categories' | 'products'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'designs' | 'impression' | 'partenaires' | 'utilisateurs'>('categories');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingItem, setEditingItem] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
-  const { categories, products, loading } = useStudioAcom(true);
+  const { categories, products, loading } = useStudioAcom(activeTab === 'categories' || activeTab === 'products');
+
+  const { data: allOrders } = useFirestoreData<Order>({
+    tableName: 'orders',
+    skip: activeTab !== 'impression'
+  });
+
+  const { data: allServices } = useFirestoreData<Service>({
+    tableName: 'services',
+    skip: activeTab !== 'impression'
+  });
+
+  const { data: allUsers } = useFirestoreData<UserProfile>({
+    tableName: 'users',
+    skip: activeTab !== 'impression'
+  });
 
   const loadingCats = loading;
   const loadingProducts = loading;
@@ -180,34 +200,75 @@ const StudioAcomManager = () => {
           >
             Produits
           </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-            />
-          </div>
           <button
-            onClick={() => {
-              setEditingItem(activeTab === 'categories' ? { name: '', sub: '', color: 'text-gray-600' } : { name: '', categoryId: categories[0]?.id || '', description: '', variants: [] });
-              setIsModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-all"
+            onClick={() => setActiveTab('designs')}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'designs' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>Ajouter</span>
+            Demandes Design
+          </button>
+          <button
+            onClick={() => setActiveTab('impression')}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'impression' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Impression
+          </button>
+          <button
+            onClick={() => setActiveTab('partenaires')}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'partenaires' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Partenaires
+          </button>
+          <button
+            onClick={() => setActiveTab('utilisateurs')}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeTab === 'utilisateurs' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Gestion Utilisateurs
           </button>
         </div>
+
+        {(activeTab === 'categories' || activeTab === 'products') && (
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+              />
+            </div>
+            <button
+              onClick={() => {
+                setEditingItem(activeTab === 'categories' ? { name: '', sub: '', color: 'text-gray-600' } : { name: '', categoryId: categories[0]?.id || '', description: '', variants: [] });
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary/90 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Ajouter</span>
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Content based on Tab */}
+      {activeTab === 'designs' && <DesignRequestManager />}
+      {activeTab === 'impression' && <PrintingManager orders={allOrders} services={allServices} users={allUsers} />}
+      {activeTab === 'partenaires' && <PartnerReputationManager />}
+      {activeTab === 'utilisateurs' && <UserManager />}
+
       {/* Grid */}
-      {filteredItems.length > 0 ? (
+      {(activeTab === 'categories' || activeTab === 'products') && (
+        filteredItems.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item: any) => (
             <motion.div
@@ -266,10 +327,13 @@ const StudioAcomManager = () => {
                 {/* Category Icon Badge */}
                 {activeTab === 'categories' && (
                   <div className="absolute top-3 left-3 px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-lg flex items-center gap-2 shadow-sm">
-                    {typeof item.icon === 'function' || typeof item.icon === 'object' ? (
+                    {typeof item.icon === 'function' ? (
                       <item.icon className={`w-4 h-4 ${item.color || 'text-primary'}`} />
+                    ) : item.icon && typeof item.icon === 'object' && 'type' in item.icon ? (
+                      item.icon
                     ) : (
-                      React.createElement(getIcon(item.icon), { className: `w-4 h-4 ${item.color || 'text-primary'}` })
+                      // Fallback: render the icon name or a default
+                      <span className="text-[10px]">{item.iconName || '📁'}</span>
                     )}
                     <span className="text-[10px] font-black uppercase tracking-wider text-gray-900">{item.id}</span>
                   </div>
@@ -335,7 +399,7 @@ const StudioAcomManager = () => {
             Commencez par ajouter un élément.
           </p>
         </div>
-      )}
+      ))}
 
       {/* Modal */}
       {isModalOpen && (
@@ -633,7 +697,7 @@ const StudioAcomManager = () => {
                                 </div>
                                 <div>
                                   <span className="font-black text-gray-900 block">{v.name || 'Sans nom'}</span>
-                                  <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">{v.size} • {v.price}€</span>
+                                  <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">{v.size} • {v.price} FCFA</span>
                                 </div>
                               </div>
                               <div className="flex items-center gap-3">
@@ -672,7 +736,7 @@ const StudioAcomManager = () => {
                                     <input type="text" value={v.size} onChange={(e) => updateVariant(index, { size: e.target.value })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
                                   </div>
                                   <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Prix (€)</label>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Prix (FCFA)</label>
                                     <input type="number" value={v.price} onChange={(e) => updateVariant(index, { price: parseFloat(e.target.value) })} className="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl focus:ring-2 focus:ring-purple-500/20 focus:bg-white focus:border-purple-200 outline-none font-bold text-sm transition-all" />
                                   </div>
                                 </div>
