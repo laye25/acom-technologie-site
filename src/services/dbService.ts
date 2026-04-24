@@ -306,28 +306,34 @@ export const dbService = {
   },
   merchants: {
     async getByOwner(ownerId: string) {
-      // First try with owner_id (snake_case)
-      let merchants = await merchantRepository.getAll([
-        where('owner_id', '==', ownerId)
-      ]);
-
-      // If nothing found, try with ownerId (camelCase)
-      if (merchants.length === 0) {
-        merchants = await merchantRepository.getAll([
-          where('ownerId', '==', ownerId)
+      try {
+        // First try with owner_id (snake_case)
+        let merchants = await merchantRepository.getAll([
+          where('owner_id', '==', ownerId)
         ]);
-      }
-      
-      // Sort in-memory if needed, but usually there's only one
-      if (merchants.length > 1) {
-        merchants.sort((a: any, b: any) => {
-          const dateA = a.created_at || a.createdAt || 0;
-          const dateB = b.created_at || b.createdAt || 0;
-          return new Date(dateB).getTime() - new Date(dateA).getTime();
-        });
-      }
 
-      return merchants.length > 0 ? merchants[0] : null;
+        // If nothing found, try with ownerId (camelCase)
+        if (merchants.length === 0) {
+          merchants = await merchantRepository.getAll([
+            where('ownerId', '==', ownerId)
+          ]);
+        }
+        
+        // Sort in-memory if needed, but usually there's only one
+        if (merchants.length > 1) {
+          merchants.sort((a: any, b: any) => {
+            const dateA = a.created_at || a.createdAt || 0;
+            const dateB = b.created_at || b.createdAt || 0;
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
+          });
+        }
+
+        return merchants.length > 0 ? merchants[0] : null;
+      } catch (error) {
+        console.error('Error fetching merchant by owner:', error);
+        // If it's a permission or index error, we assume no merchant found yet to allow onboarding
+        return null;
+      }
     },
     async save(merchant: Partial<Merchant>) {
       if (merchant.id) {

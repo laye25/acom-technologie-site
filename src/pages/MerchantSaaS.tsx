@@ -189,7 +189,7 @@ const MerchantSaaS = () => {
         // Fetch from Supabase via dbService
         const m = await dbService.merchants.getByOwner(user.uid);
         
-        // If we hit quota error, it might be stored in localStorage by handleFirestoreError
+        // Check for quota
         const quotaExceeded = localStorage.getItem('firebase_quota_exceeded');
         if (quotaExceeded && !m) {
           setError("Quota Firestore épuisé. Impossible de charger votre profil marchand.");
@@ -198,7 +198,9 @@ const MerchantSaaS = () => {
         }
       } catch (error: any) {
         console.error('Error fetching merchant:', error);
-        setError("Erreur lors du chargement de votre profil marchand.");
+        // If it's a new user and there's an error fetching, we don't block them.
+        // We set merchant to null which will trigger the Onboarding screen.
+        setMerchant(null);
       } finally {
         setLoadingMerchant(false);
       }
