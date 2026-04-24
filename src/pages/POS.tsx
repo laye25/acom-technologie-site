@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dbService } from '../services/dbService';
+import { db } from '../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { syncService } from '../services/syncService';
 import { firestoreService } from '../services/firestoreService';
 import { Service } from '../types';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { motion } from 'motion/react';
@@ -35,12 +36,16 @@ const POS = () => {
 
   const categories = ['Tous', 'Digital', 'Marketing', 'Design', 'Event'];
 
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName,
-    limit: 100
-  }), []);
+  // Sync services
+  useEffect(() => {
+    if (user?.uid) {
+      syncService.syncServices(user.uid);
+    }
+  }, [user?.uid]);
 
-  const { data: dynamicServices, loading: servicesLoading } = useFirestoreData<Service>(serviceOptions);
+  // Read from Dexie
+  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+  const servicesLoading = false;
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];

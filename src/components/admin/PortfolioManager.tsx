@@ -2,29 +2,25 @@ import React, { useState, useMemo } from 'react';
 import { PortfolioItem } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
+import { db as dexieDb } from '../../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { dbService as db } from '../../services/dbService';
+import { syncService } from '../../services/syncService';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
 import { OptimizedImage } from '../OptimizedImage';
 
 import { ConfirmModal } from './ConfirmModal';
 
 const PortfolioManager = () => {
-  const projectMapper = useMemo(() => (item: any) => ({
-    id: item.id,
-    title: item.title,
-    category: item.category,
-    image: item.image,
-    order: item.order
-  }), []);
+  // Sync on mount
+  React.useEffect(() => {
+    syncService.syncPortfolioItems();
+  }, []);
 
-  const portfolioOptions = useMemo(() => ({
-    tableName: 'portfolio' as TableName,
-    order: { column: 'order' as const },
-    mapper: projectMapper
-  }), [projectMapper]);
-
-  const { data: items, loading, error: fetchError, refresh } = useFirestoreData<PortfolioItem>(portfolioOptions);
+  const items = useLiveQuery(() => dexieDb.portfolio_items.toArray()) || [];
+  const loading = false;
+  const fetchError = null;
+  const refresh = () => syncService.syncPortfolioItems();
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentItem, setCurrentItem] = useState<Partial<PortfolioItem> | null>(null);

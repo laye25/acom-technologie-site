@@ -249,11 +249,10 @@ service cloud.firestore {
     }
 
     match /usage/{tenantId} {
-      // Users can read their own usage, but only the backend (Admin SDK) or clients via specific functions can increment
-      // For this architecture, we allow clients to increment their own usage, but they cannot set arbitrary values
-      allow read: if isAuthenticated() && get(/databases/$(database)/documents/merchants/$(tenantId)).data.owner_id == request.auth.uid;
-      allow create: if isAuthenticated() && get(/databases/$(database)/documents/merchants/$(tenantId)).data.owner_id == request.auth.uid;
-      allow update: if isAuthenticated() && get(/databases/$(database)/documents/merchants/$(tenantId)).data.owner_id == request.auth.uid;
+      // Les utilisateurs peuvent lire leur propre consommation
+      allow read: if isAuthenticated() && (isAdmin() || get(/databases/$(database)/documents/merchants/$(tenantId)).data.owner_id == request.auth.uid || get(/databases/$(database)/documents/merchants/$(tenantId)).data.ownerId == request.auth.uid);
+      // Ecriture réservée au serveur (Admin SDK exclusivement)
+      allow write: if false; 
     }
 
     match /merchant_products/{productId} {

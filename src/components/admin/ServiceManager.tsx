@@ -1,9 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
+import { useAuth } from '../../context/AuthContext';
+import { syncService } from '../../services/syncService';
 import { Service } from '../../types';
 import { Plus, Edit2, Trash2, X, Save, Image as ImageIcon, Upload, Loader2, Database, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
-import { dbService as db } from '../../services/dbService';
+import { dbService } from '../../services/dbService';
 import { getAiClient, getGeminiModel } from '../../lib/gemini';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
 import { OptimizedImage } from '../OptimizedImage';
@@ -13,6 +16,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { SEOAnalyzer } from './SEOAnalyzer';
 
 const ServiceManager = () => {
+  const { user } = useAuth();
   const serviceMapper = useMemo(() => (s: any) => ({
     id: s.id,
     name: s.name,
@@ -32,13 +36,18 @@ const ServiceManager = () => {
     }
   }), []);
 
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName,
-    order: { column: 'name' as const },
-    mapper: serviceMapper
-  }), [serviceMapper]);
+  // serviceOptions removed
 
-  const { data: services, loading, error: fetchError, refresh } = useFirestoreData<Service>(serviceOptions);
+  const services = useLiveQuery(() => db.services.toArray().then(services => services as Service[])) || [];
+  const loading = false; // Simplified
+  const fetchError = null;
+  const refresh = () => syncService.syncServices(user?.uid || ''); // Optional if needed
+
+  useEffect(() => {
+    if (user?.uid) {
+      syncService.syncServices(user.uid);
+    }
+  }, [user?.uid]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentService, setCurrentService] = useState<Partial<Service> | null>(null);
@@ -202,7 +211,7 @@ const ServiceManager = () => {
         additionalImages: additionalImages || []
       } as Service;
 
-      await db.services.save(serviceData);
+      await dbService.services.save(serviceData);
       showNotification('success', currentService.id ? 'Service mis à jour !' : 'Service ajouté !');
       
       setIsEditing(false);
@@ -218,7 +227,7 @@ const ServiceManager = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await db.services.delete(id);
+      await dbService.services.delete(id);
       showNotification('success', 'Service supprimé !');
       setConfirmDeleteId(null);
     } catch (error: any) {

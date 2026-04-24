@@ -1,10 +1,48 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useCallback } from 'react';
 import { firestoreService } from '../services/firestoreService';
 
 interface CacheItem {
   data: any;
   timestamp: number;
 }
+
+class MemoryCache {
+  private store = new Map<string, CacheItem>();
+  private pendingFetches = new Map<string, Promise<any>>();
+
+  get(key: string, ttl: number = 600000): any | null {
+    const item = this.store.get(key);
+    if (!item) return null;
+    
+    if (Date.now() - item.timestamp > ttl) {
+      this.store.delete(key);
+      return null;
+    }
+    return item.data;
+  }
+
+  set(key: string, value: any) {
+    this.store.set(key, { data: value, timestamp: Date.now() });
+  }
+
+  clear() {
+    this.store.clear();
+  }
+
+  getPending(key: string) {
+    return this.pendingFetches.get(key);
+  }
+
+  setPending(key: string, promise: Promise<any>) {
+    this.pendingFetches.set(key, promise);
+  }
+
+  deletePending(key: string) {
+    this.pendingFetches.delete(key);
+  }
+}
+
+const memoryCache = new MemoryCache();
 
 interface CacheContextType {
   getCachedData: (key: string) => any | null;
@@ -15,77 +53,36 @@ interface CacheContextType {
 
 const CacheContext = createContext<CacheContextType | undefined>(undefined);
 
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
 export const CacheProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [cache, setCache] = useState<Record<string, CacheItem>>(() => {
-    // Try to load from localStorage for persistent cache (Point 2)
-    try {
-      const saved = localStorage.getItem('firestore_cache');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Filter out expired items
-        const now = Date.now();
-        const filtered: Record<string, CacheItem> = {};
-        Object.keys(parsed).forEach(key => {
-          if (now - parsed[key].timestamp < CACHE_TTL) {
-            filtered[key] = parsed[key];
-          }
-        });
-        return filtered;
-      }
-    } catch (e) {
-      console.warn('Failed to load cache from localStorage', e);
-    }
-    return {};
-  });
-
-  const cacheRef = useRef(cache);
-  cacheRef.current = cache;
-  const fetchingRef = useRef<Record<string, boolean>>({});
-
   const setCachedData = useCallback((key: string, data: any) => {
-    const newItem = { data, timestamp: Date.now() };
-    setCache(prev => {
-      const next = { ...prev, [key]: newItem };
-      // Persist to localStorage (Point 2)
-      try {
-        localStorage.setItem('firestore_cache', JSON.stringify(next));
-      } catch (e) {
-        // If localStorage is full, clear it
-        localStorage.removeItem('firestore_cache');
-      }
-      return next;
-    });
+    memoryCache.set(key, data);
   }, []);
 
   const getCachedData = useCallback((key: string) => {
-    const item = cacheRef.current[key];
-    if (item && Date.now() - item.timestamp < CACHE_TTL) {
-      return item.data;
-    }
-    return null;
+    // Return cached value if within TTL (10 mins default in MemoryCache)
+    return memoryCache.get(key);
   }, []);
 
   const prefetchCollection = useCallback(async (collectionName: string) => {
     const key = JSON.stringify({ collectionName });
-    if (getCachedData(key) || fetchingRef.current[key]) return;
+    
+    if (memoryCache.get(key) || memoryCache.getPending(key)) return;
 
-    fetchingRef.current[key] = true;
     try {
-      const data = await firestoreService.getAll(collectionName);
-      setCachedData(key, data);
+      const promise = firestoreService.getAll(collectionName);
+      memoryCache.setPending(key, promise);
+      const data = await promise;
+      memoryCache.set(key, data);
       console.log(`[Prefetch] Loaded ${collectionName}`);
     } catch (e) {
       console.error(`[Prefetch] Failed for ${collectionName}`, e);
     } finally {
-      fetchingRef.current[key] = false;
+      memoryCache.deletePending(key);
     }
-  }, [getCachedData, setCachedData]);
+  }, []);
 
   const clearCache = useCallback(() => {
-    setCache({});
-    localStorage.removeItem('firestore_cache');
+    memoryCache.clear();
   }, []);
 
   return (

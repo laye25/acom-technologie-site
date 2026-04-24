@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Order, Service } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { 
@@ -20,7 +19,10 @@ import { fr } from 'date-fns/locale';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { getOrderDiscountedTotal } from '../lib/promotions';
-import { dbService as db } from '../services/dbService';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { dbService } from '../services/dbService';
+import { syncService } from '../services/syncService';
 import { SiteSettings } from '../types';
 
 const OrderQuote = () => {
@@ -32,6 +34,16 @@ const OrderQuote = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
 
+  // Read from Dexie (Offline-first)
+  const order = useLiveQuery(() => {
+    if (!orderId) return null;
+    return db.orders.get(orderId);
+  }, [orderId]) || null;
+
+  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+
+  const orderLoading = !order; // Basic loading state if order not yet in Dexie
+
   React.useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -42,25 +54,14 @@ const OrderQuote = () => {
       }
     };
     fetchSettings();
-  }, []);
-
-  const orderOptions = useMemo(() => ({
-    tableName: 'orders' as TableName,
-    filters: [
-      { column: 'id', value: orderId },
-      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.uid }] : [])
-    ],
-    skip: !user || !orderId
-  }), [orderId, user, isAdmin, isManager]);
-
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName
-  }), []);
-
-  const { data: orderData, loading: orderLoading } = useFirestoreData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
-
-  const order = orderData?.[0] || null;
+    
+    // Sync data if online
+    if (user?.uid) {
+      syncService.syncOrders(user.uid);
+      syncService.syncServices('global');
+      syncService.syncSettings('global');
+    }
+  }, [user?.uid, orderId]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';

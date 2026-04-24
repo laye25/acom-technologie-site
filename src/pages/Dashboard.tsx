@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { db } from '../firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { useFirestoreData } from '../hooks/useFirestoreData';
+import { db } from '../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { syncService } from '../services/syncService';
+// import { useFirestoreData } from '../hooks/useFirestoreData'; // Not used anymore for read
+// ... import { Order, Service, UserProfile, OrderStatus, Design } from '../types';
 import { Order, Service, UserProfile, OrderStatus, Design } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion } from 'motion/react';
@@ -26,83 +28,41 @@ const Dashboard = () => {
 
   React.useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'messages' || tab === 'orders' || tab === 'profile') {
+    if (tab === 'messages' || tab === 'orders' || tab === 'profile' || tab === 'designs') {
       setActiveTab(tab as any);
     }
   }, [searchParams]);
-  
-  const filter = useMemo(() => {
-    if (!user) return undefined;
-    if (isManager || isAdmin) return undefined; // Managers and admins see all orders
-    return { column: 'user_id', value: user.uid };
-  }, [user, isManager, isAdmin]);
-  
-  const { data: rawOrders, loading, error: ordersError } = useFirestoreData<Order>({
-    tableName: 'orders',
-    where: (isManager || isAdmin) ? undefined : [['user_id', '==', user?.uid]],
-    order: (isManager || isAdmin) ? { column: 'created_at', direction: 'desc' } : undefined,
-    limit: 50,
-    realtime: true,
-    skip: !user
-  });
 
-  const { data: dynamicServices, loading: servicesLoading } = useFirestoreData<Service>({
-    tableName: 'services',
-    limit: 50,
-    realtime: true
-  });
-
-  const allServices = useMemo(() => {
-    const combined = [...STATIC_SERVICES];
-    dynamicServices.forEach(ds => {
-      if (!combined.find(s => s.id === ds.id)) {
-        combined.push(ds);
+  // Sync data
+  useEffect(() => {
+    if (user?.uid) {
+      if (isAdmin || isManager) {
+        syncService.syncOrders('global');
+        syncService.syncServices('global');
+        syncService.syncUsers('global');
+        syncService.syncDesigns('global');
+      } else {
+        syncService.syncOrders(user.uid);
+        syncService.syncServices('global');
+        syncService.syncUsers(user.uid);
+        syncService.syncDesigns(user.uid);
       }
-    });
-    return combined;
-  }, [dynamicServices]);
+    }
+  }, [user?.uid, isAdmin, isManager]);
 
-  const orders = useMemo(() => {
-    if (!rawOrders || rawOrders.length === 0) return [];
-    return [...rawOrders].sort((a, b) => {
-      const getTime = (val: any) => {
-        if (!val) return 0;
-        
-        // Handle Firebase Timestamp
-        if (typeof val === 'object') {
-          if (val.seconds !== undefined) return val.seconds * 1000;
-          if (typeof val.toMillis === 'function') return val.toMillis();
-        }
-        
-        // If it's a string or number, try to parse it
-        if (typeof val === 'string' || typeof val === 'number') {
-          const date = new Date(val);
-          if (!isNaN(date.getTime())) return date.getTime();
-        }
-        
-        return 0;
-      };
-      
-      const timeA = getTime(a.updated_at || a.created_at || a.updatedAt || a.createdAt);
-      const timeB = getTime(b.updated_at || b.created_at || b.updatedAt || b.createdAt);
-      return timeB - timeA;
-    });
-  }, [rawOrders]);
+  // Read from Dexie
+  const orders = useLiveQuery(async () => {
+    if (!user) return [];
+    if (isAdmin || isManager) return db.orders.toArray();
+    return db.orders.where('userId').equals(user.uid).or('user_id').equals(user.uid).toArray();
+  }, [user, isAdmin, isManager]) || [];
 
-  const { data: users } = useFirestoreData<UserProfile>({
-    tableName: 'users',
-    limit: 50,
-    realtime: true,
-    skip: !(isManager || isAdmin)
-  });
-
-  const { data: userDesigns, loading: designsLoading } = useFirestoreData<Design>({
-    tableName: 'designs',
-    where: [['ownerId', '==', user?.uid]],
-    limit: 50,
-    realtime: true,
-    skip: !user
-  });
+  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+  const users = useLiveQuery(() => db.users.toArray()) || [];
+  const userDesigns = useLiveQuery(() => {
+    if (!user) return [];
+    return db.designs.toArray();
+  }, [user, isAdmin, isManager]) || [];
 
   const getStatusLabel = (status: string, clientAccepted?: boolean, type?: string) => {
     switch (status) {
@@ -165,7 +125,17 @@ const Dashboard = () => {
     }
   };
 
-  if (authLoading || (loading && orders.length === 0)) {
+  const allServices = useMemo(() => {
+    const combined = [...STATIC_SERVICES];
+    dynamicServices.forEach(ds => {
+      if (!combined.find(s => s.id === ds.id)) {
+        combined.push(ds as any);
+      }
+    });
+    return combined;
+  }, [dynamicServices]);
+
+  if (authLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-32">
         <Clock className="animate-spin text-primary w-10 h-10 mb-4" />
@@ -174,24 +144,9 @@ const Dashboard = () => {
     );
   }
 
-  if (ordersError) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <div className="bg-red-50 border border-red-100 rounded-3xl p-12 inline-block max-w-lg">
-          <Clock className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Erreur de chargement</h2>
-          <p className="text-gray-600 mb-8">
-            Nous n'avons pas pu récupérer vos commandes. Cela peut être dû à un problème de connexion ou de permissions.
-          </p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-8 py-3 bg-primary text-white rounded-full font-bold hover:bg-primary-hover transition-all"
-          >
-            Réessayer
-          </button>
-        </div>
-      </div>
-    );
+  if (!user) {
+    navigate('/login');
+    return null;
   }
 
   return (
@@ -425,12 +380,7 @@ const Dashboard = () => {
             </Link>
           </div>
 
-          {designsLoading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Clock className="animate-spin text-primary w-8 h-8 mb-4" />
-              <p className="text-gray-500">Chargement de vos designs...</p>
-            </div>
-          ) : userDesigns.length === 0 ? (
+          {userDesigns.length === 0 ? (
             <div className="bg-white rounded-3xl border border-black/5 p-12 text-center">
               <Palette className="w-12 h-12 text-gray-200 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-gray-900 mb-2">Aucun design enregistré</h2>

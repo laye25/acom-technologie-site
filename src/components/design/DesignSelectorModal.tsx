@@ -7,9 +7,9 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { db, auth } from '../../firebase';
-import { collection, query, where, orderBy, limit } from 'firebase/firestore';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
+import { db } from '../../db/db';
+import { syncService } from '../../services/syncService';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { INITIAL_CATEGORIES, INITIAL_PRODUCTS, Category as StudioCategory, Product, Variant } from '../../constants/studioAcom';
 import { OptimizedImage } from '../OptimizedImage';
 import { getImageUrl } from '../../lib/imageUtils';
@@ -470,30 +470,28 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
   React.useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      syncService.syncTemplates();
+      if (user?.uid) {
+        syncService.syncDesigns(user.uid);
+      }
     } else {
       document.body.style.overflow = 'unset';
     }
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, user?.uid]);
 
-  const { data: userDesigns } = useFirestoreData<any>({
-    tableName: 'designs',
-    where: [['user_id', '==', user?.uid]],
-    limit: 50,
-    realtime: true,
-    skip: !isOpen || !user?.uid || activeCategory !== 'saved'
-  });
+  const userDesigns = useLiveQuery(
+    () => user ? db.designs.where('ownerId').equals(user.uid).reverse().sortBy('updatedAt') : [],
+    [user?.uid]
+  ) || [];
 
-  const { data: communityTemplates, loading: loadingCommunity } = useFirestoreData<any>({
-    tableName: 'design_templates',
-    where: [['isPublic', '==', true]],
-    order: { column: 'createdAt', direction: 'desc' },
-    limit: 50,
-    realtime: false,
-    skip: !isOpen || activeCategory !== 'community'
-  });
+  const communityTemplates = useLiveQuery(
+    () => db.templates.orderBy('updatedAt').reverse().limit(50).toArray()
+  ) || [];
+
+  const loadingCommunity = false;
 
   const selectedProduct = useMemo(() => 
     allProducts.find(p => p.id === selectedProductId) || null

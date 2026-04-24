@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
+import { syncService } from '../../services/syncService';
 import { UserProfile } from '../../types';
 import { MessageSquare, User, Loader2, Search, ArrowRight } from 'lucide-react';
 import { PartnerChat } from '../chat/PartnerChat';
@@ -11,12 +13,17 @@ export const PartnerMessageManager = () => {
     const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
 
-    const partnerOptions = useMemo(() => ({
-        tableName: 'users' as TableName,
-        where: [['role', 'in', ['printer', 'designer']]]
-    }), []);
+    useEffect(() => {
+        if (isAdmin || isManager) {
+            syncService.syncUsers('');
+        }
+    }, [isAdmin, isManager]);
 
-    const { data: partners, loading } = useFirestoreData<UserProfile>(partnerOptions);
+    const partners = useLiveQuery(() => 
+        db.users.where('role').anyOf(['printer', 'designer']).toArray()
+    ) || [];
+
+    const loading = !partners && (isAdmin || isManager);
 
     const filteredPartners = useMemo(() => {
         return partners.filter(p => 

@@ -239,6 +239,7 @@ const HeroBanner = () => {
             <div className="w-full">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
                 {stats.map((stat, i) => {
+                  if (!stat) return null;
                   const StatIcon = iconMap[stat.iconName] || Briefcase;
                   return (
                     <motion.div

@@ -27,7 +27,11 @@ import { categoryRepository } from '../data/repositories/category.repository';
 import { studioAcomProductRepository } from '../data/repositories/studio-acom-product.repository';
 import { variantRepository } from '../data/repositories/variant.repository';
 import { partnerRatingRepository } from '../data/repositories/partner-rating.repository';
+import { assetRepository } from '../data/repositories/asset.repository';
+import { templateRepository } from '../data/repositories/template.repository';
+import { designRequestRepository } from '../data/repositories/design-request.repository';
 import { activityService } from './activityService';
+import { db } from '../db/db';
 
 export const dbService = {
   services: {
@@ -51,6 +55,10 @@ export const dbService = {
     async save(order: Partial<Order>) {
       if (order.id) {
         const result = await orderRepository.update(order.id, order);
+        
+        // Update local Dexie db for immediate reactivity
+        await db.orders.update(order.id, order);
+
         await activityService.log({
           type: 'order_updated',
           entityId: order.id,
@@ -61,6 +69,10 @@ export const dbService = {
         return result;
       }
       const id = await orderRepository.create(order as any);
+      
+      // Save full order with id in Dexie
+      await db.orders.put({ ...order, id, createdAt: order.createdAt || new Date() } as any);
+
       await activityService.log({
         type: 'order_created',
         entityId: id,
@@ -121,16 +133,24 @@ export const dbService = {
   },
   messages: {
     async save(message: any) {
-      return messageRepository.create(message);
+      const id = await messageRepository.create(message);
+      await db.messages.put({ ...message, id, createdAt: message.createdAt || new Date() });
+      return id;
     },
     async list(options: any) {
       if (options.where) {
+        const chatIdFilter = options.where.find((w: any) => w[0] === 'chatId');
+        if (chatIdFilter) {
+          return db.messages.where('chatId').equals(chatIdFilter[2]).sortBy('timestamp');
+        }
+        
+        // Fallback or generic filter
         const filters = options.where.map((f: any) => where(f[0], f[1], f[2]));
         const sorts = options.orderBy ? options.orderBy.map((s: any) => orderBy(s[0], s[1])) : [];
         const limitRes = options.limit ? [limit(options.limit)] : [];
         return messageRepository.getAll([...filters, ...sorts, ...limitRes]);
       }
-      return messageRepository.getAll();
+      return db.messages.toArray();
     }
   },
   contactMessages: {
@@ -286,11 +306,27 @@ export const dbService = {
   },
   merchants: {
     async getByOwner(ownerId: string) {
-      const merchants = await merchantRepository.getAll([
-        where('owner_id', '==', ownerId),
-        orderBy('created_at', 'desc'),
-        limit(1)
+      // First try with owner_id (snake_case)
+      let merchants = await merchantRepository.getAll([
+        where('owner_id', '==', ownerId)
       ]);
+
+      // If nothing found, try with ownerId (camelCase)
+      if (merchants.length === 0) {
+        merchants = await merchantRepository.getAll([
+          where('ownerId', '==', ownerId)
+        ]);
+      }
+      
+      // Sort in-memory if needed, but usually there's only one
+      if (merchants.length > 1) {
+        merchants.sort((a: any, b: any) => {
+          const dateA = a.created_at || a.createdAt || 0;
+          const dateB = b.created_at || b.createdAt || 0;
+          return new Date(dateB).getTime() - new Date(dateA).getTime();
+        });
+      }
+
       return merchants.length > 0 ? merchants[0] : null;
     },
     async save(merchant: Partial<Merchant>) {
@@ -310,13 +346,19 @@ export const dbService = {
   },
   merchantProducts: {
     async save(product: Partial<MerchantProduct>) {
+      let id = product.id;
       if (product.id) {
-        return merchantProductRepository.update(product.id, product);
+        await merchantProductRepository.update(product.id, product);
+      } else {
+        id = await merchantProductRepository.create(product as any);
       }
-      return merchantProductRepository.create(product as any);
+      // Update local Dexie for immediate feedback
+      await db.products.put({ ...product, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return merchantProductRepository.delete(id);
+      await merchantProductRepository.delete(id);
+      await db.products.delete(id);
     }
   },
   merchantSales: {
@@ -367,29 +409,42 @@ export const dbService = {
         metadata: { amount: sale.totalAmount || sale.total_amount }
       });
 
+      // Update local Dexie
+      await db.sales.put({ ...sale, id, createdAt: sale.createdAt || new Date() } as any);
+
       return id;
     }
   },
   merchantExpenses: {
     async save(expense: Partial<MerchantExpense>) {
+      let id = expense.id;
       if (expense.id) {
-        return merchantExpenseRepository.update(expense.id, expense);
+        await merchantExpenseRepository.update(expense.id, expense);
+      } else {
+        id = await merchantExpenseRepository.create(expense as any);
       }
-      return merchantExpenseRepository.create(expense as any);
+      await db.expenses.put({ ...expense, id, createdAt: expense.createdAt || new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return merchantExpenseRepository.delete(id);
+      await merchantExpenseRepository.delete(id);
+      await db.expenses.delete(id);
     }
   },
   merchantSuppliers: {
     async save(supplier: Partial<MerchantSupplier>) {
+      let id = supplier.id;
       if (supplier.id) {
-        return merchantSupplierRepository.update(supplier.id, supplier);
+        await merchantSupplierRepository.update(supplier.id, supplier);
+      } else {
+        id = await merchantSupplierRepository.create(supplier as any);
       }
-      return merchantSupplierRepository.create(supplier as any);
+      await db.suppliers.put({ ...supplier, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return merchantSupplierRepository.delete(id);
+      await merchantSupplierRepository.delete(id);
+      await db.suppliers.delete(id);
     }
   },
   stockMovements: {
@@ -401,8 +456,10 @@ export const dbService = {
       const newStock = currentStock + quantity;
 
       await merchantProductRepository.update(productId, { stockQuantity: newStock } as any);
+      // Update local product
+      await db.products.update(productId, { stockQuantity: newStock, updatedAt: new Date() });
 
-      await stockMovementRepository.create({
+      const movementId = await stockMovementRepository.create({
         merchantId,
         productId,
         type: 'in',
@@ -412,121 +469,215 @@ export const dbService = {
         reason,
         performedBy
       } as any);
+      // Update local movement
+      await db.movements.put({
+        id: movementId,
+        merchantId,
+        productId,
+        type: 'in',
+        quantity,
+        previousQuantity: currentStock,
+        newQuantity: newStock,
+        reason,
+        performedBy,
+        createdAt: new Date()
+      });
 
       if (cost && cost > 0) {
-        await merchantExpenseRepository.create({
+        const expenseId = await merchantExpenseRepository.create({
           merchantId,
           title: `Approvisionnement: ${product.name}`,
           amount: cost,
           category: 'Stock',
           date: new Date().toISOString().split('T')[0]
         } as any);
+        // Update local expense
+        await db.expenses.put({
+          id: expenseId,
+          merchantId,
+          title: `Approvisionnement: ${product.name}`,
+          amount: cost,
+          category: 'Stock',
+          date: new Date().toISOString().split('T')[0],
+          createdAt: new Date()
+        });
       }
     }
   },
   interventions: {
     async save(intervention: Partial<ServiceIntervention>) {
+      let id = intervention.id;
       if (intervention.id) {
-        return interventionRepository.update(intervention.id, intervention);
+        await interventionRepository.update(intervention.id, intervention);
+      } else {
+        id = await interventionRepository.create(intervention as any);
       }
-      return interventionRepository.create(intervention as any);
+      await db.interventions.put({ ...intervention, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return interventionRepository.delete(id);
+      await interventionRepository.delete(id);
+      await db.interventions.delete(id);
     }
   },
   projects: {
     async save(project: Partial<ConstructionProject>) {
+      let id = project.id;
       if (project.id) {
-        return projectRepository.update(project.id, project);
+        await projectRepository.update(project.id, project);
+      } else {
+        id = await projectRepository.create(project as any);
       }
-      return projectRepository.create(project as any);
+      await db.projects.put({ ...project, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return projectRepository.delete(id);
+      await projectRepository.delete(id);
+      await db.projects.delete(id);
     }
   },
   vehicles: {
     async save(vehicle: Partial<TransportVehicle>) {
+      let id = vehicle.id;
       if (vehicle.id) {
-        return vehicleRepository.update(vehicle.id, vehicle);
+        await vehicleRepository.update(vehicle.id, vehicle);
+      } else {
+        id = await vehicleRepository.create(vehicle as any);
       }
-      return vehicleRepository.create(vehicle as any);
+      await db.vehicles.put({ ...vehicle, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return vehicleRepository.delete(id);
+      await vehicleRepository.delete(id);
+      await db.vehicles.delete(id);
     }
   },
   employees: {
     async save(employee: Partial<HREmployee>) {
+      let id = employee.id;
       if (employee.id) {
-        return employeeRepository.update(employee.id, employee);
+        await employeeRepository.update(employee.id, employee);
+      } else {
+        id = await employeeRepository.create(employee as any);
       }
-      return employeeRepository.create(employee as any);
+      await db.employees.put({ ...employee, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return employeeRepository.delete(id);
+      await employeeRepository.delete(id);
+      await db.employees.delete(id);
     }
   },
   students: {
     async save(student: Partial<SchoolStudent>) {
+      let id = student.id;
       if (student.id) {
-        return studentRepository.update(student.id, student);
+        await studentRepository.update(student.id, student);
+      } else {
+        id = await studentRepository.create(student as any);
       }
-      return studentRepository.create(student as any);
+      await db.students.put({ ...student, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return studentRepository.delete(id);
+      await studentRepository.delete(id);
+      await db.students.delete(id);
     }
   },
   patients: {
     async save(patient: Partial<MedicalPatient>) {
+      let id = patient.id;
       if (patient.id) {
-        return patientRepository.update(patient.id, patient);
+        await patientRepository.update(patient.id, patient);
+      } else {
+        id = await patientRepository.create(patient as any);
       }
-      return patientRepository.create(patient as any);
+      await db.patients.put({ ...patient, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return patientRepository.delete(id);
+      await patientRepository.delete(id);
+      await db.patients.delete(id);
     }
   },
   appointments: {
     async save(appointment: Partial<MedicalAppointment>) {
+      let id = appointment.id;
       if (appointment.id) {
-        return appointmentRepository.update(appointment.id, appointment);
+        await appointmentRepository.update(appointment.id, appointment);
+      } else {
+        id = await appointmentRepository.create(appointment as any);
       }
-      return appointmentRepository.create(appointment as any);
+      await db.appointments.put({ ...appointment, id, updatedAt: new Date() } as any);
+      return id;
     },
     async delete(id: string) {
-      return appointmentRepository.delete(id);
+      await appointmentRepository.delete(id);
+      await db.appointments.delete(id);
     }
   },
   designBlocks: {
     async getAll(designId: string) {
-      return designBlockRepository.getAll(designId);
+      // Prefer Dexie if available, but for blocks we often want fresh data or synced data
+      const localBlocks = await db.design_blocks.where('designId').equals(designId).toArray();
+      if (localBlocks.length > 0) return localBlocks;
+      
+      const remoteBlocks = await designBlockRepository.getAll(designId);
+      if (remoteBlocks.length > 0) {
+        await db.design_blocks.bulkPut(remoteBlocks.map(b => ({ ...b, designId })));
+      }
+      return remoteBlocks;
     },
     async save(designId: string, block: any) {
+      let id = block.id;
       if (block.id) {
-        return designBlockRepository.update(designId, block.id, block);
+        await designBlockRepository.update(designId, block.id, block);
+      } else {
+        id = await designBlockRepository.create(designId, block);
       }
-      return designBlockRepository.create(designId, block);
+      await db.design_blocks.put({ ...block, id, designId, updatedAt: new Date() });
+      return id;
     },
     async delete(designId: string, blockId: string) {
-      return designBlockRepository.delete(designId, blockId);
+      await designBlockRepository.delete(designId, blockId);
+      await db.design_blocks.delete(blockId);
     }
   },
   designs: {
     async save(design: Partial<Design>) {
+      let id = design.id;
       if (design.id) {
-        return designRepository.update(design.id, design);
+        await designRepository.update(design.id, design);
+      } else {
+        id = await designRepository.create(design as any);
       }
-      return designRepository.create(design as any);
+      await db.designs.put({ ...design, id, updatedAt: new Date() });
+      return id;
     },
     async getById(id: string) {
+      const local = await db.designs.get(id);
+      if (local) return local;
       return designRepository.getById(id);
     },
     async delete(id: string) {
-      return designRepository.delete(id);
+      await designRepository.delete(id);
+      await db.designs.delete(id);
+    }
+  },
+  templates: {
+    async save(template: any) {
+      let id = template.id;
+      if (template.id) {
+        await templateRepository.update(template.id, template);
+      } else {
+        id = await templateRepository.create(template);
+      }
+      await db.templates.put({ ...template, id, updatedAt: new Date() });
+      return id;
+    },
+    async delete(id: string) {
+      await templateRepository.delete(id);
+      await db.templates.delete(id);
     }
   },
   partnerRatings: {
@@ -539,6 +690,29 @@ export const dbService = {
     async getByOrder(orderId: string) {
       const { where } = await import('firebase/firestore');
       return partnerRatingRepository.getAll([where('orderId', '==', orderId)]);
+    }
+  },
+  assets: {
+    async save(asset: any) {
+      let id = asset.id;
+      if (asset.id) {
+        await assetRepository.update(asset.id, asset);
+      } else {
+        id = await assetRepository.create(asset);
+      }
+      await db.assets.put({ ...asset, id, updatedAt: new Date() });
+      return id;
+    },
+    async delete(id: string) {
+      await assetRepository.delete(id);
+      await db.assets.delete(id);
+    }
+  },
+  designRequests: {
+    async save(request: any) {
+      const id = await designRequestRepository.create(request);
+      await db.design_requests.put({ ...request, id, updatedAt: new Date() });
+      return id;
     }
   }
 };

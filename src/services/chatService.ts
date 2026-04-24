@@ -1,9 +1,10 @@
-import { io, Socket } from 'socket.io-client';
+import io from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 import { dbService } from './dbService';
 import { Message } from '../types';
 
 class ChatService {
-  private socket: Socket | null = null;
+  private socket: any = null;
 
   connect() {
     if (this.socket?.connected) return;

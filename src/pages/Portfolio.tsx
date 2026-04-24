@@ -1,38 +1,32 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { PortfolioItem } from '../types';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
+import { PortfolioItem, SiteSettings } from '../types';
+import { db } from '../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { syncService } from '../services/syncService';
 import { ArrowRight, ExternalLink, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PORTFOLIO_ITEMS } from '../constants';
 import { OptimizedImage } from '../components/OptimizedImage';
 
 const Portfolio = () => {
-  const projectMapper = useMemo(() => (p: any) => ({
-    id: p.id,
-    title: p.title,
-    category: p.category,
-    image: p.image || p.image_url || `https://picsum.photos/seed/${p.id}/800/600`,
-    order: p.display_order
-  }), []);
+  // Sync
+  useEffect(() => {
+    syncService.syncSettings('global');
+    syncService.syncPortfolioItems();
+  }, []);
 
-  const portfolioOptions = useMemo(() => ({
-    tableName: 'portfolio' as TableName,
-    order: { column: 'display_order' as const },
-    mapper: projectMapper,
-    limit: 50
-  }), [projectMapper]);
-
-  const { data: dbProjects, loading } = useFirestoreData<PortfolioItem>(portfolioOptions);
-  const { data: settingsData } = useFirestoreData<any>({ tableName: 'settings' as TableName });
-  const settings = settingsData?.[0];
+  // Read from Dexie
+  const dbProjects = useLiveQuery(() => db.portfolio_items.toArray()) || [];
+  const settings = useLiveQuery(() => db.settings.get('global')) as SiteSettings;
+  const loading = false;
 
   const displayProjects = useMemo(() => {
-    if (!loading && dbProjects.length === 0) {
+    if (dbProjects.length === 0) {
       return PORTFOLIO_ITEMS;
     }
-    return dbProjects.length > 0 ? dbProjects : PORTFOLIO_ITEMS;
-  }, [dbProjects, loading]);
+    return dbProjects;
+  }, [dbProjects]);
 
   const portfolioSettings = settings?.portfolioSection || {
     badge: "Portfolio",
@@ -167,7 +161,7 @@ const Portfolio = () => {
             to="/quote-request"
             className="inline-block px-12 py-6 bg-primary text-white rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-2xl shadow-primary/40"
           >
-            {portfolioSettings.ctaButton}
+            {(portfolioSettings as any).ctaButton}
           </Link>
         </motion.div>
       </section>

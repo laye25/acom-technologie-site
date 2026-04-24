@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Phone, Mail, MapPin, MessageCircle, Send, CheckCircle2 } from 'lucide-react';
 import { dbService as db } from '../services/dbService';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db as dexieDb } from '../db/db';
+import { syncService } from '../services/syncService';
 
 const Contact = () => {
-  const { data: settingsData } = useFirestoreData<any>({ tableName: 'settings' as TableName });
-  const settings = settingsData?.[0];
+  const settings = useLiveQuery(() => dexieDb.settings.toCollection().first());
+
+  useEffect(() => {
+    syncService.syncSettings('global'); // Supposons que les réglages généraux soient sous l'ID 'global'
+  }, []);
 
   const [formData, setFormData] = useState({
     firstName: '',

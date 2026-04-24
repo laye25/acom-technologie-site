@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Order } from '../types';
+import { db } from '../db/db';
 import { dbService } from '../services/dbService';
+import { syncService } from '../services/syncService';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Printer, Clock, Truck, CheckCircle, Search, 
@@ -38,6 +40,39 @@ export const PartnerPortal: React.FC = () => {
     address: ''
   });
 
+  // Sync data
+  useEffect(() => {
+    if (user?.uid) {
+      if (!isAdmin && !isManager) {
+        syncService.syncPartnerOrders(user.uid);
+        syncService.syncPartnerRatings();
+      } else {
+        syncService.syncOrders('global');
+        syncService.syncPartnerRatings();
+      }
+      syncService.syncUserProfile(user.uid);
+    }
+  }, [user?.uid, isAdmin, isManager]);
+
+  // Read from Dexie
+  const myOrders = useLiveQuery(async () => {
+    if (!user) return [];
+    if (!isAdmin && !isManager) {
+      return db.orders.where('partnerId').equals(user.uid).toArray();
+    }
+    return db.orders.toArray();
+  }, [user, isAdmin, isManager]) || [];
+
+  const ratings = useLiveQuery(() => 
+    user ? db.partner_ratings.where('partnerId').equals(user.uid).toArray() : []
+  , [user?.uid]) || [];
+
+  const admins = useLiveQuery(() => 
+    db.users.where('role').equals('admin').limit(1).toArray()
+  ) || [];
+
+  const loading = myOrders === undefined;
+  
   // Initialize profile form when entering edit mode
   const startEditing = () => {
     setProfileForm({
@@ -68,9 +103,13 @@ export const PartnerPortal: React.FC = () => {
         address: profileForm.address
       };
 
-      await dbService.users.update(user.uid, {
+      const updateData = {
         partnerDetails: updatedDetails as any
-      });
+      };
+
+      await dbService.users.update(user.uid, updateData);
+      // Update local cache
+      await db.users.update(user.uid, updateData);
 
       toast.success('Profil mis à jour avec succès');
       setIsEditingProfile(false);
@@ -92,12 +131,15 @@ export const PartnerPortal: React.FC = () => {
       const url = await storageService.uploadFile('assets', path, file);
       
       const currentPhotos = profile?.partnerDetails?.workshopPhotos || [];
-      await dbService.users.update(user.uid, {
+      const updatedData = {
         partnerDetails: {
           ...(profile?.partnerDetails || {}),
           workshopPhotos: [...currentPhotos, url]
         } as any
-      });
+      };
+
+      await dbService.users.update(user.uid, updatedData);
+      await db.users.update(user.uid, updatedData);
       
       toast.success('Photo ajoutée à votre galerie');
     } catch (e) {
@@ -116,12 +158,15 @@ export const PartnerPortal: React.FC = () => {
       const currentPhotos = profile?.partnerDetails?.workshopPhotos || [];
       const updatedPhotos = currentPhotos.filter(p => p !== photoUrl);
       
-      await dbService.users.update(user.uid, {
+      const updatedData = {
         partnerDetails: {
           ...(profile?.partnerDetails || {}),
           workshopPhotos: updatedPhotos
         } as any
-      });
+      };
+
+      await dbService.users.update(user.uid, updatedData);
+      await db.users.update(user.uid, updatedData);
 
       toast.success('Photo supprimée');
     } catch (e) {
@@ -131,27 +176,6 @@ export const PartnerPortal: React.FC = () => {
       setIsUpdating(false);
     }
   };
-
-  // 1. Fetch Orders assigned to this partner (or all orders if admin/manager)
-  const orderOptions = useMemo(() => {
-    let whereClause: any[] = [];
-    
-    if (!isAdmin && !isManager) {
-      whereClause = [['partnerId', '==', user?.uid || '']];
-    } else {
-      // Pour les admins/managers, on affiche toutes les commandes qui ont été assignées (qui ont un status fournisseur)
-      // Ou on affiche toutes les commandes tout court
-      whereClause = []; 
-    }
-
-    return {
-      tableName: 'orders' as TableName,
-      where: whereClause,
-      mapper: (data: any) => ({ ...data } as Order)
-    };
-  }, [user?.uid, isAdmin, isManager]);
-  
-  const { data: myOrders, loading } = useFirestoreData<Order>(orderOptions);
 
   // 2. Statistics Calculation
   const stats = useMemo(() => {
@@ -204,26 +228,12 @@ export const PartnerPortal: React.FC = () => {
     };
   }, [myOrders]);
 
-  // 3. Reputation Data
-  const ratingOptions = useMemo(() => ({
-    tableName: 'partner_ratings' as TableName,
-    where: [['partnerId', '==', user?.uid || '']]
-  }), [user?.uid]);
-  const { data: ratings } = useFirestoreData<any>(ratingOptions);
-
   const averageRating = useMemo(() => {
     if (!ratings || ratings.length === 0) return 0;
     const sum = ratings.reduce((acc, r) => acc + (r.score || 0), 0);
     return (sum / ratings.length).toFixed(1);
   }, [ratings]);
 
-  // 4. Fetch Support Admin
-  const adminOptions = useMemo(() => ({
-    tableName: 'users' as TableName,
-    where: [['role', '==', 'admin']],
-    limit: 1
-  }), []);
-  const { data: admins } = useFirestoreData<any>(adminOptions);
   const supportAdmin = admins?.[0];
 
   // 5. Automatic Deadline Monitoring
@@ -306,8 +316,7 @@ export const PartnerPortal: React.FC = () => {
       const order = myOrders.find(o => o.id === orderId);
       if (!order) return;
 
-      // Update Order Status
-      await dbService.orders.save({
+      const updateData = {
         id: orderId,
         supplierStatus: newStatus as any,
         trackingNumber: tracking || order.trackingNumber,
@@ -315,7 +324,13 @@ export const PartnerPortal: React.FC = () => {
                 newStatus === 'shipped' ? 'completed' : 
                 newStatus === 'in_production' ? 'in_progress' : 'confirmed',
         updatedAt: new Date()
-      });
+      };
+
+      // Update Firestore
+      await dbService.orders.save(updateData as any);
+      
+      // Update Local Dexie for immediate feedback
+      await db.orders.update(orderId, updateData);
 
       // Notify Client
       const clientUid = order.userId || order.user_id;

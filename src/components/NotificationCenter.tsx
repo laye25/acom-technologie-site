@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Notification } from '../types';
-import { dbService as db } from '../services/dbService';
+import { db } from '../db/db';
+import { dbService } from '../services/dbService';
+import { syncService } from '../services/syncService';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Bell, CheckCircle, MessageSquare, CreditCard, Clock, X, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -14,13 +16,17 @@ export const NotificationCenter = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
 
-  const notificationOptions = useMemo(() => ({
-    tableName: 'notifications' as TableName,
-    filters: user ? [{ column: 'userId', value: user.uid }] : [],
-    skip: !user
-  }), [user]);
+  // Sync notifications
+  useEffect(() => {
+    if (user?.uid) {
+      syncService.syncNotifications(user.uid);
+    }
+  }, [user?.uid]);
 
-  const { data: rawNotifications } = useFirestoreData<Notification>(notificationOptions);
+  // Read from Dexie
+  const rawNotifications = useLiveQuery(() => 
+    user ? db.notifications.where('userId').equals(user.uid).toArray() : []
+  , [user?.uid]);
 
   const notifications = useMemo(() => {
     if (!rawNotifications) return [];
@@ -41,7 +47,9 @@ export const NotificationCenter = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleMarkAsRead = async (id: string) => {
-    await db.notifications.markAsRead(id);
+    await dbService.notifications.markAsRead(id);
+    // Local update for immediate feedback
+    await db.notifications.update(id, { read: true });
   };
 
   const handleNotificationClick = async (notification: Notification) => {

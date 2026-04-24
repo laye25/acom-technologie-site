@@ -12,7 +12,8 @@ export const BusinessInsights = () => {
 
     const runAnalysis = async () => {
         setLoading(true);
-        const result = await geminiService.analyzeBusinessPerformance(orders, expenses);
+        // TenantId 'admin-dashboard' pour les rapports globaux
+        const result = await geminiService.analyzeBusinessPerformance(orders, expenses, 'admin-dashboard');
         setAnalysis(result);
         setLoading(false);
     }

@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { 
   Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2, Layout
 } from 'lucide-react';
-import { useFirestoreData } from './useFirestoreData';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { syncService } from '../services/syncService';
 import { INITIAL_CATEGORIES, Category as StudioCategory, Product, Variant } from '../constants/studioAcom';
 import { getImageUrl } from '../lib/imageUtils';
 
@@ -11,6 +13,13 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export function useStudioAcom(isOpen: boolean = true) {
+  // Sync when open
+  useEffect(() => {
+    if (isOpen) {
+      syncService.syncStudioAcomData();
+    }
+  }, [isOpen]);
+
   // Memoize mappers to avoid unnecessary re-renders
   const categoryMapper = useMemo(() => (cat: any) => {
     const initial = INITIAL_CATEGORIES.find(c => c.id === cat.id);
@@ -65,28 +74,18 @@ export function useStudioAcom(isOpen: boolean = true) {
   }), []);
 
   // 1. Fetch Categories
-  const { data: dbCategories, loading: loadingCats } = useFirestoreData<any>({
-    tableName: 'studio_acom_categories',
-    realtime: true,
-    skip: !isOpen,
-    mapper: categoryMapper
-  });
+  const dbCategoriesRaw = useLiveQuery(() => db.studio_acom_categories.toArray()) || [];
+  const dbCategories = useMemo(() => dbCategoriesRaw.map(categoryMapper), [dbCategoriesRaw, categoryMapper]);
 
   // 2. Fetch Products
-  const { data: dbProducts, loading: loadingProds } = useFirestoreData<any>({
-    tableName: 'studio_acom_products',
-    realtime: true,
-    skip: !isOpen,
-    mapper: productMapper
-  });
+  const dbProductsRaw = useLiveQuery(() => db.studio_acom_products.toArray()) || [];
+  const dbProducts = useMemo(() => dbProductsRaw.map(productMapper), [dbProductsRaw, productMapper]);
 
   // 3. Fetch Variants
-  const { data: dbVariants, loading: loadingVariants } = useFirestoreData<any>({
-    tableName: 'variants',
-    realtime: true,
-    skip: !isOpen,
-    mapper: variantMapper
-  });
+  const dbVariantsRaw = useLiveQuery(() => db.variants.toArray()) || [];
+  const dbVariants = useMemo(() => dbVariantsRaw.map(variantMapper), [dbVariantsRaw, variantMapper]);
+
+  const loading = false;
 
   // Merge everything
   const categories = useMemo(() => {
@@ -116,7 +115,7 @@ export function useStudioAcom(isOpen: boolean = true) {
   return {
     categories,
     products,
-    loading: loadingCats || loadingProds || loadingVariants,
+    loading,
     dbCategories,
     dbProducts,
     dbVariants

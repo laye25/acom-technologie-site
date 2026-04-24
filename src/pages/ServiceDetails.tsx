@@ -15,7 +15,9 @@ import {
   FileText,
   Palette
 } from 'lucide-react';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
+import { db } from '../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { syncService } from '../services/syncService';
 import { Service } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { isPromotionActive, getDiscountedPrice } from '../lib/promotions';
@@ -28,31 +30,19 @@ const ServiceDetails = () => {
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState<string>('');
 
-  const serviceMapper = useMemo(() => (s: any) => ({
-    id: s.id,
-    name: s.name,
-    shortDescription: s.shortDescription,
-    description: s.description,
-    price: s.price,
-    category: s.category,
-    image: s.image || s.image_url || `https://picsum.photos/seed/${s.id}/800/600`,
-    features: s.features || [],
-    promotion: s.promotion,
-    additionalImages: s.additionalImages || []
-  }), []);
+  // Sync services
+  useEffect(() => {
+    syncService.syncServices('global');
+  }, []);
 
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName,
-    filter: { column: 'id', value: serviceId },
-    mapper: serviceMapper
-  }), [serviceId, serviceMapper]);
-
-  const { data: dbServices, loading } = useFirestoreData<Service>(serviceOptions);
+  // Read from Dexie
+  const dbServiceData = useLiveQuery(() => db.services.get(serviceId!), [serviceId]);
+  const loading = dbServiceData === undefined;
 
   const service = useMemo(() => {
-    if (!loading && dbServices.length > 0) return dbServices[0];
+    if (dbServiceData) return dbServiceData as Service;
     return STATIC_SERVICES.find(s => s.id === serviceId);
-  }, [dbServices, loading, serviceId]);
+  }, [dbServiceData, serviceId]);
 
   useEffect(() => {
     if (service) {

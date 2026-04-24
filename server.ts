@@ -8,6 +8,7 @@ import admin from "firebase-admin";
 import { createServer } from "http";
 import { Server } from "socket.io";
 
+
 // Initialize Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -143,10 +144,50 @@ async function startServer() {
     }
   });
 
-  // Stripe PaymentIntent
+
+  // Gemini Business Analysis
+  app.post("/api/gemini/analyze-business", async (req, res) => {
+    try {
+      const { orders, expenses, tenantId } = req.body;
+      
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "GEMINI_API_KEY non configurée." });
+      }
+
+      // Track usage BEFORE calling AI (Proactive)
+      const { trackUsage } = await import("./src/services/billingService.js");
+      await trackUsage(tenantId, 'ai_generations');
+
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+      const prompt = `
+        Tu es un analyste financier expert. Analyse les performances suivantes (Dernières commandes et dépenses) pour Acom Technologie.
+        Fournis un résumé concis comprenant:
+        - Tendance globale du CA
+        - Analyse de la rentabilité (par rapport aux dépenses)
+        - Points d'attention ou opportunités.
+        
+        Données :
+        Commandes : ${JSON.stringify(orders.slice(-30))}
+        Dépenses : ${JSON.stringify(expenses.slice(-30))}
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite-preview",
+        contents: prompt
+      });
+
+      res.json({ analysis: response.text || "" });
+    } catch (error: any) {
+      console.error("Gemini API error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
-      const { amount, currency = "xof", orderId } = req.body;
+      const { amount, currency = 'xof', orderId } = req.body;
 
       if (!process.env.STRIPE_SECRET_KEY) {
         console.error("STRIPE_SECRET_KEY is not configured in environment variables.");

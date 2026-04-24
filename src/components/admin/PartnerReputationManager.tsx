@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
+import React, { useMemo, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
+import { syncService } from '../../services/syncService';
 import { UserProfile, PartnerRating, Order } from '../../types';
 import { motion } from 'motion/react';
 import { Star, TrendingUp, Users, Award, MessageSquare, Clock, Printer } from 'lucide-react';
@@ -7,20 +9,21 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export const PartnerReputationManager = () => {
-  const { data: users } = useFirestoreData<UserProfile>({
-    tableName: 'users'
-  });
+  useEffect(() => {
+    syncService.syncUsers('');
+    syncService.syncPartnerRatings();
+    syncService.syncOrders('');
+  }, []);
 
-  const { data: ratings } = useFirestoreData<PartnerRating>({
-    tableName: 'partner_ratings'
-  });
-
-  const { data: orders } = useFirestoreData<Order>({
-    tableName: 'orders'
-  });
+  const users = useLiveQuery(() => db.users.toArray()) || [];
+  const ratings = useLiveQuery(() => db.partner_ratings.toArray()) || [];
+  const orders = useLiveQuery(() => db.orders.toArray()) || [];
 
   const partners = useMemo(() => {
-    return users.filter(u => u.role === 'printer' || u.role === 'designer');
+    return users.filter(u => 
+      (u.role === 'printer' || u.role === 'designer') && 
+      (u.partnerStatus === 'approved' || !u.partnerStatus) // Fallback for old records without partnerStatus
+    );
   }, [users]);
 
   const partnerStats = useMemo(() => {

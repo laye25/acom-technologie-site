@@ -5,7 +5,6 @@ import { dbService } from '../services/dbService';
 import { db } from '../db/db';
 import { syncService } from '../services/syncService';
 import { Order, OrderStatus, UserProfile, Service, Expense, SiteSettings } from '../types';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Link as LinkIcon } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
@@ -517,38 +516,6 @@ const AdminDashboard = () => {
     }
   }, [isRestrictedAdmin, activeTab]);
 
-  const orderOptions = useMemo(() => ({
-    tableName: 'orders' as TableName,
-    order: { column: 'updated_at' as const, ascending: false },
-    skip: !hasAccess || isRestrictedAdmin,
-    limit: 100
-  }), [hasAccess, isRestrictedAdmin]);
-
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName,
-    skip: !hasAccess,
-    limit: 50
-  }), [hasAccess]);
-
-  const userOptions = useMemo(() => ({
-    tableName: 'users' as TableName,
-    skip: !hasAccess,
-    limit: 100
-  }), [hasAccess]);
-
-  const expenseOptions = useMemo(() => ({
-    tableName: 'expenses' as TableName,
-    order: { column: 'date' as const, ascending: false },
-    skip: !hasAccess,
-    limit: 100
-  }), [hasAccess]);
-
-  const settingsOptions = useMemo(() => ({
-    tableName: 'settings' as TableName,
-    skip: !hasAccess,
-    limit: 20
-  }), [hasAccess]);
-
   // Replace manual loading with useLiveQuery
   const orders = useLiveQuery(() => db.orders.toArray()) || [];
   const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
@@ -575,11 +542,11 @@ const AdminDashboard = () => {
         // Sync in background (séquentiel pour lisser la charge IO)
         if (user?.uid) {
           const syncTasks = [
-            () => syncService.syncOrders(user.uid),
-            () => syncService.syncServices(user.uid),
-            () => syncService.syncUsers(user.uid),
-            () => syncService.syncExpenses(user.uid),
-            () => syncService.syncSettings(user.uid)
+            () => syncService.syncOrders('global'),
+            () => syncService.syncServices('global'),
+            () => syncService.syncUsers('global'),
+            () => syncService.syncExpenses('global'),
+            () => syncService.syncSettings('global')
           ];
 
           for (const task of syncTasks) {

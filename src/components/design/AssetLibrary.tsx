@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { storageService } from '../../services/storageService';
-import { firestoreService } from '../../services/firestoreService';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
+import { dbService } from '../../services/dbService';
+import { syncService } from '../../services/syncService';
 import { useAuth } from '../../context/AuthContext';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
 import { Asset } from '../../types';
 
 interface AssetLibraryProps {
@@ -14,10 +16,18 @@ interface AssetLibraryProps {
 export const AssetLibrary: React.FC<AssetLibraryProps> = ({ onInsert }) => {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
-  const { data: assets, refresh: refreshAssets } = useFirestoreData<Asset>({
-    tableName: 'assets',
-    filters: user ? [{ column: 'userId', value: user.uid }] : undefined
-  });
+  
+  // Read from Dexie (Offline-first)
+  const assets = useLiveQuery(
+    () => user ? db.assets.where('userId').equals(user.uid).reverse().sortBy('createdAt') : [],
+    [user?.uid]
+  ) || [];
+
+  useEffect(() => {
+    if (user?.uid) {
+      syncService.syncAssets(user.uid);
+    }
+  }, [user?.uid]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,11 +45,12 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ onInsert }) => {
         name: file.name,
         url,
         type: file.type.startsWith('image/svg') ? 'icon' : 'image',
-        createdAt: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
 
-      await firestoreService.add('assets', newAsset);
-      refreshAssets();
+      await dbService.assets.save(newAsset);
+
       toast.success("Asset ajouté !", { id: loadingToast });
     } catch (error) {
       console.error("Upload error:", error);
@@ -51,9 +62,15 @@ export const AssetLibrary: React.FC<AssetLibraryProps> = ({ onInsert }) => {
 
   const handleDelete = async (asset: Asset) => {
     try {
-      await storageService.deleteFile('assets', asset.url.split('assets%2F')[1].split('?')[0]);
-      await firestoreService.delete('assets', asset.id);
-      refreshAssets();
+      // Extract path from storage URL
+      const path = asset.url.includes('assets%2F') 
+        ? asset.url.split('assets%2F')[1].split('?')[0].replace(/%2F/g, '/')
+        : `assets/${user?.uid}/${asset.name}`;
+
+      await storageService.deleteFile('assets', path);
+      
+      await dbService.assets.delete(asset.id);
+      
       toast.success("Asset supprimé.");
     } catch (error) {
       console.error("Delete error:", error);

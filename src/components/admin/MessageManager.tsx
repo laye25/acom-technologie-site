@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
+import { syncService } from '../../services/syncService';
 import { Order, UserProfile, Service } from '../../types';
-import { dbService as db } from '../../services/dbService';
 import { Link } from 'react-router-dom';
 import { MessageSquare, User, Clock, ChevronRight, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -10,28 +11,33 @@ import { fr } from 'date-fns/locale';
 import { SERVICES as STATIC_SERVICES } from '../../constants';
 
 const MessageManager = () => {
-  const { isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager, user } = useAuth();
   const hasAccess = isAdmin || isManager;
-  
-  const orderOptions = useMemo(() => ({
-    tableName: 'orders' as TableName,
-    order: { column: 'updatedAt' as const, ascending: false },
-    skip: !hasAccess
-  }), [hasAccess]);
 
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName,
-    skip: !hasAccess
-  }), [hasAccess]);
+  useEffect(() => {
+    if (hasAccess) {
+      // Sync all orders for admin/manager
+      // In this specific system, we might need a merchantId or sync global
+      // If merchantId is missing, syncService.syncOrders handles 'global' or user's merchant
+      syncService.syncOrders(''); 
+      syncService.syncServices('');
+      syncService.syncUsers('');
+    }
+  }, [hasAccess]);
 
-  const userOptions = useMemo(() => ({
-    tableName: 'users' as TableName,
-    skip: !hasAccess
-  }), [hasAccess]);
+  const orders = useLiveQuery(() => 
+    db.orders.orderBy('updatedAt').reverse().toArray()
+  ) || [];
 
-  const { data: orders, loading: ordersLoading } = useFirestoreData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
-  const { data: users } = useFirestoreData<UserProfile>(userOptions);
+  const dynamicServices = useLiveQuery(() => 
+    db.services.toArray()
+  ) || [];
+
+  const users = useLiveQuery(() => 
+    db.users.toArray()
+  ) || [];
+
+  const ordersLoading = !orders && hasAccess;
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];

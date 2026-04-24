@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
+import React, { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
+import { useAuth } from '../../context/AuthContext';
+import { syncService } from '../../services/syncService';
 import { UserProfile } from '../../types';
 import { dbService } from '../../services/dbService';
 import { 
@@ -14,17 +17,27 @@ import { motion, AnimatePresence } from 'motion/react';
 import { notificationService } from '../../services/notificationService';
 
 export const UserManager: React.FC = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
-  const { data: users, loading } = useFirestoreData<UserProfile>({
-    tableName: 'users'
-  });
+  const users = useLiveQuery(() => db.users.toArray().then(users => users as UserProfile[])) || [];
+  const loading = false; // Simplified
 
-  const { data: settingsData } = useFirestoreData<any>({
-    tableName: 'settings'
-  });
+  useEffect(() => {
+    if (user?.uid) {
+      syncService.syncUsers('global');
+    }
+  }, [user?.uid]);
+
+  const settingsData = useLiveQuery(() => db.settings.toArray()) || [];
+  
+  useEffect(() => {
+    if (user?.uid) {
+      syncService.syncSettings(user.uid);
+    }
+  }, [user?.uid]);
   const globalSettings = settingsData?.find(s => s.id === 'global') || {};
   const defaultComm = globalSettings.defaultPartnerCommission || 80;
 

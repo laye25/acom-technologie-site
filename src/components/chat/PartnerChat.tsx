@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, UserProfile } from '../../types';
+import { Message } from '../../types';
 import { chatService } from '../../services/chatService';
 import { useAuth } from '../../context/AuthContext';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
+import { syncService } from '../../services/syncService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Send, User, Loader2, MessageCircle } from 'lucide-react';
@@ -21,7 +24,6 @@ export const PartnerChat: React.FC<PartnerChatProps> = ({
   isAdminView = false 
 }) => {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -29,27 +31,24 @@ export const PartnerChat: React.FC<PartnerChatProps> = ({
   // Deterministic chatId for this pair
   const chatId = `chat_${[partnerId, adminId].sort().join('_')}`;
 
+  const messages = useLiveQuery(() => 
+    db.messages.where('chatId').equals(chatId).sortBy('timestamp'),
+    [chatId]
+  ) || [];
+
   useEffect(() => {
     const initChat = async () => {
       setIsLoading(true);
       try {
+        await syncService.syncMessages(chatId);
         chatService.connect();
         chatService.joinRoom(chatId);
         
-        // Load history
-        const history = await chatService.getMessages(chatId);
-        setMessages(history);
-        
         // Listen for new messages
-        chatService.onMessage((msg) => {
+        chatService.onMessage(async (msg) => {
           if (msg.chatId === chatId) {
-            setMessages(prev => {
-              // Avoid duplicates if Firestore listener also triggered something
-              if (prev.find(m => m.id === msg.id || (m.timestamp === msg.timestamp && m.text === msg.text))) {
-                 return prev;
-              }
-              return [...prev, msg];
-            });
+            // Save to Dexie so useLiveQuery picks it up
+            await db.messages.put(msg);
           }
         });
       } catch (error) {

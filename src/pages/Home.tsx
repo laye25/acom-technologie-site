@@ -6,10 +6,12 @@ import Hero from '../components/Hero';
 import { Service, ServiceCategory, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, ArrowRight, CheckCircle2, Star, Users, Briefcase, Award, Filter, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, Package, FileText, BarChart3, Construction, Hospital, Truck, GraduationCap, Settings } from 'lucide-react';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { Link } from 'react-router-dom';
 import { Translate, useTranslation } from '../context/LanguageContext';
-import { dbService as db } from '../services/dbService';
+import { db } from '../db/db';
+import { dbService } from '../services/dbService';
+import { syncService } from '../services/syncService';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { OptimizedImage } from '../components/OptimizedImage';
 
 const iconMap: { [key: string]: any } = {
@@ -57,7 +59,7 @@ const Home = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const data = await db.settings.get('global');
+        const data = await dbService.settings.get('global');
         if (data) setSettings(data as SiteSettings);
       } catch (error) {
         console.error('Error fetching settings:', error);
@@ -66,28 +68,13 @@ const Home = () => {
     fetchSettings();
   }, []);
 
-  const serviceMapper = useMemo(() => (s: any) => ({
-    id: s.id,
-    name: s.name,
-    shortDescription: s.shortDescription,
-    description: s.description,
-    price: s.price,
-    category: s.category,
-    subCategory: s.subCategory,
-    pillar: s.pillar,
-    image: s.image || s.image_url || `https://picsum.photos/seed/${s.id}/800/600`,
-    features: s.features || [],
-    promotion: s.promotion
-  }), []);
+  // Sync services if needed, or rely on global sync
+  useEffect(() => {
+    syncService.syncServices('global'); // Assume global sync or handle multi-merchant if needed
+  }, []);
 
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName,
-    order: { column: 'name' as const },
-    mapper: serviceMapper,
-    limit: 50
-  }), [serviceMapper]);
-
-  const { data: dbServices, loading } = useFirestoreData<Service>(serviceOptions);
+  const dbServices = useLiveQuery(() => db.services.toArray()) || [];
+  const loading = false;
 
   const [activePillar, setActivePillar] = useState<'saas' | 'studio' | 'all'>('all');
   const [activeCategory, setActiveCategory] = useState<ServiceCategory | 'all'>('all');

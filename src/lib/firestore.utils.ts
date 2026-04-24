@@ -1,4 +1,5 @@
 import { auth } from '../firebase';
+import toast from 'react-hot-toast';
 
 export enum OperationType {
   CREATE = 'create',
@@ -28,9 +29,26 @@ export interface FirestoreErrorInfo {
   }
 }
 
+let quotaToastShown = false;
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
+  if (errorMessage.toLowerCase().includes('quota')) {
+    // Si la limite de quota est atteinte, on l'enregistre pour bloquer les futurs appels locaux pendant 1h
+    localStorage.setItem('firebase_quota_exceeded', Date.now().toString());
+    if (!quotaToastShown) {
+       toast.error("Quota Firestore épuisé. L'application est passée en mode hors-ligne complet (lecture seule cache).", { duration: 10000 });
+       quotaToastShown = true;
+    }
+  } else if (errorMessage.toLowerCase().includes('missing or insufficient permissions')) {
+    if (!quotaToastShown) {
+      toast.error("Permissions insuffisantes pour cette action.", { duration: 4000 });
+    }
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,

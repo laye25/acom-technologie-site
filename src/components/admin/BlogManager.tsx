@@ -4,8 +4,10 @@ import { Plus, Edit2, Trash2, X, Save, FileText, Calendar, User, Upload, Loader2
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useFirestoreData, TableName } from '../../hooks/useFirestoreData';
+import { db as dexieDb } from '../../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { dbService as db } from '../../services/dbService';
+import { syncService } from '../../services/syncService';
 import { getAiClient, getGeminiModel } from '../../lib/gemini';
 import { compressImage, getOptimizedUrl } from '../../lib/imageUtils';
 import { OptimizedImage } from '../OptimizedImage';
@@ -15,25 +17,15 @@ import { ConfirmModal } from './ConfirmModal';
 import { SEOAnalyzer } from './SEOAnalyzer';
 
 const BlogManager = () => {
-  const postMapper = useMemo(() => (p: any) => ({
-    id: p.id,
-    title: p.title,
-    excerpt: p.excerpt,
-    content: p.content,
-    author: p.author,
-    date: p.date,
-    image: p.image,
-    category: p.category,
-    readTime: p.readTime
-  }), []);
+  // Sync blog posts on mount
+  React.useEffect(() => {
+    syncService.syncBlogPosts();
+  }, []);
 
-  const blogOptions = useMemo(() => ({
-    tableName: 'blog_posts' as TableName,
-    order: { column: 'date' as const, ascending: false },
-    mapper: postMapper
-  }), [postMapper]);
-
-  const { data: posts, loading, error: fetchError, refresh } = useFirestoreData<BlogPost>(blogOptions);
+  const posts = useLiveQuery(() => dexieDb.blog_posts.toArray()) || [];
+  const loading = false;
+  const fetchError = null;
+  const refresh = () => syncService.syncBlogPosts();
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentPost, setCurrentPost] = useState<Partial<BlogPost> | null>(null);

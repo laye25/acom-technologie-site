@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
-import { dbService as db } from '../services/dbService';
+import { dbService as dbService } from '../services/dbService';
+import { db } from '../db/db'; // Dexie
+import { syncService } from '../services/syncService';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, MerchantPlan } from '../types';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, Package, ShoppingCart, PieChart, Plus, Trash2, 
@@ -120,6 +122,7 @@ const MerchantSaaS = () => {
   const { user, signOut } = useAuth();
   const [merchant, setMerchant] = useState<Merchant | null>(null);
   const [loadingMerchant, setLoadingMerchant] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   
@@ -136,7 +139,7 @@ const MerchantSaaS = () => {
         if (merchant.plan !== newPlan) {
           try {
             const updatedMerchant = { ...merchant, plan: newPlan, updatedAt: new Date() };
-            await db.merchants.save(updatedMerchant);
+            await dbService.merchants.save(updatedMerchant);
             setMerchant(updatedMerchant);
             toast.success(`Votre plan a été mis à jour avec succès : ${newPlan} !`, {
               duration: 5000,
@@ -161,7 +164,7 @@ const MerchantSaaS = () => {
     if (merchant) {
       handlePaymentSuccess();
     }
-  }, [searchParams, merchant, db.merchants, setSearchParams]);
+  }, [searchParams, merchant, setSearchParams]);
 
   // Handle auto-show upgrade modal from URL
   useEffect(() => {
@@ -182,11 +185,20 @@ const MerchantSaaS = () => {
       if (!user) return;
       try {
         setLoadingMerchant(true);
-        // Fetch from Supabase
-        const m = await db.merchants.getByOwner(user.uid);
-        setMerchant(m);
-      } catch (error) {
+        setError(null);
+        // Fetch from Supabase via dbService
+        const m = await dbService.merchants.getByOwner(user.uid);
+        
+        // If we hit quota error, it might be stored in localStorage by handleFirestoreError
+        const quotaExceeded = localStorage.getItem('firebase_quota_exceeded');
+        if (quotaExceeded && !m) {
+          setError("Quota Firestore épuisé. Impossible de charger votre profil marchand.");
+        } else {
+          setMerchant(m);
+        }
+      } catch (error: any) {
         console.error('Error fetching merchant:', error);
+        setError("Erreur lors du chargement de votre profil marchand.");
       } finally {
         setLoadingMerchant(false);
       }
@@ -263,6 +275,28 @@ const MerchantSaaS = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gray-50">
+        <div className="bg-white p-8 rounded-[2rem] shadow-xl max-w-md w-full text-center border border-red-100">
+          <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-black text-ink mb-4 tracking-tight">Erreur de chargement</h2>
+          <p className="text-gray-500 text-sm mb-8 leading-relaxed">
+            {error}
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full py-4 bg-ink text-white rounded-xl font-bold uppercase text-[10px] tracking-widest hover:bg-black transition-all shadow-lg shadow-ink/20"
+          >
+            Réessayer
+          </button>
+        </div>
       </div>
     );
   }
@@ -386,14 +420,32 @@ const TabButton = ({ active, onClick, icon: Icon, label }: any) => (
 const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void }) => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-  const type = searchParams.get('type') || 'boutique';
+  const urlType = searchParams.get('type') || 'boutique';
   const [name, setName] = useState('');
   const [currency, setCurrency] = useState('FCFA');
+  const [type, setType] = useState(urlType);
   const [plan, setPlan] = useState<MerchantPlan>('FREE');
   const [loading, setLoading] = useState(false);
 
-  const getSaaSConfig = (type: string) => {
-    switch (type) {
+  const managementTypes = [
+    { id: 'boutique', label: 'Commerce / Stock', icon: Package, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+    { id: 'entreprise', label: 'Services / Interventions', icon: Wrench, color: 'text-purple-500', bgColor: 'bg-purple-50' },
+    { id: 'chantier', label: 'BTP / Chantier', icon: HardHat, color: 'text-orange-500', bgColor: 'bg-orange-50' },
+    { id: 'transport', label: 'Transport / Flotte', icon: Truck, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
+    { id: 'rh', label: 'Ressources Humaines', icon: Users, color: 'text-rose-500', bgColor: 'bg-rose-50' },
+    { id: 'scolaire', label: 'Établissement Scolaire', icon: GraduationCap, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
+    { id: 'medical', label: 'Établissement Médical', icon: Stethoscope, color: 'text-red-500', bgColor: 'bg-red-50' },
+  ];
+
+  const plans = [
+    { id: 'FREE', name: 'FREE', price: '0 FCFA', desc: 'Basique' },
+    { id: 'BASIC', name: 'BASIC', price: '10.000 FCFA', desc: 'Essentiel' },
+    { id: 'STANDARD', name: 'STANDARD', price: '25.000 FCFA', desc: 'Populaire' },
+    { id: 'PREMIUM', name: 'PREMIUM', price: '45.000 FCFA', desc: 'Complet' },
+  ];
+
+  const getSaaSConfig = (t: string) => {
+    switch (t) {
       case 'entreprise':
         return { label: "l'entreprise", placeholder: "ex: Mon Entreprise de Services" };
       case 'chantier':
@@ -416,8 +468,19 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (!name.trim()) {
+      toast.error('Veuillez entrer le nom de votre organisation');
+      return;
+    }
     setLoading(true);
     try {
+      // Final check to see if a merchant was created while the user was on this page
+      const existing = await dbService.merchants.getByOwner(user.uid);
+      if (existing) {
+        onComplete(existing);
+        return;
+      }
+
       const merchantData = {
         ownerId: user.uid,
         owner_id: user.uid, // Support both snake_case and camelCase for rules/queries
@@ -428,7 +491,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      const id = await db.merchants.save(merchantData);
+      const id = await dbService.merchants.save(merchantData as any);
       onComplete({ ...merchantData, id } as Merchant);
       toast.success(`Votre ${label} a été créée !`);
     } catch (error: any) {
@@ -446,80 +509,160 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6 pt-24 pb-24">
       <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-lg w-full border border-black/5 relative overflow-hidden"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white p-8 md:p-12 rounded-[3rem] shadow-2xl max-w-4xl w-full border border-black/5 relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-ink to-primary opacity-20"></div>
         
-        <div className="w-20 h-20 bg-primary/10 rounded-[2rem] flex items-center justify-center mx-auto mb-8 border border-primary/10 shadow-inner">
-          <Store className="w-10 h-10 text-primary" />
-        </div>
-        
-        <h2 className="text-3xl font-black text-center text-ink mb-2 tracking-tight">Acom SaaS</h2>
-        <p className="text-gray-400 text-center mb-10 text-sm font-medium">
-          Configurez <span className="text-ink font-bold">{label}</span> pour commencer à gérer votre activité avec précision.
-        </p>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Nom de {label}</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink placeholder:text-gray-300"
-              placeholder={placeholder}
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Devise</label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink appearance-none bg-white"
-              >
-                <option value="FCFA">FCFA</option>
-              </select>
+        <div className="flex flex-col md:flex-row gap-12">
+          {/* Left Column: Info */}
+          <div className="md:w-1/3">
+            <div className="w-20 h-20 bg-primary/10 rounded-[2rem] flex items-center justify-center mb-8 border border-primary/10 shadow-inner">
+              <Store className="w-10 h-10 text-primary" />
             </div>
             
-            <div className="space-y-2">
-              <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Forfait</label>
-              <select
-                value={plan}
-                onChange={(e) => setPlan(e.target.value as MerchantPlan)}
-                className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink appearance-none bg-white"
-              >
-                <option value="FREE">FREE</option>
-                <option value="BASIC">BASIC</option>
-                <option value="STANDARD">STANDARD</option>
-                <option value="PREMIUM">PREMIUM</option>
-              </select>
+            <h2 className="text-4xl font-black text-ink mb-4 tracking-tighter leading-tight">Acom SaaS</h2>
+            <p className="text-gray-500 text-sm font-medium leading-relaxed mb-8">
+              Configurez votre espace de gestion professionnelle en quelques secondes. Choisissez le type d'activité qui vous correspond.
+            </p>
+
+            <div className="space-y-4 hidden md:block">
+              <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 italic text-[11px] text-gray-400">
+                "Une plateforme unique pour piloter vos stocks, vos interventions, vos chantiers ou votre établissement médical."
+              </div>
             </div>
           </div>
 
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-5 bg-ink text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-ink/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 group"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <span>Lancer mon activité</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+          {/* Right Column: Form */}
+          <form onSubmit={handleSubmit} className="md:w-2/3 space-y-8">
+            {/* Step 1: Identity */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3 mb-2">
+                <span className="w-6 h-6 bg-ink text-white text-[10px] font-black rounded-full flex items-center justify-center">1</span>
+                <h3 className="text-sm font-black uppercase tracking-widest text-ink">Identité de l'organisation</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Nom de l'organisation</label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink placeholder:text-gray-300 bg-gray-50/50"
+                    placeholder={placeholder}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Devise locale</label>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className="w-full px-5 py-4 rounded-2xl border border-gray-100 focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all font-bold text-ink appearance-none bg-gray-50/50"
+                  >
+                    <option value="FCFA">FCFA (Franc CFA)</option>
+                    <option value="EUR">€ (Euro)</option>
+                    <option value="USD">$ (Dollar)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: Management Type */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3 mb-2">
+                <span className="w-6 h-6 bg-ink text-white text-[10px] font-black rounded-full flex items-center justify-center">2</span>
+                <h3 className="text-sm font-black uppercase tracking-widest text-ink">Type de Gestion</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {managementTypes.map((mType) => {
+                  const Icon = mType.icon;
+                  const isSelected = type === mType.id;
+                  return (
+                    <button
+                      key={mType.id}
+                      type="button"
+                      onClick={() => setType(mType.id)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all group ${
+                        isSelected 
+                          ? 'border-primary bg-primary/5 ring-4 ring-primary/5' 
+                          : 'border-gray-50 bg-white hover:border-gray-200'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-all ${
+                        isSelected ? mType.bgColor + ' ' + mType.color : 'bg-gray-50 text-gray-400'
+                      }`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <span className={`text-[9px] font-black uppercase tracking-tighter text-center ${
+                        isSelected ? 'text-ink' : 'text-gray-400'
+                      }`}>
+                        {mType.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 3: Plan */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3 mb-2">
+                <span className="w-6 h-6 bg-ink text-white text-[10px] font-black rounded-full flex items-center justify-center">3</span>
+                <h3 className="text-sm font-black uppercase tracking-widest text-ink">Choisissez votre Formule</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {plans.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPlan(p.id as any)}
+                    className={`flex flex-col p-4 rounded-2xl border-2 transition-all text-left ${
+                      plan === p.id 
+                        ? 'border-primary bg-primary/5 ring-4 ring-primary/5' 
+                        : 'border-gray-50 bg-white hover:border-gray-200'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${
+                      plan === p.id ? 'text-primary' : 'text-gray-400'
+                    }`}>
+                      {p.name}
+                    </span>
+                    <span className="text-xs font-black text-ink mb-0.5">{p.price}</span>
+                    <span className="text-[10px] text-gray-400 font-medium">{p.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-6">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-5 bg-ink text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-black transition-all shadow-xl shadow-ink/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 group"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <span>Lancer mon activité</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+              <p className="text-center text-[10px] text-gray-400 mt-4 font-medium italic">
+                En cliquant sur "Lancer mon activité", vous acceptez nos conditions d'utilisation.
+              </p>
+            </div>
+          </form>
+        </div>
       </motion.div>
     </div>
   );
@@ -586,7 +729,7 @@ const PlanUpgradeModal = ({
     try {
       if (planId === 'FREE') {
         const updatedMerchant = { ...merchant, plan: 'FREE' as any, updatedAt: new Date() };
-        await db.merchants.save(updatedMerchant);
+        await dbService.merchants.save(updatedMerchant);
         onUpdate(updatedMerchant);
         toast.success(`Plan mis à jour vers FREE`);
         onClose();
@@ -664,7 +807,7 @@ const PlanUpgradeModal = ({
     if (!selectedPlanId) return;
     try {
       const updatedMerchant = { ...merchant, plan: selectedPlanId as any, updatedAt: new Date() };
-      await db.merchants.save(updatedMerchant);
+      await dbService.merchants.save(updatedMerchant);
       onUpdate(updatedMerchant);
       toast.success(`Plan mis à jour vers ${selectedPlanId} via Stripe !`);
       onClose();
@@ -832,68 +975,73 @@ const MerchantDashboard = ({
   showUpgradeModal: boolean,
   setShowUpgradeModal: (val: boolean) => void
 }) => {
-  const productOptions = useMemo(() => ({
-    tableName: 'merchant_products' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    mapper: (data: any) => ({
-      ...data,
-      merchantId: data.merchant_id,
-      costPrice: data.cost_price,
-      stockQuantity: data.stock_quantity,
-      minStockLevel: data.min_stock_level,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    })
-  }), [merchant.id]);
+  // Read from Dexie (Offline-first)
+  const products = useLiveQuery(() => 
+    db.products.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
 
-  const saleOptions = useMemo(() => ({
-    tableName: 'merchant_sales' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const },
-    limit: 500,
-    mapper: (data: any) => ({
-      ...data,
-      merchantId: data.merchant_id,
-      totalAmount: data.total_amount,
-      paymentMethod: data.payment_method,
-      customerName: data.customer_name,
-      customerPhone: data.customer_phone,
-      processedBy: data.processed_by,
-      createdAt: data.created_at
-    })
-  }), [merchant.id]);
+  const sales = useLiveQuery(() => 
+    db.sales.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
 
-  const expenseOptions = useMemo(() => ({
-    tableName: 'merchant_expenses' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const },
-    limit: 500,
-    mapper: (data: any) => ({
-      ...data,
-      merchantId: data.merchant_id,
-      createdAt: data.created_at
-    })
-  }), [merchant.id]);
-
-  const { data: products } = useFirestoreData<MerchantProduct>(productOptions);
-  const { data: sales } = useFirestoreData<MerchantSale>(saleOptions);
-  const { data: expenses } = useFirestoreData<MerchantExpense>(expenseOptions);
+  const expenses = useLiveQuery(() => 
+    db.expenses.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
   
-  // Point 6: Aggregation - Fetch global merchant stats
-  const { data: merchantStatsData } = useFirestoreData<any>(useMemo(() => ({ 
-    tableName: 'merchant_stats', 
-    filter: { column: 'id', value: merchant.id } 
-  }), [merchant.id]));
-  const merchantStats = merchantStatsData?.[0];
+  // Point 6: Aggregation - Global merchant stats (On-demand/Offline)
+  const [merchantStats, setMerchantStats] = useState<any>(null);
+  useEffect(() => {
+    const fetchStats = async () => {
+      // Pour les stats, on peut soit les calculer localement, soit les synchroniser
+      // Ici on les cherche dans Dexie (nécessite une table merchant_stats si on veut faire comme avant)
+      // Mais on peut aussi les calculer à la volée pour plus de précision
+    };
+    fetchStats();
+  }, [merchant.id]);
 
   // Specialized data for stats
-  const { data: interventions } = useFirestoreData<any>(useMemo(() => ({ tableName: 'interventions', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: projects } = useFirestoreData<any>(useMemo(() => ({ tableName: 'projects', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: vehicles } = useFirestoreData<any>(useMemo(() => ({ tableName: 'vehicles', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: employees } = useFirestoreData<any>(useMemo(() => ({ tableName: 'employees', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: students } = useFirestoreData<any>(useMemo(() => ({ tableName: 'students', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: patients } = useFirestoreData<any>(useMemo(() => ({ tableName: 'patients', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
-  const { data: appointments } = useFirestoreData<any>(useMemo(() => ({ tableName: 'appointments', where: [['merchantId', '==', merchant.id]], limit: 100 }), [merchant.id]));
+  const isAuto = merchant.type === 'auto';
+  const isBeauty = merchant.type === 'beauty';
+  const isConstruction = merchant.type === 'construction';
+  const isHR = merchant.type === 'hr';
+  const isLogistics = merchant.type === 'logistics';
+  const isSchool = merchant.type === 'school';
+  const isMedical = merchant.type === 'medical';
+
+  // Sync SaaS data
+  useEffect(() => {
+    if (merchant?.id) {
+      syncService.syncAllMerchantData(merchant.id);
+    }
+  }, [merchant?.id]);
+
+  const interventions = useLiveQuery(() => 
+    (isAuto || isBeauty) ? db.interventions.where('merchantId').equals(merchant.id || '').toArray() : []
+  , [merchant.id, isAuto, isBeauty]) || [];
+  
+  const projects = useLiveQuery(() => 
+    (isConstruction) ? db.projects.where('merchantId').equals(merchant.id || '').toArray() : []
+  , [merchant.id, isConstruction]) || [];
+
+  const vehicles = useLiveQuery(() => 
+    (isLogistics) ? db.vehicles.where('merchantId').equals(merchant.id || '').toArray() : []
+  , [merchant.id, isLogistics]) || [];
+
+  const employees = useLiveQuery(() => 
+    (isHR) ? db.employees.where('merchantId').equals(merchant.id || '').toArray() : []
+  , [merchant.id, isHR]) || [];
+
+  const students = useLiveQuery(() => 
+    (isSchool) ? db.students.where('merchantId').equals(merchant.id || '').toArray() : []
+  , [merchant.id, isSchool]) || [];
+
+  const patients = useLiveQuery(() => 
+    (isMedical) ? db.patients.where('merchantId').equals(merchant.id || '').toArray() : []
+  , [merchant.id, isMedical]) || [];
+
+  const appointments = useLiveQuery(() => 
+    (isMedical) ? db.appointments.where('merchantId').equals(merchant.id || '').toArray() : []
+  , [merchant.id, isMedical]) || [];
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -1650,40 +1798,20 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const productOptions = useMemo(() => ({
-    tableName: 'merchant_products' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    mapper: (data: any) => ({
-      ...data,
-      merchantId: data.merchant_id,
-      costPrice: data.cost_price,
-      stockQuantity: data.stock_quantity,
-      minStockLevel: data.min_stock_level,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    })
-  }), [merchant.id]);
+  // Products loaded from Dexie via useLiveQuery
+  useEffect(() => {
+    syncService.syncProducts(merchant.id);
+  }, [merchant.id]);
 
-  const { data: products, loading } = useFirestoreData<MerchantProduct>(productOptions);
+  const products = useLiveQuery(() => 
+    db.products.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
 
-  const movementOptions = useMemo(() => ({
-    tableName: 'stock_movements' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const },
-    limit: 20,
-    mapper: (data: any) => ({
-      ...data,
-      merchantId: data.merchant_id,
-      productId: data.product_id,
-      previousQuantity: data.previous_quantity,
-      newQuantity: data.new_quantity,
-      referenceId: data.reference_id,
-      performedBy: data.performed_by,
-      createdAt: data.created_at
-    })
-  }), [merchant.id]);
+  const movements = useLiveQuery(() => 
+    db.movements.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
+  , [merchant.id]) || [];
 
-  const { data: movements } = useFirestoreData<any>(movementOptions);
+  const loading = false;
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -1694,7 +1822,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
     if (!currentProduct?.name || currentProduct.price === undefined) return;
     setSaving(true);
     try {
-      await db.merchantProducts.save({
+      await dbService.merchantProducts.save({
         ...currentProduct,
         merchantId: merchant.id,
         updatedAt: new Date()
@@ -1714,7 +1842,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
     if (!currentProduct?.id || restockData.quantity <= 0) return;
     setSaving(true);
     try {
-      await db.stockMovements.addStock(
+      await dbService.stockMovements.addStock(
         merchant.id,
         currentProduct.id,
         restockData.quantity,
@@ -1735,7 +1863,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
   const handleDelete = async (id: string) => {
     setSaving(true);
     try {
-      await db.merchantProducts.delete(id);
+      await dbService.merchantProducts.delete(id);
       toast.success('Produit supprimé');
       setDeleteConfirm(null);
     } catch (error) {
@@ -2160,12 +2288,9 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showReceiptModal, setShowReceiptModal] = useState<{ show: boolean, saleData: any } | null>(null);
 
-  const productOptions = useMemo(() => ({
-    tableName: 'merchant_products' as TableName,
-    where: [['merchantId', '==', merchant.id]]
-  }), [merchant.id]);
-
-  const { data: products } = useFirestoreData<MerchantProduct>(productOptions);
+  const products = useLiveQuery(() => 
+    db.products.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) && p.stockQuantity > 0);
@@ -2205,7 +2330,7 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
       };
       
       // Save the sale (service handles stock update)
-      const saleId = await db.merchantSales.save(saleData);
+      const saleId = await dbService.merchantSales.save(saleData);
 
       setShowReceiptModal({ show: true, saleData: { ...saleData, id: saleId } });
 
@@ -2407,20 +2532,15 @@ const PaymentMethodBtn = ({ active, onClick, label }: any) => (
 
 // --- Merchant Audit Log ---
 const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
-  const productOptions = useMemo(() => ({
-    tableName: 'merchant_products' as TableName,
-    where: [['merchantId', '==', merchant.id]]
-  }), [merchant.id]);
+  const products = useLiveQuery(() => 
+    db.products.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
 
-  const { data: products } = useFirestoreData<MerchantProduct>(productOptions);
+  const movements = useLiveQuery(() => 
+    db.movements.where('merchantId').equals(merchant.id).reverse().limit(50).toArray()
+  , [merchant.id]) || [];
 
-  const movementOptions = useMemo(() => ({
-    tableName: 'stock_movements' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
-
-  const { data: movements, loading } = useFirestoreData<any>(movementOptions);
+  const loading = false;
 
   return (
     <motion.div 
@@ -2515,25 +2635,36 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
   const [newExpense, setNewExpense] = useState({ title: '', amount: 0, category: 'Général', description: '' });
   const [saving, setSaving] = useState(false);
 
-  const expenseOptions = useMemo(() => ({
-    tableName: 'merchant_expenses' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  // const expenseOptions = useMemo(() => ({
+  //   where: [['merchantId', '==', merchant.id]],
+  //   order: { column: 'createdAt' as const, direction: 'desc' as const },
+  //   limit: 100,
+  //   realtime: false
+  // }), [merchant.id]);
 
-  const { data: expenses, loading } = useFirestoreData<MerchantExpense>(expenseOptions);
+  // const { data: expenses, loading } = useFirestoreData<MerchantExpense>(expenseOptions);
+
+  useEffect(() => {
+    syncService.syncExpenses(merchant.id);
+  }, [merchant.id]);
+
+  const expenses = useLiveQuery(() => 
+    db.expenses.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
+  ) || [];
+  const loading = false; // Simplified
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExpense.title || !newExpense.amount) return;
     setSaving(true);
     try {
-      await db.merchantExpenses.save({
+      await dbService.merchantExpenses.save({
         ...newExpense,
         merchantId: merchant.id,
-        date: new Date()
+        date: new Date().toISOString()
       });
-      toast.success('Dépense enregistrée');
+      syncService.syncExpenses(merchant.id);
+      // toast.success('Dépense enregistrée');
       setIsAddingExpense(false);
       setNewExpense({ title: '', amount: 0, category: 'Général', description: '' });
     } catch (error) {
@@ -2667,13 +2798,14 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
 
 // --- Merchant Sales History ---
 const MerchantSalesHistory = ({ merchant }: { merchant: Merchant }) => {
-  const saleOptions = useMemo(() => ({
-    tableName: 'merchant_sales' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  useEffect(() => {
+    syncService.syncSales(merchant.id);
+  }, [merchant.id]);
 
-  const { data: sales, loading } = useFirestoreData<MerchantSale>(saleOptions);
+  const sales = useLiveQuery(() => 
+    db.sales.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
+  ) || [];
+  const loading = false; // Simplified
 
   return (
     <motion.div 
@@ -2781,26 +2913,18 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentSupplier, setCurrentSupplier] = useState<Partial<MerchantSupplier> | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const supplierOptions = useMemo(() => ({
-    tableName: 'merchant_suppliers' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    mapper: (data: any) => ({
-      ...data,
-      merchantId: data.merchant_id,
-      contactName: data.contact_name,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    })
-  }), [merchant.id]);
+  const suppliers = useLiveQuery(() => 
+    db.suppliers.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
 
-  const { data: suppliers, loading } = useFirestoreData<MerchantSupplier>(supplierOptions);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentSupplier?.name) return;
     setSaving(true);
     try {
-      await db.merchantSuppliers.save({
+      await dbService.merchantSuppliers.save({
         ...currentSupplier,
         merchantId: merchant.id
       });
@@ -2817,7 +2941,7 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Supprimer ce fournisseur ?')) return;
     try {
-      await db.merchantSuppliers.delete(id);
+      await dbService.merchantSuppliers.delete(id);
       toast.success('Fournisseur supprimé');
     } catch (error) {
       toast.error('Erreur lors de la suppression');
@@ -2966,7 +3090,7 @@ const MerchantSettings = ({
     e.preventDefault();
     setSaving(true);
     try {
-      await db.merchants.save({ ...formData, updatedAt: new Date() });
+      await dbService.merchants.save({ ...formData, updatedAt: new Date() } as any);
       onUpdate(formData);
       toast.success('Réglages mis à jour');
     } catch (error) {
@@ -3080,19 +3204,17 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentIntervention, setCurrentIntervention] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  const options = useMemo(() => ({
-    tableName: 'interventions' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  const interventions = useLiveQuery(() => 
+    db.interventions.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
+  , [merchant.id]) || [];
 
-  const { data: interventions, loading } = useFirestoreData<any>(options);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await db.interventions.save({
+      await dbService.interventions.save({
         ...currentIntervention,
         merchantId: merchant.id
       });
@@ -3264,19 +3386,17 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const options = useMemo(() => ({
-    tableName: 'projects' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  const projects = useLiveQuery(() => 
+    db.projects.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
+  , [merchant.id]) || [];
 
-  const { data: projects, loading } = useFirestoreData<any>(options);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await db.projects.save({
+      await dbService.projects.save({
         ...currentProject,
         merchantId: merchant.id
       });
@@ -3458,19 +3578,17 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentVehicle, setCurrentVehicle] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  const options = useMemo(() => ({
-    tableName: 'vehicles' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  const vehicles = useLiveQuery(() => 
+    db.vehicles.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
+  , [merchant.id]) || [];
 
-  const { data: vehicles, loading } = useFirestoreData<any>(options);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await db.vehicles.save({
+      await dbService.vehicles.save({
         ...currentVehicle,
         merchantId: merchant.id
       });
@@ -3641,19 +3759,17 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentEmployee, setCurrentEmployee] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  const options = useMemo(() => ({
-    tableName: 'employees' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  const employees = useLiveQuery(() => 
+    db.employees.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
+  , [merchant.id]) || [];
 
-  const { data: employees, loading } = useFirestoreData<any>(options);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await db.employees.save({
+      await dbService.employees.save({
         ...currentEmployee,
         merchantId: merchant.id
       });
@@ -3861,19 +3977,17 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentStudent, setCurrentStudent] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  const options = useMemo(() => ({
-    tableName: 'students' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  const students = useLiveQuery(() => 
+    db.students.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
+  , [merchant.id]) || [];
 
-  const { data: students, loading } = useFirestoreData<any>(options);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await db.students.save({
+      await dbService.students.save({
         ...currentStudent,
         merchantId: merchant.id
       });
@@ -4043,19 +4157,17 @@ const MedicalManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentPatient, setCurrentPatient] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  const options = useMemo(() => ({
-    tableName: 'patients' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  const patients = useLiveQuery(() => 
+    db.patients.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
+  , [merchant.id]) || [];
 
-  const { data: patients, loading } = useFirestoreData<any>(options);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await db.patients.save({
+      await dbService.patients.save({
         ...currentPatient,
         merchantId: merchant.id
       });
@@ -4243,19 +4355,17 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentAppointment, setCurrentAppointment] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
-  const options = useMemo(() => ({
-    tableName: 'appointments' as TableName,
-    where: [['merchantId', '==', merchant.id]],
-    order: { column: 'createdAt' as const, direction: 'desc' as const }
-  }), [merchant.id]);
+  const appointments = useLiveQuery(() => 
+    db.appointments.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
+  , [merchant.id]) || [];
 
-  const { data: appointments, loading } = useFirestoreData<any>(options);
+  const loading = false;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await db.appointments.save({
+      await dbService.appointments.save({
         ...currentAppointment,
         merchantId: merchant.id
       });

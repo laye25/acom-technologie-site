@@ -1,40 +1,30 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { BLOG_POSTS as STATIC_POSTS } from '../constants';
 import { BlogPost } from '../types';
+import { db } from '../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { syncService } from '../services/syncService';
 import { motion } from 'motion/react';
 import { Calendar, User, Clock, ArrowRight, ChevronRight, Bookmark } from 'lucide-react';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
 import { OptimizedImage } from '../components/OptimizedImage';
 
 const Blog = () => {
-  const postMapper = useMemo(() => (p: any) => ({
-    id: p.id,
-    title: p.title,
-    excerpt: p.excerpt,
-    content: p.content,
-    author: p.author,
-    date: p.date,
-    image: p.image || p.image_url || `https://picsum.photos/seed/${p.id}/800/600`,
-    category: p.category,
-    readTime: p.read_time
-  }), []);
+  // Sync blog posts
+  useEffect(() => {
+    syncService.syncBlogPosts();
+  }, []);
 
-  const blogOptions = useMemo(() => ({
-    tableName: 'blog_posts' as TableName,
-    order: { column: 'date' as const, ascending: false },
-    mapper: postMapper,
-    limit: 20
-  }), [postMapper]);
-
-  const { data: dbPosts, loading } = useFirestoreData<BlogPost>(blogOptions);
+  // Read from Dexie
+  const dbPosts = useLiveQuery(() => db.blog_posts.toArray()) || [];
+  const loading = false; // Simplified
 
   const posts = useMemo(() => {
-    if (!loading && dbPosts.length === 0) {
+    if (dbPosts.length === 0) {
       return STATIC_POSTS;
     }
-    return dbPosts.length > 0 ? dbPosts : STATIC_POSTS;
-  }, [dbPosts, loading]);
+    return dbPosts;
+  }, [dbPosts]);
 
   return (
     <div className="bg-paper min-h-screen">

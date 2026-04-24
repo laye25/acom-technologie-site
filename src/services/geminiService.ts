@@ -173,28 +173,20 @@ export const geminiService = {
     }
   },
 
-  analyzeBusinessPerformance: async (orders: any[], expenses: any[]): Promise<string> => {
-    const prompt = `
-      Tu es un analyste financier expert. Analyse les performances suivantes (Dernières commandes et dépenses) pour Acom Technologie.
-      Fournis un résumé concis comprenant:
-      - Tendance globale du CA
-      - Analyse de la rentabilité (par rapport aux dépenses)
-      - Points d'attention ou opportunités.
-      
-      Données :
-      Commandes : ${JSON.stringify(orders.slice(-30))}
-      Dépenses : ${JSON.stringify(expenses.slice(-30))}
-    `;
-    
+  analyzeBusinessPerformance: async (orders: any[], expenses: any[], tenantId: string): Promise<string> => {
     try {
-      const ai = getAiClient();
-      if (!ai) return "Assistant IA indisponible.";
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: prompt
+      const response = await fetch('/api/gemini/analyze-business', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orders, expenses, tenantId })
       });
-      return response.text || "";
+      
+      if (!response.ok) throw new Error('Erreur lors de l\'analyse');
+      
+      const data = await response.json();
+      return data.analysis;
     } catch (e) {
+      console.error("Failed to analyze business performance", e);
       return "Analyse impossible pour le moment.";
     }
   }

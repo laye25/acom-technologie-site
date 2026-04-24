@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles, Minimize2, Maximize2 } from 'lucide-react';
 import { getAiClient, getGeminiModel } from '../lib/gemini';
-import { db } from '../firebase';
-import { useFirestoreData } from '../hooks/useFirestoreData';
+import { db as dexieDb } from '../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Service } from '../types';
 import { Link } from 'react-router-dom';
 
@@ -22,11 +22,7 @@ const AIAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: services } = useFirestoreData<Service>({
-    tableName: 'services',
-    order: { column: 'name', direction: 'asc' },
-    realtime: true
-  });
+  const services = useLiveQuery(() => dexieDb.services.toArray()) || [];
 
   useEffect(() => {
     if (scrollRef.current) {

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, CheckCircle, XCircle, Eye, User, Mail, Calendar, Palette, ExternalLink, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { db as dexieDb } from '../../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { syncService } from '../../services/syncService';
 import { firestoreService } from '../../services/firestoreService';
 import { dbService } from '../../services/dbService';
 import { toast } from 'react-hot-toast';
@@ -56,23 +58,18 @@ const DesignRequestManager = () => {
   const navigate = useNavigate();
   const [selectedRequestForPartner, setSelectedRequestForPartner] = useState<any>(null);
 
-  const { data: requests, loading: loadingRequests, refresh: refreshRequests } = useFirestoreData<DesignRequest>({
-    tableName: 'design_requests',
-    order: { column: 'createdAt', direction: 'desc' }
-  });
+  // Sync on mount
+  React.useEffect(() => {
+    syncService.syncStudioAcomData();
+    syncService.syncOrders('global');
+    syncService.syncUsers('global');
+  }, []);
 
-  const { data: studioOrders, loading: loadingOrders, refresh: refreshOrders } = useFirestoreData<any>({
-    tableName: 'orders',
-    where: [['pillar', '==', 'studio']]
-  });
+  const requests = useLiveQuery(() => dexieDb.design_requests.toArray()) || [];
+  const studioOrders = useLiveQuery(() => dexieDb.orders.filter(o => o.pillar === 'studio').toArray()) || [];
+  const allPartners = useLiveQuery(() => dexieDb.users.filter(u => u.role === 'printer' && u.partnerStatus === 'approved').toArray()) || [];
 
-  // Fetch partners
-  const { data: allPartners, loading: loadingPartners } = useFirestoreData<UserProfile>({
-    tableName: 'users',
-    where: [['role', '==', 'printer'], ['partnerStatus', '==', 'approved']]
-  });
-
-  const loading = loadingRequests || loadingOrders || loadingPartners;
+  const loading = false;
 
   const allRequests = [
     ...requests.map(r => ({ ...r, origin: 'design_request' })),
@@ -92,7 +89,10 @@ const DesignRequestManager = () => {
       }))
   ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const refresh = () => { refreshRequests(); refreshOrders(); };
+  const refresh = () => { 
+    syncService.syncStudioAcomData();
+    syncService.syncOrders('global');
+  };
 
   const updateStatus = async (id: string, status: string, origin: 'design_request' | 'studio_order') => {
     try {

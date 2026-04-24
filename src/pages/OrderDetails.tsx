@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { syncService } from '../services/syncService';
 import { Order, Service, UserProfile, OrderStatus, PaymentRecord, PartnerRating } from '../types';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,7 +48,6 @@ import { payDunyaService } from '../services/payDunyaService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { dbService } from '../services/dbService';
-import { syncService } from '../services/syncService';
 import { toast } from 'react-hot-toast';
 import { getOrderDiscountedTotal, isPromotionActive } from '../lib/promotions';
 import { OrderAIAnalysis } from '../components/admin/OrderAIAnalysis';
@@ -82,15 +83,16 @@ const OrderDetails = () => {
   const [isAssigningPartner, setIsAssigningPartner] = useState(false);
   const [partnerSearch, setPartnerSearch] = useState('');
 
-  const { data: allPartners } = useFirestoreData<UserProfile>({
-    tableName: 'users',
-    skip: !isAdmin && !isManager
-  });
+  // Utilisez Dexie directement
+  const allPartners = useLiveQuery(() => db.users.where('role').anyOf('printer', 'designer').toArray()) || [];
+  const allRatings = useLiveQuery(() => db.partner_ratings.toArray()) || [];
 
-  const { data: allRatings } = useFirestoreData<PartnerRating>({
-    tableName: 'partner_ratings',
-    skip: !isAdmin && !isManager
-  });
+  useEffect(() => {
+    if (orderId) {
+      syncService.syncUsers(''); // Load all users/partners contextually
+      syncService.syncPartnerRatings();
+    }
+  }, [orderId, user?.uid]);
 
   const partnerReputations = useMemo(() => {
     if (!allPartners || !allRatings) return [];
@@ -120,21 +122,12 @@ const OrderDetails = () => {
     }
   };
 
-  const orderOptions = useMemo(() => ({
-    tableName: 'orders' as TableName,
-    filters: [
-      { column: 'id', value: orderId },
-      ...(!isAdmin && !isManager ? [{ column: 'userId', value: user?.uid }] : [])
-    ],
-    skip: authLoading || !user || !orderId
-  }), [orderId, user, isAdmin, isManager, authLoading]);
-
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName
-  }), []);
-
-  const { data: orderData, loading: orderLoading, error: orderError } = useFirestoreData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
+  const orderData = useLiveQuery(() => db.orders.where('id').equals(orderId || '').toArray()) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+  const allUsers = useLiveQuery(() => db.users.toArray()) || [];
+  
+  const orderLoading = false; // Simplified
+  const orderError = null; // Simplified
 
   const order = orderData?.[0] || null;
 
@@ -244,14 +237,7 @@ const OrderDetails = () => {
     }
   }, [searchParams, order, handlePaymentSuccess]);
 
-  const userProfileOptions = useMemo(() => ({
-    tableName: 'users' as TableName,
-    filters: order ? [{ column: 'uid', value: order.user_id || order.userId }] : [],
-    skip: !order || !(isAdmin || isManager)
-  }), [order, isAdmin, isManager]);
-
-  const { data: userProfiles } = useFirestoreData<UserProfile>(userProfileOptions);
-  const client = userProfiles?.[0] || null;
+  const client = allUsers.find(u => u.uid === (order?.user_id || order?.userId)) || null;
 
   const [accepting, setAccepting] = React.useState(false);
 

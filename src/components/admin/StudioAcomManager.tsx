@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
 import { dbService } from '../../services/dbService';
 import { Category as StudioCategory, Product, INITIAL_CATEGORIES, INITIAL_PRODUCTS } from '../../constants/studioAcom';
 import { firestoreService } from '../../services/firestoreService';
@@ -35,20 +36,9 @@ const StudioAcomManager = () => {
 
   const { categories, products, loading } = useStudioAcom(activeTab === 'categories' || activeTab === 'products');
 
-  const { data: allOrders } = useFirestoreData<Order>({
-    tableName: 'orders',
-    skip: activeTab !== 'impression'
-  });
-
-  const { data: allServices } = useFirestoreData<Service>({
-    tableName: 'services',
-    skip: activeTab !== 'impression'
-  });
-
-  const { data: allUsers } = useFirestoreData<UserProfile>({
-    tableName: 'users',
-    skip: activeTab !== 'impression'
-  });
+  const allOrders = useLiveQuery(() => db.orders.toArray()) || [];
+  const allServices = useLiveQuery(() => db.services.toArray()) || [];
+  const allUsers = useLiveQuery(() => db.users.toArray()) || [];
 
   const loadingCats = loading;
   const loadingProducts = loading;

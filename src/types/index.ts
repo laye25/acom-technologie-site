@@ -128,26 +128,20 @@ export interface Order {
 
 export interface Message {
   id: string;
-  orderId: string;
+  orderId?: string;
   order_id?: string;
   senderId: string;
   sender_id?: string;
   senderName?: string;
+  receiverId?: string;
   text: string;
-  createdAt: any;
+  createdAt?: any;
   created_at?: any;
+  timestamp?: string;
+  chatId?: string;
   fileUrl?: string;
   isAdmin?: boolean;
-}
-
-export interface Message {
-  id: string;
-  senderId: string;
-  receiverId: string;
-  text: string;
-  chatId: string;
-  timestamp: string;
-  read: boolean;
+  read?: boolean;
 }
 
 export interface UserProfile {
@@ -249,9 +243,15 @@ export interface Design {
   name: string;
   ownerId: string;
   user_id?: string;
-  elements: CanvasElement[];
+  elements?: CanvasElement[]; // Made optional as it might be in blocks
   bgColor: string;
   preview?: string;
+  thumbnail?: string;
+  technicalSheet?: string;
+  isTemplate?: boolean;
+  pagesCount?: number;
+  width?: number;
+  height?: number;
   createdAt: any;
   updatedAt: any;
   created_at?: any;
@@ -283,6 +283,7 @@ export interface Asset {
   url: string;
   type: 'image' | 'logo' | 'icon';
   createdAt: any;
+  updatedAt?: any;
 }
 
 export interface Template {

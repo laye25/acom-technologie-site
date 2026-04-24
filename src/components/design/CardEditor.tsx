@@ -18,7 +18,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { useFirestoreData } from '../../hooks/useFirestoreData';
 import { generateDesign } from '../../lib/gemini';
 import { firestoreService } from '../../services/firestoreService';
 import { dbService } from '../../services/dbService';
@@ -31,7 +30,13 @@ import '../../lib/events/SyncEngine'; // Initialize SyncEngine
 import { trackUsage } from '../../lib/billing/usageTracker';
 import { handleFirestoreError, OperationType, prepareForFirestore, restoreFromFirestore } from '../../lib/firestore.utils';
 import { storageService } from '../../services/storageService';
+import { assetRepository } from '../../data/repositories/asset.repository';
+import { templateRepository } from '../../data/repositories/template.repository';
+import { designBlockRepository } from '../../data/repositories/design-block.repository';
+import { syncService } from '../../services/syncService';
 import { AssetLibrary } from './AssetLibrary';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/db';
 import DesignSelectorModal, { CATEGORIES } from './DesignSelectorModal';
 import { OptimizedImage } from '../OptimizedImage';
 import { CanvasElement, Design, Template, DesignBlock } from '../../types';
@@ -437,31 +442,47 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     };
   }, []);
   const { others, updateMyPresence } = usePresence(templateId || null);
-  const { data: dbTemplates, loading: loadingTemplates, refresh: refreshTemplates } = useFirestoreData<any>({
-    tableName: 'design_templates',
-    order: { column: 'createdAt', direction: 'desc' },
-    realtime: false,
-    limit: 50
-  });
+
+  // Sync templates and designs
+  useEffect(() => {
+    syncService.syncTemplates();
+    if (user?.uid) {
+      syncService.syncDesigns(user.uid);
+    }
+  }, [user?.uid]);
+
+  const dbTemplates = useLiveQuery(
+    () => db.templates.orderBy('updatedAt').reverse().limit(50).toArray()
+  ) || [];
 
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [designTitle, setDesignTitle] = useState('Design sans titre');
   const [designId, setDesignId] = useState<string | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1050, height: 600 });
 
-  const { data: userDesigns, refresh: refreshUserDesigns } = useFirestoreData<any>({
-    tableName: 'designs',
-    filter: { column: 'ownerId', value: user?.uid },
-    skip: !user,
-    realtime: true,
-    limit: 50
-  });
+  const userDesigns = useLiveQuery(
+    () => user ? db.designs.where('ownerId').equals(user.uid).reverse().sortBy('updatedAt') : [],
+    [user?.uid]
+  ) || [];
 
-  const { data: blocks, loading: loadingBlocks, mutate: mutateBlocks } = useFirestoreData<DesignBlock>({
-    tableName: `designs/${designId}/blocks` as any,
-    skip: !designId,
-    realtime: true
-  });
+  const blocks = useLiveQuery(
+    () => designId ? db.design_blocks.where('designId').equals(designId).toArray() : [],
+    [designId]
+  ) || [];
+
+  // Trigger sync for blocks when design changes
+  useEffect(() => {
+    if (designId) {
+      syncService.syncDesignBlocks(designId);
+    }
+  }, [designId]);
+
+  const loadingTemplates = false;
+  const loadingBlocks = false;
+  const refreshTemplates = () => syncService.syncTemplates();
+  const refreshUserDesigns = () => user && syncService.syncDesigns(user.uid);
+  const mutateBlocks = () => {}; // Not needed for Dexie reactive data
+
 
   // Sync blocks to pages when they change from other sources
   useEffect(() => {
@@ -533,15 +554,14 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     
     const toastId = toast.loading("Suppression...");
     try {
-      await firestoreService.delete(collectionName, id);
-      
-      // Give Firestore a moment to propagate the deletion
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      if (collectionName === 'design_templates') {
-        await refreshTemplates(); // Force refresh from server, bypassing cache
+      if (collectionName === 'design_templates' || collectionName === 'templates') {
+        await dbService.templates.delete(id);
+        refreshTemplates();
+      } else if (collectionName === 'designs') {
+        await dbService.designs.delete(id);
+        refreshUserDesigns();
       } else {
-        await refreshUserDesigns(); // Force refresh for user designs too
+        await firestoreService.delete(collectionName, id);
       }
       
       toast.success("Design supprimé.", { id: toastId });
@@ -649,7 +669,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
   const lockBlock = async (blockId: string) => {
     if (!designId || !user) return;
-    await firestoreService.update(`designs/${designId}/blocks`, blockId, {
+    await dbService.designBlocks.save(designId, {
+      id: blockId,
       lockedBy: user.uid,
       lockedAt: new Date()
     });
@@ -657,7 +678,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
   const unlockBlock = async (blockId: string) => {
     if (!designId || !user) return;
-    await firestoreService.update(`designs/${designId}/blocks`, blockId, {
+    await dbService.designBlocks.save(designId, {
+      id: blockId,
       lockedBy: null,
       lockedAt: null
     });
@@ -840,8 +862,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
           suggestions.forEach(s => {
             const block = blocks?.find(b => b.id === s.id);
             if (block) {
-              mutateBlocks(prev => prev?.map(b => b.id === s.id ? { ...b, ...s } : b) || null);
-              firestoreService.update(`designs/${designId}/blocks`, s.id, {
+              dbService.designBlocks.save(designId, {
+                ...block,
                 ...s,
                 updatedAt: new Date()
               });
@@ -961,28 +983,6 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       // Find elements that are different from blocks
       const currentElements = pages.flatMap((p, pi) => (p.elements || []).map(el => ({ ...el, pageIndex: pi })));
       
-      // Optimistic update for blocks (local state)
-      mutateBlocks(prev => {
-        return currentElements.map(el => {
-          const existing = prev.find(b => b.id === el.id);
-          return {
-            id: el.id,
-            designId: designId!,
-            pageIndex: (el as any).pageIndex,
-            type: el.type,
-            x: el.x,
-            y: el.y,
-            width: el.width || 0,
-            height: el.height || 0,
-            rotation: el.rotation || 0,
-            content: prepareForFirestore(el),
-            zIndex: pages[(el as any).pageIndex] ? pages[(el as any).pageIndex].elements.indexOf(el as any) : 0,
-            updatedAt: new Date().toISOString(),
-            ...existing
-          } as DesignBlock;
-        });
-      });
-
       // Emit events for creates/updates
       for (const el of currentElements) {
         const block = blocks?.find(b => b.id === el.id);
@@ -1056,22 +1056,18 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
     try {
       const designData = {
+        id: designId || undefined,
         name: designTitle,
-        user_id: user.uid,
-        bg_color: bgColor,
+        ownerId: user.uid,
+        merchantId: user.uid, // Assuming personal design for now
+        bgColor: pages[0]?.bgColor || '#ffffff',
         width: canvasDimensions.width,
         height: canvasDimensions.height,
-        updated_at: new Date().toISOString(),
+        updatedAt: new Date(),
       };
 
-      let currentDesignId = designId;
-
-      if (currentDesignId) {
-        await firestoreService.update('designs', currentDesignId, designData);
-      } else {
-        currentDesignId = await firestoreService.add('designs', designData);
-        setDesignId(currentDesignId);
-      }
+      const currentDesignId = await dbService.designs.save(designData);
+      if (!designId) setDesignId(currentDesignId);
 
       // Save blocks (elements)
       if (currentDesignId) {
@@ -1087,12 +1083,11 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
               width: el.width,
               height: el.height,
               rotation: el.rotation || 0,
-              content: prepareForFirestore(el), // Store all properties without undefined values and handle nested arrays
+              content: prepareForFirestore(el),
               zIndex,
               updatedAt: new Date()
             };
-            // Use element ID as block ID for consistency
-            return firestoreService.save(`designs/${currentDesignId}/blocks`, blockData);
+            return dbService.designBlocks.save(currentDesignId, blockData);
           })
         );
         await Promise.all(savePromises);
@@ -1307,7 +1302,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
     if (template.id && !loadedPages && !loadedElements && !template.templateSvg && !template.sides) {
       try {
-        const blocks = await firestoreService.getAll(`designs/${template.id}/blocks`);
+        const blocks = await dbService.designBlocks.getAll(template.id);
         if (blocks.length > 0) {
           // Group by pageIndex and sort by zIndex
           const pagesMap: Record<number, any[]> = {};
@@ -1764,7 +1759,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       
       const selectedCategory = TEMPLATE_CATEGORIES.find(c => c.name === templateCategory);
       
-      await firestoreService.add('design_templates', {
+      await dbService.templates.save({
         name: templateName,
         category: templateCategory,
         subCategory: templateSubCategory,
@@ -1939,10 +1934,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       // 4. Save design to Firestore
       toast.loading("Enregistrement du design...", { id: toastId });
       console.log("Saving design metadata...");
-      const designDocId = await firestoreService.add('designs', {
+      const designDocId = await dbService.designs.save({
         name: templateName || `Commande - ${new Date().toLocaleDateString()}`,
         ownerId: user.uid,
-        userId: user.uid,
         user_id: user.uid,
         thumbnail: firebaseThumbnailUrl,
         technicalSheet: firebaseTechnicalSheetUrl,
@@ -1971,7 +1965,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
               zIndex,
               updatedAt: new Date()
             };
-            return firestoreService.add(`designs/${designDocId}/blocks`, blockData);
+            return dbService.designBlocks.save(designDocId, blockData);
           })
         );
         
@@ -2092,7 +2086,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         console.warn("Storage upload failed for request preview, using data URL:", e);
       }
       
-      await firestoreService.add('design_requests', {
+      await dbService.designRequests.save({
         user_id: user?.uid || null,
         userId: user?.uid || null,
         user_email: user?.email || contactInfo.email,

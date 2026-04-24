@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { dbService as db } from '../services/dbService';
-import { Message, Order, Service } from '../types';
-import { useFirestoreData, TableName } from '../hooks/useFirestoreData';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { dbService } from '../services/dbService';
+import { syncService } from '../services/syncService';
+import { Message, Order } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Paperclip, Clock, User, ShieldCheck, MessageSquare, ChevronLeft, Loader2, FileText, Image as ImageIcon } from 'lucide-react';
+import { Send, Paperclip, Clock, ShieldCheck, MessageSquare, ChevronLeft, Loader2, FileText, Image as ImageIcon } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { notificationService } from '../services/notificationService';
-import { UserProfile } from '../types';
 
 const Chat = () => {
   const { orderId } = useParams();
@@ -19,54 +20,24 @@ const Chat = () => {
   const { user, profile, isAdmin, isManager } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const chatOptions = useMemo(() => {
-    if (!user || !orderId) return { tableName: 'messages' as TableName, skip: true };
-    
-    const filters = [{ column: 'orderId', value: orderId }];
-    if (!isAdmin && !isManager) {
-      filters.push({ column: 'clientUid', value: user.uid });
+  // ... replaced useFirestoreData with LiveQuery
+  const messages = useLiveQuery(() => db.messages.where('orderId').equals(orderId || '').toArray(), [orderId]) || [];
+  const orderData = useLiveQuery(() => db.orders.where('id').equals(orderId || '').toArray(), [orderId]) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+  const userProfiles = useLiveQuery(() => db.users.toArray()) || [];
+  
+  useEffect(() => {
+    if (orderId) {
+      syncService.syncMessages(orderId);
+      syncService.syncOrders(orderId); // Simplified sync
+      syncService.syncServices('global');
+      syncService.syncUsers('global');
     }
-    
-    return {
-      tableName: 'messages' as TableName,
-      filters,
-      skip: false
-    };
-  }, [orderId, user, isAdmin, isManager]);
-
-  const orderOptions = useMemo(() => {
-    if (!user || !orderId) return { tableName: 'orders' as TableName, skip: true };
-    
-    const filters = [{ column: 'id', value: orderId }];
-    if (!isAdmin && !isManager) {
-      filters.push({ column: 'userId', value: user.uid });
-    }
-    
-    return {
-      tableName: 'orders' as TableName,
-      filters,
-      skip: false
-    };
-  }, [orderId, user, isAdmin, isManager]);
-
-  const serviceOptions = useMemo(() => ({
-    tableName: 'services' as TableName
-  }), []);
-
-  const { data: messages, loading: messagesLoading, error: messagesError } = useFirestoreData<Message>(chatOptions);
-  const { data: orderData, loading: orderLoading, error: orderError } = useFirestoreData<Order>(orderOptions);
-  const { data: dynamicServices } = useFirestoreData<Service>(serviceOptions);
+  }, [orderId]);
 
   const order = orderData?.[0] || null;
 
-  const userProfileOptions = useMemo(() => ({
-    tableName: 'users' as TableName,
-    filters: order ? [{ column: 'uid', value: order.user_id || order.userId }] : [],
-    skip: !order || !(isAdmin || isManager)
-  }), [order, isAdmin, isManager]);
-
-  const { data: userProfiles } = useFirestoreData<UserProfile>(userProfileOptions);
-  const client = userProfiles?.[0] || null;
+  const client = userProfiles.find(u => u.uid === (order?.user_id || order?.userId)) || null;
 
   const allServices = useMemo(() => {
     const combined = [...STATIC_SERVICES];
@@ -87,16 +58,10 @@ const Chat = () => {
   useEffect(() => {
     console.log('Chat state:', { 
       orderId, 
-      messagesLoading, 
       messagesCount: messages?.length, 
-      orderLoading,
       orderFound: !!order
     });
-    if (messagesError || orderError) {
-      console.error('Chat error details:', messagesError || orderError);
-      setError("Erreur lors du chargement de la discussion. Vérifiez votre connexion ou les index Firestore.");
-    }
-  }, [messagesError, orderError, messages, messagesLoading, orderLoading, order, orderId]);
+  }, [messages, order, orderId]);
 
   const sortedMessages = useMemo(() => {
     if (!messages) return [];
@@ -123,9 +88,9 @@ const Chat = () => {
 
     const clearUnread = async () => {
       if ((isAdmin || isManager) && order?.unreadByAdmin) {
-        await db.orders.save({ id: orderId, unreadByAdmin: false });
+        await dbService.orders.save({ id: orderId, unreadByAdmin: false });
       } else if (!(isAdmin || isManager) && order?.unreadByClient) {
-        await db.orders.save({ id: orderId, unreadByClient: false });
+        await dbService.orders.save({ id: orderId, unreadByClient: false });
       }
     };
 
@@ -151,7 +116,7 @@ const Chat = () => {
       const clientUid = (isAdmin || isManager) ? (order?.user_id || order?.userId) : user.uid;
       console.log('Saving message to Firestore...');
       
-      const messageId = await db.messages.save({
+      const messageId = await dbService.messages.save({
         orderId: orderId,
         senderId: user.uid,
         senderName: profile?.displayName || user.email?.split('@')[0] || 'Utilisateur',
@@ -167,7 +132,7 @@ const Chat = () => {
       try {
         console.log('Updating order status...');
         // Update order's updatedAt and unread flags
-        await db.orders.save({
+        await dbService.orders.save({
           id: orderId,
           unreadByAdmin: !(isAdmin || isManager),
           unreadByClient: (isAdmin || isManager)
@@ -213,35 +178,7 @@ const Chat = () => {
 
   const service = order ? allServices.find(s => s.id === order.serviceId) : null;
 
-  if (orderError || messagesError) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-20 h-20 bg-red-50 rounded-3xl flex items-center justify-center mb-6">
-          <ShieldCheck className="w-10 h-10 text-red-500" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Erreur de chargement</h2>
-        <p className="text-gray-500 mb-8 max-w-md">
-          {orderError?.message || messagesError?.message || "Nous n'avons pas pu charger cette conversation. Vérifiez vos permissions ou votre connexion."}
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-8 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover transition-all"
-          >
-            Réessayer
-          </button>
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="px-8 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
-          >
-            Retour au tableau de bord
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if ((messagesLoading && messages.length === 0) || orderLoading) {
+  if (messages.length === 0 && orderData.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
         <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
