@@ -9,7 +9,7 @@ import { Merchant, MerchantProduct, MerchantSale, MerchantQuote, MerchantQuoteIt
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, Package, ShoppingCart, PieChart, Plus, Trash2, 
-  Edit2, Search, Loader2, Save, X, TrendingUp, 
+  Edit2, Search, Loader2, Save, X, TrendingUp, Download,
   DollarSign, ArrowUpRight, ArrowDownRight, AlertCircle,
   BarChart3, Settings, User, Phone, Mail, MapPin,
   Calculator, Receipt, CreditCard, Smartphone, Banknote,
@@ -562,7 +562,7 @@ const MerchantSaaS = () => {
               </div>
               <div>
                 <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
-                <div className="flex items-center mt-1.5">
+                <div className="flex flex-wrap items-center mt-1.5 gap-y-2">
                   <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">
                     {merchant.type === 'entreprise' ? 'Management Entreprise' :
                      merchant.type === 'chantier' ? 'Management BTP / Chantier' :
@@ -4525,6 +4525,39 @@ const MerchantSettings = ({
       exit={{ opacity: 0, x: -20 }}
       className="max-w-4xl mx-auto"
     >
+      <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h3 className="text-2xl font-black text-ink">Version Bureau & Desktop</h3>
+            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Installer l'application sur votre ordinateur</p>
+          </div>
+          <div className="w-14 h-14 bg-primary/5 rounded-2xl flex items-center justify-center border border-primary/10">
+            <Printer className="w-7 h-7 text-primary" />
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-[2rem] p-8 border border-black/5">
+          <div className="flex flex-col md:flex-row gap-8 items-center">
+            <div className="w-24 h-24 bg-white rounded-3xl shadow-lg flex items-center justify-center border border-black/5">
+              <Download className="w-10 h-10 text-primary" />
+            </div>
+            <div className="flex-1 space-y-4">
+              <h4 className="text-lg font-black text-ink">Installation Instantanée</h4>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Vous pouvez installer Studio Acom directement sur votre PC ou Mac. Cela permet un accès plus rapide via une icône sur votre bureau et une meilleure expérience de gestion.
+              </p>
+              <div className="flex flex-wrap gap-4 pt-2">
+                <InstallButton />
+                <div className="flex items-center text-[9px] font-black text-gray-400 uppercase tracking-widest bg-white px-4 py-2.5 rounded-xl border border-black/5">
+                  <CheckCircle className="w-3 h-3 mr-2 text-emerald-500" />
+                  Compatible Windows / MacOS / Linux
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl">
         <div className="flex items-center justify-between mb-10">
           <div>

@@ -16,23 +16,25 @@ export default defineConfig(({mode}) => {
           maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         },
         manifest: {
-          name: 'Acom SaaS Management',
-          short_name: 'AcomSaaS',
-          description: 'Solution de gestion SaaS par Acom Technologie',
-          theme_color: '#ffffff',
-          start_url: '/merchant/saas',
-          scope: '/merchant/saas',
+          name: 'Studio Acom - Logiciel de Gestion SaaS',
+          short_name: 'Acom SaaS',
+          description: 'Logiciel complet de gestion commerciale, point de vente et comptabilité.',
+          theme_color: '#FF0000',
+          background_color: '#0F0F0F',
+          start_url: '/',
           display: 'standalone',
           icons: [
             {
-              src: 'pwa-192x192.png',
+              src: 'https://cdn-icons-png.flaticon.com/512/10044/10044161.png',
               sizes: '192x192',
-              type: 'image/png'
+              type: 'image/png',
+              purpose: 'any maskable'
             },
             {
-              src: 'pwa-512x512.png',
+              src: 'https://cdn-icons-png.flaticon.com/512/10044/10044161.png',
               sizes: '512x512',
-              type: 'image/png'
+              type: 'image/png',
+              purpose: 'any maskable'
             }
           ]
         }
