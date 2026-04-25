@@ -15,23 +15,35 @@ import { messageRepository } from '../data/repositories/message.repository';
 import { MerchantProduct } from '../types';
 
 export const syncService = {
-  async isOnline() {
+  async isOnline(merchantId?: string) {
     const quotaExceededStr = localStorage.getItem('firebase_quota_exceeded');
     if (quotaExceededStr) {
       const exceededAt = parseInt(quotaExceededStr, 10);
       // Disable remote sync for 1 hour after hitting quota
       if (Date.now() - exceededAt < 3600000) {
-        console.warn('Sync aborted: Firebase quota exceeded recently.');
         return false;
       } else {
         localStorage.removeItem('firebase_quota_exceeded');
       }
     }
+
+    // Check license restriction
+    if (merchantId) {
+      try {
+        const merchant = await db.merchants.get(merchantId);
+        if (merchant && merchant.licenseType === 'local') {
+          return false; // Force offline for local-only license
+        }
+      } catch (e) {
+        // Fallback to online if check fails
+      }
+    }
+
     return navigator.onLine;
   },
 
   async syncProducts(merchantId: string) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const lastSyncKey = `last_sync_products_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
@@ -65,7 +77,7 @@ export const syncService = {
 
   // Add similar methods for sales and expenses
   async syncSales(merchantId: string) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const lastSyncKey = `last_sync_sales_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
@@ -96,7 +108,7 @@ export const syncService = {
   },
 
   async syncExpenses(merchantId: string) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const lastSyncKey = `last_sync_expenses_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
@@ -126,7 +138,7 @@ export const syncService = {
   },
 
   async syncOrders(merchantId: string) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const lastSyncKey = `last_sync_orders_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
@@ -187,7 +199,7 @@ export const syncService = {
   },
 
   async syncServices(merchantId: string) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const lastSyncKey = `last_sync_services_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
@@ -341,7 +353,7 @@ export const syncService = {
   },
 
   async syncUsers(merchantId: string) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const lastSyncKey = `last_sync_users_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
@@ -367,7 +379,7 @@ export const syncService = {
   },
 
   async syncSaaSCollection(merchantId: string, collectionName: string, localTable: any) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const lastSyncKey = `last_sync_${collectionName}_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
@@ -496,7 +508,7 @@ export const syncService = {
   },
 
   async syncSettings(merchantId: string) {
-    if (!(await this.isOnline())) return;
+    if (!(await this.isOnline(merchantId))) return;
     try {
       const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
         protected collectionName = 'settings';

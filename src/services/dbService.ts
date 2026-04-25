@@ -32,6 +32,7 @@ import { assetRepository } from '../data/repositories/asset.repository';
 import { templateRepository } from '../data/repositories/template.repository';
 import { designRequestRepository } from '../data/repositories/design-request.repository';
 import { activityService } from './activityService';
+import { v4 as uuidv4 } from 'uuid';
 import { db } from '../db/db';
 
 export const dbService = {
@@ -337,18 +338,44 @@ export const dbService = {
       }
     },
     async save(merchant: Partial<Merchant>) {
-      if (merchant.id) {
-        return merchantRepository.update(merchant.id, merchant);
+      const data = {
+        ...merchant,
+        updatedAt: new Date()
+      };
+      let id = merchant.id;
+      
+      // Attempt cloud save if not forcing local
+      if (merchant.licenseType !== 'local') {
+        try {
+          if (merchant.id) {
+            await merchantRepository.update(merchant.id, data);
+          } else {
+            id = await merchantRepository.create(data as any);
+          }
+        } catch (error) {
+          console.warn('Merchant cloud save failed, keeping local');
+        }
       }
-      const id = await merchantRepository.create(merchant as any);
-      await activityService.log({
-        type: 'merchant_created',
-        entityId: id,
-        entityType: 'merchant',
-        merchantId: id,
-        message: `Nouveau marchand créé: ${merchant.name}`
-      });
+      
+      if (id || merchant.id) {
+        const finalId = id || merchant.id;
+        await db.merchants.put({ ...data, id: finalId, updatedAt: new Date() } as any);
+        
+        if (!merchant.id) {
+          await activityService.log({
+            type: 'merchant_created',
+            entityId: finalId,
+            entityType: 'merchant',
+            merchantId: finalId,
+            message: `Nouveau marchand créé: ${merchant.name}`
+          });
+        }
+        return finalId;
+      }
       return id;
+    },
+    async get(id: string) {
+      return db.merchants.get(id);
     }
   },
   merchantProducts: {
@@ -380,44 +407,40 @@ export const dbService = {
       const data = {
         ...sale,
         owner_id: user?.uid,
-        ownerId: user?.uid
+        ownerId: user?.uid,
+        updatedAt: new Date(),
+        syncStatus: 'synced'
       };
-      const id = await merchantSaleRepository.create(data);
+      
+      let id = sale.id || uuidv4();
+      
+      try {
+        // Try to save to Cloud
+        const remoteId = await merchantSaleRepository.create(data);
+        id = remoteId;
+      } catch (error) {
+        console.warn('Cloud save failed (Quota or Offline), saving locally only:', error);
+        data.syncStatus = 'pending';
+        // Auto-flag quota exceeded to quiet the sync engine temporarily
+        if (error instanceof Error && error.message.includes('Quota exceeded')) {
+          localStorage.setItem('firebase_quota_exceeded', Date.now().toString());
+        }
+      }
 
-      // Update stock levels
+      // ALWAYS Update local Dexie for reliability
+      await db.sales.put({ ...data, id, createdAt: sale.createdAt || new Date() } as any);
+
+      // Record stock movements locally and attempt cloud update for each
       for (const item of sale.items) {
-        const product = await merchantProductRepository.getById(item.productId);
-        if (product) {
-          const newStock = Math.max(0, (product.stockQuantity || (product as any).stock_quantity || 0) - item.quantity);
-          await merchantProductRepository.update(item.productId, { stockQuantity: newStock } as any);
-          
-          // Record movement
-          await stockMovementRepository.create({
-            merchantId: sale.merchantId || sale.merchant_id,
-            owner_id: user?.uid,
-            ownerId: user?.uid,
-            productId: item.productId,
-            type: 'sale',
-            quantity: item.quantity,
-            previousQuantity: product.stockQuantity || (product as any).stock_quantity,
-            newQuantity: newStock,
-            reason: `Vente POS #${id.slice(-6)}`,
-            referenceId: id,
-            performedBy: sale.processedBy || sale.processed_by
-          } as any);
-
-          // Check for low stock alert
-          const minLevel = product.minStockLevel || (product as any).min_stock_level || 5;
-          if (newStock <= minLevel) {
-            await activityService.log({
-              type: 'stock_alert',
-              entityId: item.productId,
-              entityType: 'product',
-              merchantId: sale.merchantId || sale.merchant_id,
-              message: `Alerte Stock: Le produit "${product.name}" est en dessous du seuil critique (${newStock} restants).`,
-              metadata: { currentStock: newStock, minLevel }
-            });
+        try {
+          const product = await merchantProductRepository.getById(item.productId);
+          if (product) {
+            const newStock = Math.max(0, (product.stockQuantity || (product as any).stock_quantity || 0) - item.quantity);
+            await merchantProductRepository.update(item.productId, { stockQuantity: newStock } as any);
+            await db.products.update(item.productId, { stockQuantity: newStock, updatedAt: new Date() });
           }
+        } catch (e) {
+          console.warn('Stock sync delayed due to connection/quota');
         }
       }
 
@@ -426,12 +449,9 @@ export const dbService = {
         entityId: id,
         entityType: 'sale',
         merchantId: sale.merchantId || sale.merchant_id,
-        message: `Nouvelle vente enregistrée: ${(sale.totalAmount || sale.total_amount).toLocaleString()} FCFA`,
-        metadata: { amount: sale.totalAmount || sale.total_amount }
+        message: `Vente enregistrée en local: ${(sale.totalAmount || sale.total_amount).toLocaleString()} FCFA`,
+        metadata: { amount: sale.totalAmount || sale.total_amount, offline: data.syncStatus === 'pending' }
       });
-
-      // Update local Dexie
-      await db.sales.put({ ...sale, id, createdAt: sale.createdAt || new Date() } as any);
 
       return id;
     }

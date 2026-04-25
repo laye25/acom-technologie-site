@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
+import { v4 as uuidv4 } from 'uuid';
 import { dbService as dbService } from '../services/dbService';
 import { db } from '../db/db'; // Dexie
 import { syncService } from '../services/syncService';
@@ -16,7 +17,7 @@ import {
   Clock, CheckCircle, TrendingDown, ArrowRight, FileText, Truck,
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
-  Printer,
+  Printer, HardDrive, Database,
   Lock as LockIcon
 } from 'lucide-react';
 import { 
@@ -576,6 +577,21 @@ const MerchantSaaS = () => {
                   <span className="text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em]">
                     Plan {merchant.plan}
                   </span>
+                  {merchant.licenseType && (
+                    <>
+                      <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${
+                        merchant.licenseType === 'cloud' 
+                          ? 'bg-blue-50 border-blue-100 text-blue-600' 
+                          : 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                      }`}>
+                        {merchant.licenseType === 'cloud' ? <Database className="w-3 h-3" /> : <HardDrive className="w-3 h-3" />}
+                        <span className="text-[9px] font-black uppercase tracking-widest leading-none">
+                          {merchant.licenseType === 'cloud' ? 'Licence Cloud' : 'Licence Locale'}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -4503,6 +4519,48 @@ const MerchantSettings = ({
 }) => {
   const [formData, setFormData] = useState(merchant);
   const [saving, setSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportLocalData = async () => {
+    setIsExporting(true);
+    try {
+      const allSales = await db.sales.toArray();
+      const allProducts = await db.products.toArray();
+      const exportData = {
+        sales: allSales,
+        products: allProducts,
+        exportedAt: new Date().toISOString(),
+        merchantId: merchant.id
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `studio-acom-backup-${merchant.id}-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      toast.success('Données exportées avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de l\'exportation');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleClearCache = async () => {
+    if (confirm('Voulez-vous vraiment vider le cache local ? Cela ne supprimera pas vos données sur le Cloud, mais nécessitera une nouvelle synchronisation.')) {
+      try {
+        await db.sales.clear();
+        await db.products.clear();
+        await db.expenses.clear();
+        localStorage.clear();
+        toast.success('Cache vidé. L\'application va redémarrer.');
+        window.location.reload();
+      } catch (error) {
+        toast.error('Erreur lors du nettoyage');
+      }
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4525,6 +4583,85 @@ const MerchantSettings = ({
       exit={{ opacity: 0, x: -20 }}
       className="max-w-4xl mx-auto"
     >
+      <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h3 className="text-2xl font-black text-ink">Gestion des Données Locales</h3>
+            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Données stockées sur cet appareil</p>
+          </div>
+          <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center border border-emerald-100">
+            <Database className="w-7 h-7 text-emerald-600" />
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-emerald-50/30 rounded-[2rem] p-8 border border-emerald-100/50">
+            <div className="flex items-start gap-6">
+              <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-emerald-100">
+                <HardDrive className="w-6 h-6 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-black text-ink uppercase tracking-wider">Mode Local-First (Optimisé)</h4>
+                <p className="text-xs text-emerald-800/70 mt-2 leading-relaxed">
+                  Studio Acom enregistre automatiquement chaque transaction dans la mémoire locale (IndexedDB) de votre ordinateur. 
+                  Cela garantit une rapidité maximale et vous permet de travailler <b>sans limites de quota Cloud</b> même avec une connexion lente.
+                </p>
+                
+                {merchant.licenseType === 'local' ? (
+                  <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-3">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wide">
+                      Mode "Local Uniquement" activé. La synchronisation Cloud est désactivée.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-3">
+                    <Database className="w-4 h-4 text-blue-600" />
+                    <p className="text-[10px] text-blue-800 font-bold uppercase tracking-wide">
+                      Synchronisation Cloud activée. Vos données sont sauvegardées en temps réel.
+                    </p>
+                  </div>
+                )}
+                
+                <div className="mt-6 flex flex-wrap gap-4">
+                  <div className="bg-white/80 backdrop-blur px-5 py-3 rounded-2xl border border-emerald-100 flex items-center gap-3">
+                    <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase">Statut</p>
+                      <p className="text-[11px] font-bold text-ink">Données sécurisées localement</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-6 bg-gray-50 rounded-[2rem] border border-black/5">
+              <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Exportation Critique</h5>
+              <p className="text-xs text-gray-500 mb-4">Exportez vos données locales en format JSON pour une sauvegarde manuelle.</p>
+              <button 
+                onClick={handleExportLocalData}
+                disabled={isExporting}
+                className="w-full py-4 bg-white border border-black/5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-primary/30 transition-all disabled:opacity-50"
+              >
+                {isExporting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Exporter la Base Locale'}
+              </button>
+            </div>
+            <div className="p-6 bg-rose-50/30 rounded-[2rem] border border-rose-100">
+              <h5 className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-4">Sécurité Système</h5>
+              <p className="text-xs text-rose-800/60 mb-4">Effacer le cache local peut résoudre certains problèmes de synchronisation.</p>
+              <button 
+                onClick={handleClearCache}
+                className="w-full py-4 bg-white border border-rose-100 text-rose-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all"
+              >
+                Vider le Cache (Attention)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -4602,6 +4739,24 @@ const MerchantSettings = ({
             >
               Améliorer
             </button>
+          </div>
+          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                {formData.licenseType === 'cloud' ? <Database className="w-6 h-6 text-blue-500" /> : <HardDrive className="w-6 h-6 text-emerald-500" />}
+              </div>
+              <div>
+                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Type de Licence</p>
+                <select 
+                  value={formData.licenseType || 'cloud'}
+                  onChange={(e) => setFormData({ ...formData, licenseType: e.target.value as any })}
+                  className="font-black text-ink bg-transparent border-none p-0 focus:ring-0 text-lg cursor-pointer"
+                >
+                  <option value="cloud">FORFAIT CLOUD (SYNC)</option>
+                  <option value="local">FORFAIT LOCAL (DESKTOP)</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 

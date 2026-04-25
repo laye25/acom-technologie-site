@@ -509,6 +509,8 @@ export interface Merchant {
   name: string;
   type?: string; // e.g., 'boutique', 'entreprise', 'chantier', 'transport', 'rh', 'scolaire', 'medical'
   plan?: MerchantPlan;
+  licenseType?: 'local' | 'cloud';
+  subscriptionStatus?: 'active' | 'expired' | 'none';
   status?: 'active' | 'suspended';
   description?: string;
   logo?: string;
