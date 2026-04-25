@@ -462,25 +462,20 @@ const MerchantSaaS = () => {
   }, [merchant?.id]);
 
   const getTabs = (type: string) => {
-    const commonTabs = [
-      { id: 'dashboard', label: 'Aperçu', icon: PieChart },
-      { id: 'accounting', label: 'Compta', icon: BarChart3 },
-      { id: 'reports', label: 'Rapports', icon: FileText },
-      { id: 'settings', label: 'Réglages', icon: Settings },
-      { id: 'build', label: 'Build Desktop', icon: Cpu },
-    ];
+    let tabs: any[] = [];
 
     switch (type) {
       case 'entreprise':
-        return [
+        tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'interventions', label: 'Interventions', icon: Wrench },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
+        break;
       case 'chantier':
-        return [
+        tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'projects', label: 'Projets', icon: HardHat },
           { id: 'inventory', label: 'Matériel', icon: Package },
@@ -488,31 +483,35 @@ const MerchantSaaS = () => {
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
+        break;
       case 'transport':
-        return [
+        tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'vehicles', label: 'Véhicules', icon: Car },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
+        break;
       case 'rh':
-        return [
+        tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'employees', label: 'Employés', icon: Users },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
+        break;
       case 'scolaire':
-        return [
+        tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'students', label: 'Élèves', icon: GraduationCap },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
+        break;
       case 'medical':
-        return [
+        tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'patients', label: 'Patients', icon: Stethoscope },
           { id: 'appointments', label: 'Rendez-vous', icon: Calendar },
@@ -520,8 +519,9 @@ const MerchantSaaS = () => {
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
+        break;
       default: // boutique
-        return [
+        tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'inventory', label: 'Stock', icon: Package },
           { id: 'suppliers', label: 'Fournisseurs', icon: Truck },
@@ -532,7 +532,12 @@ const MerchantSaaS = () => {
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
+        break;
     }
+    
+    tabs.push({ id: 'build', label: 'App Desktop', icon: Cpu });
+    
+    return tabs;
   };
 
   if (loadingMerchant) {
