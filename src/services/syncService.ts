@@ -614,5 +614,17 @@ export const syncService = {
     } catch (error) {
       console.error('Sync Studio Acom data failed:', error);
     }
+  },
+
+  async syncProducts(merchantId: string) {
+    return this.syncSaaSCollection(merchantId, 'merchant_products', db.products);
+  },
+
+  async syncSales(merchantId: string) {
+    return this.syncSaaSCollection(merchantId, 'merchant_sales', db.sales);
+  },
+
+  async syncExpenses(merchantId: string) {
+    return this.syncSaaSCollection(merchantId, 'merchant_expenses', db.expenses);
   }
 };

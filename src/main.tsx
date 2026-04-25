@@ -1,7 +1,8 @@
-import {StrictMode} from 'react';
+import {StrictMode, useEffect} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { initSQLite } from './services/sqliteService';
 
 // Entry point for Acom Technologie application
 // Suppress benign Vite WebSocket connection errors in the sandbox environment
@@ -14,8 +15,16 @@ if (import.meta.env.DEV) {
   });
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+function Main() {
+  useEffect(() => {
+    initSQLite().catch(console.error);
+  }, []);
+
+  return (
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<Main />);

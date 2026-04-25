@@ -410,6 +410,15 @@ export const dbService = {
       }
 
       await db.products.put({ ...data, id } as any);
+      
+      // Phase 3: SQLite Mirroring for Local/Heavy data
+      try {
+        const { sqliteHelper } = await import('./sqliteService');
+        await sqliteHelper.insertProduct({ ...data, id });
+      } catch (e) {
+        console.warn('SQLite mirroring failed:', e);
+      }
+      
       return id;
     },
     async delete(id: string) {
@@ -445,6 +454,14 @@ export const dbService = {
 
       // ALWAYS Update local Dexie for reliability
       await db.sales.put({ ...data, id, createdAt: sale.createdAt || new Date() } as any);
+
+      // Phase 3: SQLite Mirroring
+      try {
+        const { sqliteHelper } = await import('./sqliteService');
+        await sqliteHelper.insertSale({ ...data, id });
+      } catch (e) {
+        console.warn('SQLite mirroring for sale failed:', e);
+      }
 
       // Record stock movements locally and attempt cloud update for each
       for (const item of sale.items) {
@@ -504,6 +521,15 @@ export const dbService = {
       }
 
       await db.expenses.put({ ...data, id, createdAt: expense.createdAt || new Date() } as any);
+
+      // Phase 3: SQLite Mirroring
+      try {
+        const { sqliteHelper } = await import('./sqliteService');
+        await sqliteHelper.insertExpense({ ...data, id });
+      } catch (e) {
+        console.warn('SQLite mirroring for expense failed:', e);
+      }
+      
       return id;
     },
     async delete(id: string) {

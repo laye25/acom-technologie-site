@@ -17,7 +17,7 @@ import {
   Clock, CheckCircle, TrendingDown, ArrowRight, FileText, Truck,
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
-  Printer, HardDrive, Database,
+  Printer, HardDrive, Database, RefreshCw, Upload,
   Lock as LockIcon
 } from 'lucide-react';
 import { 
@@ -1466,6 +1466,102 @@ const MerchantDashboard = ({
         data={{ sales, products, expenses }} 
       />
 
+      {/* Sync Control Bar - Phase 2 */}
+      {merchant.id && (
+        <div className="flex items-center justify-between p-6 bg-white rounded-[2rem] border border-black/5 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-2xl ${navigator.onLine ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
+              {navigator.onLine ? <Database className="w-5 h-5" /> : <HardDrive className="w-5 h-5" />}
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">État du Moteur de Synchronisation</p>
+              <h4 className="text-sm font-black text-ink uppercase tracking-tight">
+                {navigator.onLine ? 'Mode Hybride (Local + Cloud)' : 'Mode Local Uniquement (Offline)'}
+              </h4>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {merchant.licenseType === 'local' && (
+              <button 
+                onClick={async () => {
+                  const { exportSQLiteDB } = await import('../services/sqliteService');
+                  const file = await exportSQLiteDB();
+                  if (file) {
+                    const url = URL.createObjectURL(file);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `acom_studio_${new Date().toISOString().split('T')[0]}.sqlite3`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    toast.success('Base de données SQLite exportée !');
+                  } else {
+                    toast.error('Échec de l\'exportation SQLite');
+                  }
+                }}
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-100 transition-all group"
+                title="Exporter la base de données SQLite pour une utilisation Desktop"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exporter (.sqlite3)
+              </button>
+            )}
+            
+            {merchant.licenseType === 'local' && (
+              <label className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink hover:border-primary/30 transition-all cursor-pointer group">
+                <Upload className="w-3.5 h-3.5" />
+                Restaurer
+                <input 
+                  type="file" 
+                  accept=".sqlite3" 
+                  className="hidden" 
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    const confirmRestore = window.confirm("ATTENTION: Restaurer une base de données écrasera toutes vos données locales actuelles. Continuer ?");
+                    if (!confirmRestore) return;
+
+                    const toastId = toast.loading('Restauration de la base de données...');
+                    try {
+                      const { restoreSQLiteDB } = await import('../services/sqliteService');
+                      const success = await restoreSQLiteDB(file);
+                      if (success) {
+                        toast.success('Restauration réussie ! Redémarrage...', { id: toastId });
+                      } else {
+                        toast.error('Échec de la restauration', { id: toastId });
+                      }
+                    } catch (err) {
+                      toast.error('Erreur lors de la restauration', { id: toastId });
+                    }
+                  }}
+                />
+              </label>
+            )}
+
+            <button 
+              onClick={async () => {
+                const toastId = toast.loading('Synchronisation des données...');
+                try {
+                  await syncService.pushPendingData(merchant.id!);
+                  await syncService.syncProducts(merchant.id!);
+                  await syncService.syncSales(merchant.id!);
+                  await syncService.syncExpenses(merchant.id!);
+                  toast.success('Données synchronisées !', { id: toastId });
+                } catch (e) {
+                  toast.error('Échec de la synchronisation', { id: toastId });
+                }
+              }}
+              className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-primary/30 transition-all group"
+            >
+              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
+              Forcer la Synchronisation
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Plan Upgrade Banner */}
       {merchant.plan !== 'PREMIUM' && (
         <div className="relative overflow-hidden bg-gradient-to-r from-primary to-primary-hover rounded-3xl sm:rounded-[2rem] p-6 lg:p-10 text-white shadow-xl shadow-primary/20">
@@ -2438,6 +2534,19 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
                                     <span className="text-[9px] font-mono font-black text-primary uppercase tracking-[0.15em]">
                                       {product.category}
                                     </span>
+                                    {(product as any).syncStatus && (
+                                      <>
+                                        <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${
+                                          (product as any).syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                          (product as any).syncStatus === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                          'bg-gray-50 text-gray-400 border-gray-100'
+                                        }`}>
+                                          {(product as any).syncStatus === 'synced' ? <Check className="w-2.5 h-2.5" /> : <RefreshCw className="w-2.5 h-2.5 animate-spin" />}
+                                          <span className="text-[8px] font-black uppercase tracking-wider">{(product as any).syncStatus}</span>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -3003,9 +3112,12 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
               </div>
               Panier
             </h3>
-            <span className="px-3 py-1 bg-gray-50 text-gray-400 text-[10px] font-black rounded-full border border-gray-100">
-              {cart.length.toString().padStart(2, '0')} ARTICLES
-            </span>
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
+              merchant.licenseType === 'local' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+            }`}>
+              {merchant.licenseType === 'local' ? <HardDrive className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}
+              {merchant.licenseType === 'local' ? 'Mode Offline' : 'Sync Cloud'}
+            </div>
           </div>
 
           <div className="space-y-4 mb-8 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
@@ -3353,7 +3465,22 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
                   <tr key={expense.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <p className="font-black text-ink text-sm leading-tight">{expense.title}</p>
-                      <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">REF: {expense.id.slice(0, 8)}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">REF: {expense.id.slice(0, 8)}</p>
+                        {(expense as any).syncStatus && (
+                          <>
+                            <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${
+                              (expense as any).syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                              (expense as any).syncStatus === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                              'bg-gray-50 text-gray-400 border-gray-100'
+                            }`}>
+                              {(expense as any).syncStatus === 'synced' ? <Check className="w-2 h-2" /> : <RefreshCw className="w-2 h-2 animate-spin" />}
+                              <span className="text-[7px] font-black uppercase">{(expense as any).syncStatus}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </td>
                     <td className="px-8 py-5">
                       <span className="px-3 py-1 bg-gray-100 rounded-full text-[9px] font-black uppercase tracking-widest text-gray-500 border border-gray-200">
@@ -3514,7 +3641,19 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                     sales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50/50 transition-colors group">
                         <td className="px-8 py-6">
-                          <p className="text-[11px] font-mono font-black text-ink">#INV-{sale.id.slice(0, 8).toUpperCase()}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[11px] font-mono font-black text-ink">#INV-{sale.id.slice(0, 8).toUpperCase()}</p>
+                            {(sale as any).syncStatus && (
+                              <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${
+                                (sale as any).syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                (sale as any).syncStatus === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                'bg-gray-50 text-gray-400 border-gray-100'
+                              }`}>
+                                {(sale as any).syncStatus === 'synced' ? <Check className="w-2 h-2" /> : <RefreshCw className="w-2 h-2 animate-spin" />}
+                                <span className="text-[7px] font-black uppercase">{(sale as any).syncStatus}</span>
+                              </div>
+                            )}
+                          </div>
                           <p className="text-[9px] font-mono text-gray-400 mt-1 uppercase">
                             {sale.createdAt?.seconds ? format(new Date(sale.createdAt.seconds * 1000), 'dd/MM/yyyy HH:mm') : format(new Date(sale.createdAt), 'dd/MM/yyyy HH:mm')}
                           </p>
