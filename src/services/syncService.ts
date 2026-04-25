@@ -532,10 +532,10 @@ export const syncService = {
       const pendingSales = await db.sales.where('syncStatus').equals('pending').toArray();
       for (const sale of pendingSales) {
         try {
-          const { syncStatus, ...data } = sale;
+          const { syncStatus, ...data } = sale as any;
           const { merchantSaleRepository } = await import('../data/repositories/merchant-sale.repository');
           await merchantSaleRepository.create(data);
-          await db.sales.update(sale.id, { syncStatus: 'synced' });
+          await db.sales.update(sale.id, { syncStatus: 'synced' } as any);
         } catch (e) {
           console.warn('Failed to push pending sale:', sale.id);
         }
@@ -545,14 +545,14 @@ export const syncService = {
       const pendingProducts = await db.products.where('syncStatus').equals('pending').toArray();
       for (const product of pendingProducts) {
         try {
-          const { syncStatus, ...data } = product;
+          const { syncStatus, ...data } = product as any;
           const { merchantProductRepository } = await import('../data/repositories/merchant-product.repository');
           if (product.id && product.id.length > 20) { // Assume it already exists if long ID
              await merchantProductRepository.update(product.id, data);
           } else {
              await merchantProductRepository.create(data as any);
           }
-          await db.products.update(product.id, { syncStatus: 'synced' });
+          await db.products.update(product.id, { syncStatus: 'synced' } as any);
         } catch (e) {
           console.warn('Failed to push pending product:', product.id);
         }
@@ -562,14 +562,14 @@ export const syncService = {
       const pendingExpenses = await db.expenses.where('syncStatus').equals('pending').toArray();
       for (const expense of pendingExpenses) {
         try {
-          const { syncStatus, ...data } = expense;
+          const { syncStatus, ...data } = expense as any;
           const { merchantExpenseRepository } = await import('../data/repositories/merchant-expense.repository');
           if (expense.id && expense.id.length > 20) {
             await merchantExpenseRepository.update(expense.id, data);
           } else {
             await merchantExpenseRepository.create(data as any);
           }
-          await db.expenses.update(expense.id, { syncStatus: 'synced' });
+          await db.expenses.update(expense.id, { syncStatus: 'synced' } as any);
         } catch (e) {
           console.warn('Failed to push pending expense:', expense.id);
         }
@@ -614,17 +614,5 @@ export const syncService = {
     } catch (error) {
       console.error('Sync Studio Acom data failed:', error);
     }
-  },
-
-  async syncProducts(merchantId: string) {
-    return this.syncSaaSCollection(merchantId, 'merchant_products', db.products);
-  },
-
-  async syncSales(merchantId: string) {
-    return this.syncSaaSCollection(merchantId, 'merchant_sales', db.sales);
-  },
-
-  async syncExpenses(merchantId: string) {
-    return this.syncSaaSCollection(merchantId, 'merchant_expenses', db.expenses);
   }
 };

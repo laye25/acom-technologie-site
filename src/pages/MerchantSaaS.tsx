@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
@@ -3380,27 +3380,48 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
 
 // --- Merchant Accounting ---
 const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) => {
-  const [isBuilding, setIsBuilding] = useState(false);
-  const [buildLogs, setBuildLogs] = useState<string[]>([]);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
-  const startBuild = async () => {
-    setIsBuilding(true);
-    setBuildLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - Lancement de la procédure de compilation...`]);
-    
-    try {
-      const response = await fetch('/api/build-desktop', { method: 'POST' });
-      const data = await response.json();
-      
-      if (data.success) {
-        toast.success(data.message);
-        setBuildLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${data.message}`]);
-      } else {
-        toast.error('Erreur: ' + data.error);
-      }
-    } catch (e: any) {
-      toast.error('Erreur réseau lors de la compilation');
-    } finally {
-      setIsBuilding(false);
+  useEffect(() => {
+    // Check if already installed
+    if ((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || (window.navigator as any).standalone) {
+      setIsInstalled(true);
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setIsInstallable(false);
+      toast.success('Application installée avec succès !');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      toast.error("Votre navigateur/appareil ne remonte pas l'invite d'installation (ou vous l'avez déjà installée). Consultez la section de droite pour l'installation manuelle.");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+      toast.success("Installation PWA acceptée !");
     }
   };
 
@@ -3408,8 +3429,8 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-8 border-b border-black/5">
         <div className="space-y-1">
-          <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-2">Centre de Packaging</p>
-          <h2 className="text-3xl font-black text-ink tracking-tight">Compilation Desktop</h2>
+          <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-2">Technologie PWA</p>
+          <h2 className="text-3xl font-black text-ink tracking-tight">Installation Bureau & Mobile</h2>
           <p className="text-gray-400 font-medium max-w-xl">
             Générez un exécutable autonome (.exe ou .dmg) pour votre PC ou Mac. Cette version fonctionnera 100% hors-ligne avec SQLite.
           </p>
@@ -3428,18 +3449,19 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-2xl font-black text-ink tracking-tight">Générer l'Exécutable</h3>
+              <h3 className="text-2xl font-black text-ink tracking-tight">Application Native</h3>
               <p className="text-gray-500 text-sm leading-relaxed">
-                Cliquez pour compiler l'ensemble du code, les assets et le runtime Electron. Le processus prend environ 2 à 3 minutes.
+                Utilisez la technologie PWA (Progressive Web App) pour une installation instantanée sans fichier exécutable (.exe/.dmg), garantie sans virus et toujours à jour.
               </p>
             </div>
 
             <ul className="space-y-3">
               {[
-                "Packaging de l'interface Web (Optimisé)",
-                "Migration du moteur SQLite (OPFS)",
-                "Compression des actifs graphiques",
-                "Génération de l'exécutable Portable (.exe)"
+                "Expérience plein écran instantanée",
+                "Moteur de base de données SQLite embarqué (OPFS)",
+                "Support complet du mode Hors-ligne",
+                "Mise à jour automatique en arrière-plan",
+                "Icône sur le bureau et le menu Démarrer"
               ].map((step, idx) => (
                 <li key={idx} className="flex items-center gap-3 text-xs font-black text-gray-400 uppercase tracking-widest">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -3448,59 +3470,54 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
               ))}
             </ul>
 
-            <button
-              onClick={startBuild}
-              disabled={isBuilding}
-              className={`w-full py-6 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all ${
-                isBuilding 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                  : 'bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]'
-              }`}
-            >
-              {isBuilding ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
-              {isBuilding ? 'Compilation en cours...' : 'Lancer la compilation automatique'}
-            </button>
+            <div className="space-y-4 relative pt-4">
+              {isInstalled ? (
+                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-600 text-sm font-semibold flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                    <Zap className="w-4 h-4" />
+                  </span>
+                  Application déjà installée sur cet appareil. Cherchez Acom Studio dans vos applications !
+                </div>
+              ) : (
+                <button
+                  onClick={handleInstallClick}
+                  className="w-full py-6 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <Download className="w-4 h-4 fill-current" />
+                  {isInstallable ? 'Installer Acom Studio' : "Vérifier la compatibilité"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="bg-gray-950 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3 text-white">
-              <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/50" />
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              <span className="ml-4 text-[10px] font-black uppercase tracking-widest opacity-50">Build Console</span>
+        <div className="bg-gray-950 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5 flex flex-col justify-center items-center text-center">
+            
+            <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center mb-8 shadow-inner border border-white/10">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="GitHub Actions" className="w-12 h-12 opacity-80 invert" />
             </div>
-            <Terminal className="text-white/20 w-5 h-5" />
-          </div>
 
-          <div className="font-mono text-xs sm:text-sm text-emerald-400/90 leading-relaxed max-h-[350px] overflow-y-auto custom-scrollbar italic">
-            {buildLogs.length === 0 ? (
-              <p className="opacity-40 select-none">En attente d'une action de build...</p>
-            ) : (
-              buildLogs.map((log, i) => (
-                <div key={i} className="mb-2">
-                  <span className="text-emerald-500/30 mr-2">$</span>
-                  {log}
-                </div>
-              ))
-            )}
-            {isBuilding && (
-              <div className="flex items-center gap-2 mt-4 animate-pulse">
-                <span className="text-emerald-500/30 mr-2">$</span>
-                <span className="bg-emerald-400 w-2 h-4" />
+            <h3 className="text-xl font-bold text-white mb-4">Générateur d'Exécutable (.exe) PRO</h3>
+            
+            <p className="text-sm text-gray-400 max-w-sm mx-auto mb-8 leading-relaxed">
+              Pour des raisons de sécurité, la compilation d'un fichier <b>.exe</b> Windows exige un serveur Windows. Nous avons configuré un pipeline CI/CD automatisé pour vous.
+            </p>
+
+            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-left w-full max-w-sm space-y-4">
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</span>
+                <span className="text-sm text-white/90">Cliquez sur <kbd className="bg-black/30 px-2 py-0.5 rounded text-gray-300">⚙️ Paramètres</kbd> (en haut à droite) puis <b>Export to Github</b>.</span>
               </div>
-            )}
-          </div>
-
-          <div className="absolute bottom-6 left-10 right-10">
-            <div className="p-4 bg-white/5 rounded-xl border border-white/5 backdrop-blur-sm">
-                <p className="text-[10px] text-white/40 uppercase tracking-widest font-black">Statut Final</p>
-                <p className="text-white font-black text-xs uppercase mt-1">
-                  {isBuilding ? 'Génération du pipeline...' : 'Prêt pour le déploiement'}
-                </p>
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</span>
+                <span className="text-sm text-white/90">Allez sur votre dépôt GitHub, section <b>Actions</b>. Les serveurs Microsoft compilent automatiquement l'application.</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</span>
+                <span className="text-sm text-white/90">Une fois terminé, téléchargez l'archive <kbd className="bg-black/30 px-2 py-0.5 rounded text-gray-300">.exe</kbd> prête à être distribuée à vos clients.</span>
+              </div>
             </div>
-          </div>
+
         </div>
       </div>
     </div>

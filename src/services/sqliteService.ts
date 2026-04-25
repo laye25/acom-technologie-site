@@ -6,7 +6,7 @@ export const initSQLite = async () => {
   if (db) return db;
 
   try {
-    const sqlite3 = await sqlite3InitModule({
+    const sqlite3 = await (sqlite3InitModule as any)({
       print: console.log,
       printErr: console.error,
     });

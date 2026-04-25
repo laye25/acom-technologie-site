@@ -116,30 +116,6 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  app.post("/api/build-desktop", async (req, res) => {
-    try {
-      const { exec } = await import('child_process');
-      console.log('API: Triggering desktop build script...');
-      
-      // Kick off the script in the background
-      exec('bash scripts/build-desktop.sh', (error, stdout, stderr) => {
-        if (error) {
-          console.error(`Build error: ${error.message}`);
-          return;
-        }
-        if (stderr) console.error(`Build stderr: ${stderr}`);
-        console.log(`Build success: ${stdout}`);
-      });
-
-      res.json({ 
-        success: true, 
-        message: "Compilation démarrée. Le build sera disponible dans le dossier /release dans quelques minutes.",
-        startTime: new Date().toISOString()
-      });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  });
 
   // Email sending
   app.post("/api/send-email", async (req, res) => {

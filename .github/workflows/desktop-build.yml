@@ -1,0 +1,39 @@
+name: Build Desktop Executable
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Build Electron Desktop App (Windows)
+        run: npx electron-builder --win portable
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Acom-Studio-Desktop-Windows
+          path: release/*.exe
