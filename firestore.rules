@@ -77,9 +77,26 @@ service cloud.firestore {
       return isAdmin() || isManager();
     }
 
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
+
+    // Global Safety Net (Deny all by default)
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
     // Public Collections (Read only for everyone, write for admin)
     match /services/{serviceId} {
@@ -257,59 +274,82 @@ service cloud.firestore {
 
     function isMerchantOwner(mId) {
       let merchantPath = /databases/$(database)/documents/merchants/$(mId);
-      return isAuthenticated() && exists(merchantPath) && (get(merchantPath).data.owner_id == request.auth.uid || get(merchantPath).data.ownerId == request.auth.uid || isAdmin());
+      return isAuthenticated() && isValidId(mId) && exists(merchantPath) && 
+             (get(merchantPath).data.get('owner_id', '') == request.auth.uid || 
+              get(merchantPath).data.get('ownerId', '') == request.auth.uid);
+    }
+
+    // Helper for fast ownership check
+    function hasOwnership(data) {
+      return isAuthenticated() && (
+        data.get('owner_id', '') == request.auth.uid || 
+        data.get('ownerId', '') == request.auth.uid ||
+        isMerchantOwner(data.get('merchant_id', data.get('merchantId', '')))
+      );
     }
 
     match /merchant_products/{productId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /merchant_sales/{saleId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /merchant_expenses/{expenseId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
-    match /suppliers/{supplierId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+    match /merchant_suppliers/{supplierId} {
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
-    match /movements/{movementId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+    match /stock_movements/{movementId} {
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /interventions/{interventionId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /projects/{projectId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /vehicles/{vehicleId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /employees/{employeeId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /students/{studentId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /patients/{patientId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
     
     match /appointments/{appointmentId} {
-      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
 
-    match /merchant_activities/{activityId} {
-      allow read: if isAuthenticated() && (resource.data.get('merchant_id', resource.data.get('merchantId', null)) == null || isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', ''))));
+    match /activities/{activityId} {
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }

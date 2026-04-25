@@ -1,3 +1,4 @@
+import { auth } from '../firebase';
 import { where, orderBy, limit } from 'firebase/firestore';
 import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment, PartnerRating } from '../types';
 import { serviceRepository } from '../data/repositories/service.repository';
@@ -352,14 +353,20 @@ export const dbService = {
   },
   merchantProducts: {
     async save(product: Partial<MerchantProduct>) {
+      const user = auth.currentUser;
+      const data = {
+        ...product,
+        owner_id: user?.uid,
+        ownerId: user?.uid // Consistency
+      };
       let id = product.id;
       if (product.id) {
-        await merchantProductRepository.update(product.id, product);
+        await merchantProductRepository.update(product.id, data);
       } else {
-        id = await merchantProductRepository.create(product as any);
+        id = await merchantProductRepository.create(data as any);
       }
       // Update local Dexie for immediate feedback
-      await db.products.put({ ...product, id, updatedAt: new Date() } as any);
+      await db.products.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -369,7 +376,13 @@ export const dbService = {
   },
   merchantSales: {
     async save(sale: any) {
-      const id = await merchantSaleRepository.create(sale);
+      const user = auth.currentUser;
+      const data = {
+        ...sale,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
+      const id = await merchantSaleRepository.create(data);
 
       // Update stock levels
       for (const item of sale.items) {
@@ -381,6 +394,8 @@ export const dbService = {
           // Record movement
           await stockMovementRepository.create({
             merchantId: sale.merchantId || sale.merchant_id,
+            owner_id: user?.uid,
+            ownerId: user?.uid,
             productId: item.productId,
             type: 'sale',
             quantity: item.quantity,
@@ -423,13 +438,19 @@ export const dbService = {
   },
   merchantExpenses: {
     async save(expense: Partial<MerchantExpense>) {
+      const user = auth.currentUser;
+      const data = {
+        ...expense,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = expense.id;
       if (expense.id) {
-        await merchantExpenseRepository.update(expense.id, expense);
+        await merchantExpenseRepository.update(expense.id, data);
       } else {
-        id = await merchantExpenseRepository.create(expense as any);
+        id = await merchantExpenseRepository.create(data as any);
       }
-      await db.expenses.put({ ...expense, id, createdAt: expense.createdAt || new Date() } as any);
+      await db.expenses.put({ ...data, id, createdAt: expense.createdAt || new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -439,13 +460,19 @@ export const dbService = {
   },
   merchantSuppliers: {
     async save(supplier: Partial<MerchantSupplier>) {
+      const user = auth.currentUser;
+      const data = {
+        ...supplier,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = supplier.id;
       if (supplier.id) {
-        await merchantSupplierRepository.update(supplier.id, supplier);
+        await merchantSupplierRepository.update(supplier.id, data);
       } else {
-        id = await merchantSupplierRepository.create(supplier as any);
+        id = await merchantSupplierRepository.create(data as any);
       }
-      await db.suppliers.put({ ...supplier, id, updatedAt: new Date() } as any);
+      await db.suppliers.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -465,8 +492,11 @@ export const dbService = {
       // Update local product
       await db.products.update(productId, { stockQuantity: newStock, updatedAt: new Date() });
 
+      const user = auth.currentUser;
       const movementId = await stockMovementRepository.create({
         merchantId,
+        owner_id: user?.uid,
+        ownerId: user?.uid,
         productId,
         type: 'in',
         quantity,
@@ -492,6 +522,8 @@ export const dbService = {
       if (cost && cost > 0) {
         const expenseId = await merchantExpenseRepository.create({
           merchantId,
+          owner_id: user?.uid,
+          ownerId: user?.uid,
           title: `Approvisionnement: ${product.name}`,
           amount: cost,
           category: 'Stock',
@@ -512,13 +544,19 @@ export const dbService = {
   },
   interventions: {
     async save(intervention: Partial<ServiceIntervention>) {
+      const user = auth.currentUser;
+      const data = {
+        ...intervention,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = intervention.id;
       if (intervention.id) {
-        await interventionRepository.update(intervention.id, intervention);
+        await interventionRepository.update(intervention.id, data);
       } else {
-        id = await interventionRepository.create(intervention as any);
+        id = await interventionRepository.create(data as any);
       }
-      await db.interventions.put({ ...intervention, id, updatedAt: new Date() } as any);
+      await db.interventions.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -528,13 +566,19 @@ export const dbService = {
   },
   projects: {
     async save(project: Partial<ConstructionProject>) {
+      const user = auth.currentUser;
+      const data = {
+        ...project,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = project.id;
       if (project.id) {
-        await projectRepository.update(project.id, project);
+        await projectRepository.update(project.id, data);
       } else {
-        id = await projectRepository.create(project as any);
+        id = await projectRepository.create(data as any);
       }
-      await db.projects.put({ ...project, id, updatedAt: new Date() } as any);
+      await db.projects.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -544,13 +588,19 @@ export const dbService = {
   },
   vehicles: {
     async save(vehicle: Partial<TransportVehicle>) {
+      const user = auth.currentUser;
+      const data = {
+        ...vehicle,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = vehicle.id;
       if (vehicle.id) {
-        await vehicleRepository.update(vehicle.id, vehicle);
+        await vehicleRepository.update(vehicle.id, data);
       } else {
-        id = await vehicleRepository.create(vehicle as any);
+        id = await vehicleRepository.create(data as any);
       }
-      await db.vehicles.put({ ...vehicle, id, updatedAt: new Date() } as any);
+      await db.vehicles.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -560,13 +610,19 @@ export const dbService = {
   },
   employees: {
     async save(employee: Partial<HREmployee>) {
+      const user = auth.currentUser;
+      const data = {
+        ...employee,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = employee.id;
       if (employee.id) {
-        await employeeRepository.update(employee.id, employee);
+        await employeeRepository.update(employee.id, data);
       } else {
-        id = await employeeRepository.create(employee as any);
+        id = await employeeRepository.create(data as any);
       }
-      await db.employees.put({ ...employee, id, updatedAt: new Date() } as any);
+      await db.employees.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -576,13 +632,19 @@ export const dbService = {
   },
   students: {
     async save(student: Partial<SchoolStudent>) {
+      const user = auth.currentUser;
+      const data = {
+        ...student,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = student.id;
       if (student.id) {
-        await studentRepository.update(student.id, student);
+        await studentRepository.update(student.id, data);
       } else {
-        id = await studentRepository.create(student as any);
+        id = await studentRepository.create(data as any);
       }
-      await db.students.put({ ...student, id, updatedAt: new Date() } as any);
+      await db.students.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -592,13 +654,19 @@ export const dbService = {
   },
   patients: {
     async save(patient: Partial<MedicalPatient>) {
+      const user = auth.currentUser;
+      const data = {
+        ...patient,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = patient.id;
       if (patient.id) {
-        await patientRepository.update(patient.id, patient);
+        await patientRepository.update(patient.id, data);
       } else {
-        id = await patientRepository.create(patient as any);
+        id = await patientRepository.create(data as any);
       }
-      await db.patients.put({ ...patient, id, updatedAt: new Date() } as any);
+      await db.patients.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
@@ -608,13 +676,19 @@ export const dbService = {
   },
   appointments: {
     async save(appointment: Partial<MedicalAppointment>) {
+      const user = auth.currentUser;
+      const data = {
+        ...appointment,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
       let id = appointment.id;
       if (appointment.id) {
-        await appointmentRepository.update(appointment.id, appointment);
+        await appointmentRepository.update(appointment.id, data);
       } else {
-        id = await appointmentRepository.create(appointment as any);
+        id = await appointmentRepository.create(data as any);
       }
-      await db.appointments.put({ ...appointment, id, updatedAt: new Date() } as any);
+      await db.appointments.put({ ...data, id, updatedAt: new Date() } as any);
       return id;
     },
     async delete(id: string) {
