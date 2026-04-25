@@ -16,6 +16,7 @@ import {
   Clock, CheckCircle, TrendingDown, ArrowRight, FileText, Truck,
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
+  Printer,
   Lock as LockIcon
 } from 'lucide-react';
 import { 
@@ -2833,7 +2834,9 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
   const [cart, setCart] = useState<{ productId: string, name: string, quantity: number, price: number }[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile_money'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile_money' | 'split'>('cash');
+  const [isPartial, setIsPartial] = useState(false);
+  const [initialPaidAmount, setInitialPaidAmount] = useState<number | string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showReceiptModal, setShowReceiptModal] = useState<{ show: boolean, saleData: any } | null>(null);
@@ -2868,11 +2871,21 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
     if (cart.length === 0 || !user) return;
     setIsSubmitting(true);
     try {
+      const actualPaid = isPartial ? (Number(initialPaidAmount) || 0) : total;
+      
       const saleData: Partial<MerchantSale> = {
         merchantId: merchant.id,
         items: cart.map(item => ({ ...item, total: item.price * item.quantity })),
         totalAmount: total,
-        paymentMethod,
+        paidAmount: actualPaid,
+        balance: total - actualPaid,
+        payments: actualPaid > 0 ? [{
+          id: uuidv4(),
+          amount: actualPaid,
+          method: paymentMethod as any,
+          date: new Date()
+        }] : [],
+        paymentMethod: isPartial ? 'split' : paymentMethod as any,
         customerName,
         customerPhone,
         processedBy: user.uid,
@@ -3000,10 +3013,42 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
               <PaymentMethodBtn active={paymentMethod === 'cash'} onClick={() => setPaymentMethod('cash')} label="ESPÈCES" />
               <PaymentMethodBtn active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} label="CARTE" />
               <PaymentMethodBtn active={paymentMethod === 'mobile_money'} onClick={() => setPaymentMethod('mobile_money')} label="MOBILE" />
+            </div>
+
+            <div className="pt-4 border-t border-black/5">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div 
+                  onClick={() => setIsPartial(!isPartial)}
+                  className={`w-10 h-6 rounded-full transition-all relative ${isPartial ? 'bg-primary' : 'bg-gray-200'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isPartial ? 'left-5' : 'left-1'}`} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Paiement partiel (Acompte)</span>
+              </label>
+
+              {isPartial && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mt-4 space-y-2 overflow-hidden"
+                >
+                  <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Montant de l'acompte</label>
+                  <input 
+                    type="number" 
+                    value={initialPaidAmount}
+                    onChange={e => setInitialPaidAmount(e.target.value)}
+                    placeholder="Entrez le montant reçu..."
+                    className="w-full px-4 py-3 bg-gray-50 border border-black/5 rounded-xl text-sm font-black outline-none focus:border-primary/30"
+                  />
+                  {initialPaidAmount && Number(initialPaidAmount) < total && (
+                    <p className="text-[9px] font-bold text-amber-500 italic">Reste à payer: {(total - Number(initialPaidAmount)).toLocaleString()} {merchant.currency}</p>
+                  )}
+                </motion.div>
+              )}
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-dashed border-gray-100">
@@ -3349,7 +3394,7 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
 // --- Merchant Sales History ---
 // --- Merchant Billing (Invoices & Quotes) ---
 const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
-  const [subTab, setSubTab] = useState<'invoices' | 'quotes'>('invoices');
+  const [subTab, setSubTab] = useState<'invoices' | 'quotes' | 'pending'>('invoices');
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<MerchantQuote | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -3391,6 +3436,12 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
             Factures
           </button>
           <button 
+            onClick={() => setSubTab('pending')}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'pending' ? 'bg-white text-rose-500 shadow-sm' : 'text-gray-400 hover:text-rose-500'}`}
+          >
+            Impayés
+          </button>
+          <button 
             onClick={() => setSubTab('quotes')}
             className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'quotes' ? 'bg-white text-ink shadow-sm' : 'text-gray-400 hover:text-ink'}`}
           >
@@ -3399,7 +3450,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
         </div>
       </div>
 
-      {subTab === 'invoices' ? (
+      {subTab === 'invoices' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-xl font-bold flex items-center gap-3">
@@ -3488,7 +3539,75 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {subTab === 'pending' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-bold flex items-center gap-3">
+              <Clock className="w-5 h-5 text-amber-500" />
+              Factures avec Impayés
+            </h3>
+            <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">{sales.filter(s => s.balance && s.balance > 0).length} En attente</span>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                    <th className="px-8 py-5">Référence</th>
+                    <th className="px-8 py-5">Client</th>
+                    <th className="px-8 py-5 text-right">Total</th>
+                    <th className="px-8 py-5 text-right text-rose-500">Reste à payer</th>
+                    <th className="px-8 py-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {sales.filter(s => s.balance !== undefined && s.balance > 0).length === 0 ? (
+                    <tr><td colSpan={5} className="py-20 text-center text-gray-400 text-sm italic uppercase tracking-widest font-black opacity-40">Toutes les créances sont recouvrées !</td></tr>
+                  ) : (
+                    sales.filter(s => s.balance !== undefined && s.balance > 0).map((sale) => (
+                      <tr key={sale.id} className="hover:bg-rose-50/20 transition-colors group">
+                        <td className="px-8 py-6">
+                          <p className="text-[11px] font-mono font-black text-ink">#INV-{sale.id.slice(0, 8).toUpperCase()}</p>
+                        </td>
+                        <td className="px-8 py-6">
+                          <p className="font-black text-ink text-sm">{sale.customerName || 'Client POS'}</p>
+                        </td>
+                        <td className="px-8 py-6 text-right font-mono font-black text-gray-400">
+                          {sale.totalAmount.toLocaleString()} <span className="text-[9px] opacity-40">{merchant.currency}</span>
+                        </td>
+                        <td className="px-8 py-6 text-right font-mono font-black text-rose-500">
+                          {sale.balance?.toLocaleString()} <span className="text-[9px] font-bold">{merchant.currency}</span>
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <div className="flex justify-end gap-2">
+                             <button 
+                               onClick={() => { setSelectedSale(sale as any); setIsPaymentModalOpen(true); }} 
+                               className="px-4 py-2.5 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all"
+                             >
+                               Encaisser
+                             </button>
+                             <button 
+                               onClick={() => generateA4InvoicePDF(merchant, sale)} 
+                               className="p-3 bg-gray-50 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded-xl transition-all border border-black/5"
+                             >
+                               <FileText className="w-4 h-4" />
+                             </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {subTab === 'quotes' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-xl font-bold flex items-center gap-3">
@@ -3869,11 +3988,13 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
 
   const financialSummary = useMemo(() => {
     const totalRevenue = sales.reduce((acc, s) => acc + s.totalAmount, 0);
+    const totalCollected = sales.reduce((acc, s) => acc + (s.paidAmount !== undefined ? s.paidAmount : s.totalAmount), 0);
+    const totalPending = sales.reduce((acc, s) => acc + (s.balance || 0), 0);
     const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
-    const netProfit = totalRevenue - totalExpenses;
-    const margin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const netProfit = totalCollected - totalExpenses;
+    const margin = totalCollected > 0 ? (netProfit / totalCollected) * 100 : 0;
 
-    return { totalRevenue, totalExpenses, netProfit, margin };
+    return { totalRevenue, totalCollected, totalPending, totalExpenses, netProfit, margin };
   }, [sales, expenses]);
 
   const monthlyData = useMemo(() => {
@@ -3947,11 +4068,12 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       </div>
 
       {/* Financial KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <ReportKPI cardColor="primary" label="Chiffre d'Affaires" value={financialSummary.totalRevenue} currency={merchant.currency} icon={DollarSign} trend="+12%" />
-        <ReportKPI cardColor="rose" label="Total Dépenses" value={financialSummary.totalExpenses} currency={merchant.currency} icon={TrendingDown} trend="+5%" />
-        <ReportKPI cardColor="emerald" label="Bénéfice Net" value={financialSummary.netProfit} currency={merchant.currency} icon={TrendingUp} trend="+18%" />
-        <ReportKPI cardColor="blue" label="Marge Nette" value={financialSummary.margin.toFixed(1)} suffix="%" icon={PieChart} trend="Stable" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <ReportKPI cardColor="primary" label="Ventes Totales" value={financialSummary.totalRevenue} currency={merchant.currency} icon={DollarSign} />
+        <ReportKPI cardColor="emerald" label="Total Encaissé" value={financialSummary.totalCollected} currency={merchant.currency} icon={CheckCircle} />
+        <ReportKPI cardColor="amber" label="Reste à Recouvrer" value={financialSummary.totalPending} currency={merchant.currency} icon={Clock} />
+        <ReportKPI cardColor="rose" label="Total Dépenses" value={financialSummary.totalExpenses} currency={merchant.currency} icon={TrendingDown} />
+        <ReportKPI cardColor="blue" label="Profit (Cash)" value={financialSummary.netProfit} currency={merchant.currency} icon={TrendingUp} />
       </div>
 
       {/* Charts Section */}

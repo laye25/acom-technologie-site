@@ -89,9 +89,8 @@ const HeroBanner = () => {
   }, [slides.length]);
 
   if (slides.length === 0) return null;
-
-  const currentSlide = slides[current];
-  const Icon = iconMap[currentSlide.iconName] || Sparkles;
+  const currentSlide = slides[current] || slides[0];
+  const Icon = currentSlide ? (iconMap[currentSlide.iconName] || Sparkles) : Sparkles;
 
   return (
     <div className="relative w-full overflow-hidden bg-ink">
