@@ -17,7 +17,7 @@ import {
   Clock, CheckCircle, TrendingDown, ArrowRight, FileText, Truck,
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
-  Printer, HardDrive, Database, RefreshCw, Upload,
+  Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
   Lock as LockIcon
 } from 'lucide-react';
 import { 
@@ -467,6 +467,7 @@ const MerchantSaaS = () => {
       { id: 'accounting', label: 'Compta', icon: BarChart3 },
       { id: 'reports', label: 'Rapports', icon: FileText },
       { id: 'settings', label: 'Réglages', icon: Settings },
+      { id: 'build', label: 'Build Desktop', icon: Cpu },
     ];
 
     switch (type) {
@@ -653,6 +654,7 @@ const MerchantSaaS = () => {
           {activeTab === 'accounting' && <MerchantAccounting key="accounting" merchant={merchant} />}
           {activeTab === 'reports' && <MerchantReports key="reports" merchant={merchant} />}
           {activeTab === 'settings' && <MerchantSettings key="settings" merchant={merchant} onUpdate={(m) => setMerchant(m)} setActiveTab={setActiveTab} />}
+          {activeTab === 'build' && <MerchantBuild key="build" merchant={merchant as any} />}
           
           {/* Specialized SaaS Tabs */}
           {activeTab === 'interventions' && <ServiceManager key="interventions" merchant={merchant} />}
@@ -3372,6 +3374,134 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
 };
 
 // --- Merchant Accounting ---
+const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) => {
+  const [isBuilding, setIsBuilding] = useState(false);
+  const [buildLogs, setBuildLogs] = useState<string[]>([]);
+
+  const startBuild = async () => {
+    setIsBuilding(true);
+    setBuildLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - Lancement de la procédure de compilation...`]);
+    
+    try {
+      const response = await fetch('/api/build-desktop', { method: 'POST' });
+      const data = await response.json();
+      
+      if (data.success) {
+        toast.success(data.message);
+        setBuildLogs(prev => [...prev, `${new Date().toLocaleTimeString()} - ${data.message}`]);
+      } else {
+        toast.error('Erreur: ' + data.error);
+      }
+    } catch (e: any) {
+      toast.error('Erreur réseau lors de la compilation');
+    } finally {
+      setIsBuilding(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-8 border-b border-black/5">
+        <div className="space-y-1">
+          <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-2">Centre de Packaging</p>
+          <h2 className="text-3xl font-black text-ink tracking-tight">Compilation Desktop</h2>
+          <p className="text-gray-400 font-medium max-w-xl">
+            Générez un exécutable autonome (.exe ou .dmg) pour votre PC ou Mac. Cette version fonctionnera 100% hors-ligne avec SQLite.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white rounded-[2.5rem] border border-black/5 p-10 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Cpu className="w-40 h-40" />
+          </div>
+
+          <div className="relative z-10 space-y-8">
+            <div className="p-4 bg-emerald-50 rounded-2xl w-fit">
+              <Download className="w-8 h-8 text-emerald-500" />
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-2xl font-black text-ink tracking-tight">Générer l'Exécutable</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                Cliquez pour compiler l'ensemble du code, les assets et le runtime Electron. Le processus prend environ 2 à 3 minutes.
+              </p>
+            </div>
+
+            <ul className="space-y-3">
+              {[
+                "Packaging de l'interface Web (Optimisé)",
+                "Migration du moteur SQLite (OPFS)",
+                "Compression des actifs graphiques",
+                "Génération de l'exécutable Portable (.exe)"
+              ].map((step, idx) => (
+                <li key={idx} className="flex items-center gap-3 text-xs font-black text-gray-400 uppercase tracking-widest">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  {step}
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={startBuild}
+              disabled={isBuilding}
+              className={`w-full py-6 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all ${
+                isBuilding 
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'bg-primary text-white hover:bg-primary-hover shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]'
+              }`}
+            >
+              {isBuilding ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
+              {isBuilding ? 'Compilation en cours...' : 'Lancer la compilation automatique'}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-gray-950 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3 text-white">
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-md shadow-rose-500/50" />
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="ml-4 text-[10px] font-black uppercase tracking-widest opacity-50">Build Console</span>
+            </div>
+            <Terminal className="text-white/20 w-5 h-5" />
+          </div>
+
+          <div className="font-mono text-xs sm:text-sm text-emerald-400/90 leading-relaxed max-h-[350px] overflow-y-auto custom-scrollbar italic">
+            {buildLogs.length === 0 ? (
+              <p className="opacity-40 select-none">En attente d'une action de build...</p>
+            ) : (
+              buildLogs.map((log, i) => (
+                <div key={i} className="mb-2">
+                  <span className="text-emerald-500/30 mr-2">$</span>
+                  {log}
+                </div>
+              ))
+            )}
+            {isBuilding && (
+              <div className="flex items-center gap-2 mt-4 animate-pulse">
+                <span className="text-emerald-500/30 mr-2">$</span>
+                <span className="bg-emerald-400 w-2 h-4" />
+              </div>
+            )}
+          </div>
+
+          <div className="absolute bottom-6 left-10 right-10">
+            <div className="p-4 bg-white/5 rounded-xl border border-white/5 backdrop-blur-sm">
+                <p className="text-[10px] text-white/40 uppercase tracking-widest font-black">Statut Final</p>
+                <p className="text-white font-black text-xs uppercase mt-1">
+                  {isBuilding ? 'Génération du pipeline...' : 'Prêt pour le déploiement'}
+                </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [newExpense, setNewExpense] = useState({ title: '', amount: 0, category: 'Général', description: '' });
