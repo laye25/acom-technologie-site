@@ -1,5 +1,7 @@
 {
   "name": "acom-technologie-site",
+  "author": "Acom",
+  "description": "Acom Studio Desktop Application",
   "private": true,
   "version": "1.0.0",
   "type": "module",
