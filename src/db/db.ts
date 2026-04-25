@@ -5,6 +5,7 @@ export class StudioAcomDB extends Dexie {
   categories!: Table<Category>;
   products!: Table<MerchantProduct>;
   sales!: Table<MerchantSale>;
+  quotes!: Table<any>;
   expenses!: Table<MerchantExpense>;
   merchants!: Table<any>;
   orders!: Table<any>;
@@ -36,10 +37,11 @@ export class StudioAcomDB extends Dexie {
 
   constructor() {
     super('StudioAcomDB');
-    this.version(11).stores({
+    this.version(12).stores({
       categories: 'id, merchantId, name',
       products: 'id, merchantId, name, category, updatedAt',
       sales: 'id, merchantId, createdAt',
+      quotes: 'id, merchantId, createdAt, status',
       expenses: 'id, merchantId, createdAt, date, category',
       merchants: 'id, owner_id, name, updatedAt',
       orders: 'id, merchantId, userId, user_id, partnerId, createdAt, status, updatedAt',

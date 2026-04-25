@@ -552,17 +552,53 @@ export interface MerchantSaleItem {
   total: number;
 }
 
+export interface MerchantQuoteItem {
+  productId?: string;
+  name: string;
+  quantity: number;
+  price: number;
+  total: number;
+}
+
+export interface MerchantQuote {
+  id: string;
+  merchantId: string;
+  items: MerchantQuoteItem[];
+  totalAmount: number;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  validUntil: any;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'invoiced';
+  notes?: string;
+  createdAt: any;
+  created_at?: any;
+  processedBy: string; // userId
+}
+
+export interface MerchantSalePayment {
+  id: string;
+  amount: number;
+  method: 'cash' | 'card' | 'mobile_money' | 'transfer';
+  date: any;
+}
+
 export interface MerchantSale {
   id: string;
   merchantId: string;
   items: MerchantSaleItem[];
   totalAmount: number;
-  paymentMethod: 'cash' | 'card' | 'mobile_money';
+  paidAmount: number;
+  balance: number;
+  payments: MerchantSalePayment[];
+  paymentMethod: 'cash' | 'card' | 'mobile_money' | 'split';
   customerName?: string;
   customerPhone?: string;
   createdAt: any;
   created_at?: any;
   processedBy: string; // userId
+  updatedAt?: any;
 }
 
 export interface MerchantExpense {
