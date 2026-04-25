@@ -384,16 +384,32 @@ export const dbService = {
       const data = {
         ...product,
         owner_id: user?.uid,
-        ownerId: user?.uid // Consistency
+        ownerId: user?.uid,
+        updatedAt: new Date(),
+        syncStatus: 'synced'
       };
-      let id = product.id;
-      if (product.id) {
-        await merchantProductRepository.update(product.id, data);
+      
+      let id = product.id || uuidv4();
+      const merchantId = product.merchantId || (product as any).merchant_id;
+      const merchant = merchantId ? await db.merchants.get(merchantId) : null;
+      
+      if (merchant?.licenseType !== 'local') {
+        try {
+          if (product.id) {
+            await merchantProductRepository.update(product.id, data);
+          } else {
+            const remoteId = await merchantProductRepository.create(data as any);
+            id = remoteId;
+          }
+        } catch (error) {
+          console.warn('Product cloud sync failed, saving locally');
+          data.syncStatus = 'pending';
+        }
       } else {
-        id = await merchantProductRepository.create(data as any);
+        data.syncStatus = 'local-only';
       }
-      // Update local Dexie for immediate feedback
-      await db.products.put({ ...data, id, updatedAt: new Date() } as any);
+
+      await db.products.put({ ...data, id } as any);
       return id;
     },
     async delete(id: string) {
@@ -462,14 +478,31 @@ export const dbService = {
       const data = {
         ...expense,
         owner_id: user?.uid,
-        ownerId: user?.uid
+        ownerId: user?.uid,
+        updatedAt: new Date(),
+        syncStatus: 'synced'
       };
-      let id = expense.id;
-      if (expense.id) {
-        await merchantExpenseRepository.update(expense.id, data);
+      
+      let id = expense.id || uuidv4();
+      const merchantId = expense.merchantId || (expense as any).merchant_id;
+      const merchant = merchantId ? await db.merchants.get(merchantId) : null;
+
+      if (merchant?.licenseType !== 'local') {
+        try {
+          if (expense.id) {
+            await merchantExpenseRepository.update(expense.id, data);
+          } else {
+            const remoteId = await merchantExpenseRepository.create(data as any);
+            id = remoteId;
+          }
+        } catch (error) {
+          console.warn('Expense cloud sync failed, saving locally');
+          data.syncStatus = 'pending';
+        }
       } else {
-        id = await merchantExpenseRepository.create(data as any);
+        data.syncStatus = 'local-only';
       }
+
       await db.expenses.put({ ...data, id, createdAt: expense.createdAt || new Date() } as any);
       return id;
     },

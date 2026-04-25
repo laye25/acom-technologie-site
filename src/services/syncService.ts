@@ -522,6 +522,65 @@ export const syncService = {
     }
   },
 
+  async pushPendingData(merchantId: string) {
+    if (!(await this.isOnline(merchantId))) return;
+    
+    try {
+      console.log('Pushing pending local data to cloud...');
+      
+      // 1. Pending Sales
+      const pendingSales = await db.sales.where('syncStatus').equals('pending').toArray();
+      for (const sale of pendingSales) {
+        try {
+          const { syncStatus, ...data } = sale;
+          const { merchantSaleRepository } = await import('../data/repositories/merchant-sale.repository');
+          await merchantSaleRepository.create(data);
+          await db.sales.update(sale.id, { syncStatus: 'synced' });
+        } catch (e) {
+          console.warn('Failed to push pending sale:', sale.id);
+        }
+      }
+
+      // 2. Pending Products
+      const pendingProducts = await db.products.where('syncStatus').equals('pending').toArray();
+      for (const product of pendingProducts) {
+        try {
+          const { syncStatus, ...data } = product;
+          const { merchantProductRepository } = await import('../data/repositories/merchant-product.repository');
+          if (product.id && product.id.length > 20) { // Assume it already exists if long ID
+             await merchantProductRepository.update(product.id, data);
+          } else {
+             await merchantProductRepository.create(data as any);
+          }
+          await db.products.update(product.id, { syncStatus: 'synced' });
+        } catch (e) {
+          console.warn('Failed to push pending product:', product.id);
+        }
+      }
+
+      // 3. Pending Expenses
+      const pendingExpenses = await db.expenses.where('syncStatus').equals('pending').toArray();
+      for (const expense of pendingExpenses) {
+        try {
+          const { syncStatus, ...data } = expense;
+          const { merchantExpenseRepository } = await import('../data/repositories/merchant-expense.repository');
+          if (expense.id && expense.id.length > 20) {
+            await merchantExpenseRepository.update(expense.id, data);
+          } else {
+            await merchantExpenseRepository.create(data as any);
+          }
+          await db.expenses.update(expense.id, { syncStatus: 'synced' });
+        } catch (e) {
+          console.warn('Failed to push pending expense:', expense.id);
+        }
+      }
+      
+      console.log('Push pending data complete.');
+    } catch (error) {
+      console.error('Push pending data failed:', error);
+    }
+  },
+
   async syncStudioAcomData() {
     if (!(await this.isOnline())) return;
     try {

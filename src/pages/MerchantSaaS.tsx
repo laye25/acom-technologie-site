@@ -442,6 +442,25 @@ const MerchantSaaS = () => {
     fetchMerchant();
   }, [user]);
 
+  // Data Synchronization
+  useEffect(() => {
+    if (merchant && merchant.id) {
+      // Sync from Cloud to Local (Delta-Sync)
+      syncService.syncProducts(merchant.id);
+      syncService.syncSales(merchant.id);
+      syncService.syncExpenses(merchant.id);
+      syncService.syncUsers(merchant.id);
+      syncService.syncSettings(merchant.id);
+      
+      // Push pending local data periodically
+      const pushInterval = setInterval(() => {
+        syncService.pushPendingData(merchant.id!);
+      }, 30000); // Every 30 seconds
+
+      return () => clearInterval(pushInterval);
+    }
+  }, [merchant?.id]);
+
   const getTabs = (type: string) => {
     const commonTabs = [
       { id: 'dashboard', label: 'Aperçu', icon: PieChart },
