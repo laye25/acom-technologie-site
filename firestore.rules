@@ -255,56 +255,61 @@ service cloud.firestore {
       allow write: if false; 
     }
 
+    function isMerchantOwner(mId) {
+      let merchantPath = /databases/$(database)/documents/merchants/$(mId);
+      return isAuthenticated() && exists(merchantPath) && (get(merchantPath).data.owner_id == request.auth.uid || get(merchantPath).data.ownerId == request.auth.uid || isAdmin());
+    }
+
     match /merchant_products/{productId} {
-      allow read, write: if isAuthenticated(); // Simplified for now, should check merchant ownership
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /merchant_sales/{saleId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /merchant_expenses/{expenseId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
-    match /merchant_suppliers/{supplierId} {
-      allow read, write: if isAuthenticated();
+    match /suppliers/{supplierId} {
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
-    match /stock_movements/{movementId} {
-      allow read, write: if isAuthenticated();
+    match /movements/{movementId} {
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /interventions/{interventionId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /projects/{projectId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /vehicles/{vehicleId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /employees/{employeeId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /students/{studentId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /patients/{patientId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
     
     match /appointments/{appointmentId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', '')) || request.resource.data.get('merchant_id', request.resource.data.get('merchantId', '')));
     }
 
-    match /activities/{activityId} {
-      allow read: if isAuthenticated();
+    match /merchant_activities/{activityId} {
+      allow read: if isAuthenticated() && (resource.data.get('merchant_id', resource.data.get('merchantId', null)) == null || isMerchantOwner(resource.data.get('merchant_id', resource.data.get('merchantId', ''))));
       allow create: if isAuthenticated();
       allow update, delete: if isAdmin();
     }
