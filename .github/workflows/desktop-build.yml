@@ -24,13 +24,13 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --omit=optional --ignore-scripts
+        run: npm ci
+        
+      - name: Remove problematic optional dependencies
+        run: npm remove canvas --no-save
         
       - name: Build Web App
         run: npm run build
-
-      - name: Remove canvas to avoid node-gyp build issues on Windows
-        run: Remove-Item -Recurse -Force node_modules\canvas -ErrorAction SilentlyContinue
 
       - name: Build Electron Desktop App (Windows)
         run: npx electron-builder --win portable -c.npmRebuild=false
