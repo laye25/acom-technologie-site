@@ -62,7 +62,7 @@ function AppContent() {
   const isEditor = location.pathname === '/design-editor';
   
   // Détection du sous-domaine SaaS (ou simulation via ?mode=saas)
-  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || typeof window !== 'undefined' && isElectron;
 
   // Pour le SaaS, on cache le header et le footer pour faire plus "Application"
   const hideNavbar = isEditor || isSaaSDomain;
