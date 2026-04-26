@@ -24,8 +24,8 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
-
+        run: npm ci --omit=optional --ignore-scripts
+        
       - name: Build Web App
         run: npm run build
 
@@ -33,7 +33,7 @@ jobs:
         run: Remove-Item -Recurse -Force node_modules\canvas -ErrorAction SilentlyContinue
 
       - name: Build Electron Desktop App (Windows)
-        run: npx electron-builder --win portable
+        run: npx electron-builder --win portable -c.npmRebuild=false
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
