@@ -18,6 +18,7 @@
   "build": {
     "appId": "com.acom.studio",
     "productName": "Acom Studio Desktop",
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },

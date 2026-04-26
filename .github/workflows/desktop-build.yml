@@ -26,14 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Remove problematic optional dependencies
-        run: npm remove canvas --no-save
-        
       - name: Build Web App
         run: npm run build
 
       - name: Build Electron Desktop App (Windows)
-        run: npx electron-builder --win portable -c.npmRebuild=false
+        run: npx electron-builder --win portable
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
