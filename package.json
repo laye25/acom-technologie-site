@@ -5,7 +5,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "desktop/main.js",
+  "main": "desktop/main.cjs",
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node server.ts",
@@ -24,7 +24,7 @@
     },
     "files": [
       "dist/**/*",
-      "desktop/main.js",
+      "desktop/main.cjs",
       "public/favicon.ico"
     ],
     "win": {
