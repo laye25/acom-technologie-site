@@ -481,6 +481,7 @@ export interface SaaSPageContent {
 export interface SiteSettings {
   brandName?: string;
   logoUrl?: string;
+  desktopLogo?: string;
   heroSlides: HeroSlide[];
   footer: FooterSettings;
   primaryColor?: string;

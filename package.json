@@ -28,7 +28,15 @@
       "public/favicon.ico"
     ],
     "win": {
-      "target": "portable"
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Acom Gestion Desktop"
     },
     "mac": {
       "target": "dmg"

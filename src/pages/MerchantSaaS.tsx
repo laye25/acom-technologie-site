@@ -18,7 +18,7 @@ import {
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
-  Lock as LockIcon, GitBranch, Github
+  Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -448,6 +448,8 @@ const MerchantSaaS = () => {
   }, [user]);
 
   const isCloudSyncEnabled = merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM';
+  
+  const siteSettings = useLiveQuery(() => db.settings.get('global'));
 
   // Data Synchronization
   useEffect(() => {
@@ -1612,28 +1614,39 @@ const MerchantDashboard = ({
       {merchant.plan === 'LOCAL' && (
         <div className="bg-gradient-to-br from-gray-900 to-black rounded-[2rem] border border-gray-800 shadow-2xl overflow-hidden relative mt-8">
           <div className="p-8 relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Architecture Col */}
+            {/* Architecture / OS Features Col */}
             <div className="lg:col-span-1 space-y-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center border border-gray-700 shadow-inner">
-                  <Terminal className="w-6 h-6 text-emerald-400" />
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-700 rounded-2xl flex items-center justify-center p-0.5 shadow-lg shadow-emerald-500/20">
+                  <div className="w-full h-full bg-gray-900 rounded-[14px] flex items-center justify-center">
+                    <Monitor className="w-8 h-8 text-emerald-400" />
+                  </div>
                 </div>
                 <div>
-                  <h3 className="text-xl font-black text-white">Acom Gestion Desktop</h3>
-                  <p className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                  <h3 className="text-xl font-black text-white tracking-tight">Acom Desktop</h3>
+                  <p className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest flex items-center gap-1.5 mt-1">
                     <Github className="w-3 h-3" /> Tauri Native Build
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-gray-800/50 rounded-lg shrink-0 border border-gray-700/50">
-                    <Cpu className="w-4 h-4 text-emerald-400" />
+                    <MonitorUp className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Architecture Ultra-Légère</h4>
-                    <p className="text-xs text-gray-400 leading-relaxed">Compilé via Rust & Tauri. Moins de 15 Mo en RAM, aucune dépendance lourde comme Electron. Backend natif multi-thread optimisé pour Windows.</p>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Intégration OS Native</h4>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">Création de raccourcis sur le bureau, ajout au Menu Démarrer avec le logo personnalisé Acom, et support du mode hors-ligne natif.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-gray-800/50 rounded-lg shrink-0 border border-gray-700/50">
+                    <Rocket className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Démarrage Automatique</h4>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">L'application démarre en arrière-plan avec Windows (System Tray) pour une ouverture instantanée au clic sur le logo.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -1642,7 +1655,7 @@ const MerchantDashboard = ({
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Moteur SQLite Intégré</h4>
-                    <p className="text-xs text-gray-400 leading-relaxed">La base de données SQLite est embarquée (via `sqlx`). Performances d'écriture instantanées et isolation HORS LIGNE totale.</p>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">La base de données SQLite est embarquée. Performances d'écriture instantanées et conservation garanties sur votre disque dur local.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -1650,8 +1663,8 @@ const MerchantDashboard = ({
                     <LockIcon className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Sécurité & Isolation IPC</h4>
-                    <p className="text-xs text-gray-400 leading-relaxed">Le frontend React ne communique avec le système qu'au travers des IPC sécurisés en Rust. Aucune exposition Node.js critique.</p>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Sécurité & Isolation</h4>
+                    <p className="text-[11px] text-gray-400 leading-relaxed">Le frontend React communique avec le système via des IPC sécurisés en Rust. Aucune dépendance matérielle sur le cloud requise.</p>
                   </div>
                 </div>
               </div>
@@ -1714,29 +1727,58 @@ const MerchantDashboard = ({
               </div>
             </div>
 
-            {/* Download Col */}
-            <div className="lg:col-span-1 flex flex-col justify-center bg-gray-800/30 rounded-2xl border border-gray-700/50 p-8 text-center relative overflow-hidden group">
-              <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors duration-500"></div>
+            {/* Download Col & Desktop Preview */}
+            <div className="lg:col-span-1 flex flex-col justify-between bg-gray-800/30 rounded-[1.5rem] border border-gray-700/50 overflow-hidden relative group">
+              <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors duration-500 pointer-events-none"></div>
               
-              <div className="relative z-10">
-                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(16,185,129,0.15)] border border-emerald-500/20 group-hover:scale-110 transition-transform duration-500">
-                  <Download className="w-10 h-10" />
+              {/* Desktop Shortcut Simulation */}
+              <div className="relative h-[220px] bg-[url('https://images.unsplash.com/photo-1617042375876-a13e36732a30?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center border-b border-gray-700/50 flex flex-col items-start justify-start">
+                <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
+                
+                {/* Desktop Icon */}
+                <div className="relative z-10 m-6 flex flex-col items-center gap-1.5 p-2 rounded hover:bg-white/20 transition-colors cursor-pointer group/icon w-[75px]">
+                  <div className="w-[54px] h-[54px] flex items-center justify-center rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.5)] relative overflow-hidden bg-white">
+                    <img src={siteSettings?.desktopLogo || "/desktop-logo.svg"} className="w-full h-full object-cover" alt="Acom Desktop Logo" />
+                    {/* Shortcut Arrow overlay */}
+                    <div className="absolute bottom-0 left-0 w-3.5 h-3.5 bg-white rounded-tr border-t border-r border-black/10 flex items-center justify-center z-20">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="4" className="w-[8px] h-[8px]">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 5v7h-7" />
+                      </svg>
+                    </div>
+                  </div>
+                  <span className="text-white text-[10px] font-bold drop-shadow-lg text-center leading-[1.1] [text-shadow:_0_1px_4px_rgb(0_0_0)] relative z-10">
+                    Acom Gestion<br/>Desktop
+                  </span>
                 </div>
-                <h4 className="text-xl font-black text-white mb-2 tracking-tight">Télécharger l'Installateur</h4>
-                <p className="text-xs text-gray-400 mb-8 px-4">Installeur optimisé Windows (x64) contenant tout le moteur Acom. Prêt pour un usage hors ligne instantané.</p>
+                
+                {/* Windows Taskbar mock */}
+                <div className="absolute bottom-0 left-0 right-0 h-10 bg-black/60 backdrop-blur-md border-t border-white/10 flex items-center px-4 gap-4 z-10">
+                  <div className="w-5 h-5 text-cyan-400 flex items-center justify-center opacity-90">
+                    <svg viewBox="0 0 88 88" fill="currentColor"><path d="M0,12.4L37.6,7.1v33H0V12.4z M42.4,6.4L88,0v39.3H42.4V6.4z M0,44.9h37.6v33.4L0,73.1V44.9z M42.4,44.9H88V88L42.4,81.4V44.9z"/></svg>
+                  </div>
+                  <div className="w-6 h-6 bg-white/20 rounded-sm"></div>
+                  <div className="w-6 h-6 bg-white/10 rounded-sm"></div>
+                  <div className="w-1 h-1 bg-white/60 rounded-full absolute bottom-1.5 left-[3.1rem]"></div>
+                </div>
+              </div>
+
+              <div className="relative p-6 pt-5 text-center z-10 flex-1 flex flex-col justify-end">
+                <h4 className="text-[17px] font-black text-white mb-2 tracking-tight">Télécharger l'Installateur</h4>
+                <p className="text-[11px] text-gray-400 mb-6 px-1 leading-relaxed">L'icône personnalisée sera automatiquement ajoutée à votre bureau Windows après l'installation.</p>
                 
                 <button 
                   onClick={() => toast.success('Simulation: Le téléchargement de Acom_Gestion_Setup_v1.2.0.exe commence !')}
-                  className="w-full relative group/btn overflow-hidden px-6 py-4 bg-emerald-500 text-black rounded-[1rem] font-black uppercase text-[11px] tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-95 flex items-center justify-center gap-3"
+                  className="w-full relative group/btn overflow-hidden px-5 py-3.5 bg-emerald-500 text-black rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-95 flex items-center justify-center gap-2.5"
                 >
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>
                   <Download className="w-4 h-4 relative z-10" />
-                  <span className="relative z-10">Acom_Gestion_Setup.exe</span>
+                  <span className="relative z-10 pt-0.5">Acom_Gestion_Setup.exe</span>
                 </button>
-                <div className="mt-5 flex justify-center items-center gap-3 text-[10px] uppercase font-mono text-gray-500">
-                  <span className="bg-gray-800 px-2 py-1 rounded">v1.2.0-stable</span>
+                <div className="mt-4 flex justify-center items-center gap-2 text-[9px] uppercase font-mono text-gray-500 font-bold">
+                  <span className="bg-gray-800/80 px-2 py-1 rounded">v1.2.0</span>
                   <span>•</span>
-                  <span className="bg-gray-800 px-2 py-1 rounded">12.4 MB</span>
+                  <span className="bg-gray-800/80 px-2 py-1 rounded">Setup NSIS (12 MB)</span>
                 </div>
               </div>
             </div>
@@ -5278,6 +5320,7 @@ const MerchantSettings = ({
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Nom de l'organisation</label>
               <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold text-lg" />
             </div>
+
             <div>
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Téléphone Professionnel</label>
               <input type="tel" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-mono font-bold" />
@@ -5286,6 +5329,7 @@ const MerchantSettings = ({
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Email de Contact</label>
               <input type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold" />
             </div>
+
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Adresse Physique</label>
               <div className="relative">
