@@ -482,6 +482,7 @@ export interface SiteSettings {
   brandName?: string;
   logoUrl?: string;
   desktopLogo?: string;
+  desktopDownloadUrl?: string;
   heroSlides: HeroSlide[];
   footer: FooterSettings;
   primaryColor?: string;

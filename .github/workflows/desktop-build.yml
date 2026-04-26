@@ -26,11 +26,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
+      - name: Fetch Database Custom Icon
+        run: node scripts/fetch-icon.js
+        
       - name: Build Web App
         run: npm run build
 
       - name: Build Electron Desktop App (Windows)
-        run: npx electron-builder --win portable
+        run: npx electron-builder --win nsis
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

@@ -1768,7 +1768,14 @@ const MerchantDashboard = ({
                 <p className="text-[11px] text-gray-400 mb-6 px-1 leading-relaxed">L'icône personnalisée sera automatiquement ajoutée à votre bureau Windows après l'installation.</p>
                 
                 <button 
-                  onClick={() => toast.success('Simulation: Le téléchargement de Acom_Gestion_Setup_v1.2.0.exe commence !')}
+                  onClick={() => {
+                    if (siteSettings?.desktopDownloadUrl) {
+                      window.open(siteSettings.desktopDownloadUrl, '_blank');
+                      toast.success('Démarrage du téléchargement...');
+                    } else {
+                      toast.success('Simulation: Le téléchargement de Acom_Gestion_Setup_v1.2.0.exe commence !');
+                    }
+                  }}
                   className="w-full relative group/btn overflow-hidden px-5 py-3.5 bg-emerald-500 text-black rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-95 flex items-center justify-center gap-2.5"
                 >
                   <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>

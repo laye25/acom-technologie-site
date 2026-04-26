@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { dbService as db } from '../../services/dbService';
-import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock, Percent } from 'lucide-react';
+import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock, Percent, Link as LinkIcon, Monitor } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ConfirmModal } from './ConfirmModal';
 import { OptimizedImage } from '../OptimizedImage';
@@ -800,51 +800,70 @@ const SettingsManager = () => {
               <p className="mt-4 text-xs text-gray-400 italic">Ce taux sera utilisé pour calculer le HT et le TTC dans vos rapports financiers.</p>
             </div>
 
-            {/* Desktop Logo Section */}
-            <div className="p-6 rounded-2xl bg-indigo-50/50 border border-indigo-100">
-              <label className="block text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4">Icône "Acom Gestion Desktop"</label>
-              <div className="flex items-center gap-6">
-                <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-indigo-100 flex items-center justify-center overflow-hidden">
-                  {settings.desktopLogo ? (
-                    <img src={settings.desktopLogo} className="w-full h-full object-cover" alt="Desktop Logo Preview" />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 opacity-30">
-                      <ImageIcon className="w-8 h-8 text-indigo-600" />
-                      <span className="text-[8px] font-black uppercase text-center px-1">Aucun Logo</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="text-[10px] text-indigo-600/70 mb-4 font-medium leading-relaxed">
-                    Ce logo représente l'application Acom Gestion Desktop. Il sera utilisé pour l'icône de raccourci sur le bureau des clients.
-                  </p>
-                  <div className="flex gap-2">
-                    <label className="px-4 py-2 bg-white border border-indigo-200 rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-indigo-50 transition-all shadow-sm text-indigo-600">
-                      Changer l'icône
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const base64 = await compressImage(file, 512, 512, 0.8);
-                            setSettings({ ...settings, desktopLogo: base64 });
-                            toast.success('Icône Desktop mise à jour !');
-                          }
-                        }}
-                      />
-                    </label>
-                    {settings.desktopLogo && (
-                      <button 
-                        onClick={() => setSettings({ ...settings, desktopLogo: undefined })}
-                        className="px-4 py-2 text-rose-500 text-[9px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
-                      >
-                        Réinitialiser
-                      </button>
+            {/* Desktop Logo & Link Section */}
+            <div className="p-6 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4">Icône "Acom Gestion Desktop"</label>
+                <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-indigo-100 flex items-center justify-center overflow-hidden">
+                    {settings.desktopLogo ? (
+                      <img src={settings.desktopLogo} className="w-full h-full object-cover" alt="Desktop Logo Preview" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 opacity-30">
+                        <ImageIcon className="w-8 h-8 text-indigo-600" />
+                        <span className="text-[8px] font-black uppercase text-center px-1">Aucun Logo</span>
+                      </div>
                     )}
                   </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-indigo-600/70 mb-4 font-medium leading-relaxed">
+                      Ce logo représente l'application Acom Gestion Desktop. Il sera utilisé pour l'icône de raccourci sur le bureau des clients.
+                    </p>
+                    <div className="flex gap-2">
+                      <label className="px-4 py-2 bg-white border border-indigo-200 rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-indigo-50 transition-all shadow-sm text-indigo-600">
+                        Changer l'icône
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const base64 = await compressImage(file, 512, 512, 0.8);
+                              setSettings({ ...settings, desktopLogo: base64 });
+                              toast.success('Icône Desktop mise à jour !');
+                            }
+                          }}
+                        />
+                      </label>
+                      {settings.desktopLogo && (
+                        <button 
+                          onClick={() => setSettings({ ...settings, desktopLogo: undefined })}
+                          className="px-4 py-2 text-rose-500 text-[9px] font-black uppercase tracking-widest hover:bg-rose-50 rounded-xl transition-all"
+                        >
+                          Réinitialiser
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              <div className="pt-4 border-t border-indigo-100">
+                <label className="block text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <LinkIcon className="w-3 h-3" />
+                  URL de téléchargement (.exe)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://votre-stockage.com/acom-gestion-setup.exe"
+                  value={settings.desktopDownloadUrl || ''}
+                  onChange={(e) => setSettings({ ...settings, desktopDownloadUrl: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-indigo-100 outline-none focus:ring-4 focus:ring-indigo-50 bg-white font-mono text-[10px] text-indigo-900"
+                />
+                <p className="mt-2 text-[10px] text-gray-400 italic">
+                  Lien direct vers l'exécutable Windows. Si vide, le bouton affichera une simulation.
+                </p>
               </div>
             </div>
 

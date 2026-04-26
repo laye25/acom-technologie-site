@@ -103,6 +103,48 @@ export const restoreSQLiteDB = async (file: File) => {
   }
 };
 
+export const syncPhysicalFile = async () => {
+  if (!db) return;
+  try {
+    const isElectron = typeof window !== 'undefined' && typeof (window as any).require !== 'undefined' && navigator.userAgent.includes('Electron');
+    if (!isElectron) return;
+
+    const fs = (window as any).require('fs');
+    const path = (window as any).require('path');
+    
+    // Instead of directly using 'electron' which might be context isolated, 
+    // we use APPDATA env var as fallback or just require
+    const processVars = (window as any).process;
+    if (!processVars) return;
+
+    const appData = processVars.env.APPDATA || (processVars.platform === 'darwin' ? processVars.env.HOME + '/Library/Application Support' : '/var/local');
+    const folderPath = path.join(appData, 'AcomGestion');
+    
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+
+    const dbPath = path.join(folderPath, 'data.sqlite');
+    
+    // Export DB
+    let uint8Array;
+    if (db.export) {
+        uint8Array = db.export();
+    } else {
+        const root = await navigator.storage.getDirectory();
+        const fileHandle = await root.getFileHandle('acom_studio.sqlite3');
+        const file = await fileHandle.getFile();
+        const arrayBuffer = await file.arrayBuffer();
+        uint8Array = new Uint8Array(arrayBuffer);
+    }
+
+    fs.writeFileSync(dbPath, uint8Array);
+    console.log(`Database anchored to physical file: ${dbPath}`);
+  } catch (e) {
+    console.error('Failed to sync physical SQLite file:', e);
+  }
+};
+
 export const sqliteHelper = {
   async insertProduct(product: any) {
     if (!db) await initSQLite();
@@ -121,6 +163,7 @@ export const sqliteHelper = {
         product.updatedAt?.toString() || new Date().toISOString()
       ]
     });
+    await syncPhysicalFile();
   },
 
   async insertSale(sale: any) {
@@ -138,6 +181,7 @@ export const sqliteHelper = {
         sale.createdAt?.toString() || new Date().toISOString()
       ]
     });
+    await syncPhysicalFile();
   },
 
   async insertExpense(expense: any) {
@@ -156,5 +200,6 @@ export const sqliteHelper = {
         expense.createdAt?.toString() || new Date().toISOString()
       ]
     });
+    await syncPhysicalFile();
   }
 };
