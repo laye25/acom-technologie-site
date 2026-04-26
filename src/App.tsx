@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './ThemeProvider';
@@ -42,6 +42,9 @@ import { CommandPalette } from './components/CommandPalette';
 
 import { Toaster } from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
+
+const isElectron = window && window.process && window.process.type || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:';
+const Router = isElectron ? HashRouter : BrowserRouter;
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, profile, loading, isAdmin, isManager } = useAuth();
