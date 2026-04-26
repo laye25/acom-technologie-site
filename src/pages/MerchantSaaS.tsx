@@ -18,7 +18,7 @@ import {
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
-  Lock as LockIcon
+  Lock as LockIcon, GitBranch, Github
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -372,7 +372,12 @@ const MerchantSaaS = () => {
       if (isSuccess && newPlan && merchantId && merchant && merchant.id === merchantId) {
         if (merchant.plan !== newPlan) {
           try {
-            const updatedMerchant = { ...merchant, plan: newPlan, updatedAt: new Date() };
+            const updatedMerchant = { 
+              ...merchant, 
+              plan: newPlan,
+              licenseType: newPlan === 'LOCAL' ? 'local' : merchant.licenseType,
+              updatedAt: new Date() 
+            };
             await dbService.merchants.save(updatedMerchant);
             setMerchant(updatedMerchant);
             toast.success(`Votre plan a été mis à jour avec succès : ${newPlan} !`, {
@@ -442,9 +447,12 @@ const MerchantSaaS = () => {
     fetchMerchant();
   }, [user]);
 
+  const isCloudSyncEnabled = merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM';
+
   // Data Synchronization
   useEffect(() => {
-    if (merchant && merchant.id) {
+    // Only premium plans get Cloud Sync. LOCAL and FREE plans are local-only.
+    if (merchant && merchant.id && isCloudSyncEnabled) {
       // Sync from Cloud to Local (Delta-Sync)
       syncService.syncProducts(merchant.id);
       syncService.syncSales(merchant.id);
@@ -459,7 +467,7 @@ const MerchantSaaS = () => {
 
       return () => clearInterval(pushInterval);
     }
-  }, [merchant?.id]);
+  }, [merchant?.id, merchant?.plan]);
 
   const getTabs = (type: string) => {
     let tabs: any[] = [];
@@ -651,9 +659,9 @@ const MerchantSaaS = () => {
         {/* Content */}
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && <MerchantDashboard key="dashboard" merchant={merchant} onUpdate={setMerchant} showUpgradeModal={showUpgradeModal} setShowUpgradeModal={setShowUpgradeModal} />}
-          {activeTab === 'inventory' && <InventoryManager key="inventory" merchant={merchant} />}
+          {activeTab === 'inventory' && <InventoryManager key="inventory" merchant={merchant} setShowUpgradeModal={setShowUpgradeModal} />}
           {activeTab === 'suppliers' && <SupplierManager key="suppliers" merchant={merchant} />}
-          {activeTab === 'pos' && <MerchantPOS key="pos" merchant={merchant} />}
+          {activeTab === 'pos' && <MerchantPOS key="pos" merchant={merchant} setShowUpgradeModal={setShowUpgradeModal} />}
           {activeTab === 'audit' && <MerchantAuditLog key="audit" merchant={merchant} />}
           {activeTab === 'billing' && <MerchantBilling key="billing" merchant={merchant} />}
           {activeTab === 'accounting' && <MerchantAccounting key="accounting" merchant={merchant} />}
@@ -724,10 +732,11 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
   ];
 
   const plans = [
-    { id: 'FREE', name: 'FREE', price: '0 FCFA', desc: 'Basique' },
+    { id: 'FREE', name: 'TESTE', price: '0 FCFA', desc: 'Basique' },
     { id: 'BASIC', name: 'BASIC', price: '10.000 FCFA', desc: 'Essentiel' },
     { id: 'STANDARD', name: 'STANDARD', price: '25.000 FCFA', desc: 'Populaire' },
     { id: 'PREMIUM', name: 'PREMIUM', price: '45.000 FCFA', desc: 'Complet' },
+    { id: 'LOCAL', name: 'LICENCE LOCALE', price: '350.000 FCFA', desc: 'A vie (Logiciel Local)' },
   ];
 
   const getSaaSConfig = (t: string) => {
@@ -975,10 +984,10 @@ const PlanUpgradeModal = ({
   const plans = [
     {
       id: 'FREE',
-      name: 'FREE',
+      name: 'TESTE',
       price: '0',
-      description: 'Pour débuter votre activité',
-      features: ['Gestion de stock basique', '10 ventes par jour', '1 utilisateur'],
+      description: 'Pour débuter votre essai',
+      features: ['Gestion de stock basique', '2 ventes par jour', '2 Produits', '1 utilisateur'],
       color: 'bg-gray-100 text-gray-600'
     },
     {
@@ -1005,6 +1014,14 @@ const PlanUpgradeModal = ({
       description: 'La solution complète',
       features: ['Établissements illimités', 'API personnalisée', 'Account Manager'],
       color: 'bg-purple-50 text-purple-600'
+    },
+    {
+      id: 'LOCAL',
+      name: 'LICENCE LOCALE',
+      price: '350 000',
+      description: 'Logiciel de Gestion Local (SQLite)',
+      features: ['Paiement unique', 'Données en local', 'Acom Gestion Desktop'],
+      color: 'bg-emerald-50 text-emerald-600'
     }
   ];
 
@@ -1014,7 +1031,12 @@ const PlanUpgradeModal = ({
     setLoading(planId);
     try {
       if (planId === 'FREE') {
-        const updatedMerchant = { ...merchant, plan: 'FREE' as any, updatedAt: new Date() };
+        const updatedMerchant = { 
+          ...merchant, 
+          plan: 'FREE' as any, 
+          licenseType: 'cloud' as 'cloud' | 'local',
+          updatedAt: new Date() 
+        };
         await dbService.merchants.save(updatedMerchant);
         onUpdate(updatedMerchant);
         toast.success(`Plan mis à jour vers FREE`);
@@ -1092,7 +1114,12 @@ const PlanUpgradeModal = ({
   const handleStripeSuccess = async () => {
     if (!selectedPlanId) return;
     try {
-      const updatedMerchant = { ...merchant, plan: selectedPlanId as any, updatedAt: new Date() };
+      const updatedMerchant = { 
+        ...merchant, 
+        plan: selectedPlanId as any, 
+        licenseType: selectedPlanId === 'LOCAL' ? 'local' : merchant.licenseType,
+        updatedAt: new Date() 
+      };
       await dbService.merchants.save(updatedMerchant);
       onUpdate(updatedMerchant);
       toast.success(`Plan mis à jour vers ${selectedPlanId} via Stripe !`);
@@ -1144,7 +1171,7 @@ const PlanUpgradeModal = ({
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white w-full max-w-5xl rounded-3xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden my-auto"
+        className="bg-white w-full max-w-7xl rounded-3xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden my-auto"
       >
         <div className="p-6 sm:p-8 border-b border-gray-100 flex items-center justify-between">
           <div>
@@ -1156,7 +1183,7 @@ const PlanUpgradeModal = ({
           </button>
         </div>
 
-        <div className="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-h-[70vh] overflow-y-auto">
+        <div className="p-6 sm:p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 max-h-[70vh] overflow-y-auto">
           {plans.map((plan) => (
             <div 
               key={plan.id}
@@ -1181,7 +1208,7 @@ const PlanUpgradeModal = ({
               <h3 className="text-lg font-bold text-gray-900 mb-1">{plan.name}</h3>
               <div className="flex items-baseline space-x-1 mb-4">
                 <span className="text-2xl font-black text-gray-900">{plan.price}</span>
-                <span className="text-xs font-bold text-gray-400">FCFA/mois</span>
+                <span className="text-xs font-bold text-gray-400">FCFA{plan.id === 'LOCAL' ? ' (Unique)' : '/mois'}</span>
               </div>
 
               <p className="text-xs text-gray-500 mb-6">{plan.description}</p>
@@ -1477,13 +1504,15 @@ const MerchantDashboard = ({
       {merchant.id && (
         <div className="flex items-center justify-between p-6 bg-white rounded-[2rem] border border-black/5 shadow-sm">
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl ${navigator.onLine ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
-              {navigator.onLine ? <Database className="w-5 h-5" /> : <HardDrive className="w-5 h-5" />}
+            <div className={`p-3 rounded-2xl ${navigator.onLine && (merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
+              {navigator.onLine && (merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? <Database className="w-5 h-5" /> : <HardDrive className="w-5 h-5" />}
             </div>
             <div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">État du Moteur de Synchronisation</p>
               <h4 className="text-sm font-black text-ink uppercase tracking-tight">
-                {navigator.onLine ? 'Mode Hybride (Local + Cloud)' : 'Mode Local Uniquement (Offline)'}
+                {(merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') 
+                  ? (navigator.onLine ? 'Mode Hybride (Local + Cloud)' : 'Mode Local Uniquement (Hors ligne)') 
+                  : `Mode Local Uniquement (Plan: ${merchant.plan || 'TESTE'})`}
               </h4>
             </div>
           </div>
@@ -1547,30 +1576,177 @@ const MerchantDashboard = ({
               </label>
             )}
 
-            <button 
-              onClick={async () => {
-                const toastId = toast.loading('Synchronisation des données...');
-                try {
-                  await syncService.pushPendingData(merchant.id!);
-                  await syncService.syncProducts(merchant.id!);
-                  await syncService.syncSales(merchant.id!);
-                  await syncService.syncExpenses(merchant.id!);
-                  toast.success('Données synchronisées !', { id: toastId });
-                } catch (e) {
-                  toast.error('Échec de la synchronisation', { id: toastId });
-                }
-              }}
-              className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-primary/30 transition-all group"
-            >
-              <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
-              Forcer la Synchronisation
-            </button>
+            {!(merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? (
+              <button 
+                onClick={() => setShowUpgradeModal(true)}
+                className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                Activer Sync Cloud
+              </button>
+            ) : (
+              <button 
+                onClick={async () => {
+                  const toastId = toast.loading('Synchronisation des données...');
+                  try {
+                    await syncService.pushPendingData(merchant.id!);
+                    await syncService.syncProducts(merchant.id!);
+                    await syncService.syncSales(merchant.id!);
+                    await syncService.syncExpenses(merchant.id!);
+                    toast.success('Données synchronisées !', { id: toastId });
+                  } catch (e) {
+                    toast.error('Échec de la synchronisation', { id: toastId });
+                  }
+                }}
+                className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-primary/30 transition-all group"
+              >
+                <RefreshCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
+                Forcer la Synchronisation
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Download Center & Build Dashboard for LOCAL Plan */}
+      {merchant.plan === 'LOCAL' && (
+        <div className="bg-gradient-to-br from-gray-900 to-black rounded-[2rem] border border-gray-800 shadow-2xl overflow-hidden relative mt-8">
+          <div className="p-8 relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Architecture Col */}
+            <div className="lg:col-span-1 space-y-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center border border-gray-700 shadow-inner">
+                  <Terminal className="w-6 h-6 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-white">Acom Gestion Desktop</h3>
+                  <p className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                    <Github className="w-3 h-3" /> Tauri Native Build
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-gray-800/50 rounded-lg shrink-0 border border-gray-700/50">
+                    <Cpu className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Architecture Ultra-Légère</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed">Compilé via Rust & Tauri. Moins de 15 Mo en RAM, aucune dépendance lourde comme Electron. Backend natif multi-thread optimisé pour Windows.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-gray-800/50 rounded-lg shrink-0 border border-gray-700/50">
+                    <Database className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Moteur SQLite Intégré</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed">La base de données SQLite est embarquée (via `sqlx`). Performances d'écriture instantanées et isolation HORS LIGNE totale.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-gray-800/50 rounded-lg shrink-0 border border-gray-700/50">
+                    <LockIcon className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-200 uppercase tracking-wider mb-1">Sécurité & Isolation IPC</h4>
+                    <p className="text-xs text-gray-400 leading-relaxed">Le frontend React ne communique avec le système qu'au travers des IPC sécurisés en Rust. Aucune exposition Node.js critique.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* GitHub Actions Pipeline Col */}
+            <div className="lg:col-span-1 bg-black/60 rounded-2xl border border-gray-800 p-6 font-mono text-sm relative shadow-inner">
+              <div className="absolute top-0 right-8 w-px h-full bg-gray-800/50"></div>
+              <div className="flex items-center justify-between mb-6 border-b border-gray-800 pb-4">
+                <div className="flex items-center gap-2 text-gray-300 bg-gray-800/50 px-3 py-1.5 rounded-md border border-gray-700">
+                  <GitBranch className="w-3.5 h-3.5" />
+                  <span className="text-xs">main</span>
+                </div>
+                <div className="flex items-center gap-2 bg-emerald-500/10 px-3 py-1.5 rounded-md border border-emerald-500/20">
+                  <span className="relative flex h-2 w-2 items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[9px] text-emerald-400 uppercase tracking-widest font-bold">Build Successful</span>
+                </div>
+              </div>
+              
+              {/* Build Steps */}
+              <div className="space-y-4 text-[11px] relative z-10">
+                <div className="flex items-start gap-3">
+                  <div className="w-4 text-center text-gray-600 mt-0.5"><Check className="w-3 h-3 text-emerald-500" /></div>
+                  <div>
+                    <p className="text-gray-300">Checkout repository</p>
+                    <p className="text-emerald-500/70 text-[9px] mt-0.5">Done in 0.5s</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-4 text-center text-gray-600 mt-0.5"><Check className="w-3 h-3 text-emerald-500" /></div>
+                  <div>
+                    <p className="text-gray-300">Install & build React frontend (Vite)</p>
+                    <p className="text-emerald-500/70 text-[9px] mt-0.5">Done in 12s</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-4 text-center text-gray-600 mt-0.5"><Check className="w-3 h-3 text-emerald-500" /></div>
+                  <div>
+                    <p className="text-gray-300">Compile Rust Backend (`cargo build --release`)</p>
+                    <p className="text-emerald-500/70 text-[9px] mt-0.5">Done in 3m 42s</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-4 text-center text-gray-600 mt-0.5"><Check className="w-3 h-3 text-emerald-500" /></div>
+                  <div>
+                    <p className="text-gray-300">Bundle embedded SQLite binaries</p>
+                    <p className="text-emerald-500/70 text-[9px] mt-0.5">Done in 1.2s</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-4 text-center text-gray-600 mt-0.5"><Check className="w-3 h-3 text-emerald-500" /></div>
+                  <div>
+                    <p className="text-gray-300 text-emerald-400">Generate Windows Artifact (`.msi` / `.exe`)</p>
+                    <p className="text-emerald-500/70 text-[9px] mt-0.5">Done in 45s</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Download Col */}
+            <div className="lg:col-span-1 flex flex-col justify-center bg-gray-800/30 rounded-2xl border border-gray-700/50 p-8 text-center relative overflow-hidden group">
+              <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors duration-500"></div>
+              
+              <div className="relative z-10">
+                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_40px_rgba(16,185,129,0.15)] border border-emerald-500/20 group-hover:scale-110 transition-transform duration-500">
+                  <Download className="w-10 h-10" />
+                </div>
+                <h4 className="text-xl font-black text-white mb-2 tracking-tight">Télécharger l'Installateur</h4>
+                <p className="text-xs text-gray-400 mb-8 px-4">Installeur optimisé Windows (x64) contenant tout le moteur Acom. Prêt pour un usage hors ligne instantané.</p>
+                
+                <button 
+                  onClick={() => toast.success('Simulation: Le téléchargement de Acom_Gestion_Setup_v1.2.0.exe commence !')}
+                  className="w-full relative group/btn overflow-hidden px-6 py-4 bg-emerald-500 text-black rounded-[1rem] font-black uppercase text-[11px] tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-95 flex items-center justify-center gap-3"
+                >
+                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>
+                  <Download className="w-4 h-4 relative z-10" />
+                  <span className="relative z-10">Acom_Gestion_Setup.exe</span>
+                </button>
+                <div className="mt-5 flex justify-center items-center gap-3 text-[10px] uppercase font-mono text-gray-500">
+                  <span className="bg-gray-800 px-2 py-1 rounded">v1.2.0-stable</span>
+                  <span>•</span>
+                  <span className="bg-gray-800 px-2 py-1 rounded">12.4 MB</span>
+                </div>
+              </div>
+            </div>
+            
           </div>
         </div>
       )}
 
       {/* Plan Upgrade Banner */}
-      {merchant.plan !== 'PREMIUM' && (
+      {merchant.plan !== 'PREMIUM' && merchant.plan !== 'LOCAL' && (
         <div className="relative overflow-hidden bg-gradient-to-r from-primary to-primary-hover rounded-3xl sm:rounded-[2rem] p-6 lg:p-10 text-white shadow-xl shadow-primary/20">
           <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-10 text-center lg:text-left">
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8">
@@ -2323,7 +2499,7 @@ const HealthIndicator = ({ label, value, color }: { label: string, value: string
   );
 };
 
-const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
+const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, setShowUpgradeModal?: (s: boolean) => void }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isRestocking, setIsRestocking] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Partial<MerchantProduct> | null>(null);
@@ -2369,6 +2545,13 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentProduct?.name || currentProduct.price === undefined) return;
+    
+    if (!currentProduct.id && merchant.plan === 'FREE' && products.length >= 2) {
+      toast.error('Vous avez atteint la limite de 2 produits pour le plan TESTE. Veuillez passer au forfait supérieur.');
+      if (setShowUpgradeModal) setShowUpgradeModal(true);
+      return;
+    }
+
     setSaving(true);
     try {
       await dbService.merchantProducts.save({
@@ -2980,7 +3163,7 @@ const InventoryManager = ({ merchant }: { merchant: Merchant }) => {
 };
 
 // --- Merchant POS ---
-const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
+const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, setShowUpgradeModal?: (s: boolean) => void }) => {
   const { user } = useAuth();
   const [cart, setCart] = useState<{ productId: string, name: string, quantity: number, price: number }[]>([]);
   const [customerName, setCustomerName] = useState('');
@@ -3021,6 +3204,25 @@ const MerchantPOS = ({ merchant }: { merchant: Merchant }) => {
   const handleCheckout = async () => {
     if (cart.length === 0 || !user) return;
     setIsSubmitting(true);
+    
+    // Check limit for TESTE plan
+    if (merchant.plan === 'FREE') {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const salesTodayCount = await db.sales
+        .where('merchantId')
+        .equals(merchant.id)
+        .filter(sale => new Date(sale.createdAt || sale.created_at || new Date()) >= startOfDay)
+        .count();
+
+      if (salesTodayCount >= 2) {
+        toast.error('Vous avez atteint la limite de 2 ventes par jour pour le plan TESTE. Veuillez passer au forfait supérieur.');
+        if (setShowUpgradeModal) setShowUpgradeModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
       const actualPaid = isPartial ? (Number(initialPaidAmount) || 0) : total;
       

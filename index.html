@@ -12,6 +12,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Automatically detect if we are in SaaS/Desktop mode
+      const isElectron = window && window.process && window.process.type || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:';
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isElectron;
+      if (isSaaSDomain) {
+        document.title = "Acom Gestion Desktop";
+      } else {
+        document.title = "Acom Studio";
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -16,8 +16,8 @@
     "lint": "tsc --noEmit"
   },
   "build": {
-    "appId": "com.acom.saas",
-    "productName": "Acom SaaS",
+    "appId": "com.acom.gestion",
+    "productName": "Acom Gestion Desktop",
     "npmRebuild": false,
     "directories": {
       "output": "release"

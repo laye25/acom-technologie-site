@@ -6,12 +6,13 @@ import { useAuth } from '../context/AuthContext';
 
 const plans = [
   {
-    name: 'FREE',
+    name: 'TESTE',
     price: '0',
-    description: 'Pour débuter votre activité',
+    description: 'Pour débuter votre essai',
     features: [
       'Gestion de stock basique',
-      '10 ventes par jour',
+      '2 ventes par jour',
+      '2 Produits',
       '1 utilisateur',
       'Reçus numériques',
       'Support par email'
@@ -141,7 +142,7 @@ const Pricing = () => {
                   }}
                   className={`w-full py-4 ${plan.buttonColor} text-white rounded-full font-bold text-sm hover:scale-105 transition-transform flex items-center justify-center space-x-2 shadow-lg shadow-black/5`}
                 >
-                  <span>{user ? (plan.name === 'FREE' ? "TABLEAU DE BORD" : "CHOISIR CE PLAN") : "S'INSCRIRE"}</span>
+                  <span>{user ? (plan.name === 'TESTE' ? "TABLEAU DE BORD" : "CHOISIR CE PLAN") : "S'INSCRIRE"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

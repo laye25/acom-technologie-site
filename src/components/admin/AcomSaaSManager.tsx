@@ -56,7 +56,7 @@ export const AcomSaaSManager = () => {
     try {
       const amount = merchant.plan === 'BASIC' ? 15000 : merchant.plan === 'STANDARD' ? 25000 : merchant.plan === 'PREMIUM' ? 45000 : 0;
       if (amount === 0) {
-        toast.error('Le plan actuel est gratuit (FREE).');
+        toast.error('Le plan actuel est gratuit (TESTE).');
         return;
       }
       
@@ -243,7 +243,7 @@ export const AcomSaaSManager = () => {
                         onChange={(e) => handleUpdatePlan(merchant.id, e.target.value)}
                         className="text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 bg-white outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                       >
-                        <option value="FREE">FREE</option>
+                        <option value="FREE">TESTE</option>
                         <option value="BASIC">BASIC</option>
                         <option value="STANDARD">STANDARD</option>
                         <option value="PREMIUM">PREMIUM</option>
@@ -334,7 +334,7 @@ export const AcomSaaSManager = () => {
                    <div className="text-center py-12">
                      <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                      <h3 className="text-lg font-bold text-gray-900">Aucun paiement</h3>
-                     <p className="text-gray-500 mt-2">Cette instance utilise actuellement le plan gratuit (FREE).</p>
+                     <p className="text-gray-500 mt-2">Cette instance utilise actuellement le plan gratuit (TESTE).</p>
                    </div>
                 ) : (
                   <div className="space-y-4">

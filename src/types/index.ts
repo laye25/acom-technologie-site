@@ -501,7 +501,7 @@ export interface SiteSettings {
 }
 
 // SaaS Merchant Types
-export type MerchantPlan = 'FREE' | 'BASIC' | 'STANDARD' | 'PREMIUM';
+export type MerchantPlan = 'FREE' | 'BASIC' | 'STANDARD' | 'PREMIUM' | 'LOCAL';
 
 export interface Merchant {
   id: string;
