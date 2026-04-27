@@ -539,22 +539,29 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const backgroundSync = async () => {
-        // Sync in background (séquentiel pour lisser la charge IO)
         if (user?.uid) {
           const syncTasks = [
-            () => syncService.syncOrders('global'),
-            () => syncService.syncServices('global'),
-            () => syncService.syncUsers('global'),
-            () => syncService.syncExpenses('global'),
-            () => syncService.syncSettings('global')
+            { id: 'orders', task: () => syncService.syncOrders('global') },
+            { id: 'services', task: () => syncService.syncServices('global') },
+            { id: 'users', task: () => syncService.syncUsers('global') },
+            { id: 'expenses', task: () => syncService.syncExpenses('global') },
+            { id: 'settings', task: () => syncService.syncSettings('global') }
           ];
 
-          for (const task of syncTasks) {
+          for (const { id, task } of syncTasks) {
+            const lastSync = localStorage.getItem(`last_sync_${id}`);
+            // 1 hour cooldown for background tasks
+            if (lastSync && Date.now() - parseInt(lastSync, 10) < 3600000) {
+                console.log(`Skipping background sync for ${id}, too soon.`);
+                continue;
+            }
             try {
+              console.log(`Running background sync for ${id}...`);
               await task();
+              localStorage.setItem(`last_sync_${id}`, Date.now().toString());
               await new Promise(resolve => setTimeout(resolve, 500)); 
             } catch (e) {
-              console.error("Sync task failed", e);
+              console.error(`Sync task ${id} failed`, e);
             }
           }
           
@@ -1237,7 +1244,7 @@ const AdminDashboard = () => {
     { id: 'expenses', label: 'Dépenses', icon: Receipt, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'design_requests', label: 'Demandes Design', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: true, allowRole: 'designer' },
     { id: 'printing', label: 'Impression', icon: Printer, adminOnly: true, superAdminOnly: false, allowManager: true, allowRole: 'printer' },
-    { id: 'studio_acom', label: 'Studio ACOM', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: false },
+    // { id: 'studio_acom', label: 'Studio ACOM', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_subscriptions', label: 'Souscriptions', icon: Store, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_appearance', label: 'Apparence', icon: Layout, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'design', label: 'Éditeur Design', icon: LayoutGrid, adminOnly: true, superAdminOnly: false, allowManager: false },
@@ -1264,7 +1271,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Studio ACOM",
-      tabs: ['design_requests', 'printing', 'studio_acom', 'design']
+      tabs: ['design_requests', 'printing', 'design']
     },
     {
       title: "Acom SaaS",

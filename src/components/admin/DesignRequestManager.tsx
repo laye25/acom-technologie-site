@@ -58,16 +58,28 @@ const DesignRequestManager = () => {
   const navigate = useNavigate();
   const [selectedRequestForPartner, setSelectedRequestForPartner] = useState<any>(null);
 
-  // Sync on mount
+  // Sync on mount - optimized to avoid excessive polling
   React.useEffect(() => {
-    syncService.syncStudioAcomData();
-    syncService.syncOrders('global');
-    syncService.syncUsers('global');
+    // Check if synced recently
+    const lastSync = localStorage.getItem('last_sync_design_dashboard');
+    if (!lastSync || Date.now() - parseInt(lastSync, 10) > 3600000) { // 1 hour threshold
+      console.log('Performing necessary sync for Design Dashboard...');
+      syncService.syncStudioAcomData();
+      syncService.syncOrders('global');
+      syncService.syncUsers('global');
+      localStorage.setItem('last_sync_design_dashboard', Date.now().toString());
+    } else {
+      console.log('Sync skipped - used recent cache');
+    }
   }, []);
 
   const requests = useLiveQuery(() => dexieDb.design_requests.toArray()) || [];
   const studioOrders = useLiveQuery(() => dexieDb.orders.filter(o => o.pillar === 'studio').toArray()) || [];
   const allPartners = useLiveQuery(() => dexieDb.users.filter(u => u.role === 'printer' && u.partnerStatus === 'approved').toArray()) || [];
+  
+  React.useEffect(() => {
+    console.log("DEBUG DesignRequestManager - allPartners:", allPartners);
+  }, [allPartners]);
 
   const loading = false;
 
@@ -122,6 +134,7 @@ const DesignRequestManager = () => {
   };
 
   const assignPartner = async (partnerId: string) => {
+    console.log("DEBUG DesignRequestManager - assignPartner called with:", { partnerId, selectedRequestForPartner });
     if (!selectedRequestForPartner) return;
     try {
       if (selectedRequestForPartner.origin === 'studio_order') {

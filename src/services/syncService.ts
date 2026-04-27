@@ -1,5 +1,5 @@
 import { db } from '../db/db';
-import { where } from 'firebase/firestore';
+import { where, limit } from 'firebase/firestore';
 import { merchantSaleRepository } from '../data/repositories/merchant-sale.repository';
 import { merchantExpenseRepository } from '../data/repositories/merchant-expense.repository';
 import { merchantProductRepository } from '../data/repositories/merchant-product.repository';
@@ -149,7 +149,7 @@ export const syncService = {
       }
       
       if (lastSyncStr) {
-        constraints.push(where('updatedAt', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
       
       console.log(`Syncing orders from Firebase... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
@@ -173,7 +173,7 @@ export const syncService = {
       const constraints: any[] = [where('partnerId', '==', partnerId)];
       
       if (lastSyncStr) {
-        constraints.push(where('updatedAt', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
       
       const remoteOrders = await orderRepository.getAll(constraints);
@@ -236,7 +236,7 @@ export const syncService = {
       }
       
       if (lastSyncStr) {
-        constraints.push(where('updatedAt', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
       
       const remoteDesigns = await designRepository.getAll(constraints);
@@ -256,7 +256,7 @@ export const syncService = {
       const lastSyncStr = localStorage.getItem(lastSyncKey);
       const constraints: any[] = [];
       if (lastSyncStr) {
-        constraints.push(where('updatedAt', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
       const remoteRatings = await partnerRatingRepository.getAll(constraints);
       if (remoteRatings && remoteRatings.length > 0) {
@@ -276,7 +276,7 @@ export const syncService = {
       const constraints: any[] = [where('userId', '==', userId)];
       
       if (lastSyncStr) {
-        constraints.push(where('updatedAt', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
       console.log(`Syncing assets... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
@@ -299,7 +299,7 @@ export const syncService = {
       const constraints: any[] = [];
       
       if (lastSyncStr) {
-        constraints.push(where('updatedAt', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
       console.log(`Syncing templates... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
@@ -365,9 +365,11 @@ export const syncService = {
       
       if (lastSyncStr) {
         constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      } else {
+        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 7)));
       }
 
-      console.log(`Syncing users... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      console.log(`Syncing users... ${lastSyncStr ? '(Delta)' : '(Initial / Recent)'}`);
       const remoteUsers = await userRepository.getAll(constraints);
       if (remoteUsers && remoteUsers.length > 0) {
         await db.users.bulkPut(remoteUsers);
@@ -440,7 +442,7 @@ export const syncService = {
       const constraints: any[] = [where('userId', '==', userId)];
       
       if (lastSyncStr) {
-        constraints.push(where('updatedAt', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
       console.log(`Syncing notifications... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
