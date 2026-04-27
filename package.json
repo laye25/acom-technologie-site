@@ -24,12 +24,10 @@
     },
     "files": [
       "dist/**/*",
-      "desktop/main.cjs",
-      "public/favicon.ico"
+      "desktop/main.cjs"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "public/favicon.ico"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": false,

@@ -9,9 +9,13 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-    },
-    icon: path.join(__dirname, '../public/favicon.ico')
+    }
   });
+
+  const iconPath = path.join(__dirname, '../public/icon.png');
+  if (require('fs').existsSync(iconPath)) {
+    win.setIcon(iconPath);
+  }
 
   // In production, load the built index.html
   // In development, load the dev server URL

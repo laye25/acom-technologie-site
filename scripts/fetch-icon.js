@@ -36,11 +36,15 @@ async function fetchIcon() {
           fs.writeFileSync(outPath, buffer);
           console.log(`Successfully saved db icon to ${outPath}`);
           
-          // Overwrite package.json to point to icon.png instead of icon.ico
+          // Overwrite package.json to point to icon.png
           const packageJsonPath = path.resolve('package.json');
           const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
           if (pkg.build && pkg.build.win) {
             pkg.build.win.icon = "public/icon.png";
+            pkg.build.files = pkg.build.files || [];
+            if (!pkg.build.files.includes("public/icon.png")) {
+              pkg.build.files.push("public/icon.png");
+            }
             fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
             console.log('Updated package.json to use public/icon.png');
           }
