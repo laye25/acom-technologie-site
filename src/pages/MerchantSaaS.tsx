@@ -977,6 +977,8 @@ const PlanUpgradeModal = ({
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const [showStripe, setShowStripe] = useState(false);
+  const [mockPaymentPlanId, setMockPaymentPlanId] = useState<string | null>(null);
+  const [mockPhone, setMockPhone] = useState('');
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
@@ -1049,7 +1051,7 @@ const PlanUpgradeModal = ({
       const selectedPlan = plans.find(p => p.id === planId);
       if (!selectedPlan) return;
 
-      const amount = parseInt(selectedPlan.price.replace(/\s/g, ''));
+      const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
       const desc = `Abonnement Acom SaaS - Plan ${planId} (${merchant.name})`;
       
       const link = await payDunyaService.createPaymentLink({
@@ -1072,9 +1074,9 @@ const PlanUpgradeModal = ({
         toast.success('Le lien de paiement a été ouvert dans un nouvel onglet.');
         onClose();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upgrade error:', error);
-      toast.error('Erreur lors de l\'initialisation du paiement');
+      toast.error(error.message || "Erreur lors de l'initialisation du paiement");
     } finally {
       setLoading(null);
     }
@@ -1087,8 +1089,12 @@ const PlanUpgradeModal = ({
       const selectedPlan = plans.find(p => p.id === planId);
       if (!selectedPlan) return;
 
-      const amount = parseInt(selectedPlan.price.replace(/\s/g, ''));
+      const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
       
+      if (!stripeKey) {
+        throw new Error("La clé publique Stripe (VITE_STRIPE_PUBLISHABLE_KEY) n'est pas configurée.");
+      }
+
       const response = await fetch('/api/create-payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1105,9 +1111,9 @@ const PlanUpgradeModal = ({
       setClientSecret(data.clientSecret);
       setSelectedPlanId(planId);
       setShowStripe(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Stripe upgrade error:', error);
-      toast.error('Erreur lors de l\'initialisation de Stripe');
+      toast.error(error.message || "Erreur lors de l'initialisation de Stripe");
     } finally {
       setLoading(null);
     }
@@ -1130,6 +1136,7 @@ const PlanUpgradeModal = ({
       toast.error('Erreur lors de la mise à jour finale du plan');
     }
   };
+
 
   if (showStripe && clientSecret && stripePromise) {
     return (
@@ -1157,10 +1164,11 @@ const PlanUpgradeModal = ({
             <PaymentForm 
               onSuccess={() => handleStripeSuccess()} 
               onCancel={() => setShowStripe(false)}
-              amount={parseInt(plans.find(p => p.id === selectedPlanId)?.price.replace(/\s/g, '') || '0')} 
-              totalAmount={parseInt(plans.find(p => p.id === selectedPlanId)?.price.replace(/\s/g, '') || '0')}
+              amount={parseInt(plans.find(p => p.id === selectedPlanId)?.price.replace(/\D/g, '') || '0', 10)} 
+              totalAmount={parseInt(plans.find(p => p.id === selectedPlanId)?.price.replace(/\D/g, '') || '0', 10)}
               orderId={`SUBSCRIPTION_${merchant.id}_${selectedPlanId}`}
               paymentType="full"
+              returnUrl={`${window.location.origin}/merchant/settings?subscription_success=true`}
             />
           </Elements>
         </motion.div>

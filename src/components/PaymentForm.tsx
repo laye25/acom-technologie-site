@@ -14,6 +14,7 @@ interface PaymentFormProps {
   discountPercentage?: number;
   orderId: string;
   paymentType: 'deposit' | 'balance' | 'full';
+  returnUrl?: string;
   onSuccess: (type: 'deposit' | 'balance' | 'full', stripePaymentIntentId?: string) => void;
   onCancel: () => void;
 }
@@ -25,6 +26,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
   discountPercentage = 0,
   orderId, 
   paymentType, 
+  returnUrl,
   onSuccess, 
   onCancel 
 }) => {
@@ -56,7 +58,7 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
     const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/order-details/${orderId}?payment_success=true&payment_type=${paymentType}`,
+        return_url: returnUrl || `${window.location.origin}/order-details/${orderId}?payment_success=true&payment_type=${paymentType}`,
       },
       redirect: 'if_required',
     });
