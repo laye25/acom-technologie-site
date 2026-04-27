@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Build Electron Desktop App (Windows)
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis --publish never
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
