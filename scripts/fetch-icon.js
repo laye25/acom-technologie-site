@@ -13,7 +13,7 @@ if (!fs.existsSync(configPath)) {
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 const app = initializeApp(config);
-const db = getFirestore(app);
+const db = getFirestore(app, config.firestoreDatabaseId);
 
 async function fetchIcon() {
   try {

@@ -1303,6 +1303,8 @@ const MerchantDashboard = ({
     db.expenses.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
   
+  const siteSettings = useLiveQuery(() => db.settings.get('global'));
+  
   // Point 6: Aggregation - Global merchant stats (On-demand/Offline)
   const [merchantStats, setMerchantStats] = useState<any>(null);
   useEffect(() => {

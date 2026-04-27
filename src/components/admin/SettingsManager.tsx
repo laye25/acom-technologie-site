@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { dbService as db } from '../../services/dbService';
 import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock, Percent, Link as LinkIcon, Monitor } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import toast from 'react-hot-toast';
 import { ConfirmModal } from './ConfirmModal';
 import { OptimizedImage } from '../OptimizedImage';
 import { SiteSettings, StatItem, WhyUsPoint, WhyUsSection, CTASection, HeroSlide, FooterSettings, PageSection, FAQItem, AboutContent } from '../../types';
