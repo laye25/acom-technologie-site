@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { dbService as db } from '../../services/dbService';
-import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock, Percent, Link as LinkIcon, Monitor } from 'lucide-react';
+import { Save, Plus, Trash2, Image as ImageIcon, Loader2, Layout, Info, Share2, Palette, Settings, Calculator, FileText, Briefcase, Users, Award, Star, CheckCircle2, Clock, Percent, Link as LinkIcon, Monitor, UploadCloud } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { ConfirmModal } from './ConfirmModal';
 import { OptimizedImage } from '../OptimizedImage';
 import { SiteSettings, StatItem, WhyUsPoint, WhyUsSection, CTASection, HeroSlide, FooterSettings, PageSection, FAQItem, AboutContent } from '../../types';
 import { compressImage, compressBase64Image } from '../../lib/imageUtils';
+import { storage } from '../../firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const PRESET_GRADIENTS = [
   { name: 'Acom Purple', value: 'from-[#8e008e] via-[#b000b0] to-[#ff00ff]' },
@@ -261,6 +263,7 @@ const SettingsManager = () => {
   const [customColors, setCustomColors] = useState<{ [key: number]: { from: string, to: string } }>({
     0: { from: '#8e008e', to: '#ff00ff' }
   });
+  const [exeUploadProgress, setExeUploadProgress] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -513,6 +516,40 @@ const SettingsManager = () => {
     } finally {
       setUploading(null);
     }
+  };
+
+  const handleExeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.exe')) {
+      toast.error('Le fichier doit être un exécutable (.exe)');
+      return;
+    }
+
+    const storageRef = ref(storage, `downloads/${file.name.replace(/\s+/g, '_')}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    setExeUploadProgress(0);
+
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setExeUploadProgress(progress);
+      },
+      (error) => {
+        console.error('Erreur lors du téléchargement de l\'exe:', error);
+        toast.error('Erreur lors du téléchargement: ' + error.message);
+        setExeUploadProgress(null);
+      },
+      () => {
+        getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+          setSettings({ ...settings, desktopDownloadUrl: downloadURL });
+          toast.success('Exécutable uploadé avec succès ! N\'oubliez pas de sauvegarder.');
+          setExeUploadProgress(null);
+        });
+      }
+    );
   };
 
   const [showConfirmRestore, setShowConfirmRestore] = useState(false);
@@ -851,19 +888,47 @@ const SettingsManager = () => {
               </div>
 
               <div className="pt-4 border-t border-indigo-100">
-                <label className="block text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                  <LinkIcon className="w-3 h-3" />
-                  URL de téléchargement (.exe)
+                <label className="block text-xs font-bold text-indigo-400 uppercase tracking-widest mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <LinkIcon className="w-3 h-3" />
+                    URL de téléchargement (.exe)
+                  </div>
+                  
+                  <label className={`cursor-pointer px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-2 ${exeUploadProgress !== null ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50'}`}>
+                    <UploadCloud className="w-3 h-3" />
+                    Héberger l'exécutable
+                    <input 
+                      type="file" 
+                      accept=".exe" 
+                      className="hidden" 
+                      onChange={handleExeUpload}
+                      disabled={exeUploadProgress !== null}
+                    />
+                  </label>
                 </label>
+                
+                {exeUploadProgress !== null && (
+                  <div className="mb-3">
+                    <div className="flex justify-between text-[10px] text-indigo-600 font-bold mb-1">
+                      <span>Upload en cours...</span>
+                      <span>{Math.round(exeUploadProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-indigo-100 rounded-full h-1.5">
+                      <div className="bg-indigo-600 h-1.5 rounded-full transition-all duration-300" style={{ width: `${exeUploadProgress}%` }}></div>
+                    </div>
+                  </div>
+                )}
+                
                 <input
                   type="url"
                   placeholder="https://votre-stockage.com/acom-gestion-setup.exe"
                   value={settings.desktopDownloadUrl || ''}
                   onChange={(e) => setSettings({ ...settings, desktopDownloadUrl: e.target.value })}
-                  className="w-full px-4 py-3 rounded-xl border border-indigo-100 outline-none focus:ring-4 focus:ring-indigo-50 bg-white font-mono text-[10px] text-indigo-900"
+                  disabled={exeUploadProgress !== null}
+                  className="w-full px-4 py-3 rounded-xl border border-indigo-100 outline-none focus:ring-4 focus:ring-indigo-50 bg-white font-mono text-[10px] text-indigo-900 disabled:opacity-50"
                 />
                 <p className="mt-2 text-[10px] text-gray-400 italic">
-                  Lien direct vers l'exécutable Windows. Si vide, le bouton affichera une simulation.
+                  Lien direct vers l'exécutable Windows. Hébergez le fichier directement ici ou collez un lien. Si vide, le bouton affichera une simulation.
                 </p>
               </div>
             </div>
