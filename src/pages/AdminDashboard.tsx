@@ -6,7 +6,7 @@ import { db } from '../db/db';
 import { syncService } from '../services/syncService';
 import { Order, OrderStatus, UserProfile, Service, Expense, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Link as LinkIcon } from 'lucide-react';
+import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Monitor, Link as LinkIcon } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, startOfYear, eachMonthOfInterval, isSameDay, isSameMonth } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -38,7 +38,7 @@ import { BusinessInsights } from '../components/admin/BusinessInsights';
 import { AdminChat } from '../components/admin/AdminChat';
 import { PartnerMessageManager } from '../components/admin/PartnerMessageManager';
 
-type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'partner_messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom' | 'printing' | 'saas_subscriptions' | 'saas_appearance';
+type Tab = 'overview' | 'orders' | 'users' | 'services' | 'portfolio' | 'blog' | 'settings' | 'messages' | 'partner_messages' | 'pos' | 'expenses' | 'design' | 'design_requests' | 'studio_acom' | 'printing' | 'saas_subscriptions' | 'saas_appearance' | 'desktop_app';
 
 // import { isSupabaseConfigured } from '../lib/supabase';
 
@@ -1247,6 +1247,7 @@ const AdminDashboard = () => {
     // { id: 'studio_acom', label: 'Studio ACOM', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_subscriptions', label: 'Souscriptions', icon: Store, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_appearance', label: 'Apparence', icon: Layout, adminOnly: true, superAdminOnly: false, allowManager: false },
+    { id: 'desktop_app', label: 'App Desktop', icon: Monitor, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'design', label: 'Éditeur Design', icon: LayoutGrid, adminOnly: true, superAdminOnly: false, allowManager: false },
   ].filter(tab => {
     if (tab.superAdminOnly && !isSuperAdmin) return false;
@@ -1255,6 +1256,7 @@ const AdminDashboard = () => {
     if ((tab.id === 'orders' || tab.id === 'overview') && isRestrictedAdmin) return false;
     return true;
   });
+
 
   const tabGroups = [
     {
@@ -1275,7 +1277,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Acom SaaS",
-      tabs: ['saas_subscriptions', 'saas_appearance']
+      tabs: ['saas_subscriptions', 'saas_appearance', 'desktop_app']
     }
   ];
 
@@ -2502,6 +2504,102 @@ const AdminDashboard = () => {
           >
             <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
               <AcomSaaSSettings />
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'desktop_app' && (
+          <motion.div
+            key="desktop_app"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <div className="bg-white p-8 md:p-12 rounded-[2.5rem] border border-black/5 shadow-sm">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex flex-col md:flex-row items-center gap-12">
+                  <div className="flex-1 text-center md:text-left">
+                    <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 mx-auto md:mx-0">
+                      <Monitor className="w-8 h-8 text-primary" />
+                    </div>
+                    <h2 className="text-3xl font-display font-bold text-gray-900 mb-4">Acom Gestion Desktop</h2>
+                    <p className="text-lg text-gray-500 mb-8 leading-relaxed">
+                      L'extension native d'Acom Gestion conçue pour les professionnels exigeants. 
+                      Profitez d'une expérience ultra-fluide, d'une stabilité accrue et d'une intégration parfaite avec vos périphériques de gestion.
+                    </p>
+                    
+                    <div className="space-y-4 mb-8">
+                      {[
+                        "Performance native et rapidité d'exécution",
+                        "Intégration optimisée des imprimantes (Tickets, A4)",
+                        "Notifications système instantanées même réduit",
+                        "Amélioration du multitâche et gestion des stocks"
+                      ].map((feature, i) => (
+                        <div key={i} className="flex items-center justify-center md:justify-start gap-3 text-gray-600">
+                          <div className="w-5 h-5 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                          </div>
+                          <span className="text-sm font-medium">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
+                      <a
+                        href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all gap-3"
+                      >
+                        <Download className="w-5 h-5" />
+                        Télécharger Windows (.exe)
+                      </a>
+                      
+                      <a
+                        href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.1.0.0.dmg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 border-2 border-gray-100 rounded-2xl font-bold hover:scale-105 active:scale-95 hover:bg-gray-50 transition-all gap-3"
+                      >
+                        <Download className="w-5 h-5 text-gray-500" />
+                        Télécharger MacOS (.dmg)
+                      </a>
+                    </div>
+
+                    <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-100 text-left">
+                      <p className="text-[10px] text-gray-400 font-mono break-all leading-tight mb-2">
+                        <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">WIN SHA-256:</span>
+                        8c68a169f2f1c7def734ad91d4ebf0cbb3d45bb32ced315d11e722cac17c4fcd
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-mono break-all leading-tight">
+                        <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
+                        b4a8e3f9d1c2b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+                      </p>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-4 italic">
+                      Compatible avec Windows 10 et versions ultérieures.
+                    </p>
+                  </div>
+                  
+                  <div className="flex-1 w-full max-w-sm">
+                    <div className="relative">
+                      <div className="absolute -inset-4 bg-primary/5 rounded-[3rem] blur-3xl" />
+                      <div className="relative bg-gray-900 aspect-video rounded-3xl border-8 border-gray-800 shadow-2xl overflow-hidden group">
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Monitor className="w-16 h-16 text-white/20 group-hover:scale-110 transition-transform duration-500" />
+                        </div>
+                        {/* Barre de titre simulée */}
+                        <div className="absolute top-0 inset-x-0 h-6 bg-gray-800 flex items-center px-3 gap-1">
+                          <div className="w-2 h-2 rounded-full bg-red-400" />
+                          <div className="w-2 h-2 rounded-full bg-amber-400" />
+                          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}

@@ -166,7 +166,7 @@ const HeroBanner = () => {
                     className="group relative px-8 py-4 bg-primary text-white rounded-full font-bold overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-primary/30"
                   >
                     <span className="relative z-10 flex items-center">
-                      <Translate>Nos Solutions SaaS</Translate>
+                      <Translate>Nos Solutions de Gestions</Translate>
                       <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </span>
                   </Link>

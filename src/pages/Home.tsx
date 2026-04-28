@@ -5,7 +5,7 @@ import HeroBanner from '../components/HeroBanner';
 import Hero from '../components/Hero';
 import { Service, ServiceCategory, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ArrowRight, CheckCircle2, Star, Users, Briefcase, Award, Filter, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, Package, FileText, BarChart3, Construction, Hospital, Truck, GraduationCap, Settings } from 'lucide-react';
+import { Search, ArrowRight, CheckCircle2, Star, Users, Briefcase, Award, Filter, Clock, Sparkles, Rocket, Palette, Layout, Smartphone, Globe, Megaphone, PenTool, Code, Package, FileText, BarChart3, Construction, Hospital, Truck, GraduationCap, Settings, Monitor, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Translate, useTranslation } from '../context/LanguageContext';
 import { db } from '../db/db';
@@ -500,6 +500,137 @@ const Home = () => {
                     </motion.div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Desktop App Section */}
+      <section className="py-20 bg-gray-50 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 md:px-12">
+          <div className="bg-white rounded-[3rem] p-8 md:p-16 border border-gray-100 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            
+            <div className="flex flex-col lg:flex-row items-center gap-16 relative z-10">
+              <div className="flex-1 text-center lg:text-left">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-bold mb-6"
+                >
+                  <Monitor className="w-4 h-4" />
+                  Application Native
+                </motion.div>
+                
+                <h2 className="text-4xl md:text-5xl font-display font-bold text-gray-900 mb-6 tracking-tight">
+                  Acom Gestion <span className="text-primary">Desktop</span>
+                </h2>
+                
+                <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-xl">
+                  Découvrez une expérience de gestion fluide et ultra-rapide. Notre application native 
+                  optimise vos flux de travail et s'intègre parfaitement avec vos périphériques (imprimantes de tickets, scanners).
+                </p>
+
+                <div className="grid sm:grid-cols-2 gap-4 mb-10">
+                  {[
+                    "Impression Ticket Directe",
+                    "Notifications Instantanées",
+                    "Démarrage Rapide",
+                    "Sécurité Renforcée"
+                  ].map((feature, i) => (
+                    <div key={i} className="flex items-center gap-3 text-gray-700">
+                      <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <span className="font-semibold">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <motion.a
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-8 py-4 bg-ink text-white rounded-2xl font-bold shadow-2xl hover:bg-primary transition-colors gap-3"
+                  >
+                    <Download className="w-5 h-5" />
+                    Télécharger Windows (.exe)
+                  </motion.a>
+
+                  <motion.a
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.1.0.0.dmg"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-8 py-4 bg-white border-2 border-gray-100 text-gray-900 rounded-2xl font-bold hover:bg-gray-50 transition-colors gap-3"
+                  >
+                    <Download className="w-5 h-5 text-gray-500" />
+                    Télécharger MacOS (.dmg)
+                  </motion.a>
+                </div>
+
+                <div className="mt-6 inline-block p-4 bg-gray-50 rounded-2xl border border-gray-100 text-left">
+                  <p className="text-[10px] text-gray-400 font-mono break-all leading-tight mb-2">
+                    <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">WIN SHA-256:</span>
+                    8c68a169f2f1c7def734ad91d4ebf0cbb3d45bb32ced315d11e722cac17c4fcd
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-mono break-all leading-tight">
+                    <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
+                    b4a8e3f9d1c2b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex-1 w-full max-w-2xl">
+                <motion.div
+                  initial={{ opacity: 0, x: 40 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  className="relative"
+                >
+                  <div className="absolute -inset-4 bg-primary/20 rounded-[4rem] blur-2xl opacity-50" />
+                  <div className="relative bg-[#0F172A] rounded-[2.5rem] border-[12px] border-[#1E293B] shadow-2xl overflow-hidden aspect-[16/10] group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
+                    
+                    {/* Fake UI Sidebar */}
+                    <div className="absolute left-0 top-0 bottom-0 w-16 bg-[#1E293B] border-r border-white/5 flex flex-col items-center py-6 gap-6">
+                      <div className="w-8 h-8 rounded-lg bg-primary/20" />
+                      <div className="w-8 h-8 rounded-lg bg-white/5" />
+                      <div className="w-8 h-8 rounded-lg bg-white/5" />
+                      <div className="w-8 h-8 rounded-lg bg-white/5" />
+                    </div>
+
+                    {/* Fake Content Area */}
+                    <div className="ml-16 p-8 space-y-6">
+                      <div className="flex justify-between items-center">
+                        <div className="h-6 w-32 bg-white/10 rounded-lg" />
+                        <div className="flex gap-2">
+                          <div className="w-8 h-8 rounded-full bg-white/5" />
+                          <div className="w-8 h-8 rounded-full bg-white/5" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="h-24 bg-white/5 rounded-2xl" />
+                        <div className="h-24 bg-white/5 rounded-2xl" />
+                        <div className="h-24 bg-white/5 rounded-2xl" />
+                      </div>
+                      <div className="h-48 bg-white/5 rounded-3xl" />
+                    </div>
+
+                    {/* Windows Titlebar */}
+                    <div className="absolute top-0 inset-x-0 h-6 bg-[#1E293B] flex items-center justify-end px-3 gap-3">
+                      <div className="w-3 h-0.5 bg-white/40" />
+                      <div className="w-3 h-3 border border-white/40 rounded-sm" />
+                      <div className="w-3 h-3 text-white/40 rotate-45 flex items-center justify-center">+</div>
+                    </div>
+                  </div>
+                </motion.div>
               </div>
             </div>
           </div>

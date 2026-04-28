@@ -42,12 +42,17 @@ export const dbService = {
     },
     async save(service: Partial<Service>) {
       if (service.id) {
-        return serviceRepository.update(service.id, service);
+        await serviceRepository.update(service.id, service);
+        await db.services.update(service.id, service);
+        return;
       }
-      return serviceRepository.create(service as any);
+      const id = await serviceRepository.create(service as any);
+      await db.services.put({ ...service, id } as any);
+      return id;
     },
     async delete(id: string) {
-      return serviceRepository.delete(id);
+      await serviceRepository.delete(id);
+      await db.services.delete(id);
     }
   },
   orders: {
@@ -88,12 +93,17 @@ export const dbService = {
   portfolio: {
     async save(item: Partial<PortfolioItem>) {
       if (item.id) {
-        return portfolioRepository.update(item.id, item);
+        await portfolioRepository.update(item.id, item);
+        await db.portfolio_items.update(item.id, item);
+        return;
       }
-      return portfolioRepository.create(item as any);
+      const id = await portfolioRepository.create(item as any);
+      await db.portfolio_items.put({ ...item, id: id } as any);
+      return id;
     },
     async delete(id: string) {
-      return portfolioRepository.delete(id);
+      await portfolioRepository.delete(id);
+      await db.portfolio_items.delete(id);
     }
   },
   blog: {
@@ -109,12 +119,17 @@ export const dbService = {
     },
     async save(post: Partial<BlogPost>) {
       if (post.id) {
-        return blogRepository.update(post.id, post);
+        await blogRepository.update(post.id, post);
+        await db.blog_posts.update(post.id, post);
+        return;
       }
-      return blogRepository.create(post as any);
+      const id = await blogRepository.create(post as any);
+      await db.blog_posts.put({ ...post, id: id } as any);
+      return id;
     },
     async delete(id: string) {
-      return blogRepository.delete(id);
+      await blogRepository.delete(id);
+      await db.blog_posts.delete(id);
     }
   },
   settings: {

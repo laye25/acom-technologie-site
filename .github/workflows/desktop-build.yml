@@ -11,7 +11,10 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
 
     steps:
       - name: Checkout repository
@@ -33,10 +36,24 @@ jobs:
         run: npm run build
 
       - name: Build Electron Desktop App (Windows)
+        if: matrix.os == 'windows-latest'
         run: npx electron-builder --win nsis --publish never
 
-      - name: Upload Artifact
+      - name: Build Electron Desktop App (macOS)
+        if: matrix.os == 'macos-latest'
+        run: npx electron-builder --mac dmg --publish never
+
+      - name: Upload Artifact (Windows)
+        if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: Acom-Gestion-Desktop-Windows
           path: release/*.exe
+
+      - name: Upload Artifact (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Acom-Gestion-Desktop-MacOS
+          path: release/*.dmg
+

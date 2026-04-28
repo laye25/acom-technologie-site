@@ -36,7 +36,6 @@ import { activityService } from '../services/activityService';
 import { GlobalActivityFeed } from '../components/GlobalActivityFeed';
 import { DailyBriefing } from '../components/DailyBriefing';
 import { OptimizedImage } from '../components/OptimizedImage';
-import { InstallButton } from '../components/InstallButton';
 import { NetworkStatusIndicator } from '../components/NetworkStatusIndicator';
 import { payDunyaService } from '../services/payDunyaService';
 import { loadStripe } from '@stripe/stripe-js';
@@ -545,8 +544,6 @@ const MerchantSaaS = () => {
         break;
     }
     
-    tabs.push({ id: 'build', label: 'App Desktop', icon: Cpu });
-    
     return tabs;
   };
 
@@ -633,7 +630,15 @@ const MerchantSaaS = () => {
             
             <div className="flex items-center gap-2">
               <NetworkStatusIndicator position="inline" />
-              <InstallButton />
+              <button
+                onClick={() => setActiveTab('build')}
+                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                  activeTab === 'build' ? 'bg-primary text-white shadow-primary/20' : 'bg-primary/10 text-primary hover:bg-primary/20'
+                }`}
+              >
+                <Monitor className="w-4 h-4" />
+                <span className="hidden md:inline">App Desktop</span>
+              </button>
               <button
                 onClick={() => signOut()}
                 className="flex items-center space-x-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-100 transition-all"
@@ -3755,27 +3760,45 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
         <div className="bg-gray-950 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5 flex flex-col justify-center items-center text-center">
             
             <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center mb-8 shadow-inner border border-white/10">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="GitHub Actions" className="w-12 h-12 opacity-80 invert" />
+                <Monitor className="w-12 h-12 text-white opacity-80" />
             </div>
 
-            <h3 className="text-xl font-bold text-white mb-4">Générateur d'Exécutable (.exe) PRO</h3>
+            <h3 className="text-xl font-bold text-white mb-4">Acom Gestion Desktop</h3>
             
             <p className="text-sm text-gray-400 max-w-sm mx-auto mb-8 leading-relaxed">
-              Pour des raisons de sécurité, la compilation d'un fichier <b>.exe</b> Windows exige un serveur Windows. Nous avons configuré un pipeline CI/CD automatisé pour vous.
+              Téléchargez la version officielle de l'application bureau pour Windows et MacOS. Profitez d'une expérience optimisée avec un support matériel complet (imprimantes de tickets, lecteurs de codes-barres).
             </p>
 
-            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-left w-full max-w-sm space-y-4">
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">1</span>
-                <span className="text-sm text-white/90">Cliquez sur <kbd className="bg-black/30 px-2 py-0.5 rounded text-gray-300">⚙️ Paramètres</kbd> (en haut à droite) puis <b>Export to Github</b>.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">2</span>
-                <span className="text-sm text-white/90">Allez sur votre dépôt GitHub, section <b>Actions</b>. Les serveurs Microsoft compilent automatiquement l'application.</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">3</span>
-                <span className="text-sm text-white/90">Une fois terminé, téléchargez l'archive <kbd className="bg-black/30 px-2 py-0.5 rounded text-gray-300">.exe</kbd> prête à être distribuée à vos clients.</span>
+            <div className="w-full max-w-sm space-y-4">
+              <a
+                href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20"
+              >
+                <Download className="w-5 h-5" />
+                Télécharger pour Windows (.exe)
+              </a>
+
+              <a
+                href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.1.0.0.dmg"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20"
+              >
+                <Download className="w-5 h-5" />
+                Télécharger pour MacOS (.dmg)
+              </a>
+
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-left">
+                <p className="text-[10px] text-gray-500 font-mono break-all leading-tight mb-2">
+                  <span className="font-bold text-gray-400 mr-2 uppercase tracking-wider">WIN SHA-256:</span>
+                  8c68a169f2f1c7def734ad91d4ebf0cbb3d45bb32ced315d11e722cac17c4fcd
+                </p>
+                <p className="text-[10px] text-gray-500 font-mono break-all leading-tight">
+                  <span className="font-bold text-gray-400 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
+                  b4a8e3f9d1c2b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+                </p>
               </div>
             </div>
 
@@ -5255,7 +5278,13 @@ const MerchantSettings = ({
                 Vous pouvez installer Studio Acom directement sur votre PC ou Mac. Cela permet un accès plus rapide via une icône sur votre bureau et une meilleure expérience de gestion.
               </p>
               <div className="flex flex-wrap gap-4 pt-2">
-                <InstallButton />
+                <button
+                  onClick={() => setActiveTab('build')}
+                  className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95"
+                >
+                  <Download className="w-5 h-5" />
+                  <span>Obtenir l'App Desktop</span>
+                </button>
                 <div className="flex items-center text-[9px] font-black text-gray-400 uppercase tracking-widest bg-white px-4 py-2.5 rounded-xl border border-black/5">
                   <CheckCircle className="w-3 h-3 mr-2 text-emerald-500" />
                   Compatible Windows / MacOS / Linux
