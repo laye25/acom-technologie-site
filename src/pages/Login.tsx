@@ -328,12 +328,17 @@ const Login = () => {
         </button>
 
         {showGoogleRedirect && (
-          <button
-            onClick={() => handleGoogleSignIn(true)}
-            className="mt-3 w-full py-3 bg-primary/5 text-primary rounded-xl font-bold hover:bg-primary/10 transition-all text-xs"
-          >
-            Utiliser le mode redirection (Plus robuste)
-          </button>
+          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-center">
+            <p className="text-sm text-amber-800 mb-3">
+              Popups bloqués. La connexion en ligne ne fonctionne pas ici.
+            </p>
+            <button
+              onClick={() => window.open(window.location.href, '_blank')}
+              className="w-full py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all text-sm"
+            >
+              Ouvrir l'application dans un nouvel onglet
+            </button>
+          </div>
         )}
 
         <div className="mt-8 pt-8 border-t border-gray-50 text-center">

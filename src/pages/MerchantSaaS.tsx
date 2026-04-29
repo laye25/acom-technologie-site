@@ -605,6 +605,10 @@ const MerchantSaaS = () => {
     return <MerchantOnboarding onComplete={(m) => setMerchant(m)} />;
   }
 
+  if (merchant.plan !== 'FREE' && merchant.subscriptionStatus !== 'active') {
+    return <PaymentPendingView merchant={merchant} />;
+  }
+
   const tabs = getTabs(merchant.type || 'boutique', merchant.plan || '');
 
   return (
@@ -743,6 +747,61 @@ const TabButton = ({ active, onClick, icon: Icon, label }: any) => (
 
 
 
+const PAYMENT_PLANS = [
+  { id: 'FREE', name: 'TESTE', price: '0 FCFA', desc: 'Basique' },
+  { id: 'BASIC', name: 'BASIC', price: '10.000 FCFA', desc: 'Essentiel' },
+  { id: 'STANDARD', name: 'STANDARD', price: '25.000 FCFA', desc: 'Populaire' },
+  { id: 'PREMIUM', name: 'PREMIUM', price: '45.000 FCFA', desc: 'Complet' },
+  { id: 'LOCAL', name: 'LICENCE LOCALE', price: '350.000 FCFA', desc: 'A vie (Logiciel Local)' },
+];
+
+// --- Payment Pending View ---
+const PaymentPendingView = ({ merchant }: { merchant: Merchant }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleRetryPayment = async () => {
+    setLoading(true);
+    try {
+      const selectedPlan = PAYMENT_PLANS.find(p => p.id === merchant.plan);
+      if (!selectedPlan) return;
+      
+      const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
+      const desc = `Abonnement Acom SaaS - Plan ${merchant.plan} (${merchant.name})`;
+      
+      const link = await payDunyaService.createPaymentLink({
+        amount,
+        description: desc,
+        orderId: `SUBSCRIPTION_${merchant.id}_${merchant.plan}_${Date.now()}`,
+        returnUrl: window.location.origin + `/merchant?payment_success=true&new_plan=${merchant.plan}&merchant_id=${merchant.id}`,
+        cancelUrl: window.location.origin + `/merchant?show_upgrade=true&target_plan=${merchant.plan}`
+      });
+
+      window.location.href = link;
+    } catch (payError) {
+      console.error('Payment initialization error:', payError);
+      toast.error("Erreur lors de l'initialisation du paiement. Veuillez réessayer.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+      <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+        <CreditCard className="w-16 h-16 text-primary mx-auto mb-6" />
+        <h2 className="text-2xl font-bold mb-4">Paiement en attente</h2>
+        <p className="mb-6 text-gray-600">Votre compte est en attente de paiement pour le plan {merchant.plan}. Veuillez compléter le paiement pour activer votre espace.</p>
+        <button 
+          onClick={handleRetryPayment}
+          disabled={loading}
+          className="w-full bg-primary text-white py-3 px-4 rounded-xl font-bold hover:bg-primary/90 transition-all"
+        >
+          {loading ? 'Redirection...' : 'Payer maintenant'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Onboarding ---
 const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void }) => {
   const { user } = useAuth();
@@ -764,13 +823,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     { id: 'medical', label: 'Établissement Médical', icon: Stethoscope, color: 'text-red-500', bgColor: 'bg-red-50' },
   ];
 
-  const plans = [
-    { id: 'FREE', name: 'TESTE', price: '0 FCFA', desc: 'Basique' },
-    { id: 'BASIC', name: 'BASIC', price: '10.000 FCFA', desc: 'Essentiel' },
-    { id: 'STANDARD', name: 'STANDARD', price: '25.000 FCFA', desc: 'Populaire' },
-    { id: 'PREMIUM', name: 'PREMIUM', price: '45.000 FCFA', desc: 'Complet' },
-    { id: 'LOCAL', name: 'LICENCE LOCALE', price: '350.000 FCFA', desc: 'A vie (Logiciel Local)' },
-  ];
+  const plans = PAYMENT_PLANS;
 
   const getSaaSConfig = (t: string) => {
     switch (t) {
@@ -817,7 +870,8 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         name,
         currency,
         type, // Store the type in the merchant profile
-        plan: 'FREE' as MerchantPlan, // Always start as FREE (trial) until payment
+        plan: plan, // Store the selected plan
+        subscriptionStatus: isPaidPlan ? 'pending' : 'active', // Pending if paid
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         licenseType: 'cloud' as 'cloud' | 'local'
