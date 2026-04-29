@@ -461,7 +461,18 @@ const MerchantSaaS = () => {
 
   const isCloudSyncEnabled = merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM';
   
-  const siteSettings = useLiveQuery(() => db.settings.get('global'));
+  const [siteSettings, setSiteSettings] = useState<any>(null);
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const globalSettings = await dbService.settings.get('global');
+        setSiteSettings(globalSettings);
+      } catch (error) {
+        console.error('Error fetching global settings:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Data Synchronization
   useEffect(() => {
@@ -1331,7 +1342,18 @@ const MerchantDashboard = ({
     db.expenses.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
   
-  const siteSettings = useLiveQuery(() => db.settings.get('global'));
+  const [siteSettings, setSiteSettings] = useState<any>(null);
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const globalSettings = await dbService.settings.get('global');
+        setSiteSettings(globalSettings);
+      } catch (error) {
+        console.error('Error fetching global settings:', error);
+      }
+    };
+    fetchSettings();
+  }, []);
   
   // Point 6: Aggregation - Global merchant stats (On-demand/Offline)
   const [merchantStats, setMerchantStats] = useState<any>(null);
