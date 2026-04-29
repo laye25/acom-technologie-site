@@ -674,17 +674,19 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-black/5 shadow-sm items-center gap-2">
-            {tabs.map(tab => (
-              <TabButton 
-                key={tab.id}
-                active={activeTab === tab.id} 
-                onClick={() => setActiveTab(tab.id)} 
-                icon={tab.icon} 
-                label={tab.label} 
-              />
-            ))}
-          </div>
+          {merchant.plan !== 'LOCAL' && (
+            <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-black/5 shadow-sm items-center gap-2">
+              {tabs.map(tab => (
+                <TabButton 
+                  key={tab.id}
+                  active={activeTab === tab.id} 
+                  onClick={() => setActiveTab(tab.id)} 
+                  icon={tab.icon} 
+                  label={tab.label} 
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content */}
