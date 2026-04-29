@@ -465,23 +465,23 @@ const MerchantSaaS = () => {
 
   // Data Synchronization
   useEffect(() => {
-    // Only premium plans get Cloud Sync. LOCAL and FREE plans are local-only.
-    if (merchant && merchant.id && isCloudSyncEnabled) {
+    if (merchant && merchant.id) {
       // Sync from Cloud to Local (Delta-Sync)
-      syncService.syncProducts(merchant.id);
-      syncService.syncSales(merchant.id);
-      syncService.syncExpenses(merchant.id);
+      syncService.syncAllMerchantData(merchant.id);
       syncService.syncUsers(merchant.id);
       syncService.syncSettings(merchant.id);
       
-      // Push pending local data periodically
-      const pushInterval = setInterval(() => {
-        syncService.pushPendingData(merchant.id!);
-      }, 30000); // Every 30 seconds
+      // Only premium plans get periodic push/pull Cloud Sync
+      if (isCloudSyncEnabled) {
+        // Push pending local data periodically
+        const pushInterval = setInterval(() => {
+          syncService.pushPendingData(merchant.id!);
+        }, 30000); // Every 30 seconds
 
-      return () => clearInterval(pushInterval);
+        return () => clearInterval(pushInterval);
+      }
     }
-  }, [merchant?.id, merchant?.plan]);
+  }, [merchant?.id, merchant?.plan, isCloudSyncEnabled]);
 
   const getTabs = (type: string) => {
     let tabs: any[] = [];
@@ -1765,7 +1765,7 @@ const MerchantDashboard = ({
               
               <div className="relative p-8 flex flex-col items-center justify-center border-b border-gray-700/50 bg-black/20">
                 <div className="w-[72px] h-[72px] flex items-center justify-center rounded-[16px] shadow-lg overflow-hidden bg-white mb-4">
-                  <img src={siteSettings?.desktopLogo || "/desktop-logo.svg"} className="w-full h-full object-cover" alt="Acom Desktop Logo" />
+                  <img src={siteSettings?.desktopLogo || siteSettings?.logoUrl || "/logo.svg"} className="w-full h-full object-contain p-1" alt="Acom Desktop Logo" />
                 </div>
                 <h4 className="text-white font-black tracking-tight text-center text-sm">
                   Acom Gestion<br/>Desktop

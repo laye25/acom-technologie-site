@@ -47,14 +47,16 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_products_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
-      const constraints: any[] = [where('merchant_id', '==', merchantId)];
-      
+      const timeConstraints: any[] = [];
       if (lastSyncStr) {
-        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
       console.log(`Syncing products... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
-      const remoteProducts = await merchantProductRepository.getAll(constraints);
+      let remoteProducts = await merchantProductRepository.getAll([where('merchant_id', '==', merchantId), ...timeConstraints]);
+      if (!remoteProducts || remoteProducts.length === 0) {
+        remoteProducts = await merchantProductRepository.getAll([where('merchantId', '==', merchantId), ...timeConstraints]);
+      }
       
       if (remoteProducts && remoteProducts.length > 0) {
         // Map to local DB format
@@ -81,14 +83,16 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_sales_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
-      const constraints: any[] = [where('merchant_id', '==', merchantId)];
-      
+      const timeConstraints: any[] = [];
       if (lastSyncStr) {
-        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
       console.log(`Syncing sales... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
-      const remoteSales = await merchantSaleRepository.getAll(constraints);
+      let remoteSales = await merchantSaleRepository.getAll([where('merchant_id', '==', merchantId), ...timeConstraints]);
+      if (!remoteSales || remoteSales.length === 0) {
+        remoteSales = await merchantSaleRepository.getAll([where('merchantId', '==', merchantId), ...timeConstraints]);
+      }
 
       if (remoteSales && remoteSales.length > 0) {
         // Map to local DB format
@@ -112,14 +116,16 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_expenses_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
-      const constraints: any[] = [where('merchant_id', '==', merchantId)];
-      
+      const timeConstraints: any[] = [];
       if (lastSyncStr) {
-        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
       console.log(`Syncing expenses... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
-      const remoteExpenses = await merchantExpenseRepository.getAll(constraints);
+      let remoteExpenses = await merchantExpenseRepository.getAll([where('merchant_id', '==', merchantId), ...timeConstraints]);
+      if (!remoteExpenses || remoteExpenses.length === 0) {
+        remoteExpenses = await merchantExpenseRepository.getAll([where('merchantId', '==', merchantId), ...timeConstraints]);
+      }
 
       if (remoteExpenses && remoteExpenses.length > 0) {
         // Map to local DB format
@@ -385,10 +391,10 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_${collectionName}_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
-      const constraints: any[] = [where('merchant_id', '==', merchantId)];
       
+      const timeConstraints: any[] = [];
       if (lastSyncStr) {
-        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
       console.log(`Syncing ${collectionName}... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
@@ -397,8 +403,14 @@ export const syncService = {
         protected collectionName = collectionName;
       })();
       
-      const remoteData = await repo.getAll(constraints);
+      // Try with merchant_id
+      let remoteData = await repo.getAll([where('merchant_id', '==', merchantId), ...timeConstraints]);
       
+      // If nothing found or to be safe, try with merchantId
+      if (!remoteData || remoteData.length === 0) {
+        remoteData = await repo.getAll([where('merchantId', '==', merchantId), ...timeConstraints]);
+      }
+
       if (remoteData && remoteData.length > 0) {
         // Map data if needed (standardize merchantId)
         const mappedData = remoteData.map((d: any) => ({
