@@ -809,18 +809,51 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         return;
       }
 
+      const isPaidPlan = plan !== 'FREE';
+
       const merchantData = {
         ownerId: user.uid,
         owner_id: user.uid, // Support both snake_case and camelCase for rules/queries
         name,
         currency,
         type, // Store the type in the merchant profile
-        plan, // Store the selected plan
+        plan: 'FREE' as MerchantPlan, // Always start as FREE (trial) until payment
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        licenseType: 'cloud' as 'cloud' | 'local'
       };
+
       const id = await dbService.merchants.save(merchantData as any);
-      onComplete({ ...merchantData, id } as Merchant);
+      const createdMerchant = { ...merchantData, id } as Merchant;
+
+      if (isPaidPlan) {
+        const selectedPlan = plans.find(p => p.id === plan);
+        if (selectedPlan) {
+          try {
+            const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
+            const desc = `Abonnement Acom SaaS - Plan ${plan} (${name})`;
+            
+            const link = await payDunyaService.createPaymentLink({
+              amount,
+              description: desc,
+              orderId: `SUBSCRIPTION_${id}_${plan}_${Date.now()}`,
+              returnUrl: window.location.origin + `/merchant?payment_success=true&new_plan=${plan}&merchant_id=${id}`,
+              cancelUrl: window.location.origin + `/merchant?show_upgrade=true&target_plan=${plan}`
+            });
+
+            toast.loading('Redirection vers le paiement...');
+            window.location.href = link;
+            return;
+          } catch (payError) {
+            console.error('Payment initialization error:', payError);
+            toast.error("Erreur lors de l'initialisation du paiement. Veuillez réessayer ou choisir le plan TESTE.");
+            setLoading(false);
+            return; // STOP HERE, DO NOT CONTINUE
+          }
+        }
+      }
+
+      onComplete(createdMerchant);
       toast.success(`Votre ${label} a été créée !`);
     } catch (error: any) {
       console.error('Erreur lors de la création du marchand:', error);
@@ -980,13 +1013,17 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
-                    <span>Lancer mon activité</span>
+                    <span>
+                      {plan === 'FREE' 
+                        ? 'Lancer mon activité' 
+                        : `Payer et Lancer (${plans.find(p => p.id === plan)?.price})`}
+                    </span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
               </button>
               <p className="text-center text-[10px] text-gray-400 mt-4 font-medium italic">
-                En cliquant sur "Lancer mon activité", vous acceptez nos conditions d'utilisation.
+                En cliquant sur "{plan === 'FREE' ? 'Lancer mon activité' : 'Payer et Lancer'}", vous acceptez nos conditions d'utilisation.
               </p>
             </div>
           </form>
