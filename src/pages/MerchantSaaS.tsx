@@ -674,7 +674,7 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          {merchant.plan !== 'LOCAL' && (
+          {(merchant.plan !== 'LOCAL' || merchant.licenseType === 'cloud') && (
             <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-black/5 shadow-sm items-center gap-2">
               {tabs.map(tab => (
                 <TabButton 
@@ -1551,7 +1551,7 @@ const MerchantDashboard = ({
       exit={{ opacity: 0, x: -20 }}
       className="space-y-8"
     >
-      {merchant.plan !== 'LOCAL' && (
+      {(merchant.plan !== 'LOCAL' || merchant.licenseType === 'cloud') && (
         <DailyBriefing 
           merchantId={merchant.id} 
           data={{ sales, products, expenses }} 
@@ -1902,7 +1902,7 @@ const MerchantDashboard = ({
           onUpdate={onUpdate}
         />
       )}
-      {merchant.plan !== 'LOCAL' && (
+      {(merchant.plan !== 'LOCAL' || merchant.licenseType === 'cloud') && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {merchant.type === 'boutique' || !merchant.type ? (
