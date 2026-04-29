@@ -1788,7 +1788,7 @@ const MerchantDashboard = ({
               <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors duration-500 pointer-events-none"></div>
               
               <div className="relative p-8 flex flex-col items-center justify-center border-b border-gray-700/50 bg-black/20">
-                <div className="w-[72px] h-[72px] flex items-center justify-center rounded-[16px] shadow-lg overflow-hidden bg-white mb-4">
+                <div className="w-[72px] h-[72px] flex items-center justify-center rounded-none shadow-lg overflow-hidden bg-white mb-4">
                   <img src={siteSettings?.desktopLogo || siteSettings?.logoUrl || "/logo.svg"} className="w-full h-full object-contain p-1" alt="Acom Desktop Logo" />
                 </div>
                 <h4 className="text-white font-black tracking-tight text-center text-sm">
