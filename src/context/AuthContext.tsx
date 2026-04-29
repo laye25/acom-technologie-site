@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signInWithPopup, 
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut as firebaseSignOut, 
   sendPasswordResetEmail, 
@@ -68,6 +69,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check for redirect result on mount to catch errors from Google login flow
+    if (typeof window !== 'undefined') {
+      console.log('AuthContext: Checking getRedirectResult');
+      getRedirectResult(auth)
+        .then((result) => {
+          if (result) {
+            console.log('AuthContext: getRedirectResult success:', result.user.email);
+          } else {
+            console.log('AuthContext: getRedirectResult no result');
+          }
+        })
+        .catch((error) => {
+          console.error('AuthContext: Error from getRedirectResult:', error);
+        });
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log('AuthContext: onAuthStateChanged - currentUser:', currentUser);
       setUser(currentUser);
@@ -201,15 +218,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
+      // Ensure we are in a browser environment
+      if (typeof window === 'undefined') return;
+      
       await signInWithPopup(auth, provider);
     } catch (error: any) {
       console.error('Google sign-in error:', error);
+      // Let the caller handle standard error codes if they want
+      // but keep the specific environment alerts here just in case
       if (error.code === 'auth/popup-blocked') {
-        alert('Veuillez autoriser les popups pour vous connecter avec Google.');
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        console.log('Popup closed by user');
-      } else {
-        alert('Erreur lors de la connexion avec Google : ' + error.message);
+        console.warn('Popup blocked, please allow popups for this site');
+      } else if (error.code === 'auth/operation-not-allowed') {
+        alert('La connexion avec Google n\'est pas activée dans la console Firebase.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        alert('Ce domaine n\'est pas autorisé pour la connexion Google. Veuillez l\'ajouter dans la console Firebase.');
       }
       throw error;
     }

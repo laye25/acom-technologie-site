@@ -55,19 +55,31 @@ const Login = () => {
     fullName: ''
   });
 
-  const handleGoogleSignIn = async () => {
+  const [showGoogleRedirect, setShowGoogleRedirect] = useState(false);
+
+  const handleGoogleSignIn = async (useRedirect = false) => {
     setGoogleLoading(true);
     setError(null);
     try {
+      if (useRedirect) {
+        const { auth } = await import('../firebase');
+        const { signInWithRedirect, GoogleAuthProvider } = await import('firebase/auth');
+        const provider = new GoogleAuthProvider();
+        await signInWithRedirect(auth, provider);
+        return; // Redirect happens
+      }
+
       await signInWithGoogle();
       const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       navigate(targetUrl);
     } catch (error: any) {
       console.error('Google Auth error:', error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        setError('La fenêtre de connexion a été fermée. Rafraîchissement de la page...');
-        setTimeout(() => window.location.reload(), 1500);
+      if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+        setError(error.code === 'auth/popup-blocked' 
+          ? 'Les popups sont bloqués par votre navigateur.' 
+          : 'La connexion a échoué (fenêtre fermée).');
+        setShowGoogleRedirect(true);
       } else {
         setError(error.message || 'Une erreur est survenue lors de la connexion avec Google.');
       }
@@ -284,11 +296,11 @@ const Login = () => {
         </div>
 
         <button
-          onClick={handleGoogleSignIn}
+          onClick={() => handleGoogleSignIn(false)}
           disabled={loading || googleLoading}
           className="mt-6 w-full py-4 bg-white border border-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {googleLoading ? (
+          {googleLoading && !showGoogleRedirect ? (
             <div className="w-6 h-6 border-2 border-primary-light border-t-primary rounded-full animate-spin" />
           ) : (
             <>
@@ -314,6 +326,15 @@ const Login = () => {
             </>
           )}
         </button>
+
+        {showGoogleRedirect && (
+          <button
+            onClick={() => handleGoogleSignIn(true)}
+            className="mt-3 w-full py-3 bg-primary/5 text-primary rounded-xl font-bold hover:bg-primary/10 transition-all text-xs"
+          >
+            Utiliser le mode redirection (Plus robuste)
+          </button>
+        )}
 
         <div className="mt-8 pt-8 border-t border-gray-50 text-center">
           <p className="text-sm text-gray-500">

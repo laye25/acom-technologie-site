@@ -443,7 +443,7 @@ const MerchantSaaS = () => {
         // Check for quota
         const quotaExceeded = localStorage.getItem('firebase_quota_exceeded');
         if (quotaExceeded && !finalMerchant) {
-          setError("Quota Firestore épuisé. Impossible de charger votre profil marchand.");
+          setError(`Quota Firestore épuisé. Impossible de charger le profil marchand pour ${user.email}.`);
         } else {
           setMerchant(finalMerchant || null);
         }
