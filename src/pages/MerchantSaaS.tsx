@@ -882,9 +882,11 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
 
       if (isPaidPlan) {
         const selectedPlan = plans.find(p => p.id === plan);
+        console.log('MerchantOnboarding: Initiating payment for plan:', selectedPlan);
         if (selectedPlan) {
           try {
             const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
+            console.log('MerchantOnboarding: Amount calculated:', amount);
             const desc = `Abonnement Acom SaaS - Plan ${plan} (${name})`;
             
             const link = await payDunyaService.createPaymentLink({
@@ -895,6 +897,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
               cancelUrl: window.location.origin + `/merchant?show_upgrade=true&target_plan=${plan}`
             });
 
+            console.log('MerchantOnboarding: Payment link created:', link);
             toast.loading('Redirection vers le paiement...');
             window.location.href = link;
             return;
