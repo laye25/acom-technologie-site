@@ -494,7 +494,7 @@ const MerchantSaaS = () => {
     }
   }, [merchant?.id, merchant?.plan, isCloudSyncEnabled]);
 
-  const getTabs = (type: string) => {
+  const getTabs = (type: string, plan: string) => {
     let tabs: any[] = [];
 
     switch (type) {
@@ -605,7 +605,7 @@ const MerchantSaaS = () => {
     return <MerchantOnboarding onComplete={(m) => setMerchant(m)} />;
   }
 
-  const tabs = getTabs(merchant.type || 'boutique');
+  const tabs = getTabs(merchant.type || 'boutique', merchant.plan || '');
 
   return (
     <div className="min-h-screen bg-gray-50 pt-24 pb-12">
