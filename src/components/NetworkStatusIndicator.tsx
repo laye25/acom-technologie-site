@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, Cloud, CloudOff, RefreshCw, HardDrive } from 'lucide-react';
 import { db } from '../db/db';
 
 interface NetworkStatusIndicatorProps {
   position?: 'bottom-right' | 'top-center' | 'inline';
+  plan?: string;
 }
 
-export const NetworkStatusIndicator = ({ position = 'bottom-right' }: NetworkStatusIndicatorProps) => {
+export const NetworkStatusIndicator = ({ position = 'bottom-right', plan }: NetworkStatusIndicatorProps) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
+
+  const isLocalPlan = plan === 'LOCAL';
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -42,9 +45,20 @@ export const NetworkStatusIndicator = ({ position = 'bottom-right' }: NetworkSta
   if (position === 'inline') {
     return (
       <div className="flex items-center gap-2">
-        <div className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${isOnline ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`} title={isOnline ? "Cloud Connecté" : "Cloud Déconnecté"}>
-          {isOnline ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
-          <span className="hidden md:inline">{isOnline ? 'Sync Cloud' : 'Mode Local'}</span>
+        <div 
+          className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+            isLocalPlan 
+              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+              : isOnline 
+                ? 'bg-blue-50 text-blue-600' 
+                : 'bg-rose-50 text-rose-600'
+          }`} 
+          title={isLocalPlan ? "Licence Locale" : isOnline ? "Cloud Connecté" : "Cloud Déconnecté"}
+        >
+          {isLocalPlan ? <HardDrive className="w-4 h-4" /> : isOnline ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
+          <span className="hidden md:inline">
+            {isLocalPlan ? 'Mode Local' : isOnline ? 'Sync Cloud' : 'Mode Local'}
+          </span>
         </div>
         
         {pendingCount > 0 && (

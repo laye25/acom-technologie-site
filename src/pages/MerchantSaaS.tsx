@@ -653,7 +653,7 @@ const MerchantSaaS = () => {
             </div>
             
             <div className="flex items-center gap-2">
-              <NetworkStatusIndicator position="inline" />
+              <NetworkStatusIndicator position="inline" plan={merchant.plan} />
               <button
                 onClick={() => setActiveTab('build')}
                 className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
@@ -3451,7 +3451,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               merchant.licenseType === 'local' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
             }`}>
               {merchant.licenseType === 'local' ? <HardDrive className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}
-              {merchant.licenseType === 'local' ? 'Mode Offline' : 'Sync Cloud'}
+              {merchant.licenseType === 'local' ? 'Mode Local' : 'Sync Cloud'}
             </div>
           </div>
 
