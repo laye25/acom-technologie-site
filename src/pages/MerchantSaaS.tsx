@@ -424,15 +424,28 @@ const MerchantSaaS = () => {
       try {
         setLoadingMerchant(true);
         setError(null);
+        
+        let localMerchant = await db.merchants.where('owner_id').equals(user.uid).first();
+        if (!localMerchant) {
+          localMerchant = await db.merchants.where('ownerId').equals(user.uid).first();
+        }
+
         // Fetch from Supabase via dbService
         const m = await dbService.merchants.getByOwner(user.uid);
         
+        const finalMerchant = m || localMerchant;
+        
+        if (m && m.id) {
+            // Update local cache
+            await db.merchants.put({ ...m, id: m.id });
+        }
+        
         // Check for quota
         const quotaExceeded = localStorage.getItem('firebase_quota_exceeded');
-        if (quotaExceeded && !m) {
+        if (quotaExceeded && !finalMerchant) {
           setError("Quota Firestore épuisé. Impossible de charger votre profil marchand.");
         } else {
-          setMerchant(m);
+          setMerchant(finalMerchant || null);
         }
       } catch (error: any) {
         console.error('Error fetching merchant:', error);
@@ -1303,6 +1316,8 @@ const MerchantDashboard = ({
   showUpgradeModal: boolean,
   setShowUpgradeModal: (val: boolean) => void
 }) => {
+  const [desktopOS, setDesktopOS] = useState<'windows' | 'mac' | 'linux'>('windows');
+
   // Read from Dexie (Offline-first)
   const products = useLiveQuery(() => 
     db.products.where('merchantId').equals(merchant.id).toArray()
@@ -1512,10 +1527,12 @@ const MerchantDashboard = ({
       exit={{ opacity: 0, x: -20 }}
       className="space-y-8"
     >
-      <DailyBriefing 
-        merchantId={merchant.id} 
-        data={{ sales, products, expenses }} 
-      />
+      {merchant.plan !== 'LOCAL' && (
+        <DailyBriefing 
+          merchantId={merchant.id} 
+          data={{ sales, products, expenses }} 
+        />
+      )}
 
       {/* Sync Control Bar - Phase 2 */}
       {merchant.id && (
@@ -1746,61 +1763,78 @@ const MerchantDashboard = ({
             <div className="lg:col-span-1 flex flex-col justify-between bg-gray-800/30 rounded-[1.5rem] border border-gray-700/50 overflow-hidden relative group">
               <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors duration-500 pointer-events-none"></div>
               
-              {/* Desktop Shortcut Simulation */}
-              <div className="relative h-[220px] bg-[url('https://images.unsplash.com/photo-1617042375876-a13e36732a30?q=80&w=600&auto=format&fit=crop')] bg-cover bg-center border-b border-gray-700/50 flex flex-col items-start justify-start">
-                <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"></div>
-                
-                {/* Desktop Icon */}
-                <div className="relative z-10 m-6 flex flex-col items-center gap-1.5 p-2 rounded hover:bg-white/20 transition-colors cursor-pointer group/icon w-[75px]">
-                  <div className="w-[54px] h-[54px] flex items-center justify-center rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.5)] relative overflow-hidden bg-white">
-                    <img src={siteSettings?.desktopLogo || "/desktop-logo.svg"} className="w-full h-full object-cover" alt="Acom Desktop Logo" />
-                    {/* Shortcut Arrow overlay */}
-                    <div className="absolute bottom-0 left-0 w-3.5 h-3.5 bg-white rounded-tr border-t border-r border-black/10 flex items-center justify-center z-20">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="4" className="w-[8px] h-[8px]">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 5v7h-7" />
-                      </svg>
-                    </div>
-                  </div>
-                  <span className="text-white text-[10px] font-bold drop-shadow-lg text-center leading-[1.1] [text-shadow:_0_1px_4px_rgb(0_0_0)] relative z-10">
-                    Acom Gestion<br/>Desktop
-                  </span>
+              <div className="relative p-8 flex flex-col items-center justify-center border-b border-gray-700/50 bg-black/20">
+                <div className="w-[72px] h-[72px] flex items-center justify-center rounded-[16px] shadow-lg overflow-hidden bg-white mb-4">
+                  <img src={siteSettings?.desktopLogo || "/desktop-logo.svg"} className="w-full h-full object-cover" alt="Acom Desktop Logo" />
                 </div>
-                
-                {/* Windows Taskbar mock */}
-                <div className="absolute bottom-0 left-0 right-0 h-10 bg-black/60 backdrop-blur-md border-t border-white/10 flex items-center px-4 gap-4 z-10">
-                  <div className="w-5 h-5 text-cyan-400 flex items-center justify-center opacity-90">
-                    <svg viewBox="0 0 88 88" fill="currentColor"><path d="M0,12.4L37.6,7.1v33H0V12.4z M42.4,6.4L88,0v39.3H42.4V6.4z M0,44.9h37.6v33.4L0,73.1V44.9z M42.4,44.9H88V88L42.4,81.4V44.9z"/></svg>
-                  </div>
-                  <div className="w-6 h-6 bg-white/20 rounded-sm"></div>
-                  <div className="w-6 h-6 bg-white/10 rounded-sm"></div>
-                  <div className="w-1 h-1 bg-white/60 rounded-full absolute bottom-1.5 left-[3.1rem]"></div>
-                </div>
+                <h4 className="text-white font-black tracking-tight text-center text-sm">
+                  Acom Gestion<br/>Desktop
+                </h4>
               </div>
 
-              <div className="relative p-6 pt-5 text-center z-10 flex-1 flex flex-col justify-end">
-                <h4 className="text-[17px] font-black text-white mb-2 tracking-tight">Télécharger l'Installateur</h4>
-                <p className="text-[11px] text-gray-400 mb-6 px-1 leading-relaxed">L'icône personnalisée sera automatiquement ajoutée à votre bureau Windows après l'installation.</p>
-                
-                <button 
-                  onClick={() => {
-                    if (siteSettings?.desktopDownloadUrl) {
-                      window.open(siteSettings.desktopDownloadUrl, '_blank');
-                      toast.success('Démarrage du téléchargement...');
-                    } else {
-                      toast.success('Simulation: Le téléchargement de Acom_Gestion_Setup_v1.2.0.exe commence !');
-                    }
-                  }}
-                  className="w-full relative group/btn overflow-hidden px-5 py-3.5 bg-emerald-500 text-black rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-95 flex items-center justify-center gap-2.5"
-                >
-                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>
-                  <Download className="w-4 h-4 relative z-10" />
-                  <span className="relative z-10 pt-0.5">Acom_Gestion_Setup.exe</span>
-                </button>
-                <div className="mt-4 flex justify-center items-center gap-2 text-[9px] uppercase font-mono text-gray-500 font-bold">
-                  <span className="bg-gray-800/80 px-2 py-1 rounded">v1.2.0</span>
-                  <span>•</span>
-                  <span className="bg-gray-800/80 px-2 py-1 rounded">Setup NSIS (12 MB)</span>
+              <div className="relative z-10 flex-1 flex flex-col bg-transparent">
+                {/* OS Toggle */}
+                <div className="flex border-b border-gray-700/50 bg-black/40">
+                  <button 
+                    onClick={() => setDesktopOS('windows')}
+                    className={`flex-1 py-3 flex items-center justify-center border-b-2 transition-colors ${desktopOS === 'windows' ? 'border-cyan-400 text-cyan-400 bg-gray-800/50' : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-gray-800/20'}`}
+                  >
+                    <svg viewBox="0 0 88 88" fill="currentColor" className="w-4 h-4"><path d="M0,12.4L37.6,7.1v33H0V12.4z M42.4,6.4L88,0v39.3H42.4V6.4z M0,44.9h37.6v33.4L0,73.1V44.9z M42.4,44.9H88V88L42.4,81.4V44.9z"/></svg>
+                  </button>
+                  <button 
+                    onClick={() => setDesktopOS('mac')}
+                    className={`flex-1 py-3 flex items-center justify-center border-b-2 transition-colors ${desktopOS === 'mac' ? 'border-white text-white bg-gray-800/50' : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-gray-800/20'}`}
+                  >
+                    <svg viewBox="0 0 384 512" fill="currentColor" className="w-4 h-4"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+                  </button>
+                  <button 
+                    onClick={() => setDesktopOS('linux')}
+                    className={`flex-1 py-3 flex items-center justify-center border-b-2 transition-colors ${desktopOS === 'linux' ? 'border-amber-400 text-amber-400 bg-gray-800/50' : 'border-transparent text-gray-500 hover:text-gray-300 hover:bg-gray-800/20'}`}
+                  >
+                   <Terminal className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="p-6 pt-6 text-center flex-1 flex flex-col justify-end">
+                  <h4 className="text-[17px] font-black text-white mb-2 tracking-tight">Télécharger l'Installateur</h4>
+                  <p className="text-[11px] text-gray-400 mb-6 px-1 leading-relaxed">
+                    {desktopOS === 'windows' ? "L'icône personnalisée sera automatiquement ajoutée à votre bureau Windows après l'installation." :
+                     desktopOS === 'mac' ? "Déplacez l'application dans le dossier Applications après l'ouverture de l'image disque." :
+                     "Le build Linux sera bientôt disponible pour les distributions basées sur Debian/Ubuntu."}
+                  </p>
+                  
+                  <button 
+                    onClick={() => {
+                      if (desktopOS === 'windows') {
+                        window.open("https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe", '_blank');
+                        toast.success('Démarrage du téléchargement Windows...');
+                      } else if (desktopOS === 'mac') {
+                        window.open("https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg", '_blank');
+                        toast.success('Démarrage du téléchargement MacOS...');
+                      } else {
+                        toast.error('Version Linux non disponible pour le moment.');
+                      }
+                    }}
+                    className={`w-full relative group/btn overflow-hidden px-5 py-3.5 ${desktopOS === 'linux' ? 'bg-gray-600 text-gray-300 cursor-not-allowed' : 'bg-emerald-500 text-black hover:bg-emerald-400 hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.3)]'} rounded-xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-2.5`}
+                    disabled={desktopOS === 'linux'}
+                  >
+                    {desktopOS !== 'linux' && <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>}
+                    <Download className="w-4 h-4 relative z-10" />
+                    <span className="relative z-10 pt-0.5">
+                      {desktopOS === 'windows' ? 'ACOM_GESTION_SETUP.EXE' :
+                       desktopOS === 'mac' ? 'ACOM_GESTION_MAC.DMG' :
+                       'ACOM_GESTION_LINUX'}
+                    </span>
+                  </button>
+                  <div className="mt-4 flex justify-center items-center gap-2 text-[9px] uppercase font-mono text-gray-500 font-bold">
+                    <span className="bg-gray-800/80 px-2 py-1 rounded">V1.0.0</span>
+                    <span>•</span>
+                    <span className="bg-gray-800/80 px-2 py-1 rounded">
+                      {desktopOS === 'windows' ? 'SETUP NSIS (12 MB)' :
+                       desktopOS === 'mac' ? 'IMAGE DISQUE (15 MB)' :
+                       'NON DISPONIBLE'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1844,7 +1878,9 @@ const MerchantDashboard = ({
           onUpdate={onUpdate}
         />
       )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {merchant.plan !== 'LOCAL' && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {merchant.type === 'boutique' || !merchant.type ? (
           <>
             <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description="Ce mois-ci" />
@@ -2471,6 +2507,8 @@ const MerchantDashboard = ({
           )}
         </div>
       </div>
+      </>
+      )}
     </motion.div>
   );
 };
@@ -3781,7 +3819,7 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
               </a>
 
               <a
-                href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.1.0.0.dmg"
+                href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20"
@@ -3797,7 +3835,7 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
                 </p>
                 <p className="text-[10px] text-gray-500 font-mono break-all leading-tight">
                   <span className="font-bold text-gray-400 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
-                  b4a8e3f9d1c2b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+                  1656ba775088e613882e8b794b03d528b7e8f9a0b1c2d3e4f5a6b7c8d9e0
                 </p>
               </div>
             </div>

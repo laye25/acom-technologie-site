@@ -27,6 +27,15 @@ const Navbar = () => {
     const checkMerchant = async () => {
       if (user) {
         try {
+          const { db } = await import('../db/db');
+          let localMerchant = await db.merchants.where('owner_id').equals(user.uid).first();
+          if (!localMerchant) {
+            localMerchant = await db.merchants.where('ownerId').equals(user.uid).first();
+          }
+          if (localMerchant) {
+            setHasMerchantAccount(true);
+            return;
+          }
           const merchant = await dbService.merchants.getByOwner(user.uid);
           setHasMerchantAccount(!!merchant);
         } catch (error) {

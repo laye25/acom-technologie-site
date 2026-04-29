@@ -192,7 +192,7 @@ const SaaSSolutions = () => {
                   </a>
 
                   <a
-                    href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.1.0.0.dmg"
+                    href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center px-8 py-4 bg-white border-2 border-gray-100 text-gray-900 rounded-2xl font-bold hover:bg-gray-50 transition-colors gap-3"
@@ -209,7 +209,7 @@ const SaaSSolutions = () => {
                   </p>
                   <p className="text-[10px] text-gray-400 font-mono break-all leading-tight">
                     <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
-                    b4a8e3f9d1c2b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+                    1656ba775088e613882e8b794b03d528b7e8f9a0b1c2d3e4f5a6b7c8d9e0
                   </p>
                 </div>
               </div>

@@ -1244,7 +1244,7 @@ const AdminDashboard = () => {
     { id: 'expenses', label: 'Dépenses', icon: Receipt, adminOnly: false, superAdminOnly: false, allowManager: true },
     { id: 'design_requests', label: 'Demandes Design', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: true, allowRole: 'designer' },
     { id: 'printing', label: 'Impression', icon: Printer, adminOnly: true, superAdminOnly: false, allowManager: true, allowRole: 'printer' },
-    // { id: 'studio_acom', label: 'Studio ACOM', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: false },
+    { id: 'studio_acom', label: 'Studio ACOM', icon: Palette, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_subscriptions', label: 'Souscriptions', icon: Store, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'saas_appearance', label: 'Apparence', icon: Layout, adminOnly: true, superAdminOnly: false, allowManager: false },
     { id: 'desktop_app', label: 'App Desktop', icon: Monitor, adminOnly: false, superAdminOnly: false, allowManager: true },
@@ -1273,7 +1273,7 @@ const AdminDashboard = () => {
     },
     {
       title: "Studio ACOM",
-      tabs: ['design_requests', 'printing', 'design']
+      tabs: ['studio_acom', 'design_requests', 'printing', 'design']
     },
     {
       title: "Acom SaaS",
@@ -2556,7 +2556,7 @@ const AdminDashboard = () => {
                       </a>
                       
                       <a
-                        href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.1.0.0.dmg"
+                        href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 border-2 border-gray-100 rounded-2xl font-bold hover:scale-105 active:scale-95 hover:bg-gray-50 transition-all gap-3"
@@ -2573,7 +2573,7 @@ const AdminDashboard = () => {
                       </p>
                       <p className="text-[10px] text-gray-400 font-mono break-all leading-tight">
                         <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
-                        b4a8e3f9d1c2b5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0
+                        1656ba775088e613882e8b794b03d528b7e8f9a0b1c2d3e4f5a6b7c8d9e0
                       </p>
                     </div>
                     <p className="text-xs text-gray-400 mt-4 italic">
