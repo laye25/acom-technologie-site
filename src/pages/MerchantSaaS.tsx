@@ -813,6 +813,13 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
   const [plan, setPlan] = useState<MerchantPlan>('FREE');
   const [loading, setLoading] = useState(false);
 
+  const [showStripe, setShowStripe] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [createdMerchant, setCreatedMerchant] = useState<Merchant | null>(null);
+  
+  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+  const stripePromise = useMemo(() => stripeKey ? loadStripe(stripeKey) : null, [stripeKey]);
+
   const managementTypes = [
     { id: 'boutique', label: 'Commerce / Stock', icon: Package, color: 'text-blue-500', bgColor: 'bg-blue-50' },
     { id: 'entreprise', label: 'Services / Interventions', icon: Wrench, color: 'text-purple-500', bgColor: 'bg-purple-50' },
@@ -857,7 +864,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     try {
       // Final check to see if a merchant was created while the user was on this page
       const existing = await dbService.merchants.getByOwner(user.uid);
-      if (existing) {
+      if (existing && !createdMerchant) {
         onComplete(existing);
         return;
       }
@@ -878,39 +885,46 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
       };
 
       const id = await dbService.merchants.save(merchantData as any);
-      const createdMerchant = { ...merchantData, id } as Merchant;
+      const newMerchant = { ...merchantData, id } as Merchant;
+      setCreatedMerchant(newMerchant);
 
       if (isPaidPlan) {
         const selectedPlan = plans.find(p => p.id === plan);
-        console.log('MerchantOnboarding: Initiating payment for plan:', selectedPlan);
         if (selectedPlan) {
           try {
             const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
-            console.log('MerchantOnboarding: Amount calculated:', amount);
-            const desc = `Abonnement Acom SaaS - Plan ${plan} (${name})`;
             
-            const link = await payDunyaService.createPaymentLink({
-              amount,
-              description: desc,
-              orderId: `SUBSCRIPTION_${id}_${plan}_${Date.now()}`,
-              returnUrl: window.location.origin + `/merchant?payment_success=true&new_plan=${plan}&merchant_id=${id}`,
-              cancelUrl: window.location.origin + `/merchant?show_upgrade=true&target_plan=${plan}`
+            if (!stripeKey) {
+                throw new Error("La clé publique Stripe n'est pas configurée.");
+            }
+
+            const response = await fetch('/api/create-payment-intent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount,
+                orderId: `SUBSCRIPTION_${id}_${plan}_${Date.now()}`,
+                currency: 'xof'
+              }),
             });
 
-            console.log('MerchantOnboarding: Payment link created:', link);
-            toast.loading('Redirection vers le paiement...');
-            window.location.href = link;
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            setClientSecret(data.clientSecret);
+            setShowStripe(true);
+            setLoading(false);
             return;
-          } catch (payError) {
+          } catch (payError: any) {
             console.error('Payment initialization error:', payError);
-            toast.error("Erreur lors de l'initialisation du paiement. Veuillez réessayer ou choisir le plan TESTE.");
+            toast.error(payError.message || "Erreur lors de l'initialisation du paiement.");
             setLoading(false);
             return; // STOP HERE, DO NOT CONTINUE
           }
         }
       }
 
-      onComplete(createdMerchant);
+      onComplete(newMerchant);
       toast.success(`Votre ${label} a été créée !`);
     } catch (error: any) {
       console.error('Erreur lors de la création du marchand:', error);
@@ -925,6 +939,69 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
       setLoading(false);
     }
   };
+
+  const handleStripeSuccess = async () => {
+    if (!createdMerchant) return;
+    try {
+      const updatedMerchant = { 
+        ...createdMerchant, 
+        subscriptionStatus: 'active' as const,
+        updatedAt: new Date() 
+      };
+      await dbService.merchants.save(updatedMerchant);
+      onComplete(updatedMerchant);
+      toast.success(`Inscription et paiement validés avec succès !`);
+      setShowStripe(false);
+    } catch (error) {
+      toast.error('Erreur lors de la validation finale de votre accès.');
+    }
+  };
+
+  if (showStripe && clientSecret && stripePromise && createdMerchant) {
+    return (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+        >
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                <LockIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-gray-900">CARTE PREPAYE</h2>
+                <p className="text-xs text-gray-500">Paiement sécurisé via Stripe</p>
+              </div>
+            </div>
+            <button onClick={() => {
+                setShowStripe(false);
+                toast.error("Paiement annulé. Vous devez payer pour accéder à votre espace.");
+                window.location.reload();
+            }} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <PaymentForm 
+              onSuccess={() => handleStripeSuccess()} 
+              onCancel={() => {
+                  setShowStripe(false);
+                  toast.error("Paiement annulé. Vous pouvez réessayer depuis l'accueil.");
+                  window.location.reload();
+              }}
+              amount={parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10)} 
+              totalAmount={parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10)}
+              orderId={`SUBSCRIPTION_${createdMerchant.id}_${plan}`}
+              paymentType="full"
+              returnUrl={`${window.location.origin}/merchant?subscription_success=true`}
+            />
+          </Elements>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6 pt-24 pb-24">
