@@ -606,7 +606,7 @@ const MerchantSaaS = () => {
   }
 
   if (merchant.plan !== 'FREE' && merchant.subscriptionStatus !== 'active') {
-    return <PaymentPendingView merchant={merchant} />;
+    return <PaymentPendingView merchant={merchant} onPaymentSuccess={() => window.location.reload()} />;
   }
 
   const tabs = getTabs(merchant.type || 'boutique', merchant.plan || '');
@@ -756,33 +756,114 @@ const PAYMENT_PLANS = [
 ];
 
 // --- Payment Pending View ---
-const PaymentPendingView = ({ merchant }: { merchant: Merchant }) => {
+const PaymentPendingView = ({ merchant, onPaymentSuccess }: { merchant: Merchant, onPaymentSuccess: () => void }) => {
   const [loading, setLoading] = useState(false);
+  const [showMockPayment, setShowMockPayment] = useState(false);
 
   const handleRetryPayment = async () => {
     setLoading(true);
-    try {
-      const selectedPlan = PAYMENT_PLANS.find(p => p.id === merchant.plan);
-      if (!selectedPlan) return;
-      
-      const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
-      const desc = `Abonnement Acom SaaS - Plan ${merchant.plan} (${merchant.name})`;
-      
-      const link = await payDunyaService.createPaymentLink({
-        amount,
-        description: desc,
-        orderId: `SUBSCRIPTION_${merchant.id}_${merchant.plan}_${Date.now()}`,
-        returnUrl: window.location.origin + `/merchant?payment_success=true&new_plan=${merchant.plan}&merchant_id=${merchant.id}`,
-        cancelUrl: window.location.origin + `/merchant?show_upgrade=true&target_plan=${merchant.plan}`
-      });
-
-      window.location.href = link;
-    } catch (payError) {
-      console.error('Payment initialization error:', payError);
-      toast.error("Erreur lors de l'initialisation du paiement. Veuillez réessayer.");
-      setLoading(false);
-    }
+    // Simulate delay
+    setTimeout(() => {
+       setShowMockPayment(true);
+       setLoading(false);
+    }, 500);
   };
+
+  const selectedPlan = PAYMENT_PLANS.find(p => p.id === merchant.plan);
+  const amountStr = selectedPlan?.price.replace(/\D/g, '') || '0';
+  const amountNum = parseInt(amountStr, 10);
+
+  if (showMockPayment) {
+    return (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+        >
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-gray-900">CARTE BANCAIRE</h2>
+                <p className="text-xs text-gray-500">Paiement Sécurisé (Mode Démo)</p>
+              </div>
+            </div>
+            <button onClick={() => setShowMockPayment(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+          
+          <div className="space-y-6">
+             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-black text-indigo-600 uppercase tracking-tight">Montant à régler</span>
+                  <span className="text-2xl font-black text-indigo-600">{amountNum.toLocaleString('fr-FR')} FCFA</span>
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Numéro de carte</label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input type="text" placeholder="0000 0000 0000 0000" className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono placeholder:text-gray-300" />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Expiration</label>
+                    <input type="text" placeholder="MM/AA" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono placeholder:text-gray-300" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">CVC</label>
+                    <input type="text" placeholder="123" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono placeholder:text-gray-300" />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Nom sur la carte</label>
+                  <input type="text" placeholder="Nom du titulaire" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" />
+                </div>
+             </div>
+
+             <div className="flex gap-3 pt-6 border-t border-gray-100">
+                <button
+                  onClick={() => setShowMockPayment(false)}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      toast.loading("Validation en cours...", { id: 'payment' });
+                      const updatedMerchant = { 
+                        ...merchant, 
+                        subscriptionStatus: 'active' as const,
+                        updatedAt: new Date() 
+                      };
+                      await dbService.merchants.save(updatedMerchant);
+                      toast.success("Paiement simulé avec succès !", { id: 'payment' });
+                      setShowMockPayment(false);
+                      onPaymentSuccess();
+                    } catch (err) {
+                      toast.error("Erreur de sauvegarde", { id: 'payment' });
+                    }
+                  }}
+                  className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center shadow-lg shadow-indigo-600/20"
+                >
+                  Payer {amountNum.toLocaleString('fr-FR')} FCFA
+                </button>
+             </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
@@ -814,11 +895,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
   const [loading, setLoading] = useState(false);
 
   const [showStripe, setShowStripe] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [createdMerchant, setCreatedMerchant] = useState<Merchant | null>(null);
-  
-  const stripeKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-  const stripePromise = useMemo(() => stripeKey ? loadStripe(stripeKey) : null, [stripeKey]);
 
   const managementTypes = [
     { id: 'boutique', label: 'Commerce / Stock', icon: Package, color: 'text-blue-500', bgColor: 'bg-blue-50' },
@@ -892,26 +969,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         const selectedPlan = plans.find(p => p.id === plan);
         if (selectedPlan) {
           try {
-            const amount = parseInt(selectedPlan.price.replace(/\D/g, ''), 10);
-            
-            if (!stripeKey) {
-                throw new Error("La clé publique Stripe n'est pas configurée.");
-            }
-
-            const response = await fetch('/api/create-payment-intent', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                amount,
-                orderId: `SUBSCRIPTION_${id}_${plan}_${Date.now()}`,
-                currency: 'xof'
-              }),
-            });
-
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-
-            setClientSecret(data.clientSecret);
+            // Mode Démo: On affiche directement la modale de paiement sans faire d'appel API
             setShowStripe(true);
             setLoading(false);
             return;
@@ -957,7 +1015,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     }
   };
 
-  if (showStripe && clientSecret && stripePromise && createdMerchant) {
+  if (showStripe && createdMerchant) {
     return (
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
         <motion.div 
@@ -968,11 +1026,11 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                <LockIcon className="w-5 h-5" />
+                <CreditCard className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-gray-900">CARTE PREPAYE</h2>
-                <p className="text-xs text-gray-500">Paiement sécurisé via Stripe</p>
+                <h2 className="text-xl font-black text-gray-900">CARTE BANCAIRE</h2>
+                <p className="text-xs text-gray-500">Paiement Sécurisé (Mode Démo)</p>
               </div>
             </div>
             <button onClick={() => {
@@ -983,21 +1041,65 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
               <X className="w-5 h-5 text-gray-400" />
             </button>
           </div>
-          <Elements stripe={stripePromise} options={{ clientSecret }}>
-            <PaymentForm 
-              onSuccess={() => handleStripeSuccess()} 
-              onCancel={() => {
-                  setShowStripe(false);
-                  toast.error("Paiement annulé. Vous pouvez réessayer depuis l'accueil.");
-                  window.location.reload();
-              }}
-              amount={parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10)} 
-              totalAmount={parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10)}
-              orderId={`SUBSCRIPTION_${createdMerchant.id}_${plan}`}
-              paymentType="full"
-              returnUrl={`${window.location.origin}/merchant?subscription_success=true`}
-            />
-          </Elements>
+          
+          <div className="space-y-6">
+             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-black text-indigo-600 uppercase tracking-tight">Montant à régler</span>
+                  <span className="text-2xl font-black text-indigo-600">{parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Numéro de carte</label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input type="text" placeholder="0000 0000 0000 0000" className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono placeholder:text-gray-300" />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Expiration</label>
+                    <input type="text" placeholder="MM/AA" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono placeholder:text-gray-300" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">CVC</label>
+                    <input type="text" placeholder="123" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono placeholder:text-gray-300" />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Nom sur la carte</label>
+                  <input type="text" placeholder="Nom du titulaire" className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all" />
+                </div>
+             </div>
+
+             <div className="flex gap-3 pt-6 border-t border-gray-100">
+                <button
+                  onClick={() => {
+                     setShowStripe(false);
+                     toast.error("Paiement annulé. Vous pouvez réessayer depuis l'accueil.");
+                     window.location.reload();
+                  }}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => {
+                    const amountStr = plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0';
+                    const amountNum = parseInt(amountStr, 10);
+                    toast.success("Paiement simulé avec succès !");
+                    handleStripeSuccess();
+                  }}
+                  className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center shadow-lg shadow-indigo-600/20"
+                >
+                  Payer {(parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10)).toLocaleString('fr-FR')} FCFA
+                </button>
+             </div>
+          </div>
         </motion.div>
       </div>
     );
