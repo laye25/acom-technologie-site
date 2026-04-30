@@ -224,12 +224,8 @@ service cloud.firestore {
     // Merchant SaaS Collections
     match /merchants/{merchantId} {
       allow read: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
-      allow create: if isAuthenticated() && (request.resource.data.owner_id == request.auth.uid || request.resource.data.ownerId == request.auth.uid || isAdmin());
-      // Prevent users from modifying their own billing status
-      allow update: if isAuthenticated() && (
-        ( (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['billing'])) || 
-        isAdmin()
-      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
       allow delete: if isAdmin();
     }
 

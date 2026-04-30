@@ -759,6 +759,7 @@ const PAYMENT_PLANS = [
 const PaymentPendingView = ({ merchant, onPaymentSuccess }: { merchant: Merchant, onPaymentSuccess: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [showMockPayment, setShowMockPayment] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleRetryPayment = async () => {
     setLoading(true);
@@ -838,7 +839,10 @@ const PaymentPendingView = ({ merchant, onPaymentSuccess }: { merchant: Merchant
                   Annuler
                 </button>
                 <button
+                  disabled={isProcessing}
                   onClick={async () => {
+                    if (isProcessing) return;
+                    setIsProcessing(true);
                     try {
                       toast.loading("Validation en cours...", { id: 'payment' });
                       const updatedMerchant = { 
@@ -852,11 +856,12 @@ const PaymentPendingView = ({ merchant, onPaymentSuccess }: { merchant: Merchant
                       onPaymentSuccess();
                     } catch (err) {
                       toast.error("Erreur de sauvegarde", { id: 'payment' });
+                      setIsProcessing(false);
                     }
                   }}
-                  className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center shadow-lg shadow-indigo-600/20"
+                  className={`flex-1 ${isProcessing ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20'} text-white px-4 py-3 rounded-xl font-bold transition-colors flex items-center justify-center`}
                 >
-                  Payer {amountNum.toLocaleString('fr-FR')} FCFA
+                  {isProcessing ? 'Traitement...' : `Payer ${amountNum.toLocaleString('fr-FR')} FCFA`}
                 </button>
              </div>
           </div>
@@ -1088,15 +1093,21 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
                   Annuler
                 </button>
                 <button
-                  onClick={() => {
-                    const amountStr = plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0';
-                    const amountNum = parseInt(amountStr, 10);
-                    toast.success("Paiement simulé avec succès !");
-                    handleStripeSuccess();
+                  disabled={isProcessing}
+                  onClick={async () => {
+                    if (isProcessing) return;
+                    setIsProcessing(true);
+                    try {
+                      toast.loading("Validation en cours...", { id: 'payment' });
+                      await handleStripeSuccess();
+                      toast.success("Paiement simulé avec succès !", { id: 'payment' });
+                    } catch (e) {
+                      setIsProcessing(false);
+                    }
                   }}
-                  className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center shadow-lg shadow-indigo-600/20"
+                  className={`flex-1 ${isProcessing ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20'} text-white px-4 py-3 rounded-xl font-bold transition-colors flex items-center justify-center`}
                 >
-                  Payer {(parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10)).toLocaleString('fr-FR')} FCFA
+                  {isProcessing ? 'Traitement...' : `Payer ${parseInt(plans.find(p => p.id === plan)?.price.replace(/\D/g, '') || '0', 10).toLocaleString('fr-FR')} FCFA`}
                 </button>
              </div>
           </div>
