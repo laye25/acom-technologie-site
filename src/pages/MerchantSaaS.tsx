@@ -684,8 +684,7 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          {(merchant.plan !== 'LOCAL' || isDesktop) && (
-            <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-black/5 shadow-sm items-center gap-2">
+          <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-black/5 shadow-sm items-center gap-2">
               {tabs.map(tab => (
                 <TabButton 
                   key={tab.id}
@@ -696,7 +695,6 @@ const MerchantSaaS = () => {
                 />
               ))}
             </div>
-          )}
         </div>
 
         {/* Content */}
@@ -1854,12 +1852,10 @@ const MerchantDashboard = ({
       exit={{ opacity: 0, x: -20 }}
       className="space-y-8"
     >
-      {(merchant.plan !== 'LOCAL' || isDesktop) && (
-        <DailyBriefing 
-          merchantId={merchant.id} 
-          data={{ sales, products, expenses }} 
-        />
-      )}
+      <DailyBriefing 
+        merchantId={merchant.id} 
+        data={{ sales, products, expenses }} 
+      />
 
       {/* Sync Control Bar - Phase 2 */}
       {merchant.id && (
@@ -2205,9 +2201,8 @@ const MerchantDashboard = ({
           onUpdate={onUpdate}
         />
       )}
-      {(merchant.plan !== 'LOCAL' || isDesktop) && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
 
         {merchant.type === 'boutique' || !merchant.type ? (
           <>
@@ -2836,7 +2831,6 @@ const MerchantDashboard = ({
         </div>
       </div>
       </>
-      )}
     </motion.div>
   );
 };

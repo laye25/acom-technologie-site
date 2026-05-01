@@ -357,23 +357,29 @@ export const dbService = {
         ...merchant,
         updatedAt: new Date()
       };
-      let id = merchant.id;
+      let id = merchant.id || uuidv4();
       
       // Attempt cloud save if not forcing local
       if (merchant.licenseType !== 'local') {
         try {
           if (merchant.id) {
             await merchantRepository.update(merchant.id, data);
+            id = merchant.id;
           } else {
             id = await merchantRepository.create(data as any);
           }
         } catch (error) {
           console.warn('Merchant cloud save failed, keeping local');
+          id = merchant.id || `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        }
+      } else {
+        if (!merchant.id) {
+            id = `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         }
       }
       
-      if (id || merchant.id) {
-        const finalId = id || merchant.id;
+      if (id) {
+        const finalId = id;
         await db.merchants.put({ ...data, id: finalId, updatedAt: new Date() } as any);
         
         if (!merchant.id) {
