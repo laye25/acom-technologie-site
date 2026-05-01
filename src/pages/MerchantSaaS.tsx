@@ -682,7 +682,7 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          {(merchant.plan !== 'LOCAL' || merchant.licenseType === 'cloud') && (
+          {merchant.plan !== 'LOCAL' && (
             <div className="flex flex-wrap bg-white p-1.5 rounded-2xl border border-black/5 shadow-sm items-center gap-2">
               {tabs.map(tab => (
                 <TabButton 
@@ -970,7 +970,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         subscriptionStatus: isPaidPlan ? 'pending' : 'active', // Pending if paid
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        licenseType: 'cloud' as 'cloud' | 'local'
+        licenseType: plan === 'LOCAL' ? 'local' : 'cloud'
       };
       console.log('MerchantOnboarding: Saving merchant', merchantData);
       const id = await dbService.merchants.save(merchantData as any);
@@ -1852,7 +1852,7 @@ const MerchantDashboard = ({
       exit={{ opacity: 0, x: -20 }}
       className="space-y-8"
     >
-      {(merchant.plan !== 'LOCAL' || merchant.licenseType === 'cloud') && (
+      {merchant.plan !== 'LOCAL' && (
         <DailyBriefing 
           merchantId={merchant.id} 
           data={{ sales, products, expenses }} 
@@ -2203,9 +2203,10 @@ const MerchantDashboard = ({
           onUpdate={onUpdate}
         />
       )}
-      {(merchant.plan !== 'LOCAL' || merchant.licenseType === 'cloud') && (
+      {merchant.plan !== 'LOCAL' && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
         {merchant.type === 'boutique' || !merchant.type ? (
           <>
             <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description="Ce mois-ci" />
