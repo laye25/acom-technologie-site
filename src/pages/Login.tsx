@@ -13,17 +13,19 @@ const Login = () => {
 
   const from = location.state?.from?.pathname + (location.state?.from?.search || '') || '/dashboard';
 
+  const isDesktop = ('__TAURI__' in window) || (window && window.process && window.process.type) || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:';
+  
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
       if (isSaaSDomain && from === '/dashboard') {
         navigate('/');
       } else {
         navigate(from);
       }
     }
-  }, [user, navigate, from]);
+  }, [user, navigate, from, isDesktop]);
 
   const [isResetting, setIsResetting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -70,7 +72,7 @@ const Login = () => {
       }
 
       await signInWithGoogle();
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       navigate(targetUrl);
     } catch (error: any) {
@@ -120,7 +122,7 @@ const Login = () => {
     setSuccess(null);
 
     try {
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas');
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       
       if (isLogin) {

@@ -43,8 +43,8 @@ import { CommandPalette } from './components/CommandPalette';
 import { Toaster } from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 
-const isElectron = window && window.process && window.process.type || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:';
-const Router = isElectron ? HashRouter : BrowserRouter;
+const isDesktop = ('__TAURI__' in window) || (window && window.process && window.process.type) || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:';
+const Router = isDesktop ? HashRouter : BrowserRouter;
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, profile, loading, isAdmin, isManager } = useAuth();
@@ -62,7 +62,7 @@ function AppContent() {
   const isEditor = location.pathname === '/design-editor';
   
   // Détection du sous-domaine SaaS (ou simulation via ?mode=saas)
-  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || typeof window !== 'undefined' && isElectron;
+  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || (typeof window !== 'undefined' && isDesktop);
 
   // Pour le SaaS, on cache le header et le footer pour faire plus "Application"
   const hideNavbar = isEditor || isSaaSDomain;

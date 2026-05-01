@@ -43,6 +43,8 @@ import { Elements } from '@stripe/react-stripe-js';
 import { PaymentForm } from '../components/PaymentForm';
 import { LogOut } from 'lucide-react';
 
+const isDesktop = (typeof window !== 'undefined' && ('__TAURI__' in window)) || (typeof window !== 'undefined' && window.process && window.process.type) || (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron')) || (typeof window !== 'undefined' && window.location.protocol === 'file:');
+
 const generateReceiptPDF = (merchant: Merchant, sale: any) => {
   const doc = new jsPDF({
     unit: 'mm',
@@ -1968,7 +1970,7 @@ const MerchantDashboard = ({
       )}
 
       {/* Download Center & Build Dashboard for LOCAL Plan */}
-      {merchant.plan === 'LOCAL' && !('__TAURI__' in window) && (
+      {merchant.plan === 'LOCAL' && !isDesktop && (
         <div className="bg-gradient-to-br from-gray-900 to-black rounded-[2rem] border border-gray-800 shadow-2xl overflow-hidden relative mt-8">
           <div className="p-8 relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Architecture / OS Features Col */}
