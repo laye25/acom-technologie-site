@@ -2131,10 +2131,10 @@ const MerchantDashboard = ({
                   <button 
                     onClick={() => {
                       if (desktopOS === 'windows') {
-                        window.open("https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe", '_blank');
+                        window.open("https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe", '_blank');
                         toast.success('Démarrage du téléchargement Windows...');
                       } else if (desktopOS === 'mac') {
-                        window.open("https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg", '_blank');
+                        window.open("https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg", '_blank');
                         toast.success('Démarrage du téléchargement MacOS...');
                       } else {
                         toast.error('Version Linux non disponible pour le moment.');
@@ -4135,7 +4135,7 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
 
             <div className="w-full max-w-sm space-y-4">
               <a
-                href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
+                href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20"
@@ -4145,7 +4145,7 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
               </a>
 
               <a
-                href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
+                href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20"

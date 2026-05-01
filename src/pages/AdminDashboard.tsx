@@ -2546,7 +2546,7 @@ const AdminDashboard = () => {
 
                     <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
                       <a
-                        href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
+                        href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all gap-3"
@@ -2556,7 +2556,7 @@ const AdminDashboard = () => {
                       </a>
                       
                       <a
-                        href="https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
+                        href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 border-2 border-gray-100 rounded-2xl font-bold hover:scale-105 active:scale-95 hover:bg-gray-50 transition-all gap-3"
