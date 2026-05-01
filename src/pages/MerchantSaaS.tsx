@@ -571,6 +571,10 @@ const MerchantSaaS = () => {
     return tabs;
   };
 
+  useEffect(() => {
+    console.log('MerchantSaaS: Render - merchant:', merchant, 'activeTab:', activeTab);
+  }, [merchant, activeTab]);
+
   if (loadingMerchant) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -898,6 +902,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
   const [type, setType] = useState(urlType);
   const [plan, setPlan] = useState<MerchantPlan>('FREE');
   const [loading, setLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const [showStripe, setShowStripe] = useState(false);
   const [createdMerchant, setCreatedMerchant] = useState<Merchant | null>(null);
@@ -937,6 +942,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('MerchantOnboarding: handleSubmit called');
     if (!user) return;
     if (!name.trim()) {
       toast.error('Veuillez entrer le nom de votre organisation');
@@ -947,6 +953,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
       // Final check to see if a merchant was created while the user was on this page
       const existing = await dbService.merchants.getByOwner(user.uid);
       if (existing && !createdMerchant) {
+        console.log('MerchantOnboarding: Found existing merchant');
         onComplete(existing);
         return;
       }
@@ -965,10 +972,11 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         updatedAt: new Date().toISOString(),
         licenseType: 'cloud' as 'cloud' | 'local'
       };
-
+      console.log('MerchantOnboarding: Saving merchant', merchantData);
       const id = await dbService.merchants.save(merchantData as any);
       const newMerchant = { ...merchantData, id } as Merchant;
       setCreatedMerchant(newMerchant);
+      console.log('MerchantOnboarding: Merchant saved with ID', id);
 
       if (isPaidPlan) {
         const selectedPlan = plans.find(p => p.id === plan);
@@ -977,6 +985,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
             // Mode Démo: On affiche directement la modale de paiement sans faire d'appel API
             setShowStripe(true);
             setLoading(false);
+            console.log('MerchantOnboarding: Stripe modal shown');
             return;
           } catch (payError: any) {
             console.error('Payment initialization error:', payError);
@@ -987,6 +996,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         }
       }
 
+      console.log('MerchantOnboarding: Creating successful, calling onComplete', newMerchant);
       onComplete(newMerchant);
       toast.success(`Votre ${label} a été créée !`);
     } catch (error: any) {
@@ -1004,18 +1014,25 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
   };
 
   const handleStripeSuccess = async () => {
-    if (!createdMerchant) return;
+    console.log('MerchantOnboarding: handleStripeSuccess called');
+    if (!createdMerchant) {
+      console.error('MerchantOnboarding: No createdMerchant');
+      return;
+    }
     try {
       const updatedMerchant = { 
         ...createdMerchant, 
         subscriptionStatus: 'active' as const,
         updatedAt: new Date() 
       };
+      console.log('MerchantOnboarding: Saving updated merchant', updatedMerchant);
       await dbService.merchants.save(updatedMerchant);
+      console.log('MerchantOnboarding: Updated merchant saved, calling onComplete', updatedMerchant);
       onComplete(updatedMerchant);
       toast.success(`Inscription et paiement validés avec succès !`);
       setShowStripe(false);
     } catch (error) {
+      console.error('MerchantOnboarding: Error saving updated merchant', error);
       toast.error('Erreur lors de la validation finale de votre accès.');
     }
   };
