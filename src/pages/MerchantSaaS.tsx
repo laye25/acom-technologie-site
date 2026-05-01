@@ -1968,7 +1968,7 @@ const MerchantDashboard = ({
       )}
 
       {/* Download Center & Build Dashboard for LOCAL Plan */}
-      {merchant.plan === 'LOCAL' && (
+      {merchant.plan === 'LOCAL' && !('__TAURI__' in window) && (
         <div className="bg-gradient-to-br from-gray-900 to-black rounded-[2rem] border border-gray-800 shadow-2xl overflow-hidden relative mt-8">
           <div className="p-8 relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Architecture / OS Features Col */}
