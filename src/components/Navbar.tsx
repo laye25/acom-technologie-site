@@ -30,7 +30,8 @@ const Navbar = () => {
           const { db } = await import('../db/db');
           let localMerchant = await db.merchants.where('owner_id').equals(user.uid).first();
           if (!localMerchant) {
-            localMerchant = await db.merchants.where('ownerId').equals(user.uid).first();
+            const allMerchants = await db.merchants.toArray();
+            localMerchant = allMerchants.find(m => m.ownerId === user.uid || m.owner_id === user.uid);
           }
           if (localMerchant) {
             setHasMerchantAccount(true);

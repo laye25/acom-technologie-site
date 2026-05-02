@@ -429,7 +429,8 @@ const MerchantSaaS = () => {
         
         let localMerchant = await db.merchants.where('owner_id').equals(user.uid).first();
         if (!localMerchant) {
-          localMerchant = await db.merchants.where('ownerId').equals(user.uid).first();
+          const allMerchants = await db.merchants.toArray();
+          localMerchant = allMerchants.find(m => m.ownerId === user.uid || m.owner_id === user.uid);
         }
 
         // Fetch from Supabase via dbService

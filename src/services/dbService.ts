@@ -355,6 +355,7 @@ export const dbService = {
     async save(merchant: Partial<Merchant>) {
       const data = {
         ...merchant,
+        owner_id: merchant.ownerId || merchant.owner_id,
         updatedAt: new Date()
       };
       let id = merchant.id || uuidv4();
