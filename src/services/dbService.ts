@@ -360,23 +360,17 @@ export const dbService = {
       };
       let id = merchant.id || uuidv4();
       
-      // Attempt cloud save if not forcing local
-      if (merchant.licenseType !== 'local') {
-        try {
-          if (merchant.id) {
-            await merchantRepository.update(merchant.id, data);
-            id = merchant.id;
-          } else {
-            id = await merchantRepository.create(data as any);
-          }
-        } catch (error) {
-          console.warn('Merchant cloud save failed, keeping local');
-          id = merchant.id || `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      // Always attempt cloud save for merchants to sync licenses
+      try {
+        if (merchant.id) {
+          await merchantRepository.update(merchant.id, data);
+          id = merchant.id;
+        } else {
+          id = await merchantRepository.create(data as any);
         }
-      } else {
-        if (!merchant.id) {
-            id = `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        }
+      } catch (error) {
+        console.warn('Merchant cloud save failed, keeping local');
+        id = merchant.id || `local_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
       }
       
       if (id) {

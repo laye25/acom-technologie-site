@@ -441,6 +441,9 @@ const MerchantSaaS = () => {
         if (m && m.id) {
             // Update local cache
             await db.merchants.put({ ...m, id: m.id });
+        } else if (localMerchant && localMerchant.id) {
+            // Rescue: it's local but not in cloud, push it to cloud now!
+            await dbService.merchants.save(localMerchant);
         }
         
         // Check for quota
