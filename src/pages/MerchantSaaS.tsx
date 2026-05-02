@@ -3471,40 +3471,84 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">URL de l'image</label>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Image (URL ou Fichier)</label>
                       <div className="flex gap-3">
-                        <input 
-                          type="text" 
-                          value={currentProduct?.image || ''} 
-                          onChange={e => setCurrentProduct({...currentProduct!, image: e.target.value})} 
-                          className="flex-1 px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-xs" 
-                          placeholder="https://..."
-                        />
+                        <div className="flex-1 space-y-2">
+                          <input 
+                            type="text" 
+                            value={currentProduct?.image || ''} 
+                            onChange={e => setCurrentProduct({...currentProduct!, image: e.target.value})} 
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-xs" 
+                            placeholder="https://..."
+                          />
+                          <label className="block w-full text-center px-4 py-2 border border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
+                            <span className="text-xs font-bold text-gray-500">Ou uploader une image</span>
+                            <input 
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => setCurrentProduct({...currentProduct!, image: reader.result as string});
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
                         {currentProduct?.image && (
-                          <div className="w-12 h-12 rounded-xl border border-black/5 overflow-hidden bg-gray-100 flex-shrink-0">
+                          <div className="w-16 h-16 rounded-xl border border-black/5 overflow-hidden bg-gray-100 flex-shrink-0">
                             <OptimizedImage src={currentProduct.image} alt={currentProduct.name} width={100} className="w-full h-full object-cover" />
                           </div>
                         )}
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
-                      <select 
-                        value={currentProduct?.category || 'Général'} 
-                        onChange={e => setCurrentProduct({...currentProduct!, category: e.target.value})} 
-                        className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
-                      >
-                        <option value="Général">Général</option>
-                        <option value="Électronique">Électronique</option>
-                        <option value="Mobilier">Mobilier</option>
-                        <option value="Fournitures">Fournitures</option>
-                        <option value="Services">Services</option>
-                      </select>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
+                        <input 
+                          type="text"
+                          list="product-categories"
+                          value={currentProduct?.category || ''} 
+                          onChange={e => setCurrentProduct({...currentProduct!, category: e.target.value})} 
+                          className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
+                          placeholder="Sélectionner ou taper..."
+                        />
+                        <datalist id="product-categories">
+                          {Array.from(new Set(['Général', 'Électronique', 'Mobilier', 'Fournitures', 'Services', ...(products || []).map(p => p.category).filter(Boolean)])).map(cat => (
+                            <option key={cat as string} value={cat as string} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Sous Catégorie</label>
+                        <input 
+                          type="text" 
+                          value={currentProduct?.subCategory || ''} 
+                          onChange={e => setCurrentProduct({...currentProduct!, subCategory: e.target.value})} 
+                          className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
+                          placeholder="ex: Smartphones"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed border-gray-100">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 border-t border-dashed border-gray-100">
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix d'achat</label>
+                    <div className="relative">
+                      <input 
+                        type="number" 
+                        value={currentProduct?.costPrice || ''} 
+                        onChange={e => setCurrentProduct({...currentProduct!, costPrice: Number(e.target.value)})} 
+                        className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix de vente</label>
                     <div className="relative">

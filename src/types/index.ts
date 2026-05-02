@@ -543,6 +543,7 @@ export interface MerchantProduct {
   minStockLevel?: number;
   supplierId?: string;
   category: string;
+  subCategory?: string;
   image?: string;
   createdAt: any;
   updatedAt: any;
