@@ -54,8 +54,11 @@ const DESIGN_TO_ORDER_STATUS: Record<string, string> = {
   'rejected': 'cancelled'
 };
 
+import { useAuth } from '../../context/AuthContext';
+
 const DesignRequestManager = () => {
   const navigate = useNavigate();
+  const { user, isAdmin, isManager } = useAuth();
   const [selectedRequestForPartner, setSelectedRequestForPartner] = useState<any>(null);
 
   // Sync on mount - optimized to avoid excessive polling
@@ -64,14 +67,14 @@ const DesignRequestManager = () => {
     const lastSync = localStorage.getItem('last_sync_design_dashboard');
     if (!lastSync || Date.now() - parseInt(lastSync, 10) > 3600000) { // 1 hour threshold
       console.log('Performing necessary sync for Design Dashboard...');
-      syncService.syncStudioAcomData();
+      syncService.syncStudioAcomData(user?.uid, isAdmin || isManager);
       syncService.syncOrders('global');
       syncService.syncUsers('global');
       localStorage.setItem('last_sync_design_dashboard', Date.now().toString());
     } else {
       console.log('Sync skipped - used recent cache');
     }
-  }, []);
+  }, [user, isAdmin, isManager]);
 
   const requests = useLiveQuery(() => dexieDb.design_requests.toArray()) || [];
   const studioOrders = useLiveQuery(() => dexieDb.orders.filter(o => o.pillar === 'studio').toArray()) || [];
@@ -102,7 +105,7 @@ const DesignRequestManager = () => {
   ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const refresh = () => { 
-    syncService.syncStudioAcomData();
+    syncService.syncStudioAcomData(user?.uid, isAdmin || isManager);
     syncService.syncOrders('global');
   };
 

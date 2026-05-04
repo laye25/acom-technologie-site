@@ -163,7 +163,7 @@ service cloud.firestore {
     }
     
     match /designs/{designId} {
-      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
       allow write: if isAuthenticated() && (request.resource.data.user_id == request.auth.uid || request.resource.data.userId == request.auth.uid || request.resource.data.ownerId == request.auth.uid || isAdmin());
       
       match /blocks/{blockId} {
@@ -356,7 +356,7 @@ service cloud.firestore {
       allow update, delete: if hasAnyAdminRole();
     }
     
-    match /design_templates/{templateId} {
+    match /templates/{templateId} {
       // Anyone can read public templates
       allow read: if true;
       // Authenticated users can create templates

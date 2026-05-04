@@ -417,6 +417,24 @@ const FONTS = [
   'Dancing Script', 'Space Grotesk', 'Anton', 'JetBrains Mono'
 ];
 
+// Helper used for deep equality between canvas elements while ignoring non-serializable fields
+const isContentEqual = (a: any, b: any) => {
+  if (!a || !b) return false;
+  const keysToCheck = ['x', 'y', 'width', 'height', 'rotation', 'scaleX', 'scaleY', 'text', 'fill', 'stroke', 'opacity', 'radius', 'fontSize', 'fontFamily', 'fontWeight', 'textAlign', 'src', 'visible', 'locked', 'bgColor'];
+  for (const k of keysToCheck) {
+    if (a[k] !== b[k]) {
+      if (typeof a[k] === 'number' && typeof b[k] === 'number') {
+        if (Math.abs(a[k] - b[k]) > 0.05) return false;
+      } else if (!a[k] && !b[k]) {
+        // both falsy, considered equal
+      } else {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
 export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initialConfig, templateId, onExport, autoOpenSelector }) => {
   const { isAdmin, isManager, profile, user } = useAuth();
   const navigate = useNavigate();
@@ -488,10 +506,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
   useEffect(() => {
     if (blocks && blocks.length > 0 && designId) {
       setPages(prevPages => {
-        const nextPages = [...prevPages];
+        let hasChanges = false;
+        const nextPages = prevPages.map(p => ({ ...p, elements: [...p.elements] }));
+        
         blocks.forEach(block => {
           const pageIdx = block.pageIndex || 0;
           if (pageIdx >= nextPages.length) {
+            hasChanges = true;
             // Add missing pages if necessary
             for (let i = nextPages.length; i <= pageIdx; i++) {
               nextPages.push({ elements: [], bgColor: '#ffffff' });
@@ -499,6 +520,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
           }
           
           if (!nextPages[pageIdx]) {
+            hasChanges = true;
             nextPages[pageIdx] = { elements: [], bgColor: '#ffffff' };
           }
           
@@ -517,24 +539,35 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
           if (existingIdx > -1) {
             // Only update if changed to avoid loops
             const existing = nextPages[pageIdx].elements[existingIdx];
-            if (JSON.stringify(existing) !== JSON.stringify(element)) {
+             let changed = true;
+            try {
+               changed = !isContentEqual(existing, element);
+            } catch (e) {
+               console.error("Comparison failed", e);
+            }
+            if (changed) {
               nextPages[pageIdx].elements[existingIdx] = element;
+              hasChanges = true;
             }
           } else {
             nextPages[pageIdx].elements.push(element);
+            hasChanges = true;
           }
         });
         
-        // Sort elements by zIndex if available in block
-        nextPages.forEach(p => {
-          p.elements.sort((a, b) => {
-            const blockA = blocks.find(bl => bl.id === a.id);
-            const blockB = blocks.find(bl => bl.id === b.id);
-            return (blockA?.zIndex || 0) - (blockB?.zIndex || 0);
+        // Let's only sort if we have changes to avoid unnecessary re-renders
+        if (hasChanges) {
+          nextPages.forEach(p => {
+            p.elements.sort((a, b) => {
+              const blockA = blocks.find(bl => bl.id === a.id);
+              const blockB = blocks.find(bl => bl.id === b.id);
+              return (blockA?.zIndex || 0) - (blockB?.zIndex || 0);
+            });
           });
-        });
-
-        return nextPages;
+          return nextPages;
+        }
+        
+        return prevPages;
       });
     }
   }, [blocks, designId]);
@@ -612,27 +645,40 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     if (pages.length === 0) return;
 
     setHistory(prevHistory => {
-      // Don't add to history if we are currently "undoing/redoing" 
-      // check if pages matches the current history at historyIndex
-      if (historyIndex >= 0 && JSON.stringify(prevHistory[historyIndex]) === JSON.stringify(pages)) {
-        return prevHistory;
-      }
+      // Don't add to history if we are currently "undoing/redoing"
+      try {
+        // Fast equality check for history using a specialized safe stringifier or limiting depth
+        const safeStringify = (obj: any) => {
+          try {
+             return JSON.stringify(obj, (key, val) => {
+               if (key === 'fabricData' || key === 'clipPath') return '[Fabric Object]';
+               return val;
+             });
+          } catch(e) { return null; }
+        };
+        const currentStr = safeStringify(pages);
+        if (historyIndex >= 0 && currentStr && safeStringify(prevHistory[historyIndex]) === currentStr) {
+          return prevHistory;
+        }
 
-      const newHistory = prevHistory.slice(0, historyIndex + 1);
-      
-      // Only push if the state actually changed to avoid redundant history entries
-      if (newHistory.length > 0 && JSON.stringify(newHistory[newHistory.length - 1]) === JSON.stringify(pages)) {
+        const newHistory = prevHistory.slice(0, historyIndex + 1);
+        
+        if (newHistory.length > 0 && currentStr && safeStringify(newHistory[newHistory.length - 1]) === currentStr) {
+          return prevHistory;
+        }
+        
+        const nextHistory = [...newHistory];
+        if (nextHistory.length >= 20) nextHistory.shift();
+        nextHistory.push(pages);
+        
+        // We'll update historyIndex in the next tick to avoid warning
+        setTimeout(() => setHistoryIndex(nextHistory.length - 1), 0);
+        
+        return nextHistory;
+      } catch (e) {
+        console.error("Failed to update history, possibly too large");
         return prevHistory;
       }
-      
-      const nextHistory = [...newHistory];
-      if (nextHistory.length >= 50) nextHistory.shift();
-      nextHistory.push(pages);
-      
-      // We'll update historyIndex in the next tick to avoid warning
-      setTimeout(() => setHistoryIndex(nextHistory.length - 1), 0);
-      
-      return nextHistory;
     });
   }, [pages]);
 
@@ -987,7 +1033,24 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       for (const el of currentElements) {
         const block = blocks?.find(b => b.id === el.id);
         
-        if (!block || JSON.stringify(block.content) !== JSON.stringify(el)) {
+        let shouldEmit = false;
+        try {
+          let cleanEl = { ...el };
+          delete (cleanEl as any).pageIndex;
+          if (!block) {
+            shouldEmit = true;
+          } else {
+            // Check essential attributes instead of full stringify
+            const bc = block.content || {}; // Safety fallback to empty object if content is missing
+            if (!isContentEqual(cleanEl, bc)) {
+              shouldEmit = true;
+            }
+          }
+        } catch (e) {
+          console.error("Stringify failed when checking blocks", e);
+        }
+
+        if (shouldEmit) {
           bus.emit('block_event', {
             type: block ? 'block_update' : 'block_create',
             designId,
@@ -1123,11 +1186,19 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         timestamp: Date.now(),
         templateId
       };
+      
       try {
-        localStorage.setItem('studio_acom_autosave', JSON.stringify(designToSave));
-      } catch (error) {
-        console.error('Autosave quota exceeded, cannot save to localStorage:', error);
-        // Optionally: clear old autosave if it's too large or take other action
+        const jsonStr = JSON.stringify(designToSave, (key, val) => {
+           if (key === 'fabricData' || key === 'clipPath') return undefined; // Strip for autosave
+           return val;
+        });
+        try {
+          localStorage.setItem('studio_acom_autosave', jsonStr);
+        } catch (error) {
+          console.error('Autosave quota exceeded, cannot save to localStorage:');
+        }
+      } catch (e) {
+        console.error("Failed to stringify designToSave for autosave. File too large.");
       }
     }
   }, [pages, designTitle, templateId]);
@@ -1755,7 +1826,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       // Sanitize pages array to remove undefined values which Firestore doesn't like
       const sanitizedPages = JSON.parse(JSON.stringify(pages));
       
-      console.log("Saving template:", { name: templateName, category: templateCategory, pages: sanitizedPages });
+      console.log("Saving template:", { name: templateName, category: templateCategory, pageCount: sanitizedPages.length });
       
       const selectedCategory = TEMPLATE_CATEGORIES.find(c => c.name === templateCategory);
       
@@ -2516,7 +2587,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     isEditingTextRef.current = true;
     (window as any).__textEditorOpen = true;
     
-    console.log('handleTextDoubleClick called', { e, id });
+    console.log('handleTextDoubleClick called', { id });
     const textNode = e.target;
     if (!textNode || !textNode.canvas) {
       console.log('No text node or canvas found');
@@ -2526,15 +2597,14 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     }
 
     const boundingRect = textNode.getBoundingRect();
-    const canvasElement = textNode.canvas.getElement();
-    const canvasBox = canvasElement.getBoundingClientRect();
     
     console.log('Setting editingTextId', id);
     setEditingTextId(id);
     setTextAreaPos({
-      x: canvasBox.left + boundingRect.left,
-      y: canvasBox.top + boundingRect.top,
+      x: boundingRect.left,
+      y: boundingRect.top,
       width: boundingRect.width,
+      height: boundingRect.height,
     });
   }, [setEditingTextId, setTextAreaPos, elements]);
 
@@ -3945,41 +4015,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
                 blocks={blocks}
                 user={user}
                 others={others}
-                onTextDoubleClick={handleTextDoubleClick}
               />
             </div>
 
-            {/* Text Editing Overlay */}
-            {editingTextId && (
-              <textarea
-                className="fabric-text-editor"
-                value={elements.find(el => el.id === editingTextId)?.text || ''}
-                onChange={handleTextChange}
-                onBlur={() => setEditingTextId(null)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    setEditingTextId(null);
-                  }
-                }}
-                autoFocus
-                style={{
-                  position: 'absolute',
-                  top: textAreaPos.y,
-                  left: textAreaPos.x,
-                  width: textAreaPos.width * stageScale,
-                  background: 'white',
-                  border: '1px solid #3b82f6',
-                  padding: '0px',
-                  margin: '0px',
-                  outline: 'none',
-                  resize: 'none',
-                  fontFamily: 'sans-serif',
-                  fontSize: `${(elements.find(el => el.id === editingTextId)?.fontSize || 16) * stageScale}px`,
-                  color: elements.find(el => el.id === editingTextId)?.fill,
-                  zIndex: 1000,
-                }}
-              />
-            )}
+            {/* Text Editing Overlay (Removed natively supported) */}
           </div>
           </div>
         </div>

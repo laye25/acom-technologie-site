@@ -595,7 +595,7 @@ export const syncService = {
     }
   },
 
-  async syncStudioAcomData() {
+  async syncStudioAcomData(userId?: string, isAdmin: boolean = false) {
     if (!(await this.isOnline())) return;
     try {
       console.log('Syncing Studio Acom data...');
@@ -604,14 +604,23 @@ export const syncService = {
         { name: 'studio_acom_categories', table: db.studio_acom_categories },
         { name: 'studio_acom_products', table: db.studio_acom_products },
         { name: 'variants', table: db.variants },
-        { name: 'design_requests', table: db.design_requests }
+        { name: 'design_requests', table: db.design_requests, requiresAuth: true }
       ];
 
       for (const col of collections) {
-        const lastSyncKey = `last_sync_${col.name}_global`;
+        if (col.requiresAuth && !isAdmin && !userId) {
+          // Cannot sync user-specific data without userId if not admin
+          continue;
+        }
+
+        const lastSyncKey = `last_sync_${col.name}_${col.requiresAuth && !isAdmin ? userId : 'global'}`;
         const lastSyncStr = localStorage.getItem(lastSyncKey);
         const constraints: any[] = [];
         
+        if (col.requiresAuth && !isAdmin && userId) {
+           constraints.push(where('userId', '==', userId));
+        }
+
         if (lastSyncStr) {
           constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
         }
@@ -628,5 +637,5 @@ export const syncService = {
     } catch (error) {
       console.error('Sync Studio Acom data failed:', error);
     }
-  }
+  },
 };

@@ -1,4 +1,5 @@
 import { useMemo, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { 
   Sparkles, Star, LayoutGrid, FolderOpen, Contact2, Megaphone, Building2, Layout
 } from 'lucide-react';
@@ -13,12 +14,13 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export function useStudioAcom(isOpen: boolean = true) {
+  const { user, isAdmin, isManager } = useAuth();
   // Sync when open
   useEffect(() => {
     if (isOpen) {
-      syncService.syncStudioAcomData();
+      syncService.syncStudioAcomData(user?.uid, isAdmin || isManager);
     }
-  }, [isOpen]);
+  }, [isOpen, user, isAdmin, isManager]);
 
   // Memoize mappers to avoid unnecessary re-renders
   const categoryMapper = useMemo(() => (cat: any) => {

@@ -70,28 +70,14 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
     fabricCanvasRef.current = canvas;
 
     canvas.on('mouse:down', (e) => {
-      console.log('Mouse down', e);
+      // no-op, prevent massive log
     });
 
     const handleDoubleClick = (e: fabric.IEvent) => {
-      console.log('Double click event detected', e);
       const target = e.target;
 
       if (target && (target.type === 'i-text' || target.type === 'text' || target.type === 'textbox')) {
-        console.log('Text element clicked', target);
-        
-        // Disable Fabric's internal editing
-        const textObj = target as fabric.IText;
-        textObj.editable = false;
-        
-        if (e.e) {
-          e.e.preventDefault();
-          e.e.stopPropagation();
-        }
-        
         onTextDoubleClick?.(e, target.name || '');
-      } else {
-        console.log('No text element clicked');
       }
     };
 
@@ -114,6 +100,25 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
     canvas.on('selection:cleared', () => {
       if (isUpdatingFromFabric.current) return;
       setSelectedIds([]);
+    });
+
+    canvas.on('text:changed', (e) => {
+      isUpdatingFromFabric.current = true;
+      const target = e.target;
+      if (!target || !target.name) {
+        setTimeout(() => { isUpdatingFromFabric.current = false; }, 50);
+        return;
+      }
+      setElements(prev => {
+        const newElements = [...prev];
+        const elIndex = newElements.findIndex(el => el.id === target.name);
+        if (elIndex !== -1 && (target as fabric.IText).text !== undefined) {
+          newElements[elIndex] = { ...newElements[elIndex], text: (target as fabric.IText).text };
+          return newElements;
+        }
+        return prev;
+      });
+      setTimeout(() => { isUpdatingFromFabric.current = false; }, 50);
     });
 
     canvas.on('object:modified', (e) => {
@@ -303,7 +308,7 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
       } else if (el.type === 'text') {
         obj = new fabric.IText(el.text || '', {
           ...commonOptions,
-          editable: false,
+          editable: true,
           fontFamily: el.fontFamily || 'Arial',
           fontSize: el.fontSize || 20,
           fontStyle: el.fontStyle?.includes('italic') ? 'italic' : 'normal',

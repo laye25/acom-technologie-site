@@ -84,7 +84,15 @@ class SyncEngine {
       for (const [blockId, data] of blockUpdates.entries()) {
         promises.push(firestoreService.save(`designs/${designId}/blocks`, {
           id: blockId,
-          ...data
+          designId,
+          pageIndex: data.pageIndex || 0,
+          type: data.type || 'shape',
+          x: data.x || 0,
+          y: data.y || 0,
+          width: data.width || 0,
+          height: data.height || 0,
+          rotation: data.rotation || 0,
+          content: data
         }));
       }
 
