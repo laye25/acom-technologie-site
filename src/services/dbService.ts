@@ -340,7 +340,9 @@ export const dbService = {
       return '';
     },
     async update(id: string, user: Partial<UserProfile>) {
-      return userRepository.update(id, user);
+      await userRepository.update(id, user);
+      // Synchronisation immédiate avec Dexie pour la réactivité UI
+      await db.users.update(id, user);
     },
     async delete(id: string) {
       return userRepository.delete(id);

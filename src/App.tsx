@@ -6,7 +6,7 @@ import { ThemeProvider } from './ThemeProvider';
 import { CacheProvider } from './context/CacheContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
-import ErrorBoundary from './components/CommonErrorBoundary';
+import ErrorBoundary from './components/ErrorBoundary.tsx';
 import { NetworkStatusIndicator } from './components/NetworkStatusIndicator';
 import { PartnerPortal } from './pages/PartnerPortal';
 import Home from './pages/Home';

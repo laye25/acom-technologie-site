@@ -6,7 +6,7 @@ import { db } from '../db/db';
 import { syncService } from '../services/syncService';
 import { Order, OrderStatus, UserProfile, Service, Expense, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Monitor, Link as LinkIcon, ChevronDown } from 'lucide-react';
+import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Monitor, Link as LinkIcon, ChevronDown, UserPlus } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, startOfYear, eachMonthOfInterval, isSameDay, isSameMonth } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -52,6 +52,9 @@ const AdminDashboard = () => {
   const [selectedOrderForSummary, setSelectedOrderForSummary] = useState<Order | null>(null);
   const [orderSearch, setOrderSearch] = useState('');
   const [expenseSearch, setExpenseSearch] = useState('');
+  const [expenseStartDate, setExpenseStartDate] = useState(format(subDays(new Date(), 90), 'yyyy-MM-dd'));
+  const [expenseEndDate, setExpenseEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState('Tous');
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
   const [isFixingImages, setIsFixingImages] = useState(false);
   const [showFixConfirm, setShowFixConfirm] = useState(false);
@@ -799,6 +802,13 @@ const AdminDashboard = () => {
       value: globalStats.totalOrders || orders.length, 
       icon: ShoppingBag, 
       color: 'bg-primary-light text-primary' 
+    },
+    { 
+      label: 'Candidatures en attente', 
+      value: users.filter(u => u.partnerStatus === 'pending').length, 
+      icon: UserPlus, 
+      color: 'bg-blue-100 text-blue-600',
+      action: () => setActiveTab('users')
     },
     { label: 'Devis Personnalisés', value: totalCustomQuotes, icon: FileQuestion, color: 'bg-purple-100 text-purple-600' },
     { label: 'En cours', value: orders.filter(o => o.status === 'in_progress').length, icon: Clock, color: 'bg-blue-100 text-blue-600' },
@@ -1581,7 +1591,8 @@ const AdminDashboard = () => {
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: i * 0.1 }}
-                          className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all"
+                          className={`bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all ${stat.action ? 'cursor-pointer hover:border-primary/20' : ''}`}
+                          onClick={() => stat.action?.()}
                         >
                           <div className={`w-10 h-10 ${stat.color} rounded-xl flex items-center justify-center mb-4`}>
                             <stat.icon className="w-5 h-5" />
@@ -2239,6 +2250,9 @@ const AdminDashboard = () => {
                             setEndDate(format(new Date(), 'yyyy-MM-dd'));
                             setOrderSearch('');
                             setExpenseSearch('');
+                            setExpenseCategoryFilter('Tous');
+                            setExpenseStartDate(format(subDays(new Date(), 90), 'yyyy-MM-dd'));
+                            setExpenseEndDate(format(new Date(), 'yyyy-MM-dd'));
                           }}
                           className="p-2 text-gray-400 hover:text-primary transition-colors bg-gray-50 border border-gray-100 rounded-xl"
                           title="Réinitialiser les filtres"
@@ -2580,14 +2594,14 @@ const AdminDashboard = () => {
           >
             <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
               <ExpenseManager 
-                startDate={startDate}
-                endDate={endDate}
-                categoryFilter={categoryFilter}
+                startDate={expenseStartDate}
+                endDate={expenseEndDate}
+                categoryFilter={expenseCategoryFilter}
                 searchTerm={expenseSearch}
                 onSearchChange={setExpenseSearch}
-                onCategoryChange={setCategoryFilter}
-                onStartDateChange={setStartDate}
-                onEndDateChange={setEndDate}
+                onCategoryChange={setExpenseCategoryFilter}
+                onStartDateChange={setExpenseStartDate}
+                onEndDateChange={setExpenseEndDate}
               />
             </div>
           </motion.div>

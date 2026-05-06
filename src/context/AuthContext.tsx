@@ -11,7 +11,7 @@ import {
   onAuthStateChanged,
   User
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '../types';
 
 interface AuthContextType {
@@ -85,15 +85,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
     }
 
+    let profileUnsubscribe: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log('AuthContext: onAuthStateChanged - currentUser:', currentUser);
+      
+      // Cleanup previous profile listener
+      if (profileUnsubscribe) {
+        profileUnsubscribe();
+        profileUnsubscribe = null;
+      }
+
       setUser(currentUser);
       if (currentUser) {
         // Fetch custom claims
         const tokenResult = await currentUser.getIdTokenResult();
         setCustomClaims(tokenResult.claims);
         
-        await fetchProfile(currentUser);
+        // Setup real-time listener for profile
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        
+        profileUnsubscribe = onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            const data = doc.data();
+            const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
+            const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
+            const expectedRole = isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client');
+            
+            setProfile({
+              uid: currentUser.uid,
+              email: currentUser.email || '',
+              displayName: data.display_name || data.displayName || currentUser.displayName || 'Utilisateur',
+              photoURL: data.photo_url || data.photoURL || currentUser.photoURL || '',
+              role: data.role || expectedRole,
+              partnerStatus: data.partnerStatus,
+              partnerDetails: data.partnerDetails,
+              merchantId: data.merchant_id || data.merchantId,
+              createdAt: data.created_at?.toDate() || (data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()))
+            });
+            setLoading(false);
+          } else {
+            // Profile doesn't exist yet, handle it via fetchProfile logic internally if needed
+            // but for simplicity and robustness we can create it here if it's the first time
+            createProfileIfMissing(currentUser);
+          }
+        }, (error) => {
+          console.error('Profile listener error:', error);
+          setLoading(false);
+        });
       } else {
         setProfile(null);
         setCustomClaims(null);
@@ -101,8 +140,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (profileUnsubscribe) profileUnsubscribe();
+    };
   }, []);
+
+  const createProfileIfMissing = async (currentUser: User) => {
+    try {
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (!userDoc.exists()) {
+        const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
+        const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
+        
+        const newProfile: UserProfile = {
+          uid: currentUser.uid,
+          email: currentUser.email || '',
+          displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
+          photoURL: currentUser.photoURL || '',
+          role: isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client'),
+          createdAt: new Date()
+        };
+
+        await setDoc(userDocRef, {
+          email: newProfile.email,
+          display_name: newProfile.displayName,
+          photo_url: newProfile.photoURL,
+          role: newProfile.role,
+          created_at: newProfile.createdAt
+        });
+      }
+    } catch (err) {
+      console.error('Error creating missing profile:', err);
+    }
+  };
 
   const syncCustomClaims = async () => {
     if (!user || !profile) return;
@@ -129,58 +201,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error syncing custom claims:', error);
-    }
-  };
-
-  const fetchProfile = async (currentUser: User) => {
-    try {
-      const userDocRef = doc(db, 'users', currentUser.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
-        const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
-        const expectedRole = isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client');
-        
-        setProfile({
-          uid: currentUser.uid,
-          email: currentUser.email || '',
-          displayName: data.display_name || currentUser.displayName || 'Utilisateur',
-          photoURL: data.photo_url || currentUser.photoURL || '',
-          role: data.role || expectedRole,
-          partnerStatus: data.partnerStatus,
-          partnerDetails: data.partnerDetails,
-          createdAt: data.created_at?.toDate() || new Date()
-        });
-      } else {
-        // Create profile if it doesn't exist
-        const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
-        const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
-        
-        const newProfile: UserProfile = {
-          uid: currentUser.uid,
-          email: currentUser.email || '',
-          displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
-          photoURL: currentUser.photoURL || '',
-          role: isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client'),
-          createdAt: new Date()
-        };
-
-        await setDoc(userDocRef, {
-          email: newProfile.email,
-          display_name: newProfile.displayName,
-          photo_url: newProfile.photoURL,
-          role: newProfile.role,
-          created_at: newProfile.createdAt
-        });
-        
-        setProfile(newProfile);
-      }
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-    } finally {
-      setLoading(false);
     }
   };
 

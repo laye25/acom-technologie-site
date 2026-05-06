@@ -9,7 +9,8 @@ import {
   Search, UserPlus, Mail, Shield, 
   Printer, Palette, User, MoreVertical,
   CheckCircle, XCircle, Loader2, Globe,
-  Facebook, Instagram, Linkedin, Percent
+  Facebook, Instagram, Linkedin, Percent,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,6 +22,21 @@ export const UserManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [filterRole, setFilterRole] = useState<'all' | 'admin' | 'printer' | 'designer' | 'client'>('all');
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    const toastId = toast.loading('Synchronisation des données...');
+    try {
+      await syncService.syncUsers('global');
+      toast.success('Données synchronisées !', { id: toastId });
+    } catch (error) {
+      toast.error('Erreur lors de la synchronisation.', { id: toastId });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const users = useLiveQuery(() => db.users.toArray().then(users => users as UserProfile[])) || [];
   const loading = false; // Simplified
@@ -49,28 +65,33 @@ export const UserManager: React.FC = () => {
         return;
       }
       
-      const user = users.find(u => (u.id || u.uid) === userId);
+      const userToUpdate = users.find(u => (u.id || u.uid) === userId);
       const updateData: any = { partnerStatus: newStatus };
       
       if (newStatus === 'approved') {
+        const requestedRole = userToUpdate?.partnerDetails?.requestedRole || 'printer';
         updateData.partnerDetails = {
-          ...(user?.partnerDetails || {}),
-          commissionPercentage: user?.partnerDetails?.commissionPercentage || defaultComm
+          ...(userToUpdate?.partnerDetails || {}),
+          commissionPercentage: userToUpdate?.partnerDetails?.commissionPercentage || defaultComm
         };
-        // Forcer le rôle à printer si ce n'est pas déjà un partenaire designer
-        if (user?.role !== 'printer' && user?.role !== 'designer') {
-          updateData.role = 'printer'; 
-        }
+        // Appliquer le rôle demandé lors de l'approbation
+        updateData.role = requestedRole;
       }
 
       await dbService.users.update(userId, updateData);
       
+      // Update local storage immediately for UI responsiveness
+      await db.users.update(userId, updateData);
+
+      // Force a background sync to keep everyone in sync
+      syncService.syncUsers('global');
+      
       // Send notifications
-      if (user) {
+      if (userToUpdate) {
         if (newStatus === 'approved') {
-          await notificationService.notifyPartnerApproval(user);
+          await notificationService.notifyPartnerApproval(userToUpdate);
         } else if (newStatus === 'rejected') {
-          await notificationService.notifyPartnerRejection(user);
+          await notificationService.notifyPartnerRejection(userToUpdate);
         }
       }
 
@@ -93,15 +114,15 @@ export const UserManager: React.FC = () => {
       }
 
       const updateData: any = { role: newRole };
+      const userToUpdate = users.find(u => (u.id || u.uid) === userId);
       
       // If we are promoting to a partner role directly from the UI, 
       // we need to set them as approved to avoid the "Accès Restreint" screen
       if (newRole === 'printer' || newRole === 'designer') {
-        const user = users.find(u => (u.id || u.uid) === userId);
         updateData.partnerStatus = 'approved';
         updateData.partnerDetails = {
-          ...(user?.partnerDetails || {}),
-          commissionPercentage: user?.partnerDetails?.commissionPercentage || defaultComm
+          ...(userToUpdate?.partnerDetails || {}),
+          commissionPercentage: userToUpdate?.partnerDetails?.commissionPercentage || defaultComm
         };
       } else if (newRole === 'client') {
         // Optionnel: On peut retirer le statut de partenaire si on le repasse en simple client.
@@ -109,6 +130,9 @@ export const UserManager: React.FC = () => {
       }
 
       await dbService.users.update(userId, updateData);
+      await db.users.update(userId, updateData);
+      syncService.syncUsers('global');
+
       toast.success('Rôle mis à jour avec succès');
     } catch (error) {
       console.error('Error updating role:', error);
@@ -137,10 +161,24 @@ export const UserManager: React.FC = () => {
 
   const pendingUsers = users.filter(u => u.partnerStatus === 'pending');
   
-  const filteredUsers = users.filter(u => 
-    u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesRole = filterRole === 'all' || u.role === filterRole;
+    
+    return matchesSearch && matchesRole;
+  }).sort((a, b) => {
+    // Sort partners first
+    if (a.partnerStatus === 'pending' && b.partnerStatus !== 'pending') return -1;
+    if (b.partnerStatus === 'pending' && a.partnerStatus !== 'pending') return 1;
+    
+    // Then by role priority
+    if (a.role === 'admin' && b.role !== 'admin') return -1;
+    if (b.role === 'admin' && a.role !== 'admin') return 1;
+    
+    return (a.displayName || '').localeCompare(b.displayName || '');
+  });
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -182,12 +220,14 @@ export const UserManager: React.FC = () => {
               className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-center justify-between"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 shadow-sm">
-                  {u.role === 'printer' ? <Printer size={20} /> : <Palette size={20} />}
+                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-500 shadow-sm text-lg">
+                  {u.partnerDetails?.requestedRole === 'designer' ? <Palette size={20} /> : <Printer size={20} />}
                 </div>
                 <div>
                   <p className="text-xs font-black text-blue-900 uppercase tracking-tight">{u.displayName}</p>
-                  <p className="text-[10px] text-blue-600 font-bold opacity-70 uppercase tracking-widest">Postule comme {u.role === 'printer' ? 'Imprimeur' : 'Designer'}</p>
+                  <p className="text-[10px] text-blue-600 font-bold opacity-70 uppercase tracking-widest">
+                    Postule comme {u.partnerDetails?.requestedRole === 'designer' ? 'Designer' : 'Imprimeur'}
+                  </p>
                 </div>
               </div>
               <button 
@@ -210,7 +250,38 @@ export const UserManager: React.FC = () => {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">
+            {[
+              { id: 'all', label: 'Tous' },
+              { id: 'printer', label: 'Imprimeurs' },
+              { id: 'designer', label: 'Designers' },
+              { id: 'admin', label: 'Admins' },
+              { id: 'client', label: 'Clients' }
+            ].map(r => (
+              <button
+                key={r.id}
+                onClick={() => setFilterRole(r.id as any)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  filterRole === r.id 
+                    ? 'bg-white text-primary shadow-sm' 
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          <button 
+            onClick={handleSync}
+            disabled={isSyncing}
+            className={`p-2 bg-white border border-gray-100 text-gray-400 rounded-xl hover:text-primary transition-colors ${isSyncing ? 'animate-spin' : ''}`}
+            title="Rafraîchir les données"
+          >
+            <RefreshCw size={18} />
+          </button>
+          
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input 

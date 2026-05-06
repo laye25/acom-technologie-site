@@ -412,13 +412,35 @@ export const syncService = {
       if (lastSyncStr) {
         constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       } else {
-        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 7)));
+        // Initial sync: last 30 days instead of 7 for better coverage
+        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 30)));
       }
 
       console.log(`Syncing users... ${lastSyncStr ? '(Delta)' : '(Initial / Recent)'}`);
       const remoteUsers = await userRepository.getAll(constraints);
-      if (remoteUsers && remoteUsers.length > 0) {
-        await db.users.bulkPut(remoteUsers);
+      
+      // CRITICAL: Always explicitly fetch pending applications and approved partners
+      // to ensure they are visible to admins even if they haven't been updated recently.
+      let extraUsers: any[] = [];
+      if (!merchantId || merchantId === 'global') {
+        const [pendingUsers, approvedUsers] = await Promise.all([
+          userRepository.getAll([where('partnerStatus', '==', 'pending')]),
+          userRepository.getAll([where('partnerStatus', '==', 'approved')])
+        ]);
+        extraUsers = [...pendingUsers, ...approvedUsers];
+      }
+
+      const allUsersToSync = [...remoteUsers];
+      // Add extra users that weren't in the time-constrained list
+      extraUsers.forEach(eu => {
+        const id = eu.id || (eu as any).uid;
+        if (!allUsersToSync.find(u => (u.id || (u as any).uid) === id)) {
+          allUsersToSync.push(eu);
+        }
+      });
+
+      if (allUsersToSync.length > 0) {
+        await db.users.bulkPut(allUsersToSync);
       }
       localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {

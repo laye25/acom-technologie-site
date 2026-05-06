@@ -58,6 +58,14 @@ const BecomePartner: React.FC = () => {
     }
 
     setSubmitting(true);
+    console.log('Starting partner application submission...');
+    const submissionTimeout = setTimeout(() => {
+      if (submitting) {
+        setSubmitting(false);
+        toast.error('La requête prend trop de temps. Veuillez vérifier votre connexion et réessayer.');
+      }
+    }, 15000); // 15s absolute timeout
+
     try {
       // Capture signature metadata
       let ip = 'Unknown';
@@ -69,6 +77,7 @@ const BecomePartner: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           ip = data.ip;
+          console.log('IP fetched for signature:', ip);
         }
       } catch (e) {
         console.warn('Could not fetch IP for signature:', e);
@@ -81,26 +90,33 @@ const BecomePartner: React.FC = () => {
         version: 'CGP-2026-V1'
       };
 
+      console.log('Updating user profile with partner application...');
       await dbService.users.update(user!.uid, {
-        role: applicationRole,
         partnerStatus: 'pending',
         partnerDetails: {
           ...formData,
+          requestedRole: applicationRole,
           signatureInfo,
           appliedAt: new Date()
         } as any
       });
       
+      console.log('Partner application submitted successfully');
+      clearTimeout(submissionTimeout);
       toast.success('Candidature envoyée avec succès ! Votre signature électronique a été enregistrée.');
       setIsApplying(false);
       window.scrollTo(0, 0);
     } catch (error: any) {
+      clearTimeout(submissionTimeout);
       console.error('Error applying:', error);
-      const errorMessage = error?.message || '';
+      const errorMessage = error?.message || String(error);
+      
       if (errorMessage.includes('permission') || errorMessage.includes('Permission')) {
-        toast.error('Erreur de permissions. Veuillez contacter le support.');
+        toast.error('Erreur de permissions Firebase. Veuillez contacter l\'administrateur.');
+      } else if (errorMessage.includes('quota')) {
+        toast.error('Quota Firestore dépassé. Veuillez réessayer plus tard.');
       } else {
-        toast.error('Une erreur est survenue lors de l\'envoi. Veuillez réessayer.');
+        toast.error(`Erreur d'envoi: ${errorMessage.substring(0, 100)}`);
       }
     } finally {
       setSubmitting(false);
@@ -427,8 +443,13 @@ const BecomePartner: React.FC = () => {
                       J'accepte les <Link to="/conditions-partenaires" className="text-primary font-bold hover:underline" target="_blank">conditions générales de partenariat</Link> d'Acom Technologie.
                     </label>
                   </div>
-                  <button type="submit" disabled={submitting || !formData.termsAccepted} className="w-full py-6 bg-ink text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-primary transition-all disabled:opacity-50">
-                    {submitting ? 'Traitement...' : 'Soumettre ma candidature'}
+                  <button 
+                    type="submit" 
+                    disabled={submitting || !formData.termsAccepted} 
+                    className="w-full py-6 bg-ink text-white rounded-[2rem] font-black uppercase tracking-widest hover:bg-primary transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
+                    {submitting ? 'TRAITEMENT...' : 'Soumettre ma candidature'}
                   </button>
                 </form>
               </div>

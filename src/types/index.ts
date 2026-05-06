@@ -323,6 +323,7 @@ export interface Expense {
   title: string;
   amount: number;
   category: string;
+  paymentMethod?: string;
   date: any;
   description?: string;
   createdAt: any;
