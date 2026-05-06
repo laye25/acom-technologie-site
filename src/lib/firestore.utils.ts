@@ -77,6 +77,8 @@ export function prepareForFirestore(data: any): any {
   if (data === undefined) return null;
   if (data === null || typeof data !== 'object') return data;
   
+  if (data instanceof Date) return data;
+  
   if (Array.isArray(data)) {
     return data.map(item => prepareForFirestore(item));
   }

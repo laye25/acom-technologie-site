@@ -51,14 +51,25 @@ const BecomePartner: React.FC = () => {
       return;
     }
 
+    if (!user) {
+      toast.error('Session expirée. Veuillez vous reconnecter.');
+      navigate('/login');
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Capture signature metadata
       let ip = 'Unknown';
       try {
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
-        ip = data.ip;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+        const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          const data = await response.json();
+          ip = data.ip;
+        }
       } catch (e) {
         console.warn('Could not fetch IP for signature:', e);
       }
@@ -79,12 +90,18 @@ const BecomePartner: React.FC = () => {
           appliedAt: new Date()
         } as any
       });
+      
       toast.success('Candidature envoyée avec succès ! Votre signature électronique a été enregistrée.');
       setIsApplying(false);
       window.scrollTo(0, 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error applying:', error);
-      toast.error('Une erreur est survenue lors de l\'envoi');
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('permission') || errorMessage.includes('Permission')) {
+        toast.error('Erreur de permissions. Veuillez contacter le support.');
+      } else {
+        toast.error('Une erreur est survenue lors de l\'envoi. Veuillez réessayer.');
+      }
     } finally {
       setSubmitting(false);
     }
