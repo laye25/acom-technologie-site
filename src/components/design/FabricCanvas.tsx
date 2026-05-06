@@ -17,6 +17,7 @@ interface FabricCanvasProps {
   width: number;
   height: number;
   onTextDoubleClick?: (e: any, id: string) => void;
+  onTextEditExit?: () => void;
 }
 
 export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
@@ -33,11 +34,19 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
   others,
   width,
   height,
-  onTextDoubleClick
+  onTextDoubleClick,
+  onTextEditExit
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const isUpdatingFromFabric = useRef(false);
+  const onTextDoubleClickRef = useRef(onTextDoubleClick);
+  const onTextEditExitRef = useRef(onTextEditExit);
+
+  useEffect(() => {
+    onTextDoubleClickRef.current = onTextDoubleClick;
+    onTextEditExitRef.current = onTextEditExit;
+  }, [onTextDoubleClick, onTextEditExit]);
 
   useImperativeHandle(ref, () => ({
     toDataURL: (options?: any) => {
@@ -74,10 +83,34 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
     });
 
     const handleDoubleClick = (e: fabric.IEvent) => {
-      const target = e.target;
+      let target = e.target;
+
+      // If we clicked a group, try to find the actual text object inside it
+      if (target && target.type === 'group') {
+        const pointer = canvas.getPointer(e.e);
+        const subTarget = (target as fabric.Group)._objects.find(obj => {
+          // Simplistic check: is the pointer inside this child's bounds after accounting for group transform?
+          // Fabric's internal subTargetCheck is better but more complex to trigger here.
+          return (obj.type === 'i-text' || obj.type === 'text' || obj.type === 'textbox');
+        });
+        if (subTarget) target = subTarget;
+      }
 
       if (target && (target.type === 'i-text' || target.type === 'text' || target.type === 'textbox')) {
-        onTextDoubleClick?.(e, target.name || '');
+        console.log('Text double-clicked:', target.type, target.name);
+        
+        // Force enter editing mode for Fabric objects that support it
+        if ((target as any).enterEditing) {
+          (target as any).enterEditing();
+          if ((target as any).selectAll) {
+            (target as any).selectAll();
+          }
+          canvas.requestRenderAll();
+        } else if (target.type === 'text') {
+           console.warn('Click on Text object without enterEditing');
+        }
+        
+        onTextDoubleClickRef.current?.(e, target.name || '');
       }
     };
 
@@ -119,6 +152,10 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
         return prev;
       });
       setTimeout(() => { isUpdatingFromFabric.current = false; }, 50);
+    });
+
+    canvas.on('text:editing:exited', () => {
+      onTextEditExitRef.current?.();
     });
 
     canvas.on('object:modified', (e) => {
@@ -200,150 +237,171 @@ export const FabricCanvas = forwardRef<any, FabricCanvasProps>(({
     if (!fabricCanvasRef.current || isUpdatingFromFabric.current) return;
     const canvas = fabricCanvasRef.current;
 
-    // We need to sync the elements array with the canvas objects.
-    // For simplicity in this migration, we will clear and re-render.
-    // In a production app, you'd want to update existing objects to preserve state/selection.
-    
-    // Save current selection
-    const activeObjectNames = canvas.getActiveObjects().map(obj => obj.name);
-    
-    canvas.clear();
-    canvas.backgroundColor = bgColor;
+    // Use a map for faster lookup of existing objects by name (initialized with el.id)
+    const objects = canvas.getObjects();
+    const objectMap = new Map<string, fabric.Object>();
+    objects.forEach(obj => {
+      if (obj.name) objectMap.set(obj.name, obj);
+    });
 
+    // Determine which elements should be on canvas
+    const currentElementIds = new Set(elements.filter(el => !el.hidden).map(el => el.id));
+
+    // Remove objects that are no longer present or are now hidden
+    objects.forEach(obj => {
+      if (obj.name && !currentElementIds.has(obj.name)) {
+        canvas.remove(obj);
+      }
+    });
+
+    // Update or add elements
     elements.forEach(el => {
       if (el.hidden) return;
 
-      if (el.fabricData) {
-        fabric.util.enlivenObjects([el.fabricData], (enlivenedObjects) => {
-          const enlivenedObj = enlivenedObjects[0];
-          if (enlivenedObj) {
-            enlivenedObj.set({
-              name: el.id,
-              left: el.x,
-              top: el.y,
-              scaleX: el.scaleX || 1,
-              scaleY: el.scaleY || 1,
-              angle: el.rotation || 0,
-              opacity: el.opacity ?? 1,
-              selectable: !el.locked,
-              evented: !el.locked,
-            });
-            
-            // Only override fill/stroke if they are explicitly set and not transparent
-            // This preserves complex SVG gradients unless the user explicitly changes the color
-            if (el.fill && el.fill !== 'transparent') {
-              enlivenedObj.set('fill', el.fill);
-              if (enlivenedObj.type === 'group') {
-                const group = enlivenedObj as fabric.Group;
-                group.getObjects().forEach(child => {
-                  child.set('fill', el.fill);
-                });
-              }
-            }
-            if (el.stroke && el.stroke !== 'transparent') {
-              enlivenedObj.set('stroke', el.stroke);
-              if (enlivenedObj.type === 'group') {
-                const group = enlivenedObj as fabric.Group;
-                group.getObjects().forEach(child => {
-                  child.set('stroke', el.stroke);
-                });
-              }
-            }
+      const existingObj = objectMap.get(el.id);
 
-            canvas.add(enlivenedObj);
-            if (activeObjectNames.includes(el.id)) {
-              canvas.setActiveObject(enlivenedObj);
-            }
-            canvas.requestRenderAll();
+      if (existingObj) {
+        // Update existing object properties
+        const isEditing = (existingObj as any).isEditing;
+        
+        // Basic properties
+        const props: any = {
+          left: el.x,
+          top: el.y,
+          scaleX: el.scaleX || 1,
+          scaleY: el.scaleY || 1,
+          angle: el.rotation || 0,
+          opacity: el.opacity ?? 1,
+          selectable: !el.locked,
+          evented: !el.locked,
+        };
+
+        // Text-specific properties
+        if (existingObj.type === 'i-text' || existingObj.type === 'textbox') {
+          // IMPORTANT: Do NOT update text content if actively editing to avoid jumping cursor
+          if (!isEditing) {
+            props.text = el.text || '';
           }
-        }, 'fabric');
-        return; // Async addition
-      }
+          props.fontFamily = el.fontFamily || 'Arial';
+          props.fontSize = el.fontSize || 20;
+          props.fontStyle = el.fontStyle?.includes('italic') ? 'italic' : 'normal';
+          props.fontWeight = el.fontStyle?.includes('bold') ? 'bold' : 'normal';
+          props.textAlign = el.align || 'left';
+          props.lineHeight = el.lineHeight || 1.2;
+        }
 
-      let obj: fabric.Object | null = null;
+        // Color properties
+        if (el.fill && el.fill !== 'transparent') {
+          props.fill = el.fill;
+        }
+        if (el.stroke && el.stroke !== 'transparent') {
+          props.stroke = el.stroke;
+        }
 
-      const commonOptions: fabric.IObjectOptions = {
-        name: el.id,
-        left: el.x,
-        top: el.y,
-        scaleX: el.scaleX || 1,
-        scaleY: el.scaleY || 1,
-        angle: el.rotation || 0,
-        fill: el.fill || 'transparent',
-        stroke: el.stroke || 'transparent',
-        strokeWidth: el.strokeWidth || 0,
-        opacity: el.opacity ?? 1,
-        selectable: !el.locked,
-        evented: !el.locked,
-      };
+        existingObj.set(props);
+        existingObj.setCoords();
+      } else {
+        // Add new object
+        if (el.fabricData) {
+          const fabricData = { ...el.fabricData };
+          if (fabricData.type === 'text') {
+            fabricData.type = 'i-text';
+          }
 
-      if (el.shadowColor) {
-        commonOptions.shadow = new fabric.Shadow({
-          color: el.shadowColor,
-          blur: el.shadowBlur || 0,
-          offsetX: el.shadowOffsetX || 0,
-          offsetY: el.shadowOffsetY || 0,
-        });
-      }
+          fabric.util.enlivenObjects([fabricData], (enlivenedObjects) => {
+            const enlivenedObj = enlivenedObjects[0];
+            if (enlivenedObj) {
+              enlivenedObj.set({
+                name: el.id,
+                left: el.x,
+                top: el.y,
+                scaleX: el.scaleX || 1,
+                scaleY: el.scaleY || 1,
+                angle: el.rotation || 0,
+                opacity: el.opacity ?? 1,
+                selectable: !el.locked,
+                evented: !el.locked,
+              });
 
-      if (el.type === 'shape') {
-        obj = new fabric.Rect({
-          ...commonOptions,
-          width: el.width || 100,
-          height: el.height || 100,
-          rx: el.cornerRadius || 0,
-          ry: el.cornerRadius || 0,
-        });
-      } else if (el.type === 'circle') {
-        obj = new fabric.Circle({
-          ...commonOptions,
-          radius: el.radius || 50,
-        });
-      } else if (el.type === 'ellipse') {
-        obj = new fabric.Ellipse({
-          ...commonOptions,
-          rx: el.radiusX || 50,
-          ry: el.radiusY || 50,
-        });
-      } else if (el.type === 'text') {
-        obj = new fabric.IText(el.text || '', {
-          ...commonOptions,
-          editable: true,
-          fontFamily: el.fontFamily || 'Arial',
-          fontSize: el.fontSize || 20,
-          fontStyle: el.fontStyle?.includes('italic') ? 'italic' : 'normal',
-          fontWeight: el.fontStyle?.includes('bold') ? 'bold' : 'normal',
-          textAlign: el.align || 'left',
-          lineHeight: el.lineHeight || 1.2,
-        });
-      } else if (el.type === 'path' && el.data) {
-        obj = new fabric.Path(el.data, commonOptions);
-      } else if (el.type === 'image' && el.src) {
-        fabric.Image.fromURL(el.src, (img) => {
-          img.set({
+              if ((enlivenedObj as any).type === 'i-text' || (enlivenedObj as any).type === 'text' || (enlivenedObj as any).type === 'textbox') {
+                enlivenedObj.set('editable', true);
+              }
+              
+              if (el.fill && el.fill !== 'transparent') {
+                enlivenedObj.set('fill', el.fill);
+              }
+
+              canvas.add(enlivenedObj);
+              if (selectedIds.includes(el.id)) {
+                canvas.setActiveObject(enlivenedObj);
+              }
+              canvas.requestRenderAll();
+            }
+          }, 'fabric');
+          return;
+        }
+
+        let obj: fabric.Object | null = null;
+        const commonOptions: fabric.IObjectOptions = {
+          name: el.id,
+          left: el.x,
+          top: el.y,
+          scaleX: el.scaleX || 1,
+          scaleY: el.scaleY || 1,
+          angle: el.rotation || 0,
+          fill: el.fill || '#000000',
+          stroke: el.stroke || 'transparent',
+          strokeWidth: el.strokeWidth || 0,
+          opacity: el.opacity ?? 1,
+          selectable: !el.locked,
+          evented: !el.locked,
+        };
+
+        if (el.type === 'shape') {
+          obj = new fabric.Rect({
             ...commonOptions,
-            width: el.width || img.width,
-            height: el.height || img.height,
+            width: el.width || 100,
+            height: el.height || 100,
+            rx: el.cornerRadius || 0,
+            ry: el.cornerRadius || 0,
           });
-          canvas.add(img);
-          if (activeObjectNames.includes(el.id)) {
-            canvas.setActiveObject(img);
-          }
-          canvas.requestRenderAll();
-        }, { crossOrigin: 'anonymous' });
-        return; // Image is added asynchronously
-      }
+        } else if (el.type === 'circle') {
+          obj = new fabric.Circle({ ...commonOptions, radius: el.radius || 50 });
+        } else if (el.type === 'ellipse') {
+          obj = new fabric.Ellipse({ ...commonOptions, rx: el.radiusX || 50, ry: el.radiusY || 50 });
+        } else if (el.type === 'text') {
+          obj = new fabric.IText(el.text || '', {
+            ...commonOptions,
+            editable: true,
+            fontFamily: el.fontFamily || 'Arial',
+            fontSize: el.fontSize || 20,
+            fontStyle: el.fontStyle?.includes('italic') ? 'italic' : 'normal',
+            fontWeight: el.fontStyle?.includes('bold') ? 'bold' : 'normal',
+            textAlign: el.align || 'left',
+          });
+        } else if (el.type === 'path' && el.data) {
+          obj = new fabric.Path(el.data, commonOptions);
+        } else if (el.type === 'image' && el.src) {
+          fabric.Image.fromURL(el.src, (img) => {
+            img.set({ ...commonOptions, width: el.width || img.width, height: el.height || img.height });
+            canvas.add(img);
+            if (selectedIds.includes(el.id)) canvas.setActiveObject(img);
+            canvas.requestRenderAll();
+          }, { crossOrigin: 'anonymous' });
+          return;
+        }
 
-      if (obj) {
-        canvas.add(obj);
-        if (activeObjectNames.includes(el.id)) {
-          canvas.setActiveObject(obj);
+        if (obj) {
+          canvas.add(obj);
+          if (selectedIds.includes(el.id)) {
+            canvas.setActiveObject(obj);
+          }
         }
       }
     });
 
     canvas.requestRenderAll();
-  }, [elements, bgColor]);
+  }, [elements, bgColor, selectedIds]);
 
   // Sync selection from props
   useEffect(() => {

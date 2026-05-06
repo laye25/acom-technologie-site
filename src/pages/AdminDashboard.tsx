@@ -6,7 +6,7 @@ import { db } from '../db/db';
 import { syncService } from '../services/syncService';
 import { Order, OrderStatus, UserProfile, Service, Expense, SiteSettings } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Monitor, Link as LinkIcon } from 'lucide-react';
+import { ShoppingBag, TrendingUp, TrendingDown, CheckCircle, Clock, MoreVertical, Filter, LayoutGrid, FileText, Database, Settings, Loader2, MessageSquare, User, Eye, Calculator, ArrowRight, Receipt, CreditCard, Smartphone, Banknote, Download, AlertTriangle, BarChart3, Bell, Printer, X, Tag, FileQuestion, Palette, Mail, Cloud, Store, Layout, Monitor, Link as LinkIcon, ChevronDown } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { format, subDays, startOfDay, endOfDay, eachDayOfInterval, startOfYear, eachMonthOfInterval, isSameDay, isSameMonth } from 'date-fns';
 import { toast } from 'react-hot-toast';
@@ -51,6 +51,7 @@ const AdminDashboard = () => {
   const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<Order | null>(null);
   const [selectedOrderForSummary, setSelectedOrderForSummary] = useState<Order | null>(null);
   const [orderSearch, setOrderSearch] = useState('');
+  const [expenseSearch, setExpenseSearch] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
   const [isFixingImages, setIsFixingImages] = useState(false);
   const [showFixConfirm, setShowFixConfirm] = useState(false);
@@ -497,8 +498,11 @@ const AdminDashboard = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('Tous');
   const [productFilter, setProductFilter] = useState<string>('Tous');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'Tous'>('Tous');
-  const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('Tous');
+  const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 180), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [ownerFilter, setOwnerFilter] = useState<string>('Tous');
+  const [visibleOrders, setVisibleOrders] = useState(50);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -1037,6 +1041,117 @@ const AdminDashboard = () => {
     }
     return Array.from(new Set(filtered.map(s => s.name))).sort();
   }, [allServices, categoryFilter]);
+
+  const filteredOrders = useMemo(() => {
+    const getIsoDate = (date: any) => {
+      if (!date) return '';
+      if (typeof date === 'string') return date;
+      if (date && typeof date.toDate === 'function') return date.toDate().toISOString();
+      if (date && typeof date === 'object') {
+        if (date.seconds !== undefined) return new Date(date.seconds * 1000).toISOString();
+        if (date._seconds !== undefined) return new Date(date._seconds * 1000).toISOString();
+      }
+      if (date instanceof Date) return date.toISOString();
+      if (typeof date === 'number') return new Date(date).toISOString();
+      return '';
+    };
+
+    return [...orders]
+      .sort((a, b) => {
+        const getTime = (val: any) => {
+          if (!val) return Date.now();
+          if (typeof val === 'object') {
+            if (val.seconds !== undefined) return val.seconds * 1000;
+            if (val._seconds !== undefined) return val._seconds * 1000;
+          }
+          if (typeof val.toMillis === 'function') return val.toMillis();
+          if (typeof val === 'string' || typeof val === 'number') {
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) return d.getTime();
+          }
+          if (val instanceof Date) return val.getTime();
+          return Date.now();
+        };
+        const timeA = getTime(a.createdAt || a.created_at || a.updated_at || a.updatedAt);
+        const timeB = getTime(b.createdAt || b.created_at || b.updated_at || b.updatedAt);
+        return timeB - timeA;
+      })
+      .filter(order => {
+        const service = allServices.find(s => s.id === order.serviceId);
+        const orderDate = getIsoDate(order.createdAt || order.created_at || order.updated_at || order.updatedAt);
+        
+        // Date filter
+        if (orderDate) {
+          const orderTime = new Date(orderDate).getTime();
+          if (startDate && orderTime < startOfDay(new Date(startDate)).getTime()) return false;
+          if (endDate && orderTime > endOfDay(new Date(endDate)).getTime()) return false;
+        } else if (startDate || endDate) {
+          // If no date found on order but we are filtering by date, 
+          // let's be lenient and show it if it doesn't match the current period but we're not sure
+          // Actually, if we're filtering, we usually want to hide things that don't fit.
+          // But if date is missing, it's better to show it than hide everything.
+        }
+
+        // Category filter
+        if (categoryFilter !== 'Tous') {
+          if (service?.category?.toLowerCase() !== categoryFilter.toLowerCase()) return false;
+        }
+
+        // Product filter
+        if (productFilter !== 'Tous' && service) {
+          if (service.name !== productFilter) return false;
+        }
+
+        // Status filter
+        if (statusFilter !== 'Tous') {
+          if (order.status !== statusFilter) return false;
+        }
+
+        // Payment filter
+        if (paymentStatusFilter !== 'Tous') {
+          if (paymentStatusFilter === 'paid' && !order.paid) return false;
+          if (paymentStatusFilter === 'deposit' && (!order.depositPaid || order.paid)) return false;
+          if (paymentStatusFilter === 'unpaid' && (order.paid || order.depositPaid)) return false;
+        }
+
+        const search = orderSearch.toLowerCase();
+        const clientName = (order.details?.clientName || order.details?.fullName || '').toLowerCase();
+        const serviceName = (order.details?.serviceName || '').toLowerCase();
+        const phone = (order.details?.phone || '').toLowerCase();
+        const address = (order.details?.address || '').toLowerCase();
+        const orderId = (order.id || '').toLowerCase();
+        return clientName.includes(search) || 
+               serviceName.includes(search) || 
+               orderId.includes(search) || 
+               phone.includes(search) || 
+               address.includes(search);
+      });
+  }, [orders, allServices, startDate, endDate, categoryFilter, productFilter, statusFilter, paymentStatusFilter, orderSearch]);
+
+  const filteredExpenses = useMemo(() => {
+    return expenses
+      .filter(expense => {
+        const expenseDate = expense.date;
+        
+        // Date filter
+        if (expenseDate) {
+          const time = new Date(expenseDate).getTime();
+          if (startDate && time < startOfDay(new Date(startDate)).getTime()) return false;
+          if (endDate && time > endOfDay(new Date(endDate)).getTime()) return false;
+        }
+
+        // Category filter (using existing categoryFilter state if active tab is expenses)
+        if (activeTab === 'expenses' && categoryFilter !== 'Tous') {
+          if (expense.category !== categoryFilter) return false;
+        }
+
+        const search = expenseSearch.toLowerCase();
+        return (expense.description || '').toLowerCase().includes(search) || 
+               (expense.category || '').toLowerCase().includes(search) ||
+               (expense.paymentMethod || '').toLowerCase().includes(search);
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [expenses, startDate, endDate, categoryFilter, expenseSearch, activeTab]);
 
   const productProfitability = useMemo(() => {
     const paidOrders = orders.filter(o => o.paid);
@@ -2059,10 +2174,46 @@ const AdminDashboard = () => {
                             <option value="in_progress">En cours</option>
                             <option value="completed">Terminé</option>
                             <option value="delivered">Livré</option>
+                            <option value="cancelled">Annulé</option>
                           </select>
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                             <Clock className="w-3 h-3 text-gray-400" />
                           </div>
+                        </div>
+
+                        {/* Payment Status Dropdown */}
+                        <div className="relative">
+                          <select
+                            value={paymentStatusFilter}
+                            onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                            className="appearance-none pl-4 pr-10 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-600 focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
+                          >
+                            <option value="Tous">Tous les paiements</option>
+                            <option value="paid">Payés</option>
+                            <option value="deposit">Acompte payé</option>
+                            <option value="unpaid">Non payés</option>
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                            <CreditCard className="w-3 h-3 text-gray-400" />
+                          </div>
+                        </div>
+
+                        {/* Date Range Filters */}
+                        <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5">
+                          <Clock className="w-3 h-3 text-gray-400" />
+                          <input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="bg-transparent text-[10px] font-bold text-gray-600 outline-none"
+                          />
+                          <span className="text-gray-300">|</span>
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="bg-transparent text-[10px] font-bold text-gray-600 outline-none"
+                          />
                         </div>
 
                         {/* Search Input */}
@@ -2076,6 +2227,24 @@ const AdminDashboard = () => {
                             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                           />
                         </div>
+
+                        {/* Reset Filters */}
+                        <button
+                          onClick={() => {
+                            setCategoryFilter('Tous');
+                            setProductFilter('Tous');
+                            setStatusFilter('Tous');
+                            setPaymentStatusFilter('Tous');
+                            setStartDate(format(subDays(new Date(), 180), 'yyyy-MM-dd'));
+                            setEndDate(format(new Date(), 'yyyy-MM-dd'));
+                            setOrderSearch('');
+                            setExpenseSearch('');
+                          }}
+                          className="p-2 text-gray-400 hover:text-primary transition-colors bg-gray-50 border border-gray-100 rounded-xl"
+                          title="Réinitialiser les filtres"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2092,60 +2261,7 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {[...orders]
-                          .sort((a, b) => {
-                            const getTime = (val: any) => {
-                              if (!val) return Date.now(); // Fallback to now
-                              if (typeof val === 'object') {
-                                if (val.seconds !== undefined) return val.seconds * 1000;
-                                if (val._seconds !== undefined) return val._seconds * 1000;
-                              }
-                              if (typeof val.toMillis === 'function') return val.toMillis();
-                              if (typeof val === 'string' || typeof val === 'number') {
-                                const d = new Date(val);
-                                if (!isNaN(d.getTime())) return d.getTime();
-                              }
-                              if (val instanceof Date) return val.getTime();
-                              return Date.now(); // Fallback to now
-                            };
-                            const timeA = getTime(a.createdAt || a.created_at || a.updated_at || a.updatedAt);
-                            const timeB = getTime(b.createdAt || b.created_at || b.updated_at || b.updatedAt);
-                            return timeB - timeA;
-                          })
-                          .filter(order => {
-                            const service = allServices.find(s => s.id === order.serviceId);
-                            
-                            // Category filter
-                            if (categoryFilter !== 'Tous') {
-                              if (service?.category?.toLowerCase() !== categoryFilter.toLowerCase()) return false;
-                            }
-
-                            // Studio ACOM filter: exclude from general orders list
-                            if (service?.pillar === 'studio') return false;
-                            
-                            // Product filter
-                            if (productFilter !== 'Tous') {
-                              if (service?.name !== productFilter) return false;
-                            }
-
-                            // Status filter
-                            if (statusFilter !== 'Tous') {
-                              if (order.status !== statusFilter) return false;
-                            }
-
-                            const search = orderSearch.toLowerCase();
-                            const clientName = (order.details?.clientName || order.details?.fullName || '').toLowerCase();
-                            const serviceName = (order.details?.serviceName || '').toLowerCase();
-                            const phone = (order.details?.phone || '').toLowerCase();
-                            const address = (order.details?.address || '').toLowerCase();
-                            const orderId = (order.id || '').toLowerCase();
-                            return clientName.includes(search) || 
-                                   serviceName.includes(search) || 
-                                   orderId.includes(search) || 
-                                   phone.includes(search) || 
-                                   address.includes(search);
-                          })
-                          .map((order) => {
+                        {filteredOrders.slice(0, visibleOrders).map((order) => {
                           const service = allServices.find(s => s.id === order.serviceId);
                           const client = users.find(u => u.id === order.userId);
                           const isPos = order.details?.type === 'pos';
@@ -2333,8 +2449,20 @@ const AdminDashboard = () => {
                         );
                       })}
                     </tbody>
-                    </table>
+                  </table>
                   </div>
+
+                  {visibleOrders < filteredOrders.length && (
+                    <div className="p-6 text-center border-t border-gray-50 bg-gray-50/10">
+                      <button
+                        onClick={() => setVisibleOrders(prev => prev + 50)}
+                        className="px-6 py-2 bg-white border border-gray-100 text-gray-500 rounded-xl text-xs font-bold hover:bg-gray-50 flex items-center gap-2 mx-auto transition-all shadow-sm"
+                      >
+                        Afficher plus de commandes
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2451,7 +2579,16 @@ const AdminDashboard = () => {
             exit={{ opacity: 0, y: -20 }}
           >
             <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
-              <ExpenseManager />
+              <ExpenseManager 
+                startDate={startDate}
+                endDate={endDate}
+                categoryFilter={categoryFilter}
+                searchTerm={expenseSearch}
+                onSearchChange={setExpenseSearch}
+                onCategoryChange={setCategoryFilter}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+              />
             </div>
           </motion.div>
         )}

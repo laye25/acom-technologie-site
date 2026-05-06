@@ -47,6 +47,12 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_products_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      // Throttle: 1 hour for background/merchant sync
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 3600000) {
+        return;
+      }
+
       const timeConstraints: any[] = [];
       if (lastSyncStr) {
         timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
@@ -71,7 +77,7 @@ export const syncService = {
         }));
         await db.products.bulkPut(mappedProducts);
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync products failed:', error);
     }
@@ -83,6 +89,11 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_sales_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 3600000) {
+        return;
+      }
+
       const timeConstraints: any[] = [];
       if (lastSyncStr) {
         timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
@@ -105,7 +116,7 @@ export const syncService = {
         }));
         await db.sales.bulkPut(mappedSales);
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync sales failed:', error);
     }
@@ -116,6 +127,11 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_expenses_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 3600000) {
+        return;
+      }
+
       const timeConstraints: any[] = [];
       if (lastSyncStr) {
         timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
@@ -137,7 +153,7 @@ export const syncService = {
         }));
         await db.expenses.bulkPut(mappedExpenses);
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync expenses failed:', error);
     }
@@ -148,6 +164,11 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_orders_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 600000) { // 10 min for orders
+        return;
+      }
+
       const constraints: any[] = [];
       
       if (merchantId && merchantId !== 'global') {
@@ -165,7 +186,7 @@ export const syncService = {
         await db.orders.bulkPut(remoteOrders);
       }
       
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync orders failed:', error);
     }
@@ -176,6 +197,11 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_partner_orders_${partnerId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 600000) {
+        return;
+      }
+
       const constraints: any[] = [where('partnerId', '==', partnerId)];
       
       if (lastSyncStr) {
@@ -186,7 +212,7 @@ export const syncService = {
       if (remoteOrders && remoteOrders.length > 0) {
         await db.orders.bulkPut(remoteOrders);
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync partner orders failed:', error);
     }
@@ -195,10 +221,18 @@ export const syncService = {
   async syncUserProfile(uid: string) {
     if (!(await this.isOnline()) || !uid) return;
     try {
+      // Small throttle for profile (30 mins)
+      const lastSyncKey = `last_sync_user_profile_${uid}`;
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 1800000) {
+        return;
+      }
+
       const remoteUser = await userRepository.getById(uid);
       if (remoteUser) {
         await db.users.put(remoteUser);
       }
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync user profile failed:', error);
     }
@@ -209,6 +243,12 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_services_${merchantId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      // Throttle 1 hour for services (they change rarely)
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 3600000) {
+        return;
+      }
+
       const constraints: any[] = [];
       
       if (merchantId && merchantId !== 'global') {
@@ -224,7 +264,7 @@ export const syncService = {
       if (remoteServices && remoteServices.length > 0) {
         await db.services.bulkPut(remoteServices);
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync services failed:', error);
     }
@@ -597,24 +637,38 @@ export const syncService = {
 
   async syncStudioAcomData(userId?: string, isAdmin: boolean = false) {
     if (!(await this.isOnline())) return;
+    
+    // Global lock to prevent concurrent syncs
+    const globalSyncLockKey = 'sync_studio_acom_active';
+    if (sessionStorage.getItem(globalSyncLockKey)) return;
+    
     try {
+      sessionStorage.setItem(globalSyncLockKey, 'true');
       console.log('Syncing Studio Acom data...');
       
       const collections = [
-        { name: 'studio_acom_categories', table: db.studio_acom_categories },
-        { name: 'studio_acom_products', table: db.studio_acom_products },
-        { name: 'variants', table: db.variants },
-        { name: 'design_requests', table: db.design_requests, requiresAuth: true }
+        { name: 'studio_acom_categories', table: db.studio_acom_categories, throttleMs: 300000 }, // 5 min
+        { name: 'studio_acom_products', table: db.studio_acom_products, throttleMs: 300000 },
+        { name: 'variants', table: db.variants, throttleMs: 300000 },
+        { name: 'design_requests', table: db.design_requests, requiresAuth: true, throttleMs: 60000 } // 1 min (more frequent for active requests)
       ];
 
       for (const col of collections) {
         if (col.requiresAuth && !isAdmin && !userId) {
-          // Cannot sync user-specific data without userId if not admin
           continue;
         }
 
         const lastSyncKey = `last_sync_${col.name}_${col.requiresAuth && !isAdmin ? userId : 'global'}`;
         const lastSyncStr = localStorage.getItem(lastSyncKey);
+        
+        // Throttle check
+        if (lastSyncStr) {
+          const lastSyncTime = parseInt(lastSyncStr, 10);
+          if (Date.now() - lastSyncTime < col.throttleMs) {
+            continue; // Skip this collection if synced recently
+          }
+        }
+
         const constraints: any[] = [];
         
         if (col.requiresAuth && !isAdmin && userId) {
@@ -632,10 +686,13 @@ export const syncService = {
         if (remoteData && remoteData.length > 0) {
           await col.table.bulkPut(remoteData);
         }
-        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+        // Save current time as last sync (no buffer needed as we use >= and throttle)
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
     } catch (error) {
       console.error('Sync Studio Acom data failed:', error);
+    } finally {
+      sessionStorage.removeItem(globalSyncLockKey);
     }
   },
 };

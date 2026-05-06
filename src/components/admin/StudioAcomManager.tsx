@@ -126,7 +126,24 @@ const StudioAcomManager = () => {
     }
   };
 
+  const handleEdit = (item: any) => {
+    console.log('Admin StudioAcom: Editing item trigger', { id: item.id, tab: activeTab });
+    
+    // Safety check: ensure item has necessary fields mapped for the edit form
+    const editItem = { ...item };
+    
+    // Map snake_case to camelCase if needed, as these are the fields the forms use
+    if (!editItem.categoryId && editItem.category_id) {
+      editItem.categoryId = editItem.category_id;
+    }
+    
+    if (!editItem.coverImage && editItem.cover_image) {
+      editItem.coverImage = editItem.cover_image;
+    }
 
+    setEditingItem(editItem);
+    setIsModalOpen(true);
+  };
 
   const [isUploading, setIsUploading] = useState(false);
 
@@ -284,30 +301,23 @@ const StudioAcomManager = () => {
                 {/* Overlay for quick actions */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center gap-3">
                   <button
-                    onClick={async () => {
-                      const itemWithVariants = { ...item };
-                      if (activeTab === 'products') {
-                        const variants = await dbService.studioAcom.products.getVariants(item.id);
-                        itemWithVariants.variants = variants.map((v: any) => ({
-                          ...v,
-                          templateId: v.template_id || v.templateId,
-                          previewImage: v.preview_image || v.previewImage,
-                          minQuantity: v.min_quantity || v.minQuantity,
-                          maxQuantity: v.max_quantity || v.maxQuantity,
-                          templateSvg: v.template_svg || v.templateSvg
-                        }));
-                      }
-                      setEditingItem(itemWithVariants);
-                      setIsModalOpen(true);
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(item);
                     }}
                     className="p-3 bg-white text-gray-900 rounded-full hover:bg-primary hover:text-white transition-all transform translate-y-4 group-hover/image:translate-y-0 duration-300"
                     title="Modifier l'image et les détails"
                   >
-                    <ImageIcon className="w-5 h-5" />
+                    <Edit2 className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-3 bg-white text-rose-500 rounded-full hover:bg-rose-500 hover:text-white transition-all transform translate-y-4 group-hover/image:translate-y-0 duration-300 delay-75"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(item.id);
+                    }}
+                    className="p-3 bg-white text-rose-500 rounded-full hover:bg-rose-50 hover:text-white transition-all transform translate-y-4 group-hover/image:translate-y-0 duration-300 delay-75"
                     title="Supprimer"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -331,9 +341,9 @@ const StudioAcomManager = () => {
               </div>
 
               <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-gray-900 truncate">{item.name}</h3>
+                <div className="flex-1 min-w-0" onClick={() => handleEdit(item)}>
+                  <div className="flex items-center gap-2 mb-1 cursor-pointer">
+                    <h3 className="font-bold text-gray-900 truncate group-hover:text-primary transition-colors">{item.name}</h3>
                     {activeTab === 'products' && (
                       <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest rounded border border-primary/10">
                         Produit
@@ -343,7 +353,7 @@ const StudioAcomManager = () => {
                   <p className="text-xs text-gray-500 line-clamp-1">{item.sub || item.description}</p>
                   
                   {activeTab === 'products' && (
-                    <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-2 mt-3 cursor-pointer">
                       <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
                         <Layout className="w-3 h-3 text-gray-400" />
                       </div>
@@ -355,23 +365,12 @@ const StudioAcomManager = () => {
                 </div>
                 
                 <button
-                  onClick={async () => {
-                    const itemWithVariants = { ...item };
-                    if (activeTab === 'products') {
-                      const variants = await dbService.studioAcom.products.getVariants(item.id);
-                      itemWithVariants.variants = variants.map((v: any) => ({
-                        ...v,
-                        templateId: v.template_id || v.templateId,
-                        previewImage: v.preview_image || v.previewImage,
-                        minQuantity: v.min_quantity || v.minQuantity,
-                        maxQuantity: v.max_quantity || v.maxQuantity,
-                        templateSvg: v.template_svg || v.templateSvg
-                      }));
-                    }
-                    setEditingItem(itemWithVariants);
-                    setIsModalOpen(true);
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit(item);
                   }}
-                  className="p-2 text-gray-400 hover:text-primary transition-colors"
+                  className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all"
                 >
                   <Edit2 className="w-4 h-4" />
                 </button>

@@ -92,7 +92,7 @@ class SyncEngine {
           width: data.width || 0,
           height: data.height || 0,
           rotation: data.rotation || 0,
-          content: data
+          content: data.content ? data.content : data
         }));
       }
 

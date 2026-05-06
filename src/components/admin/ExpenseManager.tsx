@@ -9,7 +9,8 @@ import {
   Tag, 
   FileText,
   AlertCircle,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbService } from '../../services/dbService';
@@ -29,12 +30,47 @@ const EXPENSE_CATEGORIES = [
   'Autres'
 ];
 
-export const ExpenseManager: React.FC = () => {
+interface ExpenseManagerProps {
+  startDate?: string;
+  endDate?: string;
+  categoryFilter?: string;
+  searchTerm?: string;
+  onSearchChange?: (val: string) => void;
+  onCategoryChange?: (val: string) => void;
+  onStartDateChange?: (val: string) => void;
+  onEndDateChange?: (val: string) => void;
+}
+
+export const ExpenseManager: React.FC<ExpenseManagerProps> = ({
+  startDate,
+  endDate,
+  categoryFilter: externalCategoryFilter,
+  searchTerm: externalSearchTerm,
+  onSearchChange,
+  onCategoryChange,
+  onStartDateChange,
+  onEndDateChange
+}) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('Tous');
+  
+  // Local states for when used without props (standalone)
+  const [localSearchTerm, setLocalSearchTerm] = useState('');
+  const [localCategoryFilter, setLocalCategoryFilter] = useState('Tous');
+
+  const searchTerm = externalSearchTerm !== undefined ? externalSearchTerm : localSearchTerm;
+  const categoryFilter = externalCategoryFilter !== undefined ? externalCategoryFilter : localCategoryFilter;
+
+  const setSearchTerm = (val: string) => {
+    if (onSearchChange) onSearchChange(val);
+    else setLocalSearchTerm(val);
+  };
+
+  const setCategoryFilter = (val: string) => {
+    if (onCategoryChange) onCategoryChange(val);
+    else setLocalCategoryFilter(val);
+  };
 
   const [newExpense, setNewExpense] = useState({
     title: '',
@@ -55,7 +91,7 @@ export const ExpenseManager: React.FC = () => {
       setExpenses(data || []);
     } catch (error) {
       console.error('Error fetching expenses:', error);
-      toast.error('Erreur lors du chargement des dépenses');
+      toast.error('Erreur lors du chargement des d\u00E9penses');
     } finally {
       setLoading(false);
     }
@@ -74,7 +110,7 @@ export const ExpenseManager: React.FC = () => {
         amount: parseFloat(newExpense.amount),
         date: new Date(newExpense.date)
       });
-      toast.success('Dépense ajoutée avec succès');
+      toast.success('D\u00E9pense ajout\u00E9e avec succ\u00E8s');
       setShowAddModal(false);
       setNewExpense({
         title: '',
@@ -86,16 +122,16 @@ export const ExpenseManager: React.FC = () => {
       fetchExpenses();
     } catch (error) {
       console.error('Error adding expense:', error);
-      toast.error('Erreur lors de l\'ajout de la dépense');
+      toast.error('Erreur lors de l\'ajout de la d\u00E9pense');
     }
   };
 
   const handleDeleteExpense = async (id: string) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette dépense ?')) return;
+    if (!window.confirm('\u00CAtes-vous s\u00FBr de vouloir supprimer cette d\u00E9pense ?')) return;
 
     try {
       await dbService.expenses.delete(id);
-      toast.success('Dépense supprimée');
+      toast.success('D\u00E9pense supprim\u00E9e');
       fetchExpenses();
     } catch (error) {
       console.error('Error deleting expense:', error);
@@ -104,11 +140,22 @@ export const ExpenseManager: React.FC = () => {
   };
 
   const filteredExpenses = expenses.filter(exp => {
+    // Local date filtering logic if props are provided
+    if (startDate || endDate) {
+      const expDateStr = typeof exp.date === 'string' ? exp.date : 
+                         exp.date?.toDate ? exp.date.toDate().toISOString() : 
+                         new Date(exp.date).toISOString();
+      
+      const time = new Date(expDateStr).getTime();
+      if (startDate && time < new Date(startDate + 'T00:00:00').getTime()) return false;
+      if (endDate && time > new Date(endDate + 'T23:59:59').getTime()) return false;
+    }
+
     const matchesSearch = exp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          exp.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'Tous' || exp.category === categoryFilter;
     return matchesSearch && matchesCategory;
-  });
+  }).sort((a, b) => new Date(b.date as any).getTime() - new Date(a.date as any).getTime());
 
   const totalExpenses = filteredExpenses.reduce((acc, exp) => acc + exp.amount, 0);
 
@@ -116,15 +163,15 @@ export const ExpenseManager: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Gestion des Dépenses</h2>
-          <p className="text-gray-500">Suivez et gérez toutes les charges de l'entreprise</p>
+          <h2 className="text-2xl font-bold text-gray-900">Gestion des D\u00E9penses</h2>
+          <p className="text-gray-500">Suivez et g\u00E9rez toutes les charges de l'entreprise</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center justify-center px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all shadow-lg shadow-primary/20"
         >
           <Plus className="w-5 h-5 mr-2" />
-          Nouvelle Dépense
+          Nouvelle D\u00E9pense
         </button>
       </div>
 
@@ -138,34 +185,68 @@ export const ExpenseManager: React.FC = () => {
             <span className="text-xs font-bold text-red-500 uppercase tracking-wider">Total Charges</span>
           </div>
           <p className="text-3xl font-bold text-gray-900">{totalExpenses.toLocaleString()} FCFA</p>
-          <p className="text-sm text-gray-400 mt-1">Sur la période sélectionnée</p>
+          <p className="text-sm text-gray-400 mt-1">Sur la p\u00E9riode s\u00E9lectionn\u00E9e</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 bg-white p-4 rounded-2xl border border-black/5 shadow-sm">
+      <div className="flex flex-col lg:flex-row gap-4 bg-gray-50/50 p-4 rounded-2xl border border-black/5 shadow-sm">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Rechercher une dépense..."
+            placeholder="Rechercher une d\u00E9pense..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-primary"
+            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-5 h-5 text-gray-400" />
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-primary py-2 px-4"
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Date Range Picker */}
+          <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 py-1.5 shadow-sm">
+            <Calendar className="w-4 h-4 text-gray-400" />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => onStartDateChange?.(e.target.value)}
+              className="bg-transparent text-xs font-bold text-gray-600 outline-none"
+            />
+            <span className="text-gray-300">|</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => onEndDateChange?.(e.target.value)}
+              className="bg-transparent text-xs font-bold text-gray-600 outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 py-1.5 shadow-sm">
+            <Filter className="w-4 h-4 text-gray-400" />
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="bg-transparent border-none text-xs font-bold text-gray-600 outline-none focus:ring-0 cursor-pointer"
+            >
+              <option value="Tous">Toutes les cat\u00E9gories</option>
+              {EXPENSE_CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setCategoryFilter('Tous');
+              onStartDateChange?.(format(subDays(new Date(), 180), 'yyyy-MM-dd'));
+              onEndDateChange?.(format(new Date(), 'yyyy-MM-dd'));
+            }}
+            className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-primary transition-colors shadow-sm"
+            title="R\u00E9initialiser les filtres"
           >
-            <option value="Tous">Toutes les catégories</option>
-            {EXPENSE_CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

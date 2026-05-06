@@ -424,10 +424,14 @@ const isContentEqual = (a: any, b: any) => {
   for (const k of keysToCheck) {
     if (a[k] !== b[k]) {
       if (typeof a[k] === 'number' && typeof b[k] === 'number') {
-        if (Math.abs(a[k] - b[k]) > 0.05) return false;
+        if (Math.abs(a[k] - b[k]) > 0.05) {
+          console.log(`[isContentEqual] mismatch on ${k}: ${a[k]} !== ${b[k]}`);
+          return false;
+        }
       } else if (!a[k] && !b[k]) {
         // both falsy, considered equal
       } else {
+        console.log(`[isContentEqual] mismatch on ${k}: ${a[k]} !== ${b[k]}`);
         return false;
       }
     }
@@ -502,6 +506,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
   const mutateBlocks = () => {}; // Not needed for Dexie reactive data
 
 
+  const skipNextSyncCheck = useRef(false);
+
   // Sync blocks to pages when they change from other sources
   useEffect(() => {
     if (blocks && blocks.length > 0 && designId) {
@@ -555,8 +561,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
           }
         });
         
-        // Let's only sort if we have changes to avoid unnecessary re-renders
         if (hasChanges) {
+          // Sort elements by zIndex if available in block
           nextPages.forEach(p => {
             p.elements.sort((a, b) => {
               const blockA = blocks.find(bl => bl.id === a.id);
@@ -564,6 +570,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
               return (blockA?.zIndex || 0) - (blockB?.zIndex || 0);
             });
           });
+          
+          skipNextSyncCheck.current = true; // Avoid echoing the same changes back to firestore
           return nextPages;
         }
         
@@ -715,20 +723,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
   const lockBlock = async (blockId: string) => {
     if (!designId || !user) return;
-    await dbService.designBlocks.save(designId, {
-      id: blockId,
-      lockedBy: user.uid,
-      lockedAt: new Date()
-    });
+    // Disabled block locking to Firestore to save quota and network overhead.
   };
 
   const unlockBlock = async (blockId: string) => {
     if (!designId || !user) return;
-    await dbService.designBlocks.save(designId, {
-      id: blockId,
-      lockedBy: null,
-      lockedAt: null
-    });
+    // Disabled block locking to Firestore to save quota and network overhead.
   };
 
   // Handle block locking
@@ -902,20 +902,6 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
         setElements(nextElements);
         toast.success("Mise en page améliorée par l'IA !", { id: loadingToast });
-        
-        // Trigger save for each modified block
-        if (designId) {
-          suggestions.forEach(s => {
-            const block = blocks?.find(b => b.id === s.id);
-            if (block) {
-              dbService.designBlocks.save(designId, {
-                ...block,
-                ...s,
-                updatedAt: new Date()
-              });
-            }
-          });
-        }
       } else {
         toast.error("L'IA n'a pas pu suggérer d'améliorations.", { id: loadingToast });
       }
@@ -1021,77 +1007,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     });
   };
 
-  // Auto-sync blocks to Firestore when elements change using EventBus
-  useEffect(() => {
-    if (!designId || !user || loadingBlocks) return;
-
-    const timer = setTimeout(() => {
-      // Find elements that are different from blocks
-      const currentElements = pages.flatMap((p, pi) => (p.elements || []).map(el => ({ ...el, pageIndex: pi })));
-      
-      // Emit events for creates/updates
-      for (const el of currentElements) {
-        const block = blocks?.find(b => b.id === el.id);
-        
-        let shouldEmit = false;
-        try {
-          let cleanEl = { ...el };
-          delete (cleanEl as any).pageIndex;
-          if (!block) {
-            shouldEmit = true;
-          } else {
-            // Check essential attributes instead of full stringify
-            const bc = block.content || {}; // Safety fallback to empty object if content is missing
-            if (!isContentEqual(cleanEl, bc)) {
-              shouldEmit = true;
-            }
-          }
-        } catch (e) {
-          console.error("Stringify failed when checking blocks", e);
-        }
-
-        if (shouldEmit) {
-          bus.emit('block_event', {
-            type: block ? 'block_update' : 'block_create',
-            designId,
-            pageIndex: (el as any).pageIndex,
-            blockId: el.id,
-            changes: { ...el },
-            data: {
-              type: el.type,
-              x: el.x,
-              y: el.y,
-              width: el.width,
-              height: el.height,
-              rotation: el.rotation || 0,
-              content: prepareForFirestore(el),
-              zIndex: pages[(el as any).pageIndex] ? pages[(el as any).pageIndex].elements.indexOf(el as any) : 0
-            },
-            userId: user.uid,
-            timestamp: Date.now()
-          });
-        }
-      }
-
-      // Emit events for deletions
-      if (blocks) {
-        for (const block of blocks) {
-          if (!currentElements.find(el => el.id === block.id)) {
-            bus.emit('block_event', {
-              type: 'block_delete',
-              designId,
-              pageIndex: block.pageIndex,
-              blockId: block.id,
-              userId: user.uid,
-              timestamp: Date.now()
-            });
-          }
-        }
-      }
-    }, 1000); // Reduced debounce since queue handles batching
-
-    return () => clearTimeout(timer);
-  }, [pages, designId, user, blocks]);
+  // Auto-sync blocks to Firestore when elements change using EventBus has been disabled.
+  // Modifications stay in React memory (pages context) and are autosaved to localStorage.
+  // We only sync to Firestore when the user decides to place an order ("Commander") or click "Save".
 
   const setBgColor = (newColor: string) => {
     setPages(prev => {
@@ -1129,11 +1047,19 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         updatedAt: new Date(),
       };
 
-      const currentDesignId = await dbService.designs.save(designData);
+      const currentDesignId = await dbService.designs.saveLocal(designData);
       if (!designId) setDesignId(currentDesignId);
 
       // Save blocks (elements)
       if (currentDesignId) {
+        // First, cleanup orphan blocks in local DB
+        const currentBlockIds = pages.flatMap(p => (p.elements || []).map(el => el.id));
+        const localBlocks = await db.design_blocks.where('designId').equals(currentDesignId).toArray();
+        const orphans = localBlocks.filter(lb => !currentBlockIds.includes(lb.id));
+        if (orphans.length > 0) {
+          await db.design_blocks.bulkDelete(orphans.map(o => o.id));
+        }
+
         const savePromises = pages.flatMap((page, pageIndex) => 
           (page.elements || []).map((el, zIndex) => {
             const blockData = {
@@ -1150,7 +1076,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
               zIndex,
               updatedAt: new Date()
             };
-            return dbService.designBlocks.save(currentDesignId, blockData);
+            return dbService.designBlocks.saveLocal(currentDesignId, blockData);
           })
         );
         await Promise.all(savePromises);
@@ -1166,7 +1092,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
   };
 
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [textAreaPos, setTextAreaPos] = useState({ x: 0, y: 0, width: 0 });
+  const [textAreaPos, setTextAreaPos] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const trRef = useRef<any>(null);
@@ -2576,6 +2502,12 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
   const editingTextIdRef = useRef<string | null>(null);
   const isEditingTextRef = useRef(false);
 
+  useEffect(() => {
+    if (selectedIds.length === 0) {
+      setEditingTextId(null);
+    }
+  }, [selectedIds]);
+
   const handleTextDoubleClick = useCallback((e: any, id: string) => {
     // Prevent duplicate editors
     if ((window as any).__textEditorOpen) return;
@@ -2777,9 +2709,17 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
             IA Assistant
           </button>
 
-          <button className="flex items-center h-10 px-4 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all text-sm border border-white/5">
-            <MessageCircle className="w-4 h-4 mr-2" />
-            Session invité
+          <button 
+            onClick={saveDesign}
+            disabled={isSaving}
+            className="flex items-center h-10 px-5 bg-white/5 hover:bg-white/10 text-white rounded-xl font-black transition-all text-sm border border-white/5 shadow-lg disabled:opacity-50"
+          >
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Enregistrer
           </button>
 
           <button 
@@ -4015,6 +3955,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
                 blocks={blocks}
                 user={user}
                 others={others}
+                onTextDoubleClick={handleTextDoubleClick}
+                onTextEditExit={() => setEditingTextId(null)}
               />
             </div>
 

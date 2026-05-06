@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { dbService as db } from '../services/dbService';
+import { dbService } from '../services/dbService';
+import { db } from '../db/db';
 import { SERVICES as STATIC_SERVICES } from '../constants';
 import { Service, OrderStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -24,18 +25,44 @@ const OrderForm = () => {
   useEffect(() => {
     const fetchService = async () => {
       if (!serviceId) return;
+      console.log('Fetching service details for ID:', serviceId);
       try {
-        const data = await db.services.getById(serviceId);
+        setFetchingService(true);
+        // 1. Try local Dexie DB first (fastest and handles offline/sync)
+        const localData = await db.services.get(serviceId);
+        if (localData) {
+          console.log('Found service in Dexie:', localData.name);
+          setService(localData as Service);
+          setFetchingService(false);
+          return;
+        }
+
+        // 2. Try remote Firestore via dbService
+        try {
+          const remoteData = await dbService.services.getById(serviceId);
+          if (remoteData) {
+            console.log('Found service in Firestore:', remoteData.name);
+            setService(remoteData);
+            // Also store in Dexie for next time
+            await db.services.put(remoteData);
+            setFetchingService(false);
+            return;
+          }
+        } catch (dbErr) {
+          console.warn('Firestore fetch failed (possibly quota):', dbErr);
+        }
         
-        if (data) {
-          setService(data);
+        // 3. Fallback to static services
+        const staticService = STATIC_SERVICES.find(s => s.id === serviceId);
+        if (staticService) {
+          console.log('Found service in STATIC_SERVICES:', staticService.name);
+          setService(staticService);
         } else {
-          // Fallback
-          const staticService = STATIC_SERVICES.find(s => s.id === serviceId);
-          if (staticService) setService(staticService);
+          console.warn('Service not found in any source for ID:', serviceId);
         }
       } catch (error) {
         console.error("Error fetching service:", error);
+        // Last resort fallback
         const staticService = STATIC_SERVICES.find(s => s.id === serviceId);
         if (staticService) setService(staticService);
       } finally {
@@ -71,7 +98,22 @@ const OrderForm = () => {
     );
   }
 
-  if (!service) return <div className="text-center py-20">Service non trouvé</div>;
+  if (!service) {
+    return (
+      <div className="min-h-screen bg-paper pt-24 pb-12 flex items-center justify-center">
+        <div className="text-center px-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Service non trouvé</h2>
+          <p className="text-gray-500 mb-8">Désolé, nous n'avons pas pu trouver les détails de ce service (ID: {serviceId})</p>
+          <Link 
+            to="/" 
+            className="px-8 py-3 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all inline-block"
+          >
+            Retour à l'accueil
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const promoActive = isPromotionActive(service);
   
@@ -156,15 +198,15 @@ const OrderForm = () => {
       };
 
       console.log('Submitting order:', orderData);
-      const orderId = await db.orders.save(orderData) as string;
+      const orderId = await dbService.orders.save(orderData) as string;
       console.log('Order saved with ID:', orderId);
       
       setAnalyzing(true);
       try {
-        const draft = await generateOrderDraft(orderData, service);
+        const draft = await generateOrderDraft(orderData, service!);
         if (draft) {
           setAiDraft(draft);
-          await db.orders.save({ id: orderId, aiDraft: draft });
+          await dbService.orders.save({ id: orderId, aiDraft: draft });
         }
       } catch (err) {
         console.error('AI Analysis failed:', err);

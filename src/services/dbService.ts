@@ -216,13 +216,21 @@ export const dbService = {
           color: category.color || 'text-primary',
           cover_image: category.coverImage || category.cover_image || '',
         };
-        if (category.id) {
-          return categoryRepository.update(category.id, data);
+        
+        let id = category.id;
+        if (id) {
+          await categoryRepository.update(id, data);
+        } else {
+          id = await categoryRepository.create(data as any);
         }
-        return categoryRepository.create(data as any);
+        
+        // Update local Dexie for immediate feedback
+        await db.studio_acom_categories.put({ ...data, id });
+        return id;
       },
       async delete(id: string) {
-        return categoryRepository.delete(id);
+        await categoryRepository.delete(id);
+        await db.studio_acom_categories.delete(id);
       }
     },
     products: {
@@ -246,14 +254,19 @@ export const dbService = {
           id = await studioAcomProductRepository.create(data as any);
         }
 
+        // Save variants
         if (variants && Array.isArray(variants)) {
-          // Delete existing variants first
+          // ... existing variant logic ...
           const existingVariants = await variantRepository.getAll([where('product_id', '==', id)]);
-          for (const v of existingVariants) {
+          const existingVariantIds = existingVariants.map(v => v.id);
+          const incomingVariantIds = variants.filter(v => v.id && v.id.length > 5).map(v => v.id);
+
+          const toDelete = existingVariants.filter(v => !incomingVariantIds.includes(v.id));
+          for (const v of toDelete) {
             await variantRepository.delete(v.id);
+            await db.variants.delete(v.id); // Update Dexie
           }
 
-          // Save new variants
           for (const variant of variants) {
             const variantData = {
               product_id: id,
@@ -270,9 +283,19 @@ export const dbService = {
               max_quantity: Number(variant.maxQuantity || variant.max_quantity) || 1000,
               template_svg: variant.templateSvg || variant.template_svg || '',
             };
-            await variantRepository.create(variantData as any);
+
+            if (variant.id && variant.id.length > 5 && existingVariantIds.includes(variant.id)) {
+              await variantRepository.update(variant.id, variantData as any);
+              await db.variants.update(variant.id, variantData); // Update Dexie
+            } else {
+              const vid = await variantRepository.create(variantData as any);
+              await db.variants.put({ ...variantData, id: vid }); // Update Dexie
+            }
           }
         }
+        
+        // Update local Dexie product for immediate feedback
+        await db.studio_acom_products.put({ ...data, id });
         return id;
       },
       async delete(id: string) {
@@ -280,8 +303,10 @@ export const dbService = {
         const variants = await variantRepository.getAll([where('product_id', '==', id)]);
         for (const v of variants) {
           await variantRepository.delete(v.id);
+          await db.variants.delete(v.id);
         }
-        return studioAcomProductRepository.delete(id);
+        await studioAcomProductRepository.delete(id);
+        await db.studio_acom_products.delete(id);
       },
       async getVariants(productId: string) {
         return variantRepository.getAll([
@@ -355,7 +380,7 @@ export const dbService = {
     async save(merchant: Partial<Merchant>) {
       const data = {
         ...merchant,
-        owner_id: merchant.ownerId || merchant.owner_id,
+        ownerId: merchant.ownerId,
         updatedAt: new Date()
       };
       let id = merchant.id || uuidv4();
@@ -803,6 +828,11 @@ export const dbService = {
       }
       return remoteBlocks;
     },
+    async saveLocal(designId: string, block: any) {
+      const id = block.id; // generate later if none? Well card layers usually have ids
+      await db.design_blocks.put({ ...block, id, designId, updatedAt: new Date() });
+      return id;
+    },
     async save(designId: string, block: any) {
       let id = block.id;
       if (block.id) {
@@ -819,6 +849,12 @@ export const dbService = {
     }
   },
   designs: {
+    async saveLocal(design: Partial<Design>) {
+      let id = design.id;
+      if (!id) id = uuidv4();
+      await db.designs.put({ ...design, id, updatedAt: new Date() });
+      return id;
+    },
     async save(design: Partial<Design>) {
       let id = design.id;
       if (design.id) {
