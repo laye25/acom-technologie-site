@@ -93,6 +93,22 @@ export abstract class BaseRepository<T extends { id?: string }> {
   }
 
   /**
+   * Set (upsert) a document
+   */
+  async set(id: string, data: any): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, id);
+      const dataToSave = prepareForFirestore({
+        ...data,
+        updated_at: serverTimestamp()
+      });
+      await setDoc(docRef, dataToSave, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${this.collectionName}/${id}`);
+    }
+  }
+
+  /**
    * Delete a document
    */
   async delete(id: string): Promise<void> {

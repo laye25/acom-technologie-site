@@ -4,6 +4,7 @@ import {
   getDocs, 
   query, 
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   serverTimestamp,
@@ -46,6 +47,20 @@ export class DesignBlockRepository {
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `designs/${designId}/blocks`);
       return '';
+    }
+  }
+
+  async save(designId: string, blockId: string, data: any): Promise<void> {
+    try {
+      const docRef = doc(db, 'designs', designId, 'blocks', blockId);
+      const dataToSave = prepareForFirestore({
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      // We use setDoc with merge: true to handle both initial creation (with specific ID) and updates
+      await setDoc(docRef, dataToSave, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `designs/${designId}/blocks/${blockId}`);
     }
   }
 
