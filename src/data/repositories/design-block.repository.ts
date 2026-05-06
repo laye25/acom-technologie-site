@@ -12,7 +12,7 @@ import {
 import { db } from '../../firebase';
 import { DesignBlock } from '../../types';
 import { subscriptionEngine } from '../services/subscription.engine';
-import { handleFirestoreError, OperationType } from '../../lib/firestore.utils';
+import { handleFirestoreError, OperationType, prepareForFirestore } from '../../lib/firestore.utils';
 
 export class DesignBlockRepository {
   private getCollectionRef(designId: string) {
@@ -35,12 +35,13 @@ export class DesignBlockRepository {
   async create(designId: string, data: Omit<DesignBlock, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
       const colRef = this.getCollectionRef(designId);
-      const docRef = await addDoc(colRef, {
+      const dataToSave = prepareForFirestore({
         ...data,
         designId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
+      const docRef = await addDoc(colRef, dataToSave);
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, `designs/${designId}/blocks`);
@@ -51,10 +52,11 @@ export class DesignBlockRepository {
   async update(designId: string, blockId: string, data: Partial<DesignBlock>): Promise<void> {
     try {
       const docRef = doc(db, 'designs', designId, 'blocks', blockId);
-      await updateDoc(docRef, {
+      const dataToUpdate = prepareForFirestore({
         ...data,
         updatedAt: serverTimestamp()
       });
+      await updateDoc(docRef, dataToUpdate);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `designs/${designId}/blocks/${blockId}`);
     }

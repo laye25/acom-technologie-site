@@ -75,18 +75,21 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
  */
 export function prepareForFirestore(data: any): any {
   if (data === undefined) return null;
-  if (data === null || typeof data !== 'object') return data;
+  if (data === null) return null;
+  
+  // Handle numbers that Firestore rejects
+  if (typeof data === 'number') {
+    if (isNaN(data) || !isFinite(data)) return 0;
+    return data;
+  }
+  
+  if (typeof data !== 'object') return data;
   
   if (data instanceof Date) return data;
   
   if (Array.isArray(data)) {
     return data.map(item => prepareForFirestore(item));
   }
-  
-  // If we are at the top level of 'content', just stringify the whole thing
-  // The caller in CardEditor.tsx passes 'el' as 'content' which is a large object
-  // Let's force it to be a JSON string immediately at the top level if it's the 'content' property being prepared.
-  // Actually, prepareForFirestore is recursive. This is tricky.
   
   const prepared: any = {};
   for (const [key, value] of Object.entries(data)) {

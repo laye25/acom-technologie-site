@@ -1945,9 +1945,16 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
       // Save blocks to subcollection
       if (designDocId) {
-        console.log(`Saving ${pages.reduce((acc, p) => acc + (p.elements?.length || 0), 0)} elements...`);
-        const blockPromises = pages.flatMap((page, pageIndex) => 
-          (page.elements || []).map((el, zIndex) => {
+        const elementsTotal = pages.reduce((acc, p) => acc + (p.elements?.length || 0), 0);
+        console.log(`Saving ${elementsTotal} elements to design ${designDocId}...`);
+        
+        // Truly sequential or chunky execution to avoid rate limits and connection issues
+        for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+          const page = pages[pageIndex];
+          const elements = page.elements || [];
+          
+          for (let zIndex = 0; zIndex < elements.length; zIndex++) {
+            const el = elements[zIndex];
             const blockData = {
               id: el.id,
               designId: designDocId,
@@ -1958,21 +1965,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
               width: el.width,
               height: el.height,
               rotation: el.rotation || 0,
-              content: prepareForFirestore(el),
+              content: el, // Will be prepared by the service
               zIndex,
               updatedAt: new Date()
             };
-            return dbService.designBlocks.save(designDocId, blockData);
-          })
-        );
-        
-        // Use sequential execution if there are many blocks to avoid hitting rate limits
-        if (blockPromises.length > 20) {
-          for (const promise of blockPromises) {
-            await promise;
+            
+            await dbService.designBlocks.save(designDocId, blockData);
           }
-        } else {
-          await Promise.all(blockPromises);
         }
       }
 
@@ -2056,8 +2055,19 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       setIsSaveModalOpen(false);
       navigate(`/order-details/${orderId}`);
     } catch (error) {
-      console.error("Order error:", error);
-      toast.error("Erreur lors de la création de la commande.", { id: toastId });
+      console.error("DEBUG - handlePlaceOrder failed at some step:", error);
+      
+      let errorMessage = "Erreur lors de la création de la commande.";
+      if (error instanceof Error) {
+        try {
+          const parsedError = JSON.parse(error.message);
+          if (parsedError.error) errorMessage += ` (${parsedError.error})`;
+        } catch (e) {
+          errorMessage += ` : ${error.message}`;
+        }
+      }
+      
+      toast.error(errorMessage, { id: toastId, duration: 6000 });
     } finally {
       setIsPlacingOrder(false);
     }
