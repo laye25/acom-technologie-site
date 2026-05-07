@@ -845,6 +845,7 @@ export const dbService = {
         // Fallback for blocks without IDs (unlikely in current editor)
         await designBlockRepository.create(designId, block);
       }
+      // Ensure sync with local DB
       await db.design_blocks.put({ ...block, id, designId, updatedAt: new Date() });
       return id;
     },
@@ -861,15 +862,15 @@ export const dbService = {
       return id;
     },
     async save(design: Partial<Design>) {
-      const id = design.id;
+      let id = design.id;
       // Use set for upsert to avoid "No document to update" errors
       if (id) {
         await designRepository.set(id, design);
       } else {
         // Fallback or explicit create
-        return designRepository.create(design as any);
+        id = await designRepository.create(design as any);
       }
-      await db.designs.put({ ...design, id, updatedAt: new Date() });
+      await db.designs.put({ ...design, id, updatedAt: new Date() } as any);
       return id;
     },
     async getById(id: string) {

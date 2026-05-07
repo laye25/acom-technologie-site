@@ -1,4 +1,4 @@
-import { doc, updateDoc, increment, setDoc, getDoc } from 'firebase/firestore';
+import { doc, increment, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export type UsageType = 'reads' | 'writes' | 'ai_generations' | 'storage_mb';
@@ -9,25 +9,13 @@ export async function trackUsage(tenantId: string, type: UsageType, amount: numb
   const usageRef = doc(db, 'usage', tenantId);
   
   try {
-    // Optimistic update
-    await updateDoc(usageRef, {
+    // Use setDoc with merge: true for atomic-like upsert
+    // Note: increment works with setDoc merge: true
+    await setDoc(usageRef, {
       [type]: increment(amount),
       lastUpdated: new Date().toISOString()
-    });
+    }, { merge: true });
   } catch (error: any) {
-    // If document doesn't exist, create it
-    if (error.code === 'not-found') {
-      await setDoc(usageRef, {
-        tenantId,
-        reads: 0,
-        writes: 0,
-        ai_generations: 0,
-        storage_mb: 0,
-        [type]: amount,
-        lastUpdated: new Date().toISOString()
-      });
-    } else {
-      console.error('Error tracking usage:', error);
-    }
+    console.error('Error tracking usage:', error);
   }
 }

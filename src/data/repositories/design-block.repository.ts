@@ -5,7 +5,6 @@ import {
   query, 
   addDoc,
   setDoc,
-  updateDoc,
   deleteDoc,
   serverTimestamp,
   QueryConstraint
@@ -71,7 +70,8 @@ export class DesignBlockRepository {
         ...data,
         updatedAt: serverTimestamp()
       });
-      await updateDoc(docRef, dataToUpdate);
+      // Use setDoc with merge: true to avoid "No document to update" errors
+      await setDoc(docRef, dataToUpdate, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `designs/${designId}/blocks/${blockId}`);
     }

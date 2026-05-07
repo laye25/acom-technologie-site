@@ -4,7 +4,6 @@ import {
   getDoc, 
   getDocs, 
   setDoc, 
-  updateDoc, 
   deleteDoc, 
   query, 
   QueryConstraint,
@@ -77,7 +76,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
   }
 
   /**
-   * Update an existing document
+   * Update an existing document (using set with merge to avoid "No document to update" error)
    */
   async update(id: string, data: Partial<T>): Promise<void> {
     try {
@@ -86,7 +85,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
         ...data,
         updated_at: serverTimestamp()
       });
-      await updateDoc(docRef, dataToUpdate);
+      await setDoc(docRef, dataToUpdate, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${this.collectionName}/${id}`);
     }

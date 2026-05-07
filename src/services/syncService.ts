@@ -513,6 +513,12 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_notifications_${userId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      // Throttle: 1 minute between notification syncs
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 60000) {
+        return;
+      }
+
       const constraints: any[] = [where('userId', '==', userId)];
       
       if (lastSyncStr) {
@@ -529,7 +535,7 @@ export const syncService = {
       if (remoteData && remoteData.length > 0) {
         await db.notifications.bulkPut(remoteData);
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync notifications failed:', error);
     }

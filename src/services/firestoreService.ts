@@ -4,7 +4,6 @@ import {
   getDoc, 
   getDocs, 
   setDoc, 
-  updateDoc, 
   deleteDoc, 
   query, 
   onSnapshot,
@@ -102,7 +101,8 @@ export const firestoreService = {
         ...data,
         updated_at: serverTimestamp()
       });
-      await updateDoc(docRef, dataToUpdate);
+      // Use setDoc with merge: true to avoid "No document to update" errors
+      await setDoc(docRef, dataToUpdate, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${collectionName}/${id}`);
     }

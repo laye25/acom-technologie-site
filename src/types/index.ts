@@ -172,6 +172,7 @@ export interface UserProfile {
       version: string;
     };
     appliedAt: any;
+    requestedRole?: 'printer' | 'designer';
     commissionPercentage?: number; // Custom commission for this partner (e.g., 85 for 85%)
   };
   merchantId?: string;
