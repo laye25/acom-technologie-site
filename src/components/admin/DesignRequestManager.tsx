@@ -133,9 +133,15 @@ const DesignRequestManager = () => {
         supplierStatus: o.supplierStatus
       }))
   ].sort((a: any, b: any) => {
-    const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
-    const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
-    return timeB - timeA;
+    const getDate = (val: any) => {
+      if (!val) return new Date(0);
+      if (val instanceof Date) return val;
+      if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+      if (val.seconds !== undefined) return new Date(val.seconds * 1000);
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? new Date(0) : d;
+    };
+    return getDate(b.createdAt).getTime() - getDate(a.createdAt).getTime();
   });
 
   const updateStatus = async (id: string, status: string, origin: 'design_request' | 'studio_order') => {
@@ -324,12 +330,14 @@ const DesignRequestManager = () => {
                     <Calendar className="w-3 h-3 mr-1" />
                     {(() => {
                       let d: Date | null = null;
-                      if (request.createdAt?.toDate) d = request.createdAt.toDate();
+                      if (request.createdAt instanceof Date) d = request.createdAt;
+                      else if (request.createdAt?.toDate) d = request.createdAt.toDate();
+                      else if (request.createdAt?.seconds) d = new Date(request.createdAt.seconds * 1000);
                       else if (request.createdAt) {
                         const parsed = new Date(request.createdAt);
                         if (!isNaN(parsed.getTime())) d = parsed;
                       }
-                      return d ? format(d, 'dd MMMM yyyy HH:mm', { locale: fr }) : 'Date invalide';
+                      return d ? format(d, 'dd MMMM yyyy HH:mm', { locale: fr }) : 'Date inconnue';
                     })()}
                   </div>
                 </div>

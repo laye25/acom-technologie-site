@@ -41,10 +41,10 @@ export const storageService = {
       
       const metadata = contentType ? { contentType } : undefined;
       
-      // Add a 5-second timeout to prevent infinite hanging if Storage is not configured
+      // Add a 30-second timeout to allow larger files to upload on slower connections
       const uploadPromise = uploadBytes(storageRef, fileBody, metadata);
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Upload timeout: Firebase Storage might not be configured')), 5000);
+        setTimeout(() => reject(new Error('Upload timeout: Firebase Storage might be slow or unconfigured')), 30000);
       });
       
       const snapshot = await Promise.race([uploadPromise, timeoutPromise]);

@@ -1752,6 +1752,13 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       // Sanitize pages array to remove undefined values which Firestore doesn't like
       const sanitizedPages = JSON.parse(JSON.stringify(pages));
       
+      // Check for document size limit (1MB roughly equals 1 million characters in JSON)
+      const dataSize = JSON.stringify(sanitizedPages).length;
+      if (dataSize > 950000) {
+        toast.error("Le design est trop lourd (images trop grandes). Réduisez la taille des images importées.");
+        return;
+      }
+      
       console.log("Saving template:", { name: templateName, category: templateCategory, pageCount: sanitizedPages.length });
       
       const selectedCategory = TEMPLATE_CATEGORIES.find(c => c.name === templateCategory);
@@ -1796,10 +1803,11 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     const toastId = toast.loading("Capture du design en cours...");
     
     try {
-      // 1. Capture design thumbnail - Use 1.25 for balance between speed and quality
+      // 1. Capture design thumbnail - Balanced for speed/quality/size
       if (!stageRef.current) throw new Error("Canvas non initialisé");
       console.log("Capturing canvas...");
-      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1.25 });
+      // Reduced pixelRatio to 1.0 to keep base64 size manageable if fallback happens
+      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1.0 });
       
       // 2. Add PDF generation (fiche technique)
       toast.loading("Génération de la fiche technique...", { id: toastId });
@@ -1909,14 +1917,17 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         const pdfPath = `designs/${user.uid}/technical-sheets/${timestamp}.pdf`;
 
         // Parallel upload with timeout protection
+        // Note: returning a generic placeholder instead of full base64 on failure to avoid Firestore 1MB limit
         const uploadPromises = [
           storageService.uploadFile('designs', thumbnailPath, dataUrl).catch(e => {
             console.warn("Storage upload failed for thumbnail:", e);
-            return dataUrl;
+            // If the thumbnail is small enough, it might still fit, but let's be safe
+            return dataUrl.length < 500000 ? dataUrl : 'pending_upload';
           }),
           storageService.uploadFile('designs', pdfPath, pdfDataUrl).catch(e => {
             console.warn("Storage upload failed for PDF:", e);
-            return pdfDataUrl;
+            // NEVER return a massive PDF data URI to Firestore
+            return 'pending_upload';
           })
         ];
 
@@ -2081,8 +2092,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
     setIsSubmitting(true);
     try {
-      // Capture a preview of the front side
-      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1.5 });
+      // Capture a preview - 1.0 is enough for a thumbnail/preview and keeps size down
+      const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1.0 });
       
       let firebasePreviewUrl = dataUrl;
       try {
@@ -2090,9 +2101,19 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         const path = `design_requests/${user?.uid || 'guest'}_${timestamp}.png`;
         firebasePreviewUrl = await storageService.uploadFile('design_requests', path, dataUrl);
       } catch (e) {
-        console.warn("Storage upload failed for request preview, using data URL:", e);
+        console.warn("Storage upload failed for request preview, using limited data URL:", e);
+        // Limit base64 length to prevent Firestore 1MB error
+        firebasePreviewUrl = dataUrl.length < 800000 ? dataUrl : 'pending_upload';
       }
       
+      // Check if pages data is too huge (Firestore limit is 1MB total for doc)
+      const pagesString = JSON.stringify(pages);
+      if (pagesString.length > 900000) {
+        toast.error("Design trop complexe pour être sauvegardé tel quel. Essayez de réduire le nombre d'images haute résolution.");
+        setIsSubmitting(false);
+        return;
+      }
+
       await dbService.designRequests.save({
         user_id: user?.uid || null,
         userId: user?.uid || null,

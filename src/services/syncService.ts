@@ -191,21 +191,28 @@ export const syncService = {
       }
       
       if (lastSyncStr) {
-        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        const lastSyncDate = new Date(parseInt(lastSyncStr, 10));
+        // On recule de 1 min pour être sûr de ne rien rater à cause du décalage de serveur
+        const safeDate = new Date(lastSyncDate.getTime() - 60000);
+        constraints.push(where('updated_at', '>=', safeDate));
+        constraints.push(limit(300));
       } else {
         // Initial sync: ONLY fetch last 90 days of orders to prevent quota explosion
         constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 90)));
+        constraints.push(limit(500));
       }
       
       console.log(`Syncing orders from Firebase... ${lastSyncStr ? '(Delta)' : '(Initial 90d)'}`);
       const remoteOrders = await orderRepository.getAll(constraints);
       
+      // Set sync key immediately after successful fetch to prevent retry loops on processing errors
+      const currentSyncTime = Date.now().toString();
+      
       if (remoteOrders && remoteOrders.length > 0) {
         await db.orders.bulkPut(remoteOrders);
-        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+        localStorage.setItem(lastSyncKey, (parseInt(currentSyncTime) - 60000).toString());
       } else if (!lastSyncStr) {
-        // Even if no data, mark as synced to prevent retry-loop if collection is small/empty
-        localStorage.setItem(lastSyncKey, Date.now().toString());
+        localStorage.setItem(lastSyncKey, currentSyncTime);
       }
     } catch (error) {
       console.error('Sync orders failed:', error);
@@ -761,14 +768,21 @@ export const syncService = {
            constraints.push(where('userId', '==', userId));
         }
 
-        if (lastSyncStr && !force) {
-          constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        if (lastSyncStr) {
+          const lastSyncDate = new Date(parseInt(lastSyncStr, 10));
+          // On recule de 1 min pour être sûr de ne rien rater à cause du décalage de serveur
+          const safeDate = new Date(lastSyncDate.getTime() - 60000);
+          constraints.push(where('updated_at', '>=', safeDate));
+          // Limit delta syncs to 200 items for stability
+          constraints.push(limit(200));
         } else if (force) {
           // If forced, we check last 24h to be sure we catch everything missed
           constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000)));
+          constraints.push(limit(100)); // Lower limit for force to be safe
         } else {
           // Initial: 90 days to catch more requests for admin
           constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 90)));
+          constraints.push(limit(300)); // Cap initial sync to 300 items
         }
 
         const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {

@@ -109,10 +109,16 @@ export function prepareForFirestore(data: any): any {
 
 /**
  * Restores data from Firestore by parsing stringified properties (like fabricData)
+ * and converting Firebase Timestamps to Date objects.
  */
 export function restoreFromFirestore(data: any): any {
   if (data === null || typeof data !== 'object') return data;
   
+  // Handle Firebase Timestamps
+  if (data.seconds !== undefined && data.nanoseconds !== undefined) {
+    return new Date(data.seconds * 1000 + data.nanoseconds / 1000000);
+  }
+
   if (Array.isArray(data)) {
     return data.map(item => restoreFromFirestore(item));
   }
