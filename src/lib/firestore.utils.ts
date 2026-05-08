@@ -38,7 +38,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     // Si la limite de quota est atteinte, on l'enregistre pour bloquer les futurs appels locaux pendant 1h
     localStorage.setItem('firebase_quota_exceeded', Date.now().toString());
     if (!quotaToastShown) {
-       toast.error("Quota Firestore épuisé. L'application est passée en mode hors-ligne complet (lecture seule cache).", { duration: 10000 });
+       toast.error("Quota Firestore épuisé. L'application est passée en mode hors-ligne (Lecture seule cache) pour les prochaines 60 min.", { duration: 10000 });
        quotaToastShown = true;
     }
   } else if (errorMessage.toLowerCase().includes('missing or insufficient permissions')) {

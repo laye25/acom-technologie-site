@@ -61,16 +61,42 @@ const DesignRequestManager = () => {
   const { user, isAdmin, isManager } = useAuth();
   const [selectedRequestForPartner, setSelectedRequestForPartner] = useState<any>(null);
 
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   // Sync on mount - optimized to avoid excessive polling
+  const refresh = async (force: boolean = false) => { 
+    setIsRefreshing(true);
+    const quotaExceeded = localStorage.getItem('firebase_quota_exceeded');
+    if (quotaExceeded && !force) {
+       const exceededAt = parseInt(quotaExceeded, 10);
+       if (Date.now() - exceededAt < 3600000) {
+         toast.error("Synchronisation impossible : Quota Firestore épuisé. Réessayez plus tard.");
+         setIsRefreshing(false);
+         return;
+       }
+    }
+
+    try {
+      if (force) toast.loading("Force la synchronisation...", { id: 'sync-force' });
+      await syncService.syncStudioAcomData(user?.uid, isAdmin || isManager, force);
+      await syncService.syncOrders('global', force);
+      await syncService.syncUsers('global', force);
+      localStorage.setItem('last_sync_design_dashboard', Date.now().toString());
+      if (force) toast.success("Synchronisation forcée réussie !", { id: 'sync-force' });
+    } catch (error) {
+      console.error("Manual refresh failed:", error);
+      if (force) toast.error("La synchronisation forcée a échoué.", { id: 'sync-force' });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   React.useEffect(() => {
     // Check if synced recently
     const lastSync = localStorage.getItem('last_sync_design_dashboard');
-    if (!lastSync || Date.now() - parseInt(lastSync, 10) > 3600000) { // 1 hour threshold
+    if (!lastSync || Date.now() - parseInt(lastSync, 10) > 120000) { // 2 minute threshold for admin dashboard
       console.log('Performing necessary sync for Design Dashboard...');
-      syncService.syncStudioAcomData(user?.uid, isAdmin || isManager);
-      syncService.syncOrders('global');
-      syncService.syncUsers('global');
-      localStorage.setItem('last_sync_design_dashboard', Date.now().toString());
+      refresh();
     } else {
       console.log('Sync skipped - used recent cache');
     }
@@ -87,7 +113,11 @@ const DesignRequestManager = () => {
   const loading = false;
 
   const allRequests = [
-    ...requests.map(r => ({ ...r, origin: 'design_request' })),
+    ...requests.map(r => ({ 
+      ...r, 
+      createdAt: r.createdAt || r.created_at, // Handle both formats
+      origin: 'design_request' 
+    })),
     ...studioOrders
       .map((o: any) => ({
         id: o.id,
@@ -97,17 +127,16 @@ const DesignRequestManager = () => {
         sides: o.details?.customOptions?.sides || {},
         previewUrl: o.details?.designThumbnail || o.serviceImage || '',
         status: ORDER_TO_DESIGN_STATUS[o.status] || 'pending',
-        createdAt: o.createdAt || o.updatedAt,
+        createdAt: o.createdAt || o.created_at || o.updatedAt || o.updated_at,
         origin: 'studio_order',
         partnerId: o.partnerId,
         supplierStatus: o.supplierStatus
       }))
-  ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  const refresh = () => { 
-    syncService.syncStudioAcomData(user?.uid, isAdmin || isManager);
-    syncService.syncOrders('global');
-  };
+  ].sort((a: any, b: any) => {
+    const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
+    const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
+    return timeB - timeA;
+  });
 
   const updateStatus = async (id: string, status: string, origin: 'design_request' | 'studio_order') => {
     try {
@@ -224,8 +253,20 @@ const DesignRequestManager = () => {
           <h2 className="text-3xl font-display font-bold text-gray-900">Demandes de Design</h2>
           <p className="text-gray-500 mt-1">Gérez les personnalisations envoyées par les clients pour tirage.</p>
         </div>
-        <div className="bg-primary/10 px-4 py-2 rounded-xl">
-          <span className="text-primary font-bold">{allRequests.length} demandes</span>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => refresh(true)}
+            disabled={isRefreshing}
+            className={`flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 shadow-sm hover:shadow-md transition-all active:scale-95 ${isRefreshing ? 'opacity-50' : ''}`}
+          >
+            <div className={`${isRefreshing ? 'animate-spin' : ''}`}>
+              <Clock className="w-4 h-4 text-primary" />
+            </div>
+            {isRefreshing ? 'Mise à jour...' : 'Rafraîchir'}
+          </button>
+          <div className="bg-primary/10 px-4 py-2.5 rounded-2xl">
+            <span className="text-primary font-bold">{allRequests.length} demandes</span>
+          </div>
         </div>
       </div>
 

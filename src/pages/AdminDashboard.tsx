@@ -552,7 +552,8 @@ const AdminDashboard = () => {
             { id: 'services', task: () => syncService.syncServices('global') },
             { id: 'users', task: () => syncService.syncUsers('global') },
             { id: 'expenses', task: () => syncService.syncExpenses('global') },
-            { id: 'settings', task: () => syncService.syncSettings('global') }
+            { id: 'settings', task: () => syncService.syncSettings('global') },
+            { id: 'studio_acom', task: () => syncService.syncStudioAcomData(user.uid, isAdmin || isManager) }
           ];
 
           for (const { id, task } of syncTasks) {

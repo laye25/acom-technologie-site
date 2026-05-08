@@ -15,14 +15,15 @@ import { messageRepository } from '../data/repositories/message.repository';
 import { MerchantProduct } from '../types';
 
 export const syncService = {
-  async isOnline(merchantId?: string) {
+  async isOnline(merchantId?: string, force: boolean = false) {
     const quotaExceededStr = localStorage.getItem('firebase_quota_exceeded');
     if (quotaExceededStr) {
       const exceededAt = parseInt(quotaExceededStr, 10);
-      // Disable remote sync for 1 hour after hitting quota
-      if (Date.now() - exceededAt < 3600000) {
+      // Disable remote sync for 1 hour after hitting quota (unless forced)
+      if (!force && Date.now() - exceededAt < 3600000) {
+        console.warn('Sync cancelled: Firebase Quota Exceeded. Next retry in', Math.ceil((3600000 - (Date.now() - exceededAt)) / 60000), 'min');
         return false;
-      } else {
+      } else if (!force) {
         localStorage.removeItem('firebase_quota_exceeded');
       }
     }
@@ -125,47 +126,61 @@ export const syncService = {
   async syncExpenses(merchantId: string) {
     if (!(await this.isOnline(merchantId))) return;
     try {
-      const lastSyncKey = `last_sync_expenses_${merchantId}`;
+      const lastSyncKey = `last_sync_expenses_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
       
-      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 3600000) {
+      // Throttle: 5 minutes for expenses
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 300000) {
         return;
       }
 
       const timeConstraints: any[] = [];
       if (lastSyncStr) {
         timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      } else {
+        // Initial: last 30 days
+        timeConstraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 30)));
       }
 
-      console.log(`Syncing expenses... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
-      let remoteExpenses = await merchantExpenseRepository.getAll([where('merchant_id', '==', merchantId), ...timeConstraints]);
-      if (!remoteExpenses || remoteExpenses.length === 0) {
-        remoteExpenses = await merchantExpenseRepository.getAll([where('merchantId', '==', merchantId), ...timeConstraints]);
+      console.log(`Syncing expenses... ${lastSyncStr ? '(Delta)' : '(Initial 30d)'}`);
+      const mId = merchantId || 'global';
+      let remoteExpenses: any[] = [];
+      
+      if (mId !== 'global') {
+        remoteExpenses = await merchantExpenseRepository.getAll([where('merchant_id', '==', mId), ...timeConstraints]);
+        if (!remoteExpenses || remoteExpenses.length === 0) {
+          remoteExpenses = await merchantExpenseRepository.getAll([where('merchantId', '==', mId), ...timeConstraints]);
+        }
+      } else {
+        remoteExpenses = await merchantExpenseRepository.getAll([...timeConstraints]);
       }
 
       if (remoteExpenses && remoteExpenses.length > 0) {
         // Map to local DB format
         const mappedExpenses = remoteExpenses.map((e: any) => ({
           ...e,
-          merchantId: e.merchant_id,
-          createdAt: e.created_at,
-          updatedAt: e.updated_at
+          merchantId: e.merchant_id || e.merchantId,
+          createdAt: e.created_at || e.createdAt,
+          updatedAt: e.updated_at || e.updatedAt
         }));
         await db.expenses.bulkPut(mappedExpenses);
+        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      } else if (!lastSyncStr) {
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
-      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync expenses failed:', error);
     }
   },
 
-  async syncOrders(merchantId: string) {
-    if (!(await this.isOnline(merchantId))) return;
+  async syncOrders(merchantId: string, force: boolean = false) {
+    if (!(await this.isOnline(merchantId, force))) return;
     try {
       const lastSyncKey = `last_sync_orders_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
       
-      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 600000) { // 10 min for orders
+      // Strict Throttle: 5 minutes between order syncs (unless forced)
+      if (!force && lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 300000) {
         return;
       }
 
@@ -177,16 +192,21 @@ export const syncService = {
       
       if (lastSyncStr) {
         constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      } else {
+        // Initial sync: ONLY fetch last 90 days of orders to prevent quota explosion
+        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 90)));
       }
       
-      console.log(`Syncing orders from Firebase... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      console.log(`Syncing orders from Firebase... ${lastSyncStr ? '(Delta)' : '(Initial 90d)'}`);
       const remoteOrders = await orderRepository.getAll(constraints);
       
       if (remoteOrders && remoteOrders.length > 0) {
         await db.orders.bulkPut(remoteOrders);
+        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      } else if (!lastSyncStr) {
+        // Even if no data, mark as synced to prevent retry-loop if collection is small/empty
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
-      
-      localStorage.setItem(lastSyncKey, Date.now().toString());
     } catch (error) {
       console.error('Sync orders failed:', error);
     }
@@ -275,6 +295,12 @@ export const syncService = {
     try {
       const lastSyncKey = `last_sync_designs_${userId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      // Throttle: 5 minutes
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 300000) {
+        return;
+      }
+
       const constraints: any[] = [];
       
       if (userId && userId !== 'global') {
@@ -283,13 +309,19 @@ export const syncService = {
       
       if (lastSyncStr) {
         constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      } else {
+        // Initial: last 60 days for designs
+        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 60)));
       }
       
+      console.log(`Syncing designs... ${lastSyncStr ? '(Delta)' : '(Initial 60d)'}`);
       const remoteDesigns = await designRepository.getAll(constraints);
       if (remoteDesigns && remoteDesigns.length > 0) {
         await db.designs.bulkPut(remoteDesigns);
+        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      } else if (!lastSyncStr) {
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync designs failed:', error);
     }
@@ -317,21 +349,35 @@ export const syncService = {
   async syncAssets(userId: string) {
     if (!(await this.isOnline()) || !userId) return;
     try {
-      const lastSyncKey = `last_sync_assets_${userId}`;
+      const lastSyncKey = `last_sync_assets_${userId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
-      const constraints: any[] = [where('userId', '==', userId)];
+      
+      // Throttle: 10 minutes for assets
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 600000) {
+        return;
+      }
+
+      const constraints: any[] = [];
+      if (userId && userId !== 'global') {
+        constraints.push(where('userId', '==', userId));
+      }
       
       if (lastSyncStr) {
         constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      } else {
+        // Initial: last 60 days
+        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 60)));
       }
 
-      console.log(`Syncing assets... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      console.log(`Syncing assets... ${lastSyncStr ? '(Delta)' : '(Initial 60d)'}`);
       const remoteAssets = await assetRepository.getAll(constraints);
       
       if (remoteAssets && remoteAssets.length > 0) {
         await db.assets.bulkPut(remoteAssets);
+        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      } else if (!lastSyncStr) {
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync assets failed:', error);
     }
@@ -398,11 +444,17 @@ export const syncService = {
     }
   },
 
-  async syncUsers(merchantId: string) {
-    if (!(await this.isOnline(merchantId))) return;
+  async syncUsers(merchantId: string, force: boolean = false) {
+    if (!(await this.isOnline(merchantId, force))) return;
     try {
       const lastSyncKey = `last_sync_users_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      // Strict Throttle: 5 minutes between user list syncs (unless forced)
+      if (!force && lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 300000) {
+        return;
+      }
+
       const constraints: any[] = [];
       
       if (merchantId && merchantId !== 'global') {
@@ -412,37 +464,37 @@ export const syncService = {
       if (lastSyncStr) {
         constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       } else {
-        // Initial sync: last 30 days instead of 7 for better coverage
-        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 30)));
+        // Initial sync: last 7 days for users to be really aggressive on quota
+        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 7)));
       }
 
-      console.log(`Syncing users... ${lastSyncStr ? '(Delta)' : '(Initial / Recent)'}`);
+      console.log(`Syncing users... ${lastSyncStr ? '(Delta)' : '(Initial 7d)'}`);
       const remoteUsers = await userRepository.getAll(constraints);
       
-      // CRITICAL: Always explicitly fetch pending applications and approved partners
-      // to ensure they are visible to admins even if they haven't been updated recently.
+      // CRITICAL: For partners, we need more coverage but still time-limited
       let extraUsers: any[] = [];
       if (!merchantId || merchantId === 'global') {
         const [pendingUsers, approvedUsers] = await Promise.all([
-          userRepository.getAll([where('partnerStatus', '==', 'pending')]),
-          userRepository.getAll([where('partnerStatus', '==', 'approved')])
+          userRepository.getAll([where('partnerStatus', '==', 'pending'), ...constraints]),
+          userRepository.getAll([where('partnerStatus', '==', 'approved'), ...constraints])
         ]);
         extraUsers = [...pendingUsers, ...approvedUsers];
       }
 
       const allUsersToSync = [...remoteUsers];
-      // Add extra users that weren't in the time-constrained list
       extraUsers.forEach(eu => {
-        const id = eu.id || (eu as any).uid;
-        if (!allUsersToSync.find(u => (u.id || (u as any).uid) === id)) {
+        const id = eu.id || eu.uid;
+        if (!allUsersToSync.find(u => (u.id || u.uid) === id)) {
           allUsersToSync.push(eu);
         }
       });
 
       if (allUsersToSync.length > 0) {
         await db.users.bulkPut(allUsersToSync);
+        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      } else if (!lastSyncStr) {
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync users failed:', error);
     }
@@ -451,26 +503,38 @@ export const syncService = {
   async syncSaaSCollection(merchantId: string, collectionName: string, localTable: any) {
     if (!(await this.isOnline(merchantId))) return;
     try {
-      const lastSyncKey = `last_sync_${collectionName}_${merchantId}`;
+      const lastSyncKey = `last_sync_${collectionName}_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
       
+      // Throttle: 30 minutes for SaaS data
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 1800000) {
+        return;
+      }
+
       const timeConstraints: any[] = [];
       if (lastSyncStr) {
         timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+      } else {
+        // Initial sync: last 30 days
+        timeConstraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 30)));
       }
 
-      console.log(`Syncing ${collectionName}... ${lastSyncStr ? '(Delta)' : '(Full)'}`);
+      console.log(`Syncing ${collectionName}... ${lastSyncStr ? '(Delta)' : '(Initial 30d)'}`);
       
       const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
         protected collectionName = collectionName;
       })();
       
-      // Try with merchant_id
-      let remoteData = await repo.getAll([where('merchant_id', '==', merchantId), ...timeConstraints]);
-      
-      // If nothing found or to be safe, try with merchantId
-      if (!remoteData || remoteData.length === 0) {
-        remoteData = await repo.getAll([where('merchantId', '==', merchantId), ...timeConstraints]);
+      let remoteData: any[] = [];
+      const mId = merchantId || 'global';
+
+      if (mId !== 'global') {
+        remoteData = await repo.getAll([where('merchant_id', '==', mId), ...timeConstraints]);
+        if (!remoteData || remoteData.length === 0) {
+          remoteData = await repo.getAll([where('merchantId', '==', mId), ...timeConstraints]);
+        }
+      } else {
+        remoteData = await repo.getAll([...timeConstraints]);
       }
 
       if (remoteData && remoteData.length > 0) {
@@ -480,8 +544,10 @@ export const syncService = {
           merchantId: d.merchant_id || d.merchantId
         }));
         await localTable.bulkPut(mappedData);
+        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      } else if (!lastSyncStr) {
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error(`Sync ${collectionName} failed:`, error);
     }
@@ -663,59 +729,61 @@ export const syncService = {
     }
   },
 
-  async syncStudioAcomData(userId?: string, isAdmin: boolean = false) {
-    if (!(await this.isOnline())) return;
+  async syncStudioAcomData(userId?: string, isAdmin: boolean = false, force: boolean = false) {
+    if (!(await this.isOnline(navigator.onLine ? undefined : 'offline', force))) return;
     
     // Global lock to prevent concurrent syncs
     const globalSyncLockKey = 'sync_studio_acom_active';
-    if (sessionStorage.getItem(globalSyncLockKey)) return;
+    if (sessionStorage.getItem(globalSyncLockKey) && !force) return;
     
     try {
       sessionStorage.setItem(globalSyncLockKey, 'true');
-      console.log('Syncing Studio Acom data...');
+      console.log(`Syncing Studio Acom data... ${force ? '(Forced)' : ''}`);
       
       const collections = [
-        { name: 'studio_acom_categories', table: db.studio_acom_categories, throttleMs: 300000 }, // 5 min
-        { name: 'studio_acom_products', table: db.studio_acom_products, throttleMs: 300000 },
-        { name: 'variants', table: db.variants, throttleMs: 300000 },
-        { name: 'design_requests', table: db.design_requests, requiresAuth: true, throttleMs: 60000 } // 1 min (more frequent for active requests)
+        { name: 'studio_acom_categories', table: db.studio_acom_categories, throttleMs: 600000 }, 
+        { name: 'studio_acom_products', table: db.studio_acom_products, throttleMs: 600000 },
+        { name: 'variants', table: db.variants, throttleMs: 600000 },
+        { name: 'design_requests', table: db.design_requests, requiresAuth: true, throttleMs: 30000 }
       ];
 
       for (const col of collections) {
-        if (col.requiresAuth && !isAdmin && !userId) {
-          continue;
-        }
-
         const lastSyncKey = `last_sync_${col.name}_${col.requiresAuth && !isAdmin ? userId : 'global'}`;
         const lastSyncStr = localStorage.getItem(lastSyncKey);
         
-        // Throttle check
-        if (lastSyncStr) {
-          const lastSyncTime = parseInt(lastSyncStr, 10);
-          if (Date.now() - lastSyncTime < col.throttleMs) {
-            continue; // Skip this collection if synced recently
-          }
+        // Skip if recently synced (unless forced)
+        if (!force && lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < col.throttleMs) {
+          continue;
         }
 
         const constraints: any[] = [];
-        
         if (col.requiresAuth && !isAdmin && userId) {
            constraints.push(where('userId', '==', userId));
         }
 
-        if (lastSyncStr) {
+        if (lastSyncStr && !force) {
           constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        } else if (force) {
+          // If forced, we check last 24h to be sure we catch everything missed
+          constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000)));
+        } else {
+          // Initial: 90 days to catch more requests for admin
+          constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 90)));
         }
 
         const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
           protected collectionName = col.name;
         })();
-        const remoteData = await repo.getAll(constraints);
-        if (remoteData && remoteData.length > 0) {
-          await col.table.bulkPut(remoteData);
+        
+        try {
+          const remoteData = await repo.getAll(constraints);
+          if (remoteData && remoteData.length > 0) {
+            await col.table.bulkPut(remoteData);
+          }
+          localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+        } catch (e) {
+          console.warn(`Sync failed for collection ${col.name}:`, e);
         }
-        // Save current time as last sync (no buffer needed as we use >= and throttle)
-        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
     } catch (error) {
       console.error('Sync Studio Acom data failed:', error);
