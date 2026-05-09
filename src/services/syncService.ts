@@ -1,5 +1,5 @@
 import { db } from '../db/db';
-import { where, limit } from 'firebase/firestore';
+import { where, limit, orderBy } from 'firebase/firestore';
 import { merchantSaleRepository } from '../data/repositories/merchant-sale.repository';
 import { merchantExpenseRepository } from '../data/repositories/merchant-expense.repository';
 import { merchantProductRepository } from '../data/repositories/merchant-product.repository';
@@ -190,27 +190,37 @@ export const syncService = {
         constraints.push(where('merchantId', '==', merchantId));
       }
       
-      if (lastSyncStr) {
+      if (lastSyncStr && !force) {
         const lastSyncDate = new Date(parseInt(lastSyncStr, 10));
-        // On recule de 1 min pour être sûr de ne rien rater à cause du décalage de serveur
-        const safeDate = new Date(lastSyncDate.getTime() - 60000);
+        // On recule de 10 min pour être sûr de ne rien rater à cause du décalage de serveur ou propagation Firestore
+        const safeDate = new Date(lastSyncDate.getTime() - 600000);
         constraints.push(where('updated_at', '>=', safeDate));
-        constraints.push(limit(300));
+        constraints.push(orderBy('updated_at', 'desc'));
+        constraints.push(limit(500)); // Increase limit slightly
+      } else if (force) {
+        // If forced, check last 30 days to ensure no gap
+        constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 30)));
+        constraints.push(orderBy('updated_at', 'desc'));
+        constraints.push(limit(2000));
       } else {
         // Initial sync: ONLY fetch last 90 days of orders to prevent quota explosion
         constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 90)));
-        constraints.push(limit(500));
+        constraints.push(orderBy('updated_at', 'desc'));
+        constraints.push(limit(1000)); // Larger limit for initial global sync
       }
       
-      console.log(`Syncing orders from Firebase... ${lastSyncStr ? '(Delta)' : '(Initial 90d)'}`);
+      console.log(`[syncOrders] Using constraints for ${merchantId || 'global'}:`, constraints.map(c => JSON.stringify(c)));
+      
       const remoteOrders = await orderRepository.getAll(constraints);
+      console.log(`[syncOrders] Sync completed. Received ${remoteOrders?.length || 0} orders.`);
       
       // Set sync key immediately after successful fetch to prevent retry loops on processing errors
       const currentSyncTime = Date.now().toString();
       
       if (remoteOrders && remoteOrders.length > 0) {
+        console.log(`[syncOrders] Adding ${remoteOrders.length} orders to Dexie`);
         await db.orders.bulkPut(remoteOrders);
-        localStorage.setItem(lastSyncKey, (parseInt(currentSyncTime) - 60000).toString());
+        localStorage.setItem(lastSyncKey, (parseInt(currentSyncTime) - 600000).toString()); // 10 min overlap
       } else if (!lastSyncStr) {
         localStorage.setItem(lastSyncKey, currentSyncTime);
       }
@@ -768,21 +778,19 @@ export const syncService = {
            constraints.push(where('userId', '==', userId));
         }
 
-        if (lastSyncStr) {
+        if (lastSyncStr && !force) {
           const lastSyncDate = new Date(parseInt(lastSyncStr, 10));
-          // On recule de 1 min pour être sûr de ne rien rater à cause du décalage de serveur
-          const safeDate = new Date(lastSyncDate.getTime() - 60000);
+          // On recule de 10 min
+          const safeDate = new Date(lastSyncDate.getTime() - 600000);
           constraints.push(where('updated_at', '>=', safeDate));
-          // Limit delta syncs to 200 items for stability
-          constraints.push(limit(200));
-        } else if (force) {
-          // If forced, we check last 24h to be sure we catch everything missed
-          constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000)));
-          constraints.push(limit(100)); // Lower limit for force to be safe
+          constraints.push(orderBy('updated_at', 'desc'));
+          // Limit delta syncs
+          constraints.push(limit(250));
         } else {
-          // Initial: 90 days to catch more requests for admin
+          // If forced or initial: 90 days to catch more requests for admin
           constraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 90)));
-          constraints.push(limit(300)); // Cap initial sync to 300 items
+          constraints.push(orderBy('updated_at', 'desc'));
+          constraints.push(limit(500)); 
         }
 
         const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
@@ -790,11 +798,14 @@ export const syncService = {
         })();
         
         try {
+          console.log(`[syncStudioAcom] Syncing ${col.name} (force=${force})...`);
           const remoteData = await repo.getAll(constraints);
+          console.log(`[syncStudioAcom] Received ${remoteData?.length || 0} items for ${col.name}`);
+          
           if (remoteData && remoteData.length > 0) {
             await col.table.bulkPut(remoteData);
           }
-          localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+          localStorage.setItem(lastSyncKey, (Date.now() - 600000).toString()); // 10 min overlap
         } catch (e) {
           console.warn(`Sync failed for collection ${col.name}:`, e);
         }

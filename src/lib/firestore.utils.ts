@@ -1,4 +1,5 @@
 import { auth } from '../firebase';
+import { FieldValue } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 export enum OperationType {
@@ -86,6 +87,7 @@ export function prepareForFirestore(data: any): any {
   if (typeof data !== 'object') return data;
   
   if (data instanceof Date) return data;
+  if (data instanceof FieldValue) return data; // Preserve serverTimestamp()
   
   if (Array.isArray(data)) {
     return data.map(item => prepareForFirestore(item));

@@ -2122,7 +2122,9 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
         user_phone: contactInfo.phone || null,
         pages: pages,
         preview_url: firebasePreviewUrl,
-        status: 'pending'
+        status: 'pending',
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
 
       setIsSuccessModalOpen(true);

@@ -103,7 +103,26 @@ const DesignRequestManager = () => {
   }, [user, isAdmin, isManager]);
 
   const requests = useLiveQuery(() => dexieDb.design_requests.toArray()) || [];
-  const studioOrders = useLiveQuery(() => dexieDb.orders.filter(o => o.pillar === 'studio').toArray()) || [];
+  const studioOrders = useLiveQuery(() => {
+    try {
+      return dexieDb.orders
+        .filter(o => {
+          if (!o) return false;
+          try {
+            return o.pillar === 'studio' || 
+                   o.details?.pillar === 'studio' || 
+                   o.details?.isStudioAcom === true ||
+                   o.serviceId === 'custom_design';
+          } catch (e) {
+            return false;
+          }
+        })
+        .toArray();
+    } catch (e) {
+      console.error("DEBUG - dexieDb.orders.filter failed:", e);
+      return [];
+    }
+  }) || [];
   const allPartners = useLiveQuery(() => dexieDb.users.filter(u => u.role === 'printer' && u.partnerStatus === 'approved').toArray()) || [];
   
   React.useEffect(() => {
@@ -113,35 +132,54 @@ const DesignRequestManager = () => {
   const loading = false;
 
   const allRequests = [
-    ...requests.map(r => ({ 
-      ...r, 
-      createdAt: r.createdAt || r.created_at, // Handle both formats
-      origin: 'design_request' 
-    })),
+    ...requests.map(r => {
+      try {
+        return { 
+          ...r, 
+          userName: r.userName || r.user_name || 'Client',
+          userEmail: r.userEmail || r.user_email || '',
+          previewUrl: r.previewUrl || r.preview_url || '',
+          createdAt: r.createdAt || r.created_at || new Date(), // Handle both formats
+          origin: 'design_request' 
+        };
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean),
     ...studioOrders
-      .map((o: any) => ({
-        id: o.id,
-        userId: o.userId,
-        userEmail: o.clientEmail,
-        userName: o.clientName,
-        sides: o.details?.customOptions?.sides || {},
-        previewUrl: o.details?.designThumbnail || o.serviceImage || '',
-        status: ORDER_TO_DESIGN_STATUS[o.status] || 'pending',
-        createdAt: o.createdAt || o.created_at || o.updatedAt || o.updated_at,
-        origin: 'studio_order',
-        partnerId: o.partnerId,
-        supplierStatus: o.supplierStatus
-      }))
+      .map((o: any) => {
+        try {
+          return {
+            id: o.id,
+            userId: o.userId || o.user_id || o.userUid,
+            userEmail: o.clientEmail || o.userEmail || o.user_email || '',
+            userName: o.clientName || o.userName || o.user_name || 'Client',
+            sides: o.details?.customOptions?.sides || o.details?.sides || {},
+            previewUrl: o.details?.designThumbnail || o.details?.previewUrl || o.serviceImage || '',
+            status: ORDER_TO_DESIGN_STATUS[o.status] || 'pending',
+            createdAt: o.createdAt || o.created_at || o.updatedAt || o.updated_at || new Date(),
+            origin: 'studio_order',
+            partnerId: o.partnerId || o.partner_id,
+            supplierStatus: o.supplierStatus || o.supplier_status
+          };
+        } catch (e) {
+          return null;
+        }
+      }).filter(Boolean)
   ].sort((a: any, b: any) => {
-    const getDate = (val: any) => {
-      if (!val) return new Date(0);
-      if (val instanceof Date) return val;
-      if (val.toDate && typeof val.toDate === 'function') return val.toDate();
-      if (val.seconds !== undefined) return new Date(val.seconds * 1000);
-      const d = new Date(val);
-      return isNaN(d.getTime()) ? new Date(0) : d;
-    };
-    return getDate(b.createdAt).getTime() - getDate(a.createdAt).getTime();
+    try {
+      const getDate = (val: any) => {
+        if (!val) return new Date(0);
+        if (val instanceof Date) return val;
+        if (val.toDate && typeof val.toDate === 'function') return val.toDate();
+        if (val.seconds !== undefined) return new Date(val.seconds * 1000);
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? new Date(0) : d;
+      };
+      return getDate(b.createdAt).getTime() - getDate(a.createdAt).getTime();
+    } catch (e) {
+      return 0;
+    }
   });
 
   const updateStatus = async (id: string, status: string, origin: 'design_request' | 'studio_order') => {
