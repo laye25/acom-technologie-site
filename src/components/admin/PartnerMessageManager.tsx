@@ -21,7 +21,7 @@ export const PartnerMessageManager = () => {
 
     const partners = useLiveQuery(() => 
         db.users.where('role').anyOf(['printer', 'designer']).toArray()
-    ) || [];
+    , []) || [];
 
     const loading = !partners && (isAdmin || isManager);
 

@@ -76,15 +76,15 @@ export function useStudioAcom(isOpen: boolean = true) {
   }), []);
 
   // 1. Fetch Categories
-  const dbCategoriesRaw = useLiveQuery(() => db.studio_acom_categories.toArray()) || [];
+  const dbCategoriesRaw = useLiveQuery(() => db.studio_acom_categories.toArray(), []) || [];
   const dbCategories = useMemo(() => dbCategoriesRaw.map(categoryMapper), [dbCategoriesRaw, categoryMapper]);
 
   // 2. Fetch Products
-  const dbProductsRaw = useLiveQuery(() => db.studio_acom_products.toArray()) || [];
+  const dbProductsRaw = useLiveQuery(() => db.studio_acom_products.toArray(), []) || [];
   const dbProducts = useMemo(() => dbProductsRaw.map(productMapper), [dbProductsRaw, productMapper]);
 
   // 3. Fetch Variants
-  const dbVariantsRaw = useLiveQuery(() => db.variants.toArray()) || [];
+  const dbVariantsRaw = useLiveQuery(() => db.variants.toArray(), []) || [];
   const dbVariants = useMemo(() => dbVariantsRaw.map(variantMapper), [dbVariantsRaw, variantMapper]);
 
   const loading = false;

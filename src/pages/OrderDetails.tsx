@@ -84,14 +84,11 @@ const OrderDetails = () => {
   const [partnerSearch, setPartnerSearch] = useState('');
 
   // Utilisez Dexie directement
-  const allPartners = useLiveQuery(() => db.users.where('role').anyOf('printer', 'designer').toArray()) || [];
-  const allRatings = useLiveQuery(() => db.partner_ratings.toArray()) || [];
+  const allPartners = useLiveQuery(() => db.users.where('role').anyOf('printer', 'designer').toArray(), []) || [];
+  const allRatings = useLiveQuery(() => db.partner_ratings.toArray(), []) || [];
 
   useEffect(() => {
-    if (orderId) {
-      syncService.syncUsers(''); // Load all users/partners contextually
-      syncService.syncPartnerRatings();
-    }
+    // Syncs handled by BackgroundSyncManager or user action
   }, [orderId, user?.uid]);
 
   const partnerReputations = useMemo(() => {
@@ -122,9 +119,9 @@ const OrderDetails = () => {
     }
   };
 
-  const orderData = useLiveQuery(() => db.orders.where('id').equals(orderId || '').toArray()) || [];
-  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
-  const allUsers = useLiveQuery(() => db.users.toArray()) || [];
+  const orderData = useLiveQuery(() => db.orders.where('id').equals(orderId || '').toArray(), []) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray(), []) || [];
+  const allUsers = useLiveQuery(() => db.users.toArray(), []) || [];
   
   const orderLoading = false; // Simplified
   const orderError = null; // Simplified

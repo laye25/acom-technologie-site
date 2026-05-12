@@ -22,7 +22,7 @@ const AIAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const services = useLiveQuery(() => dexieDb.services.toArray()) || [];
+  const services = useLiveQuery(() => dexieDb.services.toArray(), []) || [];
 
   useEffect(() => {
     if (scrollRef.current) {

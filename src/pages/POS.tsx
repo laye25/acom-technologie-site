@@ -44,7 +44,7 @@ const POS = () => {
   }, [user?.uid]);
 
   // Read from Dexie
-  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray(), []) || [];
   const servicesLoading = false;
 
   const allServices = useMemo(() => {

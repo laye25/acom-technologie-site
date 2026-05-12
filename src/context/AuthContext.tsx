@@ -13,6 +13,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { UserProfile } from '../types';
+import { syncManager } from '../services/backgroundSyncManager';
 
 interface AuthContextType {
   user: User | null;
@@ -145,6 +146,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileUnsubscribe) profileUnsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (user && profile) {
+      syncManager.setContext(user, profile.merchantId || null, customClaims?.admin || false);
+      syncManager.start();
+    } else {
+      syncManager.stop();
+    }
+  }, [user, profile, customClaims]);
 
   const createProfileIfMissing = async (currentUser: User) => {
     try {

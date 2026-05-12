@@ -489,7 +489,7 @@ const DesignSelectorModal: React.FC<DesignSelectorModalProps> = ({
 
   const communityTemplates = useLiveQuery(
     () => db.templates.orderBy('updatedAt').reverse().limit(50).toArray()
-  ) || [];
+  , []) || [];
 
   const loadingCommunity = false;
 

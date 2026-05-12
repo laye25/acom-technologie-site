@@ -17,7 +17,7 @@ export const AcomSaaSManager = () => {
   const [isGeneratingLink, setIsGeneratingLink] = useState<string | null>(null);
   
   // Remplacé useFirestoreData par useLiveQuery pour la réactivité automatique via Dexie
-  const merchants = useLiveQuery(() => db.merchants.toArray()) || [];
+  const merchants = useLiveQuery(() => db.merchants.toArray(), []) || [];
   const loading = merchants.length === 0; // Utilisation simplifiée du chargement
 
   const filteredMerchants = merchants.filter(merchant => 

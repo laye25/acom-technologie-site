@@ -34,8 +34,10 @@ const Dashboard = () => {
   }, [searchParams]);
 
   // Sync data
+  // The BackgroundSyncManager orchestrates syncs now, removing reactive triggers
   useEffect(() => {
-    if (user?.uid) {
+    // Only perform an initial sync if the data is completely missing in Dexie
+    if (user?.uid && orders.length === 0) {
       if (isAdmin || isManager) {
         syncService.syncOrders('global');
         syncService.syncServices('global');
@@ -48,7 +50,7 @@ const Dashboard = () => {
         syncService.syncDesigns(user.uid);
       }
     }
-  }, [user?.uid, isAdmin, isManager]);
+  }, [user?.uid, isAdmin, isManager, orders.length]);
 
   // Read from Dexie
   const orders = useLiveQuery(async () => {
@@ -57,8 +59,8 @@ const Dashboard = () => {
     return db.orders.where('userId').equals(user.uid).or('user_id').equals(user.uid).toArray();
   }, [user, isAdmin, isManager]) || [];
 
-  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
-  const users = useLiveQuery(() => db.users.toArray()) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray(), []) || [];
+  const users = useLiveQuery(() => db.users.toArray(), []) || [];
   const userDesigns = useLiveQuery(() => {
     if (!user) return [];
     return db.designs.toArray();

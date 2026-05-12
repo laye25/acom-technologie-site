@@ -15,9 +15,9 @@ export const PartnerReputationManager = () => {
     syncService.syncOrders('');
   }, []);
 
-  const users = useLiveQuery(() => db.users.toArray()) || [];
-  const ratings = useLiveQuery(() => db.partner_ratings.toArray()) || [];
-  const orders = useLiveQuery(() => db.orders.toArray()) || [];
+  const users = useLiveQuery(() => db.users.toArray(), []) || [];
+  const ratings = useLiveQuery(() => db.partner_ratings.toArray(), []) || [];
+  const orders = useLiveQuery(() => db.orders.toArray(), []) || [];
 
   const partners = useMemo(() => {
     return users.filter(u => 

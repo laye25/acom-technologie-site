@@ -524,15 +524,15 @@ const AdminDashboard = () => {
   }, [isRestrictedAdmin, activeTab]);
 
   // Replace manual loading with useLiveQuery
-  const orders = useLiveQuery(() => db.orders.toArray()) || [];
-  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
-  const users = useLiveQuery(() => db.users.toArray()) || [];
-  const rawExpenses = useLiveQuery(() => db.expenses.toArray()) || [];
+  const orders = useLiveQuery(() => db.orders.toArray(), []) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray(), []) || [];
+  const users = useLiveQuery(() => db.users.toArray(), []) || [];
+  const rawExpenses = useLiveQuery(() => db.expenses.toArray(), []) || [];
   const expenses = useMemo(() => rawExpenses.map(exp => ({
     ...exp,
     updatedAt: exp.updatedAt || exp.created_at || exp.createdAt || new Date()
   })) as Expense[], [rawExpenses]);
-  const settingsData = useLiveQuery(() => db.settings.toArray()) || [];
+  const settingsData = useLiveQuery(() => db.settings.toArray(), []) || [];
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

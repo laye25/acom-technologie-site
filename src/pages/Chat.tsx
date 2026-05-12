@@ -23,16 +23,12 @@ const Chat = () => {
   // ... replaced useFirestoreData with LiveQuery
   const messages = useLiveQuery(() => db.messages.where('orderId').equals(orderId || '').toArray(), [orderId]) || [];
   const orderData = useLiveQuery(() => db.orders.where('id').equals(orderId || '').toArray(), [orderId]) || [];
-  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
-  const userProfiles = useLiveQuery(() => db.users.toArray()) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray(), []) || [];
+  const userProfiles = useLiveQuery(() => db.users.toArray(), []) || [];
   
+  // Sync messages only if needed or managed by user action/manager
   useEffect(() => {
-    if (orderId) {
-      syncService.syncMessages(orderId);
-      syncService.syncOrders(orderId); // Simplified sync
-      syncService.syncServices('global');
-      syncService.syncUsers('global');
-    }
+    // Rely on LiveQuery for local state
   }, [orderId]);
 
   const order = orderData?.[0] || null;

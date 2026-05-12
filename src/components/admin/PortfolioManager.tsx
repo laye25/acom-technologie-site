@@ -17,7 +17,7 @@ const PortfolioManager = () => {
     syncService.syncPortfolioItems();
   }, []);
 
-  const items = useLiveQuery(() => dexieDb.portfolio_items.toArray()) || [];
+  const items = useLiveQuery(() => dexieDb.portfolio_items.toArray(), []) || [];
   const loading = false;
   const fetchError = null;
   const refresh = () => syncService.syncPortfolioItems();

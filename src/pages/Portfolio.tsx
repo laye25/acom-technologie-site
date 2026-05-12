@@ -17,8 +17,8 @@ const Portfolio = () => {
   }, []);
 
   // Read from Dexie
-  const dbProjects = useLiveQuery(() => db.portfolio_items.toArray()) || [];
-  const settings = useLiveQuery(() => db.settings.get('global')) as SiteSettings;
+  const dbProjects = useLiveQuery(() => db.portfolio_items.toArray(), []) || [];
+  const settings = useLiveQuery(() => db.settings.get('global'), []) as SiteSettings;
   const loading = false;
 
   const displayProjects = useMemo(() => {

@@ -3,6 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { Order } from '../types';
 import { db } from '../db/db';
+import { db as firestoreDb } from '../firebase';
+import { collection, query, where } from 'firebase/firestore';
+import { subscriptionEngine } from '../data/services/subscription.engine';
 import { dbService } from '../services/dbService';
 import { syncService } from '../services/syncService';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -40,28 +43,49 @@ export const PartnerPortal: React.FC = () => {
     address: ''
   });
 
-  // Sync data
+  // Sync data handled by BackgroundSyncManager
   useEffect(() => {
-    if (user?.uid) {
-      if (!isAdmin && !isManager) {
-        syncService.syncPartnerOrders(user.uid);
-        syncService.syncPartnerRatings();
-      } else {
-        syncService.syncOrders('global');
-        syncService.syncPartnerRatings();
+    // Only perform an initial sync if the data is completely missing in Dexie
+    const initialSync = async () => {
+      if (user?.uid) {
+         // Rely on BackgroundSyncManager for background updates
+         // Just a one-time check or just trust the Dexie local-first state
+         // If necessary, call manual sync here ONLY if data is missing, 
+         // but that logic is better handled by syncManager.
       }
-      syncService.syncUserProfile(user.uid);
-    }
-  }, [user?.uid, isAdmin, isManager]);
+    };
+    initialSync();
+  }, [user?.uid]);
 
   // Read from Dexie
   const myOrders = useLiveQuery(async () => {
     if (!user) return [];
     if (!isAdmin && !isManager) {
-      return db.orders.where('partnerId').equals(user.uid).toArray();
+      const orders = await db.orders.where('partnerId').equals(user.uid).toArray();
+      console.log('[PartnerPortal] Dexie orders for partner:', orders);
+      return orders;
     }
-    return db.orders.toArray();
+    const orders = await db.orders.toArray();
+    console.log('[PartnerPortal] Dexie orders for admin:', orders);
+    return orders;
   }, [user, isAdmin, isManager]) || [];
+
+  // Real-time synchronization for printers
+  useEffect(() => {
+    if (!user || isAdmin || isManager) return;
+    
+    // Subscribe to Firestore orders for this partner
+    const colRef = collection(firestoreDb, 'orders');
+    const q = query(colRef, where('partnerId', '==', user.uid));
+    
+    const unsubscribe = subscriptionEngine.subscribe('partner_orders_realtime', q, async (snapshot) => {
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        await db.orders.bulkPut(orders as any);
+        console.log('[PartnerPortal] Real-time order update synced to Dexie');
+    });
+
+    return () => unsubscribe();
+  }, [user, isAdmin, isManager]);
 
   const ratings = useLiveQuery(() => 
     user ? db.partner_ratings.where('partnerId').equals(user.uid).toArray() : []
@@ -69,7 +93,7 @@ export const PartnerPortal: React.FC = () => {
 
   const admins = useLiveQuery(() => 
     db.users.where('role').equals('admin').limit(1).toArray()
-  ) || [];
+  , []) || [];
 
   const loading = myOrders === undefined;
   

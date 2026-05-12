@@ -482,25 +482,7 @@ const MerchantSaaS = () => {
     fetchSettings();
   }, []);
 
-  // Data Synchronization
-  useEffect(() => {
-    if (merchant && merchant.id) {
-      // Sync from Cloud to Local (Delta-Sync)
-      syncService.syncAllMerchantData(merchant.id);
-      syncService.syncUsers(merchant.id);
-      syncService.syncSettings(merchant.id);
-      
-      // Only premium plans get periodic push/pull Cloud Sync
-      if (isCloudSyncEnabled) {
-        // Push pending local data periodically
-        const pushInterval = setInterval(() => {
-          syncService.pushPendingData(merchant.id!);
-        }, 30000); // Every 30 seconds
-
-        return () => clearInterval(pushInterval);
-      }
-    }
-  }, [merchant?.id, merchant?.plan, isCloudSyncEnabled]);
+  // Data Synchronization: BackgroundSyncManager handles it
 
   const getTabs = (type: string, plan: string) => {
     let tabs: any[] = [];
@@ -4238,7 +4220,7 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
 
   const expenses = useLiveQuery(() => 
     db.expenses.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
-  ) || [];
+  , []) || [];
   const loading = false; // Simplified
 
   const handleSaveExpense = async (e: React.FormEvent) => {
@@ -4410,11 +4392,11 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
 
   const sales = useLiveQuery(() => 
     db.sales.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
-  ) || [];
+  , []) || [];
 
   const quotes = useLiveQuery(() => 
     db.quotes.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
-  ) || [];
+  , []) || [];
 
   const handleConvertQuote = async (quote: MerchantQuote) => {
     try {

@@ -40,7 +40,7 @@ const OrderQuote = () => {
     return db.orders.get(orderId);
   }, [orderId]) || null;
 
-  const dynamicServices = useLiveQuery(() => db.services.toArray()) || [];
+  const dynamicServices = useLiveQuery(() => db.services.toArray(), []) || [];
 
   const orderLoading = !order; // Basic loading state if order not yet in Dexie
 

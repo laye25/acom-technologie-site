@@ -475,7 +475,7 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
 
   const dbTemplates = useLiveQuery(
     () => db.templates.orderBy('updatedAt').reverse().limit(50).toArray()
-  ) || [];
+  , []) || [];
 
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [designTitle, setDesignTitle] = useState('Design sans titre');
@@ -1106,46 +1106,41 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
   // Auto-save to localStorage
   useEffect(() => {
     if (hasLoaded.current) {
-      const designToSave = {
-        pages,
-        designTitle,
-        timestamp: Date.now(),
-        templateId
-      };
-      
-      try {
-        const jsonStr = JSON.stringify(designToSave, (key, val) => {
-           if (key === 'fabricData' || key === 'clipPath') return undefined; // Strip for autosave
-           return val;
-        });
+      const saveDesign = async () => {
         try {
-          localStorage.setItem('studio_acom_autosave', jsonStr);
+          await db.designs.put({
+            id: 'autosave',
+            pages,
+            designTitle,
+            timestamp: Date.now(),
+            templateId,
+            syncStatus: 'pending' // Flag for later sync
+          });
         } catch (error) {
-          console.error('Autosave quota exceeded, cannot save to localStorage:');
+          console.error('Autosave to Dexie failed:', error);
         }
-      } catch (e) {
-        console.error("Failed to stringify designToSave for autosave. File too large.");
-      }
+      };
+      saveDesign();
     }
   }, [pages, designTitle, templateId]);
 
   // Check for auto-save on mount
   useEffect(() => {
-    const saved = localStorage.getItem('studio_acom_autosave');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Only prompt if the saved design is relatively recent (e.g., last 24h) 
-        // or if it's a different design than what's currently loading
-        if (parsed && parsed.pages && parsed.pages[0] && parsed.pages[0].elements && parsed.pages[0].elements.length > 0) {
-          setSavedDesign(parsed);
-          // We'll show the prompt after the initial load logic runs
-          setTimeout(() => setShowRestorePrompt(true), 1000);
+    const checkAutosave = async () => {
+      const saved = await db.designs.get('autosave');
+      if (saved) {
+        try {
+          if (saved.pages && saved.pages[0] && saved.pages[0].elements && saved.pages[0].elements.length > 0) {
+            setSavedDesign(saved);
+            // We'll show the prompt after the initial load logic runs
+            setTimeout(() => setShowRestorePrompt(true), 1000);
+          }
+        } catch (e) {
+          console.error("Error parsing autosave from Dexie", e);
         }
-      } catch (e) {
-        console.error("Error parsing autosave", e);
       }
-    }
+    };
+    checkAutosave();
   }, []);
 
   const restoreDesign = () => {
@@ -1157,8 +1152,8 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
     }
   };
 
-  const discardSavedDesign = () => {
-    localStorage.removeItem('studio_acom_autosave');
+  const discardSavedDesign = async () => {
+    await db.designs.delete('autosave');
     setShowRestorePrompt(false);
   };
 

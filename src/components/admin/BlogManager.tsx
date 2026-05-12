@@ -22,7 +22,7 @@ const BlogManager = () => {
     syncService.syncBlogPosts();
   }, []);
 
-  const posts = useLiveQuery(() => dexieDb.blog_posts.toArray()) || [];
+  const posts = useLiveQuery(() => dexieDb.blog_posts.toArray(), []) || [];
   const loading = false;
   const fetchError = null;
   const refresh = () => syncService.syncBlogPosts();

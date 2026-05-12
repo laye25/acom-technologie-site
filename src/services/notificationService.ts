@@ -721,5 +721,61 @@ export const notificationService = {
     } catch (error) {
       console.error('Email sending failed:', error);
     }
+  },
+
+  async notifyPartnerNewMission(partner: UserProfile, orderId: string, serviceName: string) {
+    const dashboardUrl = `${window.location.origin}/partner-portal`;
+
+    // 1. In-App Notification
+    try {
+      await dbService.notifications.save({
+        userId: partner.uid,
+        title: 'Nouvelle mission assignée',
+        message: `Une nouvelle mission vous a été assignée : ${serviceName} (Commande #${orderId.slice(0, 8)})`,
+        type: 'order_status',
+        orderId: orderId,
+        read: false
+      });
+    } catch (error) {
+      console.error('Failed to save in-app notification:', error);
+    }
+
+    // 2. Email Notification
+    try {
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: partner.email,
+          subject: `Acom Technologie - Nouvelle mission #${orderId.slice(0, 8)}`,
+          html: `
+            <div style="background-color: #f8f9fa; padding: 40px 20px; font-family: sans-serif;">
+              <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0;">
+                <div style="background-color: #b522c1; padding: 40px; text-align: center; color: white;">
+                  <h1 style="margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">Nouvelle Mission</h1>
+                </div>
+                <div style="padding: 50px; color: #1e293b; line-height: 1.6;">
+                  <h2 style="color: #1e293b; margin-top: 0; font-size: 20px; font-weight: 800;">Bonjour ${partner.displayName || partner.partnerDetails?.companyName},</h2>
+                  <p style="font-size: 16px; color: #475569;">Une nouvelle commande vient de vous être assignée.</p>
+                  
+                  <div style="background-color: #f8fafc; border-radius: 12px; padding: 25px; margin: 30px 0; border: 1px dashed #cbd5e1;">
+                    <p style="margin: 0; font-size: 16px; font-weight: bold; color: #1e293b;">Commande #${orderId.slice(0, 8)}</p>
+                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #64748b;">${serviceName}</p>
+                  </div>
+
+                  <p style="font-size: 15px; color: #475569;">Connectez-vous à votre portail pour consulter les détails et débuter la production.</p>
+                  
+                  <div style="text-align: center; margin-top: 40px;">
+                    <a href="${dashboardUrl}" style="background-color: #b522c1; color: white; padding: 16px 32px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 14px; display: inline-block;">Accéder au portail</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `
+        })
+      });
+    } catch (error) {
+      console.error('Email sending failed:', error);
+    }
   }
 };

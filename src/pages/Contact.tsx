@@ -7,7 +7,7 @@ import { db as dexieDb } from '../db/db';
 import { syncService } from '../services/syncService';
 
 const Contact = () => {
-  const settings = useLiveQuery(() => dexieDb.settings.toCollection().first());
+  const settings = useLiveQuery(() => dexieDb.settings.toCollection().first(), []);
 
   useEffect(() => {
     syncService.syncSettings('global'); // Supposons que les réglages généraux soient sous l'ID 'global'

@@ -13,7 +13,9 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import OrderForm from './pages/OrderForm';
 import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const MerchantSaaS = React.lazy(() => import('./pages/MerchantSaaS'));
+const DesignEditor = React.lazy(() => import('./pages/DesignEditor'));
 import Chat from './pages/Chat';
 import OrderDetails from './pages/OrderDetails';
 import OrderQuote from './pages/OrderQuote';
@@ -24,11 +26,13 @@ import Contact from './pages/Contact';
 import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import POS from './pages/POS';
-import MerchantSaaS from './pages/MerchantSaaS';
+// Removed direct imports for lazy loading
+
 import Pricing from './pages/Pricing';
 import SaaSSolutions from './pages/SaaSSolutions';
 import ServiceDetails from './pages/ServiceDetails';
-import DesignEditor from './pages/DesignEditor';
+// Removed direct imports for lazy loading
+
 import EmailPreview from './pages/EmailPreview';
 import ReleaseNotes from './pages/ReleaseNotes';
 import About from './pages/About';
@@ -74,44 +78,46 @@ function AppContent() {
       <CommandPalette />
       {!hideNavbar && <Navbar />}
       <main key={location.key} className={isEditor ? 'h-screen' : ''}>
-        <Routes>
-          {isSaaSDomain ? (
-            <Route path="/" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
-          ) : (
-            <Route path="/" element={<Home />} />
-          )}
-          <Route path="/login" element={<Login />} />
-          <Route path="/portfolio" element={<Portfolio />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/:postId" element={<BlogPost />} />
-          <Route path="/service/:serviceId" element={<ServiceDetails />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/devenir-partenaire" element={<BecomePartner />} />
-          <Route path="/conditions-partenaires" element={<PartnerTerms />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/release-notes" element={<ReleaseNotes />} />
-          <Route path="/order/:serviceId" element={<ProtectedRoute><OrderForm /></ProtectedRoute>} />
-          <Route path="/quote-request" element={<ProtectedRoute><QuoteRequest /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/email-preview" element={<ProtectedRoute adminOnly><EmailPreview /></ProtectedRoute>} />
-          <Route path="/manager/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
-          <Route path="/merchant/saas" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
-          <Route path="/partner-portal" element={<ProtectedRoute><PartnerPortal /></ProtectedRoute>} />
-          <Route path="/solutions-saas" element={<SaaSSolutions />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/prix" element={<Pricing />} />
-          <Route path="/design-editor" element={<ProtectedRoute><DesignEditor /></ProtectedRoute>} />
-          <Route path="/chat/:orderId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-          <Route path="/order-details/:orderId" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
-          <Route path="/quote/:orderId" element={<ProtectedRoute><OrderQuote /></ProtectedRoute>} />
-          <Route path="/invoice/:orderId" element={<ProtectedRoute><OrderInvoice /></ProtectedRoute>} />
-          <Route path="/messages" element={<Navigate to="/dashboard" />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+        <React.Suspense fallback={<div className="p-8 text-center">Chargement...</div>}>
+          <Routes>
+            {isSaaSDomain ? (
+              <Route path="/" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
+            ) : (
+              <Route path="/" element={<Home />} />
+            )}
+            <Route path="/login" element={<Login />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:postId" element={<BlogPost />} />
+            <Route path="/service/:serviceId" element={<ServiceDetails />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/devenir-partenaire" element={<BecomePartner />} />
+            <Route path="/conditions-partenaires" element={<PartnerTerms />} />
+            <Route path="/faq" element={<FAQ />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/release-notes" element={<ReleaseNotes />} />
+            <Route path="/order/:serviceId" element={<ProtectedRoute><OrderForm /></ProtectedRoute>} />
+            <Route path="/quote-request" element={<ProtectedRoute><QuoteRequest /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/email-preview" element={<ProtectedRoute adminOnly><EmailPreview /></ProtectedRoute>} />
+            <Route path="/manager/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
+            <Route path="/merchant/saas" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
+            <Route path="/partner-portal" element={<ProtectedRoute><PartnerPortal /></ProtectedRoute>} />
+            <Route path="/solutions-saas" element={<SaaSSolutions />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/prix" element={<Pricing />} />
+            <Route path="/design-editor" element={<ProtectedRoute><DesignEditor /></ProtectedRoute>} />
+            <Route path="/chat/:orderId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+            <Route path="/order-details/:orderId" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
+            <Route path="/quote/:orderId" element={<ProtectedRoute><OrderQuote /></ProtectedRoute>} />
+            <Route path="/invoice/:orderId" element={<ProtectedRoute><OrderInvoice /></ProtectedRoute>} />
+            <Route path="/messages" element={<Navigate to="/dashboard" />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </React.Suspense>
       </main>
       
       {!hideFooter && <Footer />}

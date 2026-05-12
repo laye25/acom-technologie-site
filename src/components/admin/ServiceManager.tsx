@@ -38,7 +38,7 @@ const ServiceManager = () => {
 
   // serviceOptions removed
 
-  const services = useLiveQuery(() => db.services.toArray().then(services => services as Service[])) || [];
+  const services = useLiveQuery(() => db.services.toArray().then(services => services as Service[]), []) || [];
   const loading = false; // Simplified
   const fetchError = null;
   const refresh = () => syncService.syncServices(user?.uid || ''); // Optional if needed

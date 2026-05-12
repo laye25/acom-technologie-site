@@ -5,8 +5,8 @@ import { geminiService } from '../../services/geminiService';
 import { MessageSquare, Loader2, Send } from 'lucide-react';
 
 export const AdminChat = () => {
-    const orders = useLiveQuery(() => db.orders.toArray()) || [];
-    const expenses = useLiveQuery(() => db.expenses.toArray()) || [];
+    const orders = useLiveQuery(() => db.orders.toArray(), []) || [];
+    const expenses = useLiveQuery(() => db.expenses.toArray(), []) || [];
     const [messages, setMessages] = useState<{ role: 'user' | 'assistant', text: string }[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);

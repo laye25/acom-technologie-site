@@ -27,15 +27,15 @@ const MessageManager = () => {
 
   const orders = useLiveQuery(() => 
     db.orders.orderBy('updatedAt').reverse().toArray()
-  ) || [];
+  , []) || [];
 
   const dynamicServices = useLiveQuery(() => 
     db.services.toArray()
-  ) || [];
+  , []) || [];
 
   const users = useLiveQuery(() => 
     db.users.toArray()
-  ) || [];
+  , []) || [];
 
   const ordersLoading = !orders && hasAccess;
 

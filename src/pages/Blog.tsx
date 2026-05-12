@@ -16,7 +16,7 @@ const Blog = () => {
   }, []);
 
   // Read from Dexie
-  const dbPosts = useLiveQuery(() => db.blog_posts.toArray()) || [];
+  const dbPosts = useLiveQuery(() => db.blog_posts.toArray(), []) || [];
   const loading = false; // Simplified
 
   const posts = useMemo(() => {

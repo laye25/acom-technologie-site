@@ -36,9 +36,9 @@ const StudioAcomManager = () => {
 
   const { categories, products, loading } = useStudioAcom(activeTab === 'categories' || activeTab === 'products');
 
-  const allOrders = useLiveQuery(() => db.orders.toArray()) || [];
-  const allServices = useLiveQuery(() => db.services.toArray()) || [];
-  const allUsers = useLiveQuery(() => db.users.toArray()) || [];
+  const allOrders = useLiveQuery(() => db.orders.toArray(), []) || [];
+  const allServices = useLiveQuery(() => db.services.toArray(), []) || [];
+  const allUsers = useLiveQuery(() => db.users.toArray(), []) || [];
 
   const loadingCats = loading;
   const loadingProducts = loading;

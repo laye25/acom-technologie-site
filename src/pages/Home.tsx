@@ -73,7 +73,7 @@ const Home = () => {
     syncService.syncServices('global'); // Assume global sync or handle multi-merchant if needed
   }, []);
 
-  const dbServices = useLiveQuery(() => db.services.toArray()) || [];
+  const dbServices = useLiveQuery(() => db.services.toArray(), []) || [];
   const loading = false;
 
   const [activePillar, setActivePillar] = useState<'saas' | 'studio' | 'all'>('all');

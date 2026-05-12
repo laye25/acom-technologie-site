@@ -8,6 +8,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { syncService } from '../../services/syncService';
 import { firestoreService } from '../../services/firestoreService';
 import { dbService } from '../../services/dbService';
+import { notificationService } from '../../services/notificationService';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { OptimizedImage } from '../OptimizedImage';
@@ -102,7 +103,7 @@ const DesignRequestManager = () => {
     }
   }, [user, isAdmin, isManager]);
 
-  const requests = useLiveQuery(() => dexieDb.design_requests.toArray()) || [];
+  const requests = useLiveQuery(() => dexieDb.design_requests.toArray(), []) || [];
   const studioOrders = useLiveQuery(() => {
     try {
       return dexieDb.orders
@@ -122,8 +123,8 @@ const DesignRequestManager = () => {
       console.error("DEBUG - dexieDb.orders.filter failed:", e);
       return [];
     }
-  }) || [];
-  const allPartners = useLiveQuery(() => dexieDb.users.filter(u => u.role === 'printer' && u.partnerStatus === 'approved').toArray()) || [];
+  }, []) || [];
+  const allPartners = useLiveQuery(() => dexieDb.users.filter(u => u.role === 'printer' && u.partnerStatus === 'approved').toArray(), []) || [];
   
   React.useEffect(() => {
     console.log("DEBUG DesignRequestManager - allPartners:", allPartners);
@@ -220,6 +221,10 @@ const DesignRequestManager = () => {
           status: DESIGN_TO_ORDER_STATUS[orderStatus] || 'in_progress',
           supplierStatus: 'pending' // Initial status for printer
         });
+        const partner = allPartners.find(p => p.uid === partnerId || p.id === partnerId);
+        if (partner) {
+           await notificationService.notifyPartnerNewMission(partner, selectedRequestForPartner.id, 'Impression Studio');
+        }
       } else {
         // It's a pure design_request. 
         if (selectedRequestForPartner.orderId) {
@@ -231,6 +236,10 @@ const DesignRequestManager = () => {
           await firestoreService.update('design_requests', selectedRequestForPartner.id, { 
             partnerId
           });
+          const partner = allPartners.find(p => p.uid === partnerId || p.id === partnerId);
+          if (partner) {
+             await notificationService.notifyPartnerNewMission(partner, selectedRequestForPartner.orderId, 'Impression Design Personnalisé');
+          }
         } else {
           // We must create an 'Order' document so it shows up in the Partner's Kanban
           const newOrder = {
@@ -265,6 +274,10 @@ const DesignRequestManager = () => {
             status: 'in_progress',
             orderId: newId
           });
+          const partner = allPartners.find(p => p.uid === partnerId || p.id === partnerId);
+          if (partner) {
+             await notificationService.notifyPartnerNewMission(partner, newId, 'Impression Design Personnalisé');
+          }
         }
       }
       toast.success("Partenaire assigné avec succès !");

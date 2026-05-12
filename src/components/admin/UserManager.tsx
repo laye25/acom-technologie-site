@@ -38,7 +38,7 @@ export const UserManager: React.FC = () => {
     }
   };
 
-  const users = useLiveQuery(() => db.users.toArray().then(users => users as UserProfile[])) || [];
+  const users = useLiveQuery(() => db.users.toArray().then(users => users as UserProfile[]), []) || [];
   const loading = false; // Simplified
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export const UserManager: React.FC = () => {
     }
   }, [user?.uid]);
 
-  const settingsData = useLiveQuery(() => db.settings.toArray()) || [];
+  const settingsData = useLiveQuery(() => db.settings.toArray(), []) || [];
   
   useEffect(() => {
     if (user?.uid) {

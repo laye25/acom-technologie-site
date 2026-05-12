@@ -5,8 +5,8 @@ import { geminiService } from '../../services/geminiService';
 import { Brain, Loader2 } from 'lucide-react';
 
 export const BusinessInsights = () => {
-    const orders = useLiveQuery(() => db.orders.toArray()) || [];
-    const expenses = useLiveQuery(() => db.expenses.toArray()) || [];
+    const orders = useLiveQuery(() => db.orders.toArray(), []) || [];
+    const expenses = useLiveQuery(() => db.expenses.toArray(), []) || [];
     const [analysis, setAnalysis] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
