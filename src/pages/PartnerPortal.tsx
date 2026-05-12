@@ -61,7 +61,15 @@ export const PartnerPortal: React.FC = () => {
   const myOrders = useLiveQuery(async () => {
     if (!user) return [];
     if (!isAdmin && !isManager) {
-      const orders = await db.orders.where('partnerId').equals(user.uid).toArray();
+      // Need to query both fields and merge results
+      const orders1 = await db.orders.where('partnerId').equals(user.uid).toArray();
+      const orders2 = await db.orders.where('partner_id').equals(user.uid).toArray();
+      
+      // Merge and remove duplicates
+      const orderMap = new Map();
+      [...orders1, ...orders2].forEach(o => orderMap.set(o.id, o));
+      const orders = Array.from(orderMap.values());
+      
       console.log('[PartnerPortal] Dexie orders for partner:', orders);
       return orders;
     }
@@ -74,17 +82,32 @@ export const PartnerPortal: React.FC = () => {
   useEffect(() => {
     if (!user || isAdmin || isManager) return;
     
-    // Subscribe to Firestore orders for this partner
+    // Subscribe to Firestore orders for this partner (support both partnerId and partner_id)
     const colRef = collection(firestoreDb, 'orders');
-    const q = query(colRef, where('partnerId', '==', user.uid));
+    const q1 = query(colRef, where('partnerId', '==', user.uid));
+    const q2 = query(colRef, where('partner_id', '==', user.uid));
     
-    const unsubscribe = subscriptionEngine.subscribe('partner_orders_realtime', q, async (snapshot) => {
+    // We can't easily perform an OR query in a single Firestore `query` object for simple indexing.
+    // However, we can subscribe to both if necessary, but this might duplicate data in Dexie.
+    // Let's just create a subscription for each to make sure.    
+    const unsubscribe1 = subscriptionEngine.subscribe('partner_orders_realtime_1', q1, async (snapshot) => {
+        console.log('[PartnerPortal] Snapshot (partnerId) received. Documents:', snapshot.docs.length);
         const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         await db.orders.bulkPut(orders as any);
-        console.log('[PartnerPortal] Real-time order update synced to Dexie');
+        console.log('[PartnerPortal] Real-time order update synced to Dexie (partnerId). Found:', orders.length);
     });
 
-    return () => unsubscribe();
+    const unsubscribe2 = subscriptionEngine.subscribe('partner_orders_realtime_2', q2, async (snapshot) => {
+        console.log('[PartnerPortal] Snapshot (partner_id) received. Documents:', snapshot.docs.length);
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        await db.orders.bulkPut(orders as any);
+        console.log('[PartnerPortal] Real-time order update synced to Dexie (partner_id). Found:', orders.length);
+    });
+
+    return () => {
+        unsubscribe1();
+        unsubscribe2();
+    };
   }, [user, isAdmin, isManager]);
 
   const ratings = useLiveQuery(() => 

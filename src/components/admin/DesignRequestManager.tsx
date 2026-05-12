@@ -218,6 +218,7 @@ const DesignRequestManager = () => {
         const orderStatus = selectedRequestForPartner.status === 'pending' || selectedRequestForPartner.status === 'approved' ? 'in_progress' : selectedRequestForPartner.status;
         await firestoreService.update('orders', selectedRequestForPartner.id, {
           partnerId,
+          partner_id: partnerId,
           status: DESIGN_TO_ORDER_STATUS[orderStatus] || 'in_progress',
           supplierStatus: 'pending' // Initial status for printer
         });
@@ -231,10 +232,12 @@ const DesignRequestManager = () => {
           // An order was already generated, just update the partner
           await firestoreService.update('orders', selectedRequestForPartner.orderId, {
             partnerId,
+            partner_id: partnerId,
             supplierStatus: 'pending'
           });
           await firestoreService.update('design_requests', selectedRequestForPartner.id, { 
-            partnerId
+            partnerId,
+            partner_id: partnerId
           });
           const partner = allPartners.find(p => p.uid === partnerId || p.id === partnerId);
           if (partner) {
@@ -247,6 +250,7 @@ const DesignRequestManager = () => {
             status: 'in_progress' as const, // Internal status
             supplierStatus: 'pending' as const, // Partner status
             partnerId: partnerId,
+            partner_id: partnerId,
             serviceId: 'custom_design',
             serviceName: 'Impression Design Personnalisé',
             serviceImage: selectedRequestForPartner.previewUrl,
@@ -271,6 +275,7 @@ const DesignRequestManager = () => {
           // Update the design request to point to the order and mark as in progress
           await firestoreService.update('design_requests', selectedRequestForPartner.id, { 
             partnerId,
+            partner_id: partnerId,
             status: 'in_progress',
             orderId: newId
           });

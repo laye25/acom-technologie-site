@@ -109,6 +109,7 @@ const OrderDetails = () => {
       await dbService.orders.save({
         id: orderId!,
         partnerId: pId,
+        partner_id: pId, // Explicitly set both
         partnerEarnings: order?.partnerEarnings ? order.partnerEarnings : earnings,
         updatedAt: new Date()
       });
