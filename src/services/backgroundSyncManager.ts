@@ -16,10 +16,13 @@ class BackgroundSyncManager {
   private merchantId: string | null = null;
   private isAdmin: boolean = false;
 
-  setContext(user: { uid: string }, merchantId: string | null, isAdmin: boolean) {
+  private role: string | null = null;
+
+  setContext(user: { uid: string }, merchantId: string | null, isAdmin: boolean, role?: string) {
     this.userId = user.uid;
     this.merchantId = merchantId;
     this.isAdmin = isAdmin;
+    this.role = role || null;
     this.initTasks();
   }
 
@@ -27,13 +30,28 @@ class BackgroundSyncManager {
     this.tasks = [];
     if (!this.userId) return;
 
-    this.addTask({
-      id: 'orders',
-      name: 'Orders',
-      throttleMs: 900000, // 15 mins
-      syncFn: () => syncService.syncOrders(this.merchantId || this.userId!),
-      lastSyncKey: `last_sync_orders_${this.merchantId || this.userId}`
-    });
+    if (this.isAdmin) {
+      this.addTask({
+        id: 'orders',
+        name: 'Orders',
+        throttleMs: 900000, // 15 mins
+        syncFn: () => syncService.syncOrders('global'),
+        lastSyncKey: `last_sync_orders_global`
+      });
+    } else if (this.role === 'partner' || this.role === 'printer' || this.role === 'designer') {
+      this.addTask({
+        id: 'orders', // partner orders
+        name: 'Partner Orders',
+        throttleMs: 900000, // 15 mins
+        syncFn: () => syncService.syncPartnerOrders(this.userId!),
+        lastSyncKey: `last_sync_partner_orders_${this.userId}`
+      });
+    } else {
+      // General customer or other role (could be merchant without admin... but mostly customer here)
+      // Actually we don't need a background task for ordinary client orders if they use Real-time subscriptions, 
+      // but let's sync their user orders via a new syncUserOrders method if needed.
+      // But for now, just don't run merchant orders for them.
+    }
 
     this.addTask({
       id: 'notifications',

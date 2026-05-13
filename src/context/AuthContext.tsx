@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (user && profile) {
-      syncManager.setContext(user, profile.merchantId || null, customClaims?.admin || false);
+      syncManager.setContext(user, profile.merchantId || null, customClaims?.admin || false, profile.role);
       syncManager.start();
     } else {
       syncManager.stop();

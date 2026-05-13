@@ -62,24 +62,14 @@ export const PartnerPortal: React.FC = () => {
     if (!user) return [];
     if (!isAdmin && !isManager) {
       // Need to query both fields and merge results
-      const allOrders = await db.orders.toArray();
-      console.log('[PartnerPortal] Partner UID:', user.uid);
-      // DEBUG: Log orders that actually have a partnerId to see what the values are
-      const ordersWithPartner = allOrders.filter(o => o.partnerId || o.partner_id).slice(0, 5);
-      console.log('[PartnerPortal] Debug - Sample of orders with a partner assigned:', ordersWithPartner.map(o => ({ id: o.id, partnerId: o.partnerId, partner_id: o.partner_id })));
-      
       const orders1 = await db.orders.where('partnerId').equals(user.uid).toArray();
       const orders2 = await db.orders.where('partner_id').equals(user.uid).toArray();
-      
-      console.log('[PartnerPortal] Orders matched by partnerId:', orders1.length);
-      console.log('[PartnerPortal] Orders matched by partner_id:', orders2.length);
       
       // Merge and remove duplicates
       const orderMap = new Map();
       [...orders1, ...orders2].forEach(o => orderMap.set(o.id, o));
       const orders = Array.from(orderMap.values());
       
-      console.log('[PartnerPortal] Dexie orders for partner (final):', orders);
       return orders;
     }
     const orders = await db.orders.toArray();
@@ -96,50 +86,20 @@ export const PartnerPortal: React.FC = () => {
     const q1 = query(colRef, where('partnerId', '==', user.uid));
     const q2 = query(colRef, where('partner_id', '==', user.uid));
     
-    const testQuery = async () => {
-      // DEBUG: Find out the exact field names in Firestore for this partner
-      try {
-          const snapshot = await firestoreDb.collection ? 
-            await firestoreDb.collection('orders').limit(5).get() :
-            null;
-            
-          // Using compat or lite?
-          // Since it's web, use getDocs
-      } catch (e) {}
-    };
-    
     // Initial sync
-    syncService.syncPartnerOrders(user.uid).then(async () => {
-        console.log('[PartnerPortal] Initial sync for partner complete');
-        const { getDocs, limit, collection, query } = await import('firebase/firestore');
-        const snap = await getDocs(query(collection(firestoreDb, 'orders'), limit(10)));
-        const data = snap.docs.map(doc => {
-            const d = doc.data();
-            return { id: doc.id, pId: d.partnerId, p_id: d.partner_id, status: d.status };
-        });
-        console.log('[PartnerPortal] Direct Firestore check. 10 random orders:', JSON.stringify(data));
-        
-        // Check users
-        const usersSnap = await getDocs(collection(firestoreDb, 'users'));
-        const partners = usersSnap.docs.map(d => ({id: d.id, ...d.data()})).filter((u: any) => u.role === 'partner');
-        console.log('[PartnerPortal] All Partners in DB:', JSON.stringify(partners.map(p => ({uid: p.id, name: p.displayName, email: p.email}))));
-    });
+    syncService.syncPartnerOrders(user.uid);
 
     // We can't easily perform an OR query in a single Firestore `query` object for simple indexing.
     // However, we can subscribe to both if necessary, but this might duplicate data in Dexie.
     // Let's just create a subscription for each to make sure.    
     const unsubscribe1 = subscriptionEngine.subscribe('partner_orders_realtime_1', q1, async (snapshot) => {
-        console.log('[PartnerPortal] Snapshot (partnerId) received. Documents:', snapshot.docs.length);
         const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         await db.orders.bulkPut(orders as any);
-        console.log('[PartnerPortal] Real-time order update synced to Dexie (partnerId). Found:', orders.length);
     });
 
     const unsubscribe2 = subscriptionEngine.subscribe('partner_orders_realtime_2', q2, async (snapshot) => {
-        console.log('[PartnerPortal] Snapshot (partner_id) received. Documents:', snapshot.docs.length);
         const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         await db.orders.bulkPut(orders as any);
-        console.log('[PartnerPortal] Real-time order update synced to Dexie (partner_id). Found:', orders.length);
     });
 
     return () => {
