@@ -63,8 +63,8 @@ export const PartnerPortal: React.FC = () => {
     if (!isAdmin && !isManager) {
       // Need to query both fields and merge results
       const allOrders = await db.orders.toArray();
-      console.log('[PartnerPortal] Total orders in Dexie:', allOrders.length);
       console.log('[PartnerPortal] Partner UID:', user.uid);
+      console.log('[PartnerPortal] All orders in Dexie (first 5 of ' + allOrders.length + '):', allOrders.slice(0, 5));
       
       const orders1 = await db.orders.where('partnerId').equals(user.uid).toArray();
       const orders2 = await db.orders.where('partner_id').equals(user.uid).toArray();
