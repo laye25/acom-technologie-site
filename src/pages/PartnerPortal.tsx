@@ -62,15 +62,22 @@ export const PartnerPortal: React.FC = () => {
     if (!user) return [];
     if (!isAdmin && !isManager) {
       // Need to query both fields and merge results
+      const allOrders = await db.orders.toArray();
+      console.log('[PartnerPortal] Total orders in Dexie:', allOrders.length);
+      console.log('[PartnerPortal] Partner UID:', user.uid);
+      
       const orders1 = await db.orders.where('partnerId').equals(user.uid).toArray();
       const orders2 = await db.orders.where('partner_id').equals(user.uid).toArray();
+      
+      console.log('[PartnerPortal] Orders matched by partnerId:', orders1.length);
+      console.log('[PartnerPortal] Orders matched by partner_id:', orders2.length);
       
       // Merge and remove duplicates
       const orderMap = new Map();
       [...orders1, ...orders2].forEach(o => orderMap.set(o.id, o));
       const orders = Array.from(orderMap.values());
       
-      console.log('[PartnerPortal] Dexie orders for partner:', orders);
+      console.log('[PartnerPortal] Dexie orders for partner (final):', orders);
       return orders;
     }
     const orders = await db.orders.toArray();
