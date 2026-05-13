@@ -239,13 +239,20 @@ export const syncService = {
         return;
       }
 
-      const constraints: any[] = [where('partnerId', '==', partnerId)];
+      const constraints1 = [where('partnerId', '==', partnerId)];
+      const constraints2 = [where('partner_id', '==', partnerId)];
       
       if (lastSyncStr) {
-        constraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints1.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
+        constraints2.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
       
-      const remoteOrders = await orderRepository.getAll(constraints);
+      const [remoteOrders1, remoteOrders2] = await Promise.all([
+        orderRepository.getAll(constraints1),
+        orderRepository.getAll(constraints2)
+      ]);
+      
+      const remoteOrders = [...(remoteOrders1 || []), ...(remoteOrders2 || [])];
       if (remoteOrders && remoteOrders.length > 0) {
         await db.orders.bulkPut(remoteOrders);
       }

@@ -94,6 +94,11 @@ export const PartnerPortal: React.FC = () => {
     const q1 = query(colRef, where('partnerId', '==', user.uid));
     const q2 = query(colRef, where('partner_id', '==', user.uid));
     
+    // Initial sync
+    syncService.syncPartnerOrders(user.uid).then(() => {
+        console.log('[PartnerPortal] Initial sync for partner complete');
+    });
+
     // We can't easily perform an OR query in a single Firestore `query` object for simple indexing.
     // However, we can subscribe to both if necessary, but this might duplicate data in Dexie.
     // Let's just create a subscription for each to make sure.    
