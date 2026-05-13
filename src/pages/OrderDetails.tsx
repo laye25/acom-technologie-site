@@ -102,7 +102,7 @@ const OrderDetails = () => {
 
   const handleAssignPartner = async (pId: string) => {
     try {
-      const partner = allPartners?.find(p => p.uid === pId);
+      const partner = allPartners?.find(p => (p.uid || p.id) === pId);
       const commission = partner?.partnerDetails?.commissionPercentage || 80;
       const earnings = Math.round((order?.totalPrice || 0) * (commission / 100));
 
@@ -559,7 +559,7 @@ const OrderDetails = () => {
     try {
       let updatedEarnings = order.partnerEarnings;
       if (order.partnerId) {
-        const partner = allPartners?.find(p => p.uid === order.partnerId);
+        const partner = allPartners?.find(p => (p.uid || p.id) === order.partnerId);
         const commission = partner?.partnerDetails?.commissionPercentage || 80;
         updatedEarnings = Math.round(tempPrice * (commission / 100));
       }
@@ -1568,7 +1568,7 @@ const OrderDetails = () => {
                             <div className="min-w-0">
                               <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">Assigné à</p>
                               <p className="text-xs font-bold text-white truncate">
-                                {allPartners.find(p => p.uid === order.partnerId)?.displayName || 'Partenaire ID: ' + (order.partnerId?.slice(0, 8))}
+                                {allPartners.find(p => (p.uid || p.id) === order.partnerId)?.displayName || 'Partenaire ID: ' + (order.partnerId?.slice(0, 8))}
                               </p>
                             </div>
                           </div>
@@ -1618,7 +1618,7 @@ const OrderDetails = () => {
                                <button 
                                  type="button"
                                  onClick={() => {
-                                   const partner = allPartners.find(p => p.uid === order?.partnerId);
+                                   const partner = allPartners.find(p => (p.uid || p.id) === order?.partnerId);
                                    const comm = partner?.partnerDetails?.commissionPercentage || 80;
                                    setTempPartnerEarnings(Math.round((order?.totalPrice || 0) * (comm / 100)));
                                    toast.success(`Calculé à ${comm}% du total`);
@@ -1666,7 +1666,7 @@ const OrderDetails = () => {
                         <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
                            <div className="min-w-0">
                               <p className="text-[10px] text-white/40 uppercase tracking-widest leading-none mb-1 text-left">
-                                Montant Estimé ({allPartners.find(p => p.uid === order.partnerId)?.partnerDetails?.commissionPercentage || 80}%)
+                                Montant Estimé ({allPartners.find(p => (p.uid || p.id) === order.partnerId)?.partnerDetails?.commissionPercentage || 80}%)
                               </p>
                               <p className="text-lg font-black text-white truncate">
                                 {order.partnerEarnings ? `${order.partnerEarnings.toLocaleString()} CFA` : 'À définir'}

@@ -495,10 +495,10 @@ const DesignRequestManager = () => {
                 {allPartners && allPartners.length > 0 ? (
                   allPartners.map(partner => (
                     <button
-                      key={partner.uid}
-                      onClick={() => assignPartner(partner.uid!)}
+                      key={partner.uid || partner.id}
+                      onClick={() => assignPartner((partner.uid || partner.id)!)}
                       className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group ${
-                        selectedRequestForPartner.partnerId === partner.uid
+                        (selectedRequestForPartner.partnerId === partner.uid || selectedRequestForPartner.partnerId === partner.id)
                           ? 'border-primary bg-primary/5' 
                           : 'border-gray-200 hover:border-primary/30 hover:bg-gray-50'
                       }`}
@@ -515,10 +515,10 @@ const DesignRequestManager = () => {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h4 className={`font-bold text-sm ${selectedRequestForPartner.partnerId === partner.uid ? 'text-primary' : 'text-gray-900'}`}>
+                            <h4 className={`font-bold text-sm ${(selectedRequestForPartner.partnerId === partner.uid || selectedRequestForPartner.partnerId === partner.id) ? 'text-primary' : 'text-gray-900'}`}>
                               {partner.displayName}
                             </h4>
-                            {selectedRequestForPartner.partnerId === partner.uid && (
+                            {(selectedRequestForPartner.partnerId === partner.uid || selectedRequestForPartner.partnerId === partner.id) && (
                               <span className="px-2 py-0.5 bg-primary text-white text-[8px] font-black uppercase tracking-widest rounded-full">
                                 Actuel
                               </span>

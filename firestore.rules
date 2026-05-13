@@ -137,7 +137,7 @@ service cloud.firestore {
     }
     
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || hasAnyAdminRole() || (isPartner() && (resource.data.partner_id == request.auth.uid || resource.data.partnerId == request.auth.uid)));
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || hasAnyAdminRole() || resource.data.partner_id == request.auth.uid || resource.data.partnerId == request.auth.uid);
       // Règle assouplie pour le test
       allow create: if isAuthenticated(); 
       allow update: if hasAnyAdminRole() || (
