@@ -64,7 +64,9 @@ export const PartnerPortal: React.FC = () => {
       // Need to query both fields and merge results
       const allOrders = await db.orders.toArray();
       console.log('[PartnerPortal] Partner UID:', user.uid);
-      console.log('[PartnerPortal] All orders in Dexie (first 5 of ' + allOrders.length + '):', allOrders.slice(0, 5));
+      // DEBUG: Log orders that actually have a partnerId to see what the values are
+      const ordersWithPartner = allOrders.filter(o => o.partnerId || o.partner_id).slice(0, 5);
+      console.log('[PartnerPortal] Debug - Sample of orders with a partner assigned:', ordersWithPartner.map(o => ({ id: o.id, partnerId: o.partnerId, partner_id: o.partner_id })));
       
       const orders1 = await db.orders.where('partnerId').equals(user.uid).toArray();
       const orders2 = await db.orders.where('partner_id').equals(user.uid).toArray();
@@ -94,9 +96,33 @@ export const PartnerPortal: React.FC = () => {
     const q1 = query(colRef, where('partnerId', '==', user.uid));
     const q2 = query(colRef, where('partner_id', '==', user.uid));
     
+    const testQuery = async () => {
+      // DEBUG: Find out the exact field names in Firestore for this partner
+      try {
+          const snapshot = await firestoreDb.collection ? 
+            await firestoreDb.collection('orders').limit(5).get() :
+            null;
+            
+          // Using compat or lite?
+          // Since it's web, use getDocs
+      } catch (e) {}
+    };
+    
     // Initial sync
-    syncService.syncPartnerOrders(user.uid).then(() => {
+    syncService.syncPartnerOrders(user.uid).then(async () => {
         console.log('[PartnerPortal] Initial sync for partner complete');
+        const { getDocs, limit, collection, query } = await import('firebase/firestore');
+        const snap = await getDocs(query(collection(firestoreDb, 'orders'), limit(10)));
+        const data = snap.docs.map(doc => {
+            const d = doc.data();
+            return { id: doc.id, pId: d.partnerId, p_id: d.partner_id, status: d.status };
+        });
+        console.log('[PartnerPortal] Direct Firestore check. 10 random orders:', JSON.stringify(data));
+        
+        // Check users
+        const usersSnap = await getDocs(collection(firestoreDb, 'users'));
+        const partners = usersSnap.docs.map(d => ({id: d.id, ...d.data()})).filter((u: any) => u.role === 'partner');
+        console.log('[PartnerPortal] All Partners in DB:', JSON.stringify(partners.map(p => ({uid: p.id, name: p.displayName, email: p.email}))));
     });
 
     // We can't easily perform an OR query in a single Firestore `query` object for simple indexing.
