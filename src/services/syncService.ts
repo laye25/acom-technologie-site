@@ -586,12 +586,17 @@ export const syncService = {
       { name: 'patients', table: db.patients },
       { name: 'appointments', table: db.appointments },
       { name: 'merchant_suppliers', table: db.suppliers },
-      { name: 'stock_movements', table: db.movements }
+      { name: 'stock_movements', table: db.movements },
+      { name: 'merchant_categories', table: db.categories }
     ];
     
     for (const col of collections) {
       await this.syncSaaSCollection(merchantId, col.name, col.table);
     }
+  },
+
+  async syncCategories(merchantId: string) {
+    await this.syncSaaSCollection(merchantId, 'merchant_categories', db.categories);
   },
 
   async syncNotifications(userId: string) {

@@ -1,6 +1,6 @@
 import { auth } from '../firebase';
 import { where, orderBy, limit } from 'firebase/firestore';
-import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment, PartnerRating } from '../types';
+import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment, PartnerRating, Category } from '../types';
 import { serviceRepository } from '../data/repositories/service.repository';
 import { orderRepository } from '../data/repositories/order.repository';
 import { portfolioRepository } from '../data/repositories/portfolio.repository';
@@ -14,6 +14,7 @@ import { merchantProductRepository } from '../data/repositories/merchant-product
 import { merchantSaleRepository } from '../data/repositories/merchant-sale.repository';
 import { merchantExpenseRepository } from '../data/repositories/merchant-expense.repository';
 import { merchantSupplierRepository } from '../data/repositories/merchant-supplier.repository';
+import { merchantCategoryRepository } from '../data/repositories/merchant-category.repository';
 import { stockMovementRepository } from '../data/repositories/stock-movement.repository';
 import { interventionRepository } from '../data/repositories/intervention.repository';
 import { projectRepository } from '../data/repositories/project.repository';
@@ -600,6 +601,32 @@ export const dbService = {
     async delete(id: string) {
       await merchantSupplierRepository.delete(id);
       await db.suppliers.delete(id);
+    }
+  },
+  merchantCategories: {
+    async getAll(merchantId: string) {
+      return db.categories.where('merchantId').equals(merchantId).toArray();
+    },
+    async save(category: Partial<Category>) {
+      const id = category.id || uuidv4();
+      const data = { ...category, id, updatedAt: new Date() };
+      
+      try {
+        if (category.id) {
+          await merchantCategoryRepository.update(category.id, data as any);
+        } else {
+          await merchantCategoryRepository.set(id, data as any);
+        }
+      } catch (error) {
+        console.warn('Category cloud sync failed');
+      }
+      
+      await db.categories.put(data as any);
+      return id;
+    },
+    async delete(id: string) {
+      await merchantCategoryRepository.delete(id);
+      await db.categories.delete(id);
     }
   },
   stockMovements: {

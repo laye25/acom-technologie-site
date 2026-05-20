@@ -57,6 +57,17 @@ const generateReceiptPDF = (merchant: Merchant, sale: any) => {
   let y = 10;
 
   // Header
+  if (merchant.logo) {
+    try {
+      const imgData = merchant.logo;
+      const format = imgData.startsWith('data:image/png') ? 'PNG' : (imgData.startsWith('data:image/webp') ? 'WEBP' : 'JPEG');
+      doc.addImage(imgData, format, 30, y, 20, 20, undefined, 'FAST');
+      y += 25;
+    } catch (e) {
+      console.error('Error adding logo to PDF', e);
+    }
+  }
+
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text(merchant.name, 40, y, { align: 'center' });
@@ -130,6 +141,17 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any) => {
   let y = 20;
 
   // Header - Merchant Info
+  if (merchant.logo) {
+    try {
+      const imgData = merchant.logo;
+      const format = imgData.startsWith('data:image/png') ? 'PNG' : (imgData.startsWith('data:image/webp') ? 'WEBP' : 'JPEG');
+      doc.addImage(imgData, format, margin, y, 30, 30, undefined, 'FAST');
+      y += 35;
+    } catch (e) {
+      console.error('Error adding logo to PDF', e);
+    }
+  }
+
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 0, 0);
@@ -251,6 +273,17 @@ const generateA4QuotePDF = (merchant: Merchant, quote: any) => {
   let y = 20;
 
   // Header - Merchant Info
+  if (merchant.logo) {
+    try {
+      const imgData = merchant.logo;
+      const format = imgData.startsWith('data:image/png') ? 'PNG' : (imgData.startsWith('data:image/webp') ? 'WEBP' : 'JPEG');
+      doc.addImage(imgData, format, margin, y, 30, 30, undefined, 'FAST');
+      y += 35;
+    } catch (e) {
+      console.error('Error adding logo to PDF', e);
+    }
+  }
+
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 0, 0);
@@ -612,8 +645,12 @@ const MerchantSaaS = () => {
         <div className="flex flex-col mb-12 gap-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center space-x-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner">
-                <Store className="w-8 h-8 text-primary" />
+              <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner overflow-hidden shrink-0">
+                {merchant.logo ? (
+                  <img src={merchant.logo} alt="Logo" className="w-full h-full object-contain bg-white p-1" />
+                ) : (
+                  <Store className="w-8 h-8 text-primary" />
+                )}
               </div>
               <div>
                 <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
@@ -2923,10 +2960,15 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
   // Products loaded from Dexie via useLiveQuery
   useEffect(() => {
     syncService.syncProducts(merchant.id);
+    syncService.syncCategories(merchant.id);
   }, [merchant.id]);
 
   const products = useLiveQuery(() => 
     db.products.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
+
+  const categories = useLiveQuery(() => 
+    db.categories.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
   const movements = useLiveQuery(() => 
@@ -2971,6 +3013,27 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
         merchantId: merchant.id,
         updatedAt: new Date()
       });
+
+      // Memorize Category and Sub-category for future products
+      if (currentProduct.category) {
+        const existingCat = categories.find(c => c.name.toLowerCase() === currentProduct.category?.toLowerCase());
+        if (!existingCat) {
+          await dbService.merchantCategories.save({
+            merchantId: merchant.id,
+            name: currentProduct.category,
+            subCategories: currentProduct.subCategory ? [currentProduct.subCategory] : []
+          });
+        } else if (currentProduct.subCategory) {
+          const subCats = existingCat.subCategories || [];
+          if (!subCats.some(s => s.toLowerCase() === currentProduct.subCategory?.toLowerCase())) {
+            await dbService.merchantCategories.save({
+              ...existingCat,
+              subCategories: [...subCats, currentProduct.subCategory]
+            });
+          }
+        }
+      }
+
       toast.success(currentProduct.id ? 'Produit mis à jour' : 'Produit ajouté');
       setIsEditing(false);
       setCurrentProduct(null);
@@ -3501,7 +3564,11 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                           placeholder="Sélectionner ou taper..."
                         />
                         <datalist id="product-categories">
-                          {Array.from(new Set(['Général', 'Électronique', 'Mobilier', 'Fournitures', 'Services', ...(products || []).map(p => p.category).filter(Boolean)])).map(cat => (
+                          {Array.from(new Set([
+                            'Général', 'Électronique', 'Mobilier', 'Fournitures', 'Services', 
+                            ...(categories || []).map(c => c.name),
+                            ...(products || []).map(p => p.category)
+                          ].filter(Boolean))).map(cat => (
                             <option key={cat as string} value={cat as string} />
                           ))}
                         </datalist>
@@ -3510,11 +3577,20 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                         <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Sous Catégorie</label>
                         <input 
                           type="text" 
+                          list="product-subcategories"
                           value={currentProduct?.subCategory || ''} 
                           onChange={e => setCurrentProduct({...currentProduct!, subCategory: e.target.value})} 
                           className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
                           placeholder="ex: Smartphones"
                         />
+                        <datalist id="product-subcategories">
+                          {Array.from(new Set([
+                            ...(categories.find(c => c.name.toLowerCase() === currentProduct?.category?.toLowerCase())?.subCategories || []),
+                            ...(products.filter(p => p.category && p.category.toLowerCase() === currentProduct?.category?.toLowerCase()).map(p => p.subCategory))
+                          ].filter(Boolean))).map(sub => (
+                            <option key={sub as string} value={sub as string} />
+                          ))}
+                        </datalist>
                       </div>
                     </div>
                   </div>
@@ -5757,6 +5833,46 @@ const MerchantSettings = ({
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Nom de l'organisation</label>
               <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold text-lg" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Logo de l'entreprise</label>
+              <div className="flex items-center gap-6">
+                <div className="w-20 h-20 rounded-2xl border border-gray-200 flex items-center justify-center overflow-hidden bg-white shrink-0 shadow-sm relative group">
+                  {formData.logo ? (
+                    <img src={formData.logo} alt="Logo" className="w-full h-full object-contain p-2" />
+                  ) : (
+                    <Store className="w-8 h-8 text-gray-300" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 2 * 1024 * 1024) {
+                          alert("Le fichier est trop volumineux (max 2MB)");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setFormData({...formData, logo: reader.result as string});
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="logo-upload"
+                  />
+                  <label htmlFor="logo-upload" className="cursor-pointer inline-flex items-center px-6 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold shadow-sm uppercase tracking-widest hover:border-primary/50 transition-all text-gray-600">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Changer le logo
+                  </label>
+                  <p className="text-[10px] text-gray-400 mt-2 font-medium">Format JPG, PNG ou WEBP. Le logo apparaîtra sur vos devis et factures.</p>
+                </div>
+              </div>
             </div>
 
             <div>

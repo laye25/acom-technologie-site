@@ -531,6 +531,7 @@ export interface Category {
   merchantId: string;
   name: string;
   description?: string;
+  subCategories?: string[]; // Added to store related sub-categories
 }
 
 export interface MerchantProduct {
