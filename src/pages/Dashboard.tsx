@@ -33,6 +33,13 @@ const Dashboard = () => {
     }
   }, [searchParams]);
 
+  // Read from Dexie
+  const orders = useLiveQuery(async () => {
+    if (!user) return [];
+    if (isAdmin || isManager) return db.orders.toArray();
+    return db.orders.where('userId').equals(user.uid).or('user_id').equals(user.uid).toArray();
+  }, [user, isAdmin, isManager]) || [];
+
   // Sync data
   // The BackgroundSyncManager orchestrates syncs now, removing reactive triggers
   useEffect(() => {
@@ -51,13 +58,6 @@ const Dashboard = () => {
       }
     }
   }, [user?.uid, isAdmin, isManager, orders.length]);
-
-  // Read from Dexie
-  const orders = useLiveQuery(async () => {
-    if (!user) return [];
-    if (isAdmin || isManager) return db.orders.toArray();
-    return db.orders.where('userId').equals(user.uid).or('user_id').equals(user.uid).toArray();
-  }, [user, isAdmin, isManager]) || [];
 
   const dynamicServices = useLiveQuery(() => db.services.toArray(), []) || [];
   const users = useLiveQuery(() => db.users.toArray(), []) || [];

@@ -112,7 +112,7 @@ const OrderDetails = () => {
         partner_id: pId, // Explicitly set both
         partnerEarnings: order?.partnerEarnings ? order.partnerEarnings : earnings,
         updatedAt: new Date()
-      });
+      } as any);
       toast.success('Partenaire assigné et revenus calculés !');
       setIsAssigningPartner(false);
     } catch (err) {

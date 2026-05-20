@@ -11,9 +11,14 @@ import {
   onAuthStateChanged,
   User
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { UserProfile } from '../types';
-import { syncManager } from '../services/backgroundSyncManager';
+import { db as localDb } from '../db/db';
+import { liveQuery } from 'dexie';
+
+// Lazy load sync services to prevent circular dependencies
+const getSyncService = () => import('../services/syncService').then(m => m.syncService);
+const getSyncManager = () => import('../services/backgroundSyncManager').then(m => m.syncManager);
 
 interface AuthContextType {
   user: User | null;
@@ -103,37 +108,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const tokenResult = await currentUser.getIdTokenResult();
         setCustomClaims(tokenResult.claims);
         
-        // Setup real-time listener for profile
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        
-        profileUnsubscribe = onSnapshot(userDocRef, (doc) => {
-          if (doc.exists()) {
-            const data = doc.data();
-            const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
-            const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
-            const expectedRole = isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client');
-            
-            setProfile({
-              uid: currentUser.uid,
-              email: currentUser.email || '',
-              displayName: data.display_name || data.displayName || currentUser.displayName || 'Utilisateur',
-              photoURL: data.photo_url || data.photoURL || currentUser.photoURL || '',
-              role: data.role || expectedRole,
-              partnerStatus: data.partnerStatus,
-              partnerDetails: data.partnerDetails,
-              merchantId: data.merchant_id || data.merchantId,
-              createdAt: data.created_at?.toDate() || (data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt || Date.now()))
-            });
+        // Setup local watcher for profile using Dexie
+        const observable = liveQuery(() => localDb.users.get(currentUser.uid));
+        const sub = observable.subscribe({
+          next: (data) => {
+            if (data) {
+              const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
+              const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
+              const expectedRole = isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client');
+              
+              setProfile({
+                uid: currentUser.uid,
+                email: currentUser.email || '',
+                displayName: data.display_name || data.displayName || currentUser.displayName || 'Utilisateur',
+                photoURL: data.photo_url || data.photoURL || currentUser.photoURL || '',
+                role: data.role || expectedRole,
+                partnerStatus: data.partnerStatus,
+                partnerDetails: data.partnerDetails,
+                merchantId: data.merchant_id || data.merchantId,
+                createdAt: data.created_at?.toDate ? data.created_at.toDate() : (data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.created_at || data.createdAt || Date.now()))
+              });
+              setLoading(false);
+            } else {
+              // If not in Dexie, try to fetch then create if missing
+              getSyncService().then(service => service.syncUserProfile(currentUser.uid)).then(() => {
+                // After sync attempt, checking one last time
+                localDb.users.get(currentUser.uid).then(profile => {
+                  if (!profile) {
+                    createProfileIfMissing(currentUser);
+                  }
+                });
+              }).catch(err => {
+                console.error('Initial profile sync failed:', err);
+                setLoading(false);
+              });
+            }
+          },
+          error: (err) => {
+            console.error('Dexie profile subscription error:', err);
             setLoading(false);
-          } else {
-            // Profile doesn't exist yet, handle it via fetchProfile logic internally if needed
-            // but for simplicity and robustness we can create it here if it's the first time
-            createProfileIfMissing(currentUser);
           }
-        }, (error) => {
-          console.error('Profile listener error:', error);
-          setLoading(false);
         });
+
+        profileUnsubscribe = () => sub.unsubscribe();
+        
+        // Immediate sync
+        getSyncService().then(service => service.syncUserProfile(currentUser.uid));
       } else {
         setProfile(null);
         setCustomClaims(null);
@@ -149,10 +169,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (user && profile) {
-      syncManager.setContext(user, profile.merchantId || null, customClaims?.admin || false, profile.role);
-      syncManager.start();
+      getSyncManager().then(manager => {
+        manager.setContext(user, profile.merchantId || null, customClaims?.admin || false, profile.role);
+        manager.start();
+      });
     } else {
-      syncManager.stop();
+      getSyncManager().then(manager => manager.stop());
     }
   }, [user, profile, customClaims]);
 
@@ -180,9 +202,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: newProfile.role,
           created_at: newProfile.createdAt
         });
+
+        // Immediately sync to Dexie so the liveQuery picks it up
+        const service = await getSyncService();
+        await service.syncUserProfile(currentUser.uid);
+      } else {
+        // If it exists in Firestore but missing in Dexie, just sync
+        const service = await getSyncService();
+        await service.syncUserProfile(currentUser.uid);
       }
     } catch (err) {
       console.error('Error creating missing profile:', err);
+      setLoading(false);
     }
   };
 

@@ -69,6 +69,14 @@ class BackgroundSyncManager {
         lastSyncKey: `last_sync_designs_${this.isAdmin ? 'global' : this.userId}`
     });
 
+    this.addTask({
+      id: 'activities',
+      name: 'Activities',
+      throttleMs: 600000, // 10 mins
+      syncFn: () => syncService.syncActivities(this.isAdmin ? 'global' : (this.merchantId || undefined)),
+      lastSyncKey: `last_sync_activities_${this.isAdmin ? 'global' : (this.merchantId || 'global')}`
+    });
+
     if (this.merchantId) {
         this.addTask({
             id: 'merchant_data',

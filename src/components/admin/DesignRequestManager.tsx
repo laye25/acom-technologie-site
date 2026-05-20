@@ -222,6 +222,12 @@ const DesignRequestManager = () => {
           status: DESIGN_TO_ORDER_STATUS[orderStatus] || 'in_progress',
           supplierStatus: 'pending' // Initial status for printer
         });
+        await dexieDb.orders.update(selectedRequestForPartner.id, {
+          partnerId,
+          partner_id: partnerId,
+          status: DESIGN_TO_ORDER_STATUS[orderStatus] || 'in_progress',
+          supplierStatus: 'pending'
+        });
         const partner = allPartners.find(p => p.uid === partnerId || p.id === partnerId);
         if (partner) {
            await notificationService.notifyPartnerNewMission(partner, selectedRequestForPartner.id, 'Impression Studio');
@@ -235,7 +241,16 @@ const DesignRequestManager = () => {
             partner_id: partnerId,
             supplierStatus: 'pending'
           });
+          await dexieDb.orders.update(selectedRequestForPartner.orderId, {
+            partnerId,
+            partner_id: partnerId,
+            supplierStatus: 'pending'
+          });
           await firestoreService.update('design_requests', selectedRequestForPartner.id, { 
+            partnerId,
+            partner_id: partnerId
+          });
+          await dexieDb.design_requests.update(selectedRequestForPartner.id, { 
             partnerId,
             partner_id: partnerId
           });
@@ -279,9 +294,15 @@ const DesignRequestManager = () => {
             status: 'in_progress',
             orderId: newId
           });
+          await dexieDb.design_requests.update(selectedRequestForPartner.id, { 
+            partnerId,
+            partner_id: partnerId,
+            status: 'in_progress',
+            orderId: newId
+          });
           const partner = allPartners.find(p => p.uid === partnerId || p.id === partnerId);
           if (partner) {
-             await notificationService.notifyPartnerNewMission(partner, newId, 'Impression Design Personnalisé');
+             await notificationService.notifyPartnerNewMission(partner, newId as string, 'Impression Design Personnalisé');
           }
         }
       }

@@ -16,6 +16,7 @@ export class StudioAcomDB extends Dexie {
   notifications!: Table<any>;
   blog_posts!: Table<any>;
   portfolio_items!: Table<any>;
+  activities!: Table<any>;
   interventions!: Table<any>;
   projects!: Table<any>;
   vehicles!: Table<any>;
@@ -51,6 +52,7 @@ export class StudioAcomDB extends Dexie {
       settings: 'id, merchantId, updatedAt',
       messages: 'id, orderId, senderId, chatId, createdAt',
       notifications: 'id, userId, createdAt, read',
+      activities: 'id, merchantId, createdAt',
       blog_posts: 'id, date, category, updatedAt',
       portfolio_items: 'id, category, updatedAt',
       interventions: 'id, merchantId, updatedAt',

@@ -28,7 +28,17 @@ const Chat = () => {
   
   // Sync messages only if needed or managed by user action/manager
   useEffect(() => {
-    // Rely on LiveQuery for local state
+    if (!orderId) return;
+    
+    // Initial sync
+    syncService.syncMessages(orderId);
+    
+    // Periodic poll every 30 seconds while chat is active
+    const interval = setInterval(() => {
+      syncService.syncMessages(orderId);
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [orderId]);
 
   const order = orderData?.[0] || null;

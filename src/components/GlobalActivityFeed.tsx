@@ -4,6 +4,9 @@ import { Activity } from '../data/repositories/activity.repository';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { syncService } from '../services/syncService';
 import { 
   ShoppingBag, 
   CreditCard, 
@@ -12,7 +15,8 @@ import {
   UserPlus, 
   Store,
   Clock,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -27,30 +31,38 @@ export const GlobalActivityFeed: React.FC<GlobalActivityFeedProps> = ({
   limit = 10,
   className = ""
 }) => {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    setLoading(true);
-    
-    let unsubscribe: () => void;
+  // Read from local Dexie database
+  const activities = useLiveQuery(async () => {
+    let query = db.activities.orderBy('createdAt').reverse();
     
     if (merchantId) {
-      unsubscribe = activityService.subscribeByMerchant(merchantId, (data) => {
-        setActivities(data);
-        setLoading(false);
-      }, limit);
-    } else {
-      unsubscribe = activityService.subscribeRecent((data) => {
-        setActivities(data);
-        setLoading(false);
-      }, limit);
+      // Dexie filtering
+      return db.activities
+        .where('merchantId')
+        .equals(merchantId)
+        .reverse()
+        .sortBy('createdAt')
+        .then(data => data.slice(0, limit));
     }
+    
+    return query.limit(limit).toArray();
+  }, [merchantId, limit]) || [];
 
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [merchantId, limit]);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await syncService.syncActivities(merchantId, true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Trigger initial sync on mount if needed
+  useEffect(() => {
+    syncService.syncActivities(merchantId);
+  }, [merchantId]);
 
   const getIcon = (type: Activity['type']) => {
     switch (type) {
@@ -70,22 +82,6 @@ export const GlobalActivityFeed: React.FC<GlobalActivityFeedProps> = ({
     if (activity.entityType === 'merchant') return `/merchant/saas?id=${activity.entityId}`;
     return '#';
   };
-
-  if (loading) {
-    return (
-      <div className={`space-y-4 ${className}`}>
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex gap-4 animate-pulse">
-            <div className="w-10 h-10 bg-gray-100 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 bg-gray-100 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-1/2" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
 
   return (
     <div className={`space-y-1 ${className}`}>

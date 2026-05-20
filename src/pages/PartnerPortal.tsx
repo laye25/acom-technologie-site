@@ -42,6 +42,17 @@ export const PartnerPortal: React.FC = () => {
     managerName: '',
     address: ''
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!user) return;
+    setIsRefreshing(true);
+    try {
+      await syncService.syncPartnerOrders(user.uid, true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Sync data handled by BackgroundSyncManager
   useEffect(() => {
@@ -77,35 +88,14 @@ export const PartnerPortal: React.FC = () => {
     return orders;
   }, [user, isAdmin, isManager]) || [];
 
-  // Real-time synchronization for printers
+  // Data synchronization strategy:
+  // We strictly use Delta-Sync via syncService to avoid Firebase Quota exhaustion.
+  // Real-time onSnapshot listeners are disabled for large list collections like Orders.
   useEffect(() => {
     if (!user || isAdmin || isManager) return;
     
-    // Subscribe to Firestore orders for this partner (support both partnerId and partner_id)
-    const colRef = collection(firestoreDb, 'orders');
-    const q1 = query(colRef, where('partnerId', '==', user.uid));
-    const q2 = query(colRef, where('partner_id', '==', user.uid));
-    
-    // Initial sync
+    // Initial delta-sync on mount
     syncService.syncPartnerOrders(user.uid);
-
-    // We can't easily perform an OR query in a single Firestore `query` object for simple indexing.
-    // However, we can subscribe to both if necessary, but this might duplicate data in Dexie.
-    // Let's just create a subscription for each to make sure.    
-    const unsubscribe1 = subscriptionEngine.subscribe('partner_orders_realtime_1', q1, async (snapshot) => {
-        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        await db.orders.bulkPut(orders as any);
-    });
-
-    const unsubscribe2 = subscriptionEngine.subscribe('partner_orders_realtime_2', q2, async (snapshot) => {
-        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        await db.orders.bulkPut(orders as any);
-    });
-
-    return () => {
-        unsubscribe1();
-        unsubscribe2();
-    };
   }, [user, isAdmin, isManager]);
 
   const ratings = useLiveQuery(() => 
@@ -509,13 +499,23 @@ export const PartnerPortal: React.FC = () => {
       <div className="bg-white border-b border-gray-200 sticky top-[90px] md:top-[100px] z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
+            <div className="flex items-center gap-4">
               <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <PrinterIcon className="text-primary w-6 h-6" />
                 </div>
                 Portail Production
               </h1>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-600 transition-colors disabled:opacity-50"
+                title="Rafraîchir les données"
+              >
+                <div className={isRefreshing ? "animate-spin" : ""}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                </div>
+              </button>
             </div>
 
             <div className="flex bg-gray-100 p-1 rounded-2xl overflow-x-auto no-scrollbar">
