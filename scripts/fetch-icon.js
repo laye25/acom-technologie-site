@@ -50,19 +50,14 @@ async function fetchIcon() {
         // Overwrite package.json to point to icon.png
         const packageJsonPath = path.resolve('package.json');
         const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-        if (pkg.build) {
-          if (!pkg.build.win) pkg.build.win = {};
+        if (pkg.build && pkg.build.win) {
           pkg.build.win.icon = "public/icon.png";
-          
-          if (!pkg.build.mac) pkg.build.mac = {};
-          pkg.build.mac.icon = "public/icon.png";
-
           pkg.build.files = pkg.build.files || [];
           if (!pkg.build.files.includes("public/icon.png")) {
             pkg.build.files.push("public/icon.png");
           }
           fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
-          console.log('Updated package.json to use public/icon.png for win and mac');
+          console.log('Updated package.json to use public/icon.png');
         }
       }
     } else {
