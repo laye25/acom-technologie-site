@@ -1804,7 +1804,7 @@ const MerchantDashboard = ({
       revenue,
       expenses: expensesStats,
       netProfit,
-      lowStockCount: products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).length,
+      lowStockCount: products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length,
       totalProducts: products.length,
       specialized: {
         interventions: activeInterventions,
@@ -2295,15 +2295,15 @@ const MerchantDashboard = ({
             </div>
             
             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-              {products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).length === 0 ? (
+              {products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length === 0 ? (
                 <div className="py-12 text-center opacity-30 flex flex-col items-center">
                   <CheckCircle className="w-10 h-10 mb-3 text-emerald-500" />
                   <p className="text-xs font-black uppercase tracking-widest">Tout est en ordre</p>
                 </div>
               ) : (
                 products
-                  .filter(p => p.stockQuantity <= (p.minStockLevel || 5))
-                  .sort((a, b) => a.stockQuantity - b.stockQuantity)
+                  .filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5))
+                  .sort((a, b) => Number(a.stockQuantity || 0) - Number(b.stockQuantity || 0))
                   .slice(0, 5)
                   .map(product => (
                     <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100">
@@ -2321,18 +2321,18 @@ const MerchantDashboard = ({
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className={`text-xs font-black font-mono ${product.stockQuantity <= 0 ? 'text-rose-600' : 'text-orange-500'}`}>
-                          {product.stockQuantity} UNITÉS
+                        <p className={`text-xs font-black font-mono ${Number(product.stockQuantity || 0) <= 0 ? 'text-rose-600' : 'text-orange-500'}`}>
+                          {product.stockQuantity || 0} UNITÉS
                         </p>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{product.stockQuantity <= 0 ? 'RUPTURE' : 'STOCK BAS'}</p>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{Number(product.stockQuantity || 0) <= 0 ? 'RUPTURE' : 'STOCK BAS'}</p>
                       </div>
                     </div>
                   ))
               )}
             </div>
-            {products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).length > 5 && (
+            {products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length > 5 && (
               <p className="text-center text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-widest">
-                + {products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).length - 5} autres alertes
+                + {products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length - 5} autres alertes
               </p>
             )}
           </div>
@@ -2352,7 +2352,7 @@ const MerchantDashboard = ({
                   <div className="flex justify-between items-end mb-2">
                     <span className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">Valeur Marchande</span>
                     <span className="text-2xl font-black text-white">
-                      {products.reduce((acc, p) => acc + (p.price * p.stockQuantity), 0).toLocaleString()} <span className="text-xs font-mono opacity-50">{merchant.currency}</span>
+                      {products.reduce((acc, p) => acc + (p.price * Number(p.stockQuantity || 0)), 0).toLocaleString()} <span className="text-xs font-mono opacity-50">{merchant.currency}</span>
                     </span>
                   </div>
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
@@ -2813,7 +2813,7 @@ const MerchantDashboard = ({
                 </span>
               </div>
               <div className="space-y-4">
-                {products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).length === 0 ? (
+                {products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center bg-emerald-50/30 rounded-[2rem] border border-dashed border-emerald-200">
                     <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100">
                       <CheckCircle className="w-10 h-10 text-emerald-500" />
@@ -2822,7 +2822,7 @@ const MerchantDashboard = ({
                     <p className="text-xs text-emerald-500/60 mt-2 font-mono font-bold">Niveaux optimaux</p>
                   </div>
                 ) : (
-                  products.filter(p => p.stockQuantity <= (p.minStockLevel || 5)).map((product) => (
+                  products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).map((product) => (
                     <div key={product.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-rose-100 hover:shadow-xl transition-all group relative overflow-hidden">
                       <div className="absolute inset-y-0 left-0 w-1 bg-rose-500"></div>
                       <div className="flex items-center space-x-5">
@@ -2833,7 +2833,7 @@ const MerchantDashboard = ({
                           <p className="font-black text-base text-ink leading-tight">{product.name}</p>
                           <div className="flex items-center space-x-2 mt-1">
                             <span className="text-[10px] font-mono text-rose-600 font-black uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded-md">
-                              STOCK: {product.stockQuantity}
+                              STOCK: {product.stockQuantity || 0}
                             </span>
                             <span className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
                               MIN: {product.minStockLevel || 5}
@@ -2845,7 +2845,7 @@ const MerchantDashboard = ({
                         <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 shadow-sm mb-3 uppercase tracking-[0.2em]">
                           CRITIQUE
                         </span>
-                        <button className="text-[10px] font-black text-primary hover:text-primary-hover uppercase tracking-[0.2em] transition-colors">Réapprovisionner</button>
+                        <button onClick={() => { setCurrentProduct(product); setIsRestocking(true); }} className="text-[10px] font-black text-primary hover:text-primary-hover uppercase tracking-[0.2em] transition-colors">Réapprovisionner</button>
                       </div>
                     </div>
                   ))
@@ -2956,6 +2956,8 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showNewCatInput, setShowNewCatInput] = useState(false);
+  const [showNewSubCatInput, setShowNewSubCatInput] = useState(false);
 
   // Products loaded from Dexie via useLiveQuery
   useEffect(() => {
@@ -2988,10 +2990,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
   // Enhanced Stats
   const stats = useMemo(() => {
     const totalItems = products.length;
-    const totalQuantity = products.reduce((acc, p) => acc + p.stockQuantity, 0);
-    const lowStock = products.filter(p => p.stockQuantity > 0 && p.stockQuantity <= (p.minStockLevel || 5)).length;
-    const outOfStock = products.filter(p => p.stockQuantity <= 0).length;
-    const totalValue = products.reduce((acc, p) => acc + (p.price * p.stockQuantity), 0);
+    const totalQuantity = products.reduce((acc, p) => acc + Number(p.stockQuantity || 0), 0);
+    const lowStock = products.filter(p => Number(p.stockQuantity || 0) > 0 && Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length;
+    const outOfStock = products.filter(p => Number(p.stockQuantity || 0) <= 0).length;
+    const totalValue = products.reduce((acc, p) => acc + (p.price * Number(p.stockQuantity || 0)), 0);
     
     return { totalItems, totalQuantity, lowStock, outOfStock, totalValue };
   }, [products]);
@@ -3175,8 +3177,8 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                       </tr>
                     ) : (
                       filteredProducts.map((product) => {
-                        const isLow = product.stockQuantity > 0 && product.stockQuantity <= (product.minStockLevel || 5);
-                        const isOut = product.stockQuantity <= 0;
+                        const isLow = Number(product.stockQuantity || 0) > 0 && Number(product.stockQuantity || 0) <= (Number(product.minStockLevel) || 5);
+                        const isOut = Number(product.stockQuantity || 0) <= 0;
                         
                         return (
                           <tr key={product.id} className="hover:bg-gray-50/20 transition-colors group">
@@ -3222,7 +3224,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                   {product.price.toLocaleString()} <span className="text-[9px] opacity-40">{merchant.currency}</span>
                                 </span>
                                 <span className="text-[9px] font-mono font-bold text-gray-400 mt-1 uppercase tracking-wider">
-                                  VAL: {(product.price * product.stockQuantity).toLocaleString()}
+                                  VAL: {(product.price * Number(product.stockQuantity || 0)).toLocaleString()}
                                 </span>
                               </div>
                             </td>
@@ -3233,7 +3235,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                   isLow ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' : 
                                   'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100 transition-colors cursor-help'
                                 }`}>
-                                  {product.stockQuantity.toString().padStart(2, '0')} UNITÉS
+                                  {(product.stockQuantity || 0).toString().padStart(2, '0')} UNITÉS
                                 </div>
                                 <button 
                                   onClick={() => { setCurrentProduct(product); setIsRestocking(true); }}
@@ -3274,7 +3276,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
               </p>
               
               <div className="space-y-5">
-                <HealthIndicator label="Disponibilité" value={products.length > 0 ? (products.filter(p => p.stockQuantity > 0).length / products.length * 100).toFixed(0) : '0'} color="primary" />
+                <HealthIndicator label="Disponibilité" value={products.length > 0 ? (products.filter(p => Number(p.stockQuantity || 0) > 0).length / products.length * 100).toFixed(0) : '0'} color="primary" />
                 <HealthIndicator label="Rentabilité théorique" value="85" color="blue" />
                 <HealthIndicator label="Rotation de stock" value="62" color="purple" />
               </div>
@@ -3554,43 +3556,85 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="flex-1">
-                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
-                        <input 
-                          type="text"
-                          list="product-categories"
-                          value={currentProduct?.category || ''} 
-                          onChange={e => setCurrentProduct({...currentProduct!, category: e.target.value})} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
-                          placeholder="Sélectionner ou taper..."
-                        />
-                        <datalist id="product-categories">
-                          {Array.from(new Set([
-                            'Général', 'Électronique', 'Mobilier', 'Fournitures', 'Services', 
-                            ...(categories || []).map(c => c.name),
-                            ...(products || []).map(p => p.category)
-                          ].filter(Boolean))).map(cat => (
-                            <option key={cat as string} value={cat as string} />
-                          ))}
-                        </datalist>
+                        <label className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
+                          <span>Catégorie</span>
+                          {showNewCatInput && (
+                            <button type="button" onClick={() => { setShowNewCatInput(false); setCurrentProduct({...currentProduct!, category: ''}); }} className="text-primary hover:text-primary-hover capitalize tracking-normal text-[10px]">Annuler</button>
+                          )}
+                        </label>
+                        {showNewCatInput ? (
+                          <input 
+                            type="text"
+                            value={currentProduct?.category || ''} 
+                            onChange={e => setCurrentProduct({...currentProduct!, category: e.target.value})} 
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
+                            placeholder="Saisir la nouvelle catégorie..."
+                            autoFocus
+                          />
+                        ) : (
+                          <select
+                            value={currentProduct?.category || ''}
+                            onChange={e => {
+                              if (e.target.value === '_new') {
+                                setShowNewCatInput(true);
+                                setCurrentProduct({...currentProduct!, category: ''});
+                              } else {
+                                setCurrentProduct({...currentProduct!, category: e.target.value});
+                              }
+                            }}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold bg-white"
+                          >
+                            <option value="" disabled>Sélectionner une catégorie</option>
+                            {Array.from(new Set([
+                              'Général', 'Électronique', 'Mobilier', 'Fournitures', 'Services', 
+                              ...(categories || []).map(c => c.name),
+                              ...(products || []).map(p => p.category)
+                            ].filter(Boolean))).map(cat => (
+                              <option key={cat as string} value={cat as string}>{cat}</option>
+                            ))}
+                            <option value="_new" className="font-bold text-primary">+ Ajouter une nouvelle</option>
+                          </select>
+                        )}
                       </div>
                       <div className="flex-1">
-                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Sous Catégorie</label>
-                        <input 
-                          type="text" 
-                          list="product-subcategories"
-                          value={currentProduct?.subCategory || ''} 
-                          onChange={e => setCurrentProduct({...currentProduct!, subCategory: e.target.value})} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
-                          placeholder="ex: Smartphones"
-                        />
-                        <datalist id="product-subcategories">
-                          {Array.from(new Set([
-                            ...(categories.find(c => c.name.toLowerCase() === currentProduct?.category?.toLowerCase())?.subCategories || []),
-                            ...(products.filter(p => p.category && p.category.toLowerCase() === currentProduct?.category?.toLowerCase()).map(p => p.subCategory))
-                          ].filter(Boolean))).map(sub => (
-                            <option key={sub as string} value={sub as string} />
-                          ))}
-                        </datalist>
+                        <label className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
+                          <span>Sous Catégorie</span>
+                          {showNewSubCatInput && (
+                            <button type="button" onClick={() => { setShowNewSubCatInput(false); setCurrentProduct({...currentProduct!, subCategory: ''}); }} className="text-primary hover:text-primary-hover capitalize tracking-normal text-[10px]">Annuler</button>
+                          )}
+                        </label>
+                        {showNewSubCatInput ? (
+                          <input 
+                            type="text" 
+                            value={currentProduct?.subCategory || ''} 
+                            onChange={e => setCurrentProduct({...currentProduct!, subCategory: e.target.value})} 
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
+                            placeholder="Saisir la nouvelle sous catégorie..."
+                            autoFocus
+                          />
+                        ) : (
+                          <select
+                            value={currentProduct?.subCategory || ''}
+                            onChange={e => {
+                              if (e.target.value === '_new') {
+                                setShowNewSubCatInput(true);
+                                setCurrentProduct({...currentProduct!, subCategory: ''});
+                              } else {
+                                setCurrentProduct({...currentProduct!, subCategory: e.target.value});
+                              }
+                            }}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold bg-white"
+                          >
+                            <option value="">(Aucune)</option>
+                            {Array.from(new Set([
+                              ...(categories.find(c => c.name.toLowerCase() === currentProduct?.category?.toLowerCase())?.subCategories || []),
+                              ...(products.filter(p => p.category && p.category.toLowerCase() === currentProduct?.category?.toLowerCase()).map(p => p.subCategory))
+                            ].filter(Boolean))).map(sub => (
+                              <option key={sub as string} value={sub as string}>{sub}</option>
+                            ))}
+                            <option value="_new" className="font-bold text-primary">+ Ajouter une nouvelle</option>
+                          </select>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3601,9 +3645,9 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix d'achat</label>
                     <div className="relative">
                       <input 
-                        type="number" 
-                        value={currentProduct?.costPrice || ''} 
-                        onChange={e => setCurrentProduct({...currentProduct!, costPrice: Number(e.target.value)})} 
+                        type="text" 
+                        value={currentProduct?.costPrice === 0 ? '' : currentProduct?.costPrice || ''} 
+                        onChange={e => setCurrentProduct({...currentProduct!, costPrice: Number(e.target.value.replace(/\D/g, ''))})} 
                         className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
@@ -3613,10 +3657,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix de vente</label>
                     <div className="relative">
                       <input 
-                        type="number" 
+                        type="text" 
                         required 
-                        value={currentProduct?.price || ''} 
-                        onChange={e => setCurrentProduct({...currentProduct!, price: Number(e.target.value)})} 
+                        value={currentProduct?.price === 0 ? '' : currentProduct?.price || ''} 
+                        onChange={e => setCurrentProduct({...currentProduct!, price: Number(e.target.value.replace(/\D/g, ''))})} 
                         className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
@@ -3712,14 +3756,14 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   , [merchant.id]) || [];
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) && p.stockQuantity > 0);
+    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) && Number(p.stockQuantity || 0) > 0);
   }, [products, searchTerm]);
 
   const addToCart = (product: MerchantProduct) => {
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
-        if (existing.quantity >= product.stockQuantity) {
+        if (existing.quantity >= (product.stockQuantity || 0)) {
           toast.error('Stock insuffisant');
           return prev;
         }
@@ -3830,7 +3874,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               <div className="flex items-center justify-between mt-2">
                 <p className="text-sm text-primary font-black">{product.price.toLocaleString()} <span className="text-[10px] opacity-60 font-mono">{merchant.currency}</span></p>
                 <div className="px-2 py-0.5 bg-gray-50 rounded-lg border border-gray-100">
-                  <p className="text-[9px] font-mono font-bold text-gray-400">STOCK: {product.stockQuantity}</p>
+                  <p className="text-[9px] font-mono font-bold text-gray-400">STOCK: {product.stockQuantity || 0}</p>
                 </div>
               </div>
               
@@ -5500,9 +5544,9 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
                     <div className="w-32 space-y-1">
                       <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Prix Unitaire</label>
                       <input 
-                        type="number" 
-                        value={item.price}
-                        onChange={e => updateItem(idx, { price: parseFloat(e.target.value) || 0 })}
+                        type="text" 
+                        value={item.price === 0 ? '' : item.price}
+                        onChange={e => updateItem(idx, { price: parseFloat(e.target.value.replace(/\D/g, '')) || 0 })}
                         className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl text-xs font-black font-mono outline-none text-right"
                       />
                     </div>
@@ -6393,7 +6437,7 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Montant de la prestation</label>
                   <div className="relative">
-                    <input type="number" required value={currentIntervention.price} onChange={e => setCurrentIntervention({...currentIntervention, price: Number(e.target.value)})} className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                    <input type="text" required value={currentIntervention.price === 0 ? '' : currentIntervention.price} onChange={e => setCurrentIntervention({...currentIntervention, price: Number(e.target.value.replace(/\D/g, ''))})} className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
                   </div>
                 </div>

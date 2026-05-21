@@ -70,12 +70,12 @@ export const syncService = {
         // Map to local DB format
         const mappedProducts = remoteProducts.map((p: any) => ({
           ...p,
-          merchantId: p.merchant_id,
-          costPrice: p.cost_price,
-          stockQuantity: p.stock_quantity,
-          minStockLevel: p.min_stock_level,
-          createdAt: p.created_at,
-          updatedAt: p.updated_at
+          merchantId: p.merchant_id || p.merchantId,
+          costPrice: p.cost_price !== undefined ? p.cost_price : p.costPrice,
+          stockQuantity: p.stock_quantity !== undefined ? p.stock_quantity : (p.stockQuantity !== undefined ? p.stockQuantity : 0),
+          minStockLevel: p.min_stock_level !== undefined ? p.min_stock_level : (p.minStockLevel !== undefined ? p.minStockLevel : 5),
+          createdAt: p.created_at || p.createdAt,
+          updatedAt: p.updated_at || p.updatedAt
         }));
         await db.products.bulkPut(mappedProducts);
       }

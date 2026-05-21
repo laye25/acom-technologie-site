@@ -512,7 +512,7 @@ export const dbService = {
         try {
           const product = await merchantProductRepository.getById(item.productId);
           if (product) {
-            const newStock = Math.max(0, (product.stockQuantity || (product as any).stock_quantity || 0) - item.quantity);
+            const newStock = Math.max(0, Number(product.stockQuantity || (product as any).stock_quantity || 0) - Number(item.quantity));
             await merchantProductRepository.update(item.productId, { stockQuantity: newStock } as any);
             await db.products.update(item.productId, { stockQuantity: newStock, updatedAt: new Date() });
           }
@@ -634,8 +634,8 @@ export const dbService = {
       const product = await merchantProductRepository.getById(productId);
       if (!product) throw new Error('Produit non trouvé');
 
-      const currentStock = product.stockQuantity || (product as any).stock_quantity || 0;
-      const newStock = currentStock + quantity;
+      const currentStock = Number(product.stockQuantity || (product as any).stock_quantity || 0);
+      const newStock = currentStock + Number(quantity);
 
       await merchantProductRepository.update(productId, { stockQuantity: newStock } as any);
       // Update local product
