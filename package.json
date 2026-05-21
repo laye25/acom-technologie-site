@@ -25,7 +25,8 @@
     "files": [
       "dist/**/*",
       "desktop/main.cjs",
-      "public/icon.png"
+      "public/icon.png",
+      "!node_modules/**/*"
     ],
     "win": {
       "target": "nsis",
