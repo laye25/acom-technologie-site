@@ -510,14 +510,52 @@ export const dbService = {
       // Record stock movements locally and attempt cloud update for each
       for (const item of sale.items) {
         try {
-          const product = await merchantProductRepository.getById(item.productId);
-          if (product) {
-            const newStock = Math.max(0, Number(product.stockQuantity || (product as any).stock_quantity || 0) - Number(item.quantity));
-            await merchantProductRepository.update(item.productId, { stockQuantity: newStock } as any);
+          // Get product locally first for absolute reliability
+          const localProd = await db.products.get(item.productId);
+          if (localProd) {
+            const currentStock = Number(localProd.stockQuantity !== undefined ? localProd.stockQuantity : (localProd as any).stock_quantity || 0);
+            const newStock = Math.max(0, currentStock - Number(item.quantity));
+            
+            // 1. ALWAYS update locally first immediately!
             await db.products.update(item.productId, { stockQuantity: newStock, updatedAt: new Date() });
+            
+            // 2. Log a local stock movement so the movement history/journal is kept updated and correct
+            const movementId = uuidv4();
+            await db.movements.put({
+              id: movementId,
+              merchantId: sale.merchantId || sale.merchant_id || '',
+              productId: item.productId,
+              type: 'out',
+              quantity: Number(item.quantity),
+              previousQuantity: currentStock,
+              newQuantity: newStock,
+              reason: 'Vente',
+              performedBy: user?.uid || 'system',
+              createdAt: new Date()
+            });
+
+            // 3. Try to save remote representation in background
+            try {
+              await merchantProductRepository.update(item.productId, { stockQuantity: newStock } as any);
+            } catch (cloudErr) {
+              console.warn('Could not update remote product stock, will sync later (Offline/Quota):', cloudErr);
+            }
+          } else {
+            // Fallback: search remote repository
+            const product = await merchantProductRepository.getById(item.productId);
+            if (product) {
+              const currentStock = Number(product.stockQuantity || (product as any).stock_quantity || 0);
+              const newStock = Math.max(0, currentStock - Number(item.quantity));
+              await db.products.put({ ...product, stockQuantity: newStock, updatedAt: new Date() } as any);
+              try {
+                await merchantProductRepository.update(item.productId, { stockQuantity: newStock } as any);
+              } catch (cloudErr) {
+                console.warn('Could not update remote product stock, will sync later:', cloudErr);
+              }
+            }
           }
         } catch (e) {
-          console.warn('Stock sync delayed due to connection/quota');
+          console.warn('Stock sync delayed due to connection/quota:', e);
         }
       }
 

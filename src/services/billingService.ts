@@ -1,6 +1,7 @@
 import { db } from '../db/db';
 import { MerchantQuote, MerchantSale, Merchant } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { dbService } from './dbService';
 
 export const billingService = {
   async convertQuoteToInvoice(quote: MerchantQuote, merchant: Merchant) {
@@ -26,7 +27,7 @@ export const billingService = {
       createdAt: new Date()
     };
 
-    await db.sales.add(sale as MerchantSale);
+    await dbService.merchantSales.save(sale as MerchantSale);
     await db.quotes.update(quote.id, { status: 'invoiced', updatedAt: new Date() });
 
     return sale;

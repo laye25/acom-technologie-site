@@ -47,7 +47,34 @@ import { LogOut } from 'lucide-react';
 
 const isDesktop = (typeof window !== 'undefined' && ('__TAURI__' in window)) || (typeof window !== 'undefined' && window.process && window.process.type) || (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron')) || (typeof window !== 'undefined' && window.location.protocol === 'file:');
 
-const generateReceiptPDF = (merchant: Merchant, sale: any) => {
+const printPDF = (doc: jsPDF) => {
+  try {
+    doc.autoPrint();
+    const blobUrlorObject = doc.output('bloburl');
+    const blobUrl = typeof blobUrlorObject === 'string' ? blobUrlorObject : (blobUrlorObject as any).toString();
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = blobUrl;
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 5000);
+    };
+  } catch (err) {
+    console.error('Error auto-printing PDF:', err);
+    doc.save('document.pdf');
+  }
+};
+
+const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'download' = 'download') => {
   const doc = new jsPDF({
     unit: 'mm',
     format: [80, 150] // Receipt printer format
@@ -132,10 +159,14 @@ const generateReceiptPDF = (merchant: Merchant, sale: any) => {
   doc.setFont('helvetica', 'italic');
   doc.text('Merci de votre visite !', 40, y, { align: 'center' });
 
-  doc.save(`recu_${sale.id || Date.now()}.pdf`);
+  if (action === 'print') {
+    printPDF(doc);
+  } else {
+    doc.save(`recu_${sale.id || Date.now()}.pdf`);
+  }
 };
 
-const generateA4InvoicePDF = (merchant: Merchant, sale: any) => {
+const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | 'download' = 'download') => {
   const doc = new jsPDF();
   const margin = 20;
   let y = 20;
@@ -264,10 +295,14 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any) => {
   doc.setTextColor(150, 150, 150);
   doc.text('Généré via Acom Technologie - Studio Acom POS', 105, 280, { align: 'center' });
 
-  doc.save(`facture_${sale.id.slice(0, 8)}.pdf`);
+  if (action === 'print') {
+    printPDF(doc);
+  } else {
+    doc.save(`facture_${sale.id.slice(0, 8)}.pdf`);
+  }
 };
 
-const generateA4QuotePDF = (merchant: Merchant, quote: any) => {
+const generateA4QuotePDF = (merchant: Merchant, quote: any, action: 'print' | 'download' = 'download') => {
   const doc = new jsPDF();
   const margin = 20;
   let y = 20;
@@ -385,7 +420,11 @@ const generateA4QuotePDF = (merchant: Merchant, quote: any) => {
   doc.setTextColor(150, 150, 150);
   doc.text('Généré via Acom Technologie - Studio Acom POS', 105, 280, { align: 'center' });
 
-  doc.save(`devis_${quote.id.slice(0, 8)}.pdf`);
+  if (action === 'print') {
+    printPDF(doc);
+  } else {
+    doc.save(`devis_${quote.id.slice(0, 8)}.pdf`);
+  }
 };
 
 const MerchantSaaS = () => {
@@ -4055,23 +4094,65 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Vente Réussie !</h3>
               <p className="text-gray-500 mb-8">La transaction a été enregistrée avec succès.</p>
               
-              <div className="space-y-3">
-                <button 
-                  onClick={() => {
-                    generateReceiptPDF(merchant, showReceiptModal.saleData);
-                    setShowReceiptModal(null);
-                  }}
-                  className="w-full py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all flex items-center justify-center space-x-2"
-                >
-                  <FileText className="w-5 h-5" />
-                  <span>Imprimer le Reçu</span>
-                </button>
-                <button 
-                  onClick={() => setShowReceiptModal(null)}
-                  className="w-full py-4 bg-gray-50 text-gray-600 rounded-2xl font-bold hover:bg-gray-100 transition-all"
-                >
-                  Fermer
-                </button>
+              <div className="space-y-4 text-left">
+                {/* Section Ticket */}
+                <div>
+                  <div className="text-[9px] font-mono font-black uppercase text-amber-500 tracking-[0.2em] mb-2">Format Ticket POS</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => {
+                        generateReceiptPDF(merchant, showReceiptModal.saleData, 'print');
+                      }}
+                      className="py-3 bg-amber-500 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-amber-600 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Imprimer</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        generateReceiptPDF(merchant, showReceiptModal.saleData, 'download');
+                      }}
+                      className="py-3 bg-amber-50 text-amber-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-amber-100 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Télécharger</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section Facture A4 */}
+                <div>
+                  <div className="text-[9px] font-mono font-black uppercase text-emerald-500 tracking-[0.2em] mb-2">Format Facture A4</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => {
+                        generateA4InvoicePDF(merchant, showReceiptModal.saleData, 'print');
+                      }}
+                      className="py-3 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Imprimer</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        generateA4InvoicePDF(merchant, showReceiptModal.saleData, 'download');
+                      }}
+                      className="py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Télécharger</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    onClick={() => setShowReceiptModal(null)}
+                    className="w-full py-3 bg-gray-50 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-black/5 text-center"
+                  >
+                    Fermer
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -4664,30 +4745,52 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                           {sale.totalAmount.toLocaleString()} <span className="text-[9px] opacity-40">{merchant.currency}</span>
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end items-center gap-3">
                              {(sale.balance === undefined || sale.balance > 0) && (
                                <button 
                                  onClick={() => { setSelectedSale(sale as any); setIsPaymentModalOpen(true); }} 
-                                 className="p-3 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-all border border-primary/20"
-                                 title="Encaisser paiement"
+                                 className="px-3 py-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-all border border-primary/20 text-[10px] font-black uppercase tracking-wider"
+                                 title="Encaisser"
                                >
-                                 <Plus className="w-4 h-4" />
+                                 Encaisser
                                </button>
                              )}
-                             <button 
-                               onClick={() => generateReceiptPDF(merchant, sale)} 
-                               className="p-3 bg-gray-50 hover:bg-primary/10 text-gray-400 hover:text-primary rounded-xl transition-all border border-black/5"
-                               title="Reçu POS"
-                             >
-                               <Receipt className="w-4 h-4" />
-                             </button>
-                             <button 
-                               onClick={() => generateA4InvoicePDF(merchant, sale)} 
-                               className="p-3 bg-gray-50 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded-xl transition-all border border-black/5"
-                               title="Facture A4"
-                             >
-                               <FileText className="w-4 h-4" />
-                             </button>
+                             
+                             {/* Reçu Ticket Group */}
+                             <div className="flex items-center bg-gray-50 rounded-xl p-0.5 border border-black/5" title="Format Ticket POS">
+                               <button 
+                                 onClick={() => generateReceiptPDF(merchant, sale, 'print')} 
+                                 className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                 title="Imprimer Reçu (Ticket)"
+                               >
+                                 <Printer className="w-3.5 h-3.5" />
+                               </button>
+                               <button 
+                                 onClick={() => generateReceiptPDF(merchant, sale, 'download')} 
+                                 className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all"
+                                 title="Télécharger Reçu (Ticket)"
+                               >
+                                 <Download className="w-3.5 h-3.5" />
+                               </button>
+                             </div>
+
+                             {/* Facture A4 Group */}
+                             <div className="flex items-center bg-gray-50 rounded-xl p-0.5 border border-black/5" title="Format Facture A4">
+                               <button 
+                                 onClick={() => generateA4InvoicePDF(merchant, sale, 'print')} 
+                                 className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                                 title="Imprimer Facture (A4)"
+                               >
+                                 <Printer className="w-3.5 h-3.5" />
+                               </button>
+                               <button 
+                                 onClick={() => generateA4InvoicePDF(merchant, sale, 'download')} 
+                                 className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all"
+                                 title="Télécharger Facture (A4)"
+                               >
+                                 <Download className="w-3.5 h-3.5" />
+                               </button>
+                             </div>
                           </div>
                         </td>
                       </tr>
@@ -4741,19 +4844,49 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                           {sale.balance?.toLocaleString()} <span className="text-[9px] font-bold">{merchant.currency}</span>
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end items-center gap-3">
                              <button 
                                onClick={() => { setSelectedSale(sale as any); setIsPaymentModalOpen(true); }} 
-                               className="px-4 py-2.5 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg transition-all"
+                               className="px-3 py-2 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-rose-600 transition-all"
                              >
                                Encaisser
                              </button>
-                             <button 
-                               onClick={() => generateA4InvoicePDF(merchant, sale)} 
-                               className="p-3 bg-gray-50 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded-xl transition-all border border-black/5"
-                             >
-                               <FileText className="w-4 h-4" />
-                             </button>
+                             
+                             {/* Reçu Ticket Group */}
+                             <div className="flex items-center bg-gray-50 rounded-xl p-0.5 border border-black/5" title="Format Ticket POS">
+                               <button 
+                                 onClick={() => generateReceiptPDF(merchant, sale, 'print')} 
+                                 className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                 title="Imprimer Reçu (Ticket)"
+                               >
+                                 <Printer className="w-3.5 h-3.5" />
+                               </button>
+                               <button 
+                                 onClick={() => generateReceiptPDF(merchant, sale, 'download')} 
+                                 className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all"
+                                 title="Télécharger Reçu (Ticket)"
+                               >
+                                 <Download className="w-3.5 h-3.5" />
+                               </button>
+                             </div>
+
+                             {/* Facture A4 Group */}
+                             <div className="flex items-center bg-gray-50 rounded-xl p-0.5 border border-black/5" title="Format Facture A4">
+                               <button 
+                                 onClick={() => generateA4InvoicePDF(merchant, sale, 'print')} 
+                                 className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-all"
+                                 title="Imprimer Facture (A4)"
+                               >
+                                 <Printer className="w-3.5 h-3.5" />
+                               </button>
+                               <button 
+                                 onClick={() => generateA4InvoicePDF(merchant, sale, 'download')} 
+                                 className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all"
+                                 title="Télécharger Facture (A4)"
+                               >
+                                 <Download className="w-3.5 h-3.5" />
+                               </button>
+                             </div>
                           </div>
                         </td>
                       </tr>
@@ -4823,30 +4956,41 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                           {quote.totalAmount.toLocaleString()} <span className="text-[9px] opacity-40">{merchant.currency}</span>
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <div className="flex justify-end gap-2">
-                             <button 
-                               onClick={() => generateA4QuotePDF(merchant, quote)} 
-                               className="p-3 bg-gray-50 hover:bg-blue-50 text-gray-400 hover:text-blue-500 rounded-xl transition-all border border-black/5"
-                               title="Imprimer Devis"
-                             >
-                               <FileText className="w-4 h-4" />
-                             </button>
+                          <div className="flex justify-end items-center gap-3">
+                             {/* Devis A4 Group */}
+                             <div className="flex items-center bg-gray-50 rounded-xl p-0.5 border border-black/5" title="Format Devis A4">
+                               <button 
+                                 onClick={() => generateA4QuotePDF(merchant, quote, 'print')} 
+                                 className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                 title="Imprimer Devis"
+                               >
+                                 <Printer className="w-3.5 h-3.5" />
+                               </button>
+                               <button 
+                                 onClick={() => generateA4QuotePDF(merchant, quote, 'download')} 
+                                 className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-all"
+                                 title="Télécharger Devis PDF"
+                               >
+                                 <Download className="w-3.5 h-3.5" />
+                               </button>
+                             </div>
+
                              {quote.status === 'draft' && (
                                <button 
                                  onClick={() => { setSelectedQuote(quote); setIsQuoteModalOpen(true); }} 
-                                 className="p-3 bg-gray-50 hover:bg-amber-50 text-gray-400 hover:text-amber-500 rounded-xl transition-all border border-black/5"
+                                 className="p-2.5 bg-gray-50 hover:bg-amber-50 text-gray-400 hover:text-amber-500 rounded-xl transition-all border border-black/5"
                                  title="Modifier Devis"
                                >
-                                 <Edit2 className="w-4 h-4" />
+                                 <Edit2 className="w-3.5 h-3.5" />
                                </button>
                              )}
                              {quote.status !== 'invoiced' && (
                                <button 
                                  onClick={() => handleConvertQuote(quote)} 
-                                 className="p-3 bg-gray-50 hover:bg-emerald-50 text-emerald-400 hover:text-emerald-600 rounded-xl transition-all border border-black/5"
+                                 className="p-2.5 bg-gray-50 hover:bg-emerald-50 text-emerald-400 hover:text-emerald-600 rounded-xl transition-all border border-black/5"
                                  title="Convertir en Facture"
                                >
-                                 <Plus className="w-4 h-4" />
+                                 <Plus className="w-3.5 h-3.5" />
                                </button>
                              )}
                           </div>
