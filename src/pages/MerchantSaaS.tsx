@@ -47,31 +47,79 @@ import { LogOut } from 'lucide-react';
 
 const isDesktop = (typeof window !== 'undefined' && ('__TAURI__' in window)) || (typeof window !== 'undefined' && window.process && window.process.type) || (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron')) || (typeof window !== 'undefined' && window.location.protocol === 'file:');
 
-const printPDF = (doc: jsPDF) => {
+const printPDF = (doc: jsPDF, filename = 'document_imprimer.pdf') => {
   try {
+    // 1. Tell jsPDF to add the auto-print script to the PDF
     doc.autoPrint();
-    const blobUrlorObject = doc.output('bloburl');
-    const blobUrl = typeof blobUrlorObject === 'string' ? blobUrlorObject : (blobUrlorObject as any).toString();
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    iframe.src = blobUrl;
-    document.body.appendChild(iframe);
-    iframe.onload = () => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
+
+    // 2. Generate a standard, universally supported W3C Blob
+    const blob = doc.output('blob');
+    const blobUrl = URL.createObjectURL(blob);
+
+    // If we are in Acom Gestion Desktop (Tauri/Electron context or local file), 
+    // webview printing (IFrames) can be blocked by sandboxing or lack of native Webview2 print hooks.
+    // Triggering direct download with a beautifully designed notice is 100% reliable and friendly.
+    if (isDesktop) {
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success(
+        `Impression Desktop : Le fichier "${filename}" a été généré et téléchargé sur votre PC. Ouvrez-le pour l'imprimer directement.`, 
+        { duration: 8000, position: 'top-center' }
+      );
+      
       setTimeout(() => {
-        document.body.removeChild(iframe);
+        URL.revokeObjectURL(blobUrl);
       }, 5000);
-    };
+      return;
+    }
+
+    // 3. Web browser same-origin/cross-origin nested friendly tab popup opening.
+    // Because modern browsers silently block nesting .print() on iframes inside sandboxed containers,
+    // opening the PDF blob in a new tab is the absolute Gold Standard for web app printing.
+    // Since doc.autoPrint() is embedded in the PDF, any PDF-capable browser (Chrome, Edge, Safari...)
+    // will automatically summon the print dialog when the new sheet page finishes loading!
+    const win = window.open(blobUrl, '_blank');
+    if (win) {
+      win.focus();
+      toast.success('Génération réussie : l\'onglet d\'impression s\'est ouvert !', { position: 'top-center' });
+    } else {
+      // Safe fallback if popup blocker is aggressive
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast(
+        `Le bloqueur de fenêtres a empêché l'ouverture directe. Le document PDF "${filename}" a été téléchargé sur votre disque pour impression.`, 
+        { duration: 8000, position: 'top-center' }
+      );
+    }
+
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 10000);
   } catch (err) {
     console.error('Error auto-printing PDF:', err);
-    doc.save('document.pdf');
+    try {
+      doc.save(filename);
+      toast.success('Le document PDF a été téléchargé.', { position: 'top-center' });
+    } catch (e) {
+      toast.error('Une erreur est survenue lors de la génération de l\'impression.', { position: 'top-center' });
+    }
   }
+};
+
+const pdfFormatNum = (num: number) => {
+  if (num === undefined || num === null || isNaN(num)) return '0';
+  const parts = Math.round(num).toString().split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return parts.join('.');
 };
 
 const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'download' = 'download') => {
@@ -139,7 +187,7 @@ const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'do
   sale.items.forEach((item: any) => {
     doc.text(item.name.substring(0, 20), margin, y);
     doc.text(item.quantity.toString(), 45, y);
-    doc.text(`${(item.price * item.quantity).toLocaleString()}`, 75, y, { align: 'right' });
+    doc.text(`${pdfFormatNum(item.price * item.quantity)}`, 75, y, { align: 'right' });
     y += 4;
   });
 
@@ -151,7 +199,7 @@ const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'do
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('TOTAL', margin, y);
-  doc.text(`${sale.totalAmount.toLocaleString()} ${merchant.currency}`, 75, y, { align: 'right' });
+  doc.text(`${pdfFormatNum(sale.totalAmount)} ${merchant.currency}`, 75, y, { align: 'right' });
   y += 8;
 
   // Footer
@@ -160,7 +208,7 @@ const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'do
   doc.text('Merci de votre visite !', 40, y, { align: 'center' });
 
   if (action === 'print') {
-    printPDF(doc);
+    printPDF(doc, `recu_ticket_${sale.id || Date.now()}.pdf`);
   } else {
     doc.save(`recu_${sale.id || Date.now()}.pdf`);
   }
@@ -169,134 +217,197 @@ const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'do
 const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | 'download' = 'download') => {
   const doc = new jsPDF();
   const margin = 20;
-  let y = 20;
-
-  // Header - Merchant Info
+  
+  // Track vertical coordinates independently to prevent any overlap
+  let leftY = 20;
+  
+  // Left Side Header - Company Information and Logo
   if (merchant.logo) {
     try {
       const imgData = merchant.logo;
       const format = imgData.startsWith('data:image/png') ? 'PNG' : (imgData.startsWith('data:image/webp') ? 'WEBP' : 'JPEG');
-      doc.addImage(imgData, format, margin, y, 30, 30, undefined, 'FAST');
-      y += 35;
+      doc.addImage(imgData, format, margin, leftY, 26, 26, undefined, 'FAST');
+      leftY += 32;
     } catch (e) {
       console.error('Error adding logo to PDF', e);
     }
   }
 
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
-  doc.text(merchant.name, margin, y);
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  y += 10;
-  if (merchant.address) { doc.text(merchant.address, margin, y); y += 5; }
-  if (merchant.phone) { doc.text(`Tél: ${merchant.phone}`, margin, y); y += 5; }
-  if (merchant.email) { doc.text(`Email: ${merchant.email}`, margin, y); y += 5; }
-
-  // Title
-  y = 20;
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 0, 0); // Primary color red
-  doc.text('FACTURE', 190, y, { align: 'right' });
+  doc.setTextColor(30, 41, 59); // Slate-800
+  doc.text(merchant.name, margin, leftY);
+  leftY += 7;
   
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  y += 6;
-  doc.text(`N°: INV-${sale.id.slice(0, 8).toUpperCase()}`, 190, y, { align: 'right' });
-  y += 5;
+  doc.setTextColor(100, 116, 139); // Slate-500
+  if (merchant.address) { doc.text(merchant.address, margin, leftY); leftY += 4.5; }
+  if (merchant.phone) { doc.text(`Tél: ${merchant.phone}`, margin, leftY); leftY += 4.5; }
+  if (merchant.email) { doc.text(`Email: ${merchant.email}`, margin, leftY); leftY += 4.5; }
+
+  // Right Side Header - Invoice title and unique references
+  let rightY = 20;
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(220, 38, 38); // Professional warm Red
+  doc.text('FACTURE', 190, rightY, { align: 'right' });
+  rightY += 10;
+  
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105); // Slate-600
+  doc.text(`N° Facture : INV-${sale.id.slice(0, 8).toUpperCase()}`, 190, rightY, { align: 'right' });
+  rightY += 5.5;
+  
   const dateStr = sale.createdAt?.seconds 
     ? format(new Date(sale.createdAt.seconds * 1000), 'dd/MM/yyyy') 
     : format(new Date(sale.createdAt || Date.now()), 'dd/MM/yyyy');
-  doc.text(`Date: ${dateStr}`, 190, y, { align: 'right' });
+  doc.text(`Date : ${dateStr}`, 190, rightY, { align: 'right' });
+  rightY += 5.5;
 
-  // Client Info
-  y += 20;
+  // Use the exact maximum height of left/right sections to start client block. Overlap impossible!
+  let y = Math.max(leftY, rightY) + 12;
+
+  // Client Information Section
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
-  doc.text('FACTURÉ À:', margin, y);
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139); // Slate-500
+  doc.text('FACTURÉ À :', margin, y);
   y += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.text(sale.customerName || 'Client de passage', margin, y);
-  if (sale.customerPhone) { y += 5; doc.text(`Tél: ${sale.customerPhone}`, margin, y); }
-
-  // Table Header
-  y += 15;
-  doc.setFillColor(245, 245, 245);
-  doc.rect(margin, y, 170, 10, 'F');
+  
   doc.setFont('helvetica', 'bold');
-  doc.text('Description', margin + 2, y + 7);
-  doc.text('Qté', margin + 100, y + 7);
-  doc.text('PU', margin + 120, y + 7);
-  doc.text('Total', margin + 168, y + 7, { align: 'right' });
+  doc.setFontSize(12);
+  doc.setTextColor(15, 23, 42); // Slate-900 (Bold Name)
+  doc.text(sale.customerName || 'Client de passage', margin, y);
+  y += 5;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(71, 85, 105); // Slate-600
+  if (sale.customerPhone) { 
+    doc.text(`Tél : ${sale.customerPhone}`, margin, y); 
+    y += 5; 
+  }
 
-  // Table Content
+  // Elegant Document Table Header
+  y += 8;
+  doc.setFillColor(241, 245, 249); // Slate-100 fill
+  doc.rect(margin, y, 170, 10, 'F');
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(71, 85, 105); // Slate-600
+  doc.text('Description', margin + 3, y + 6.5);
+  doc.text('Qté', 135, y + 6.5, { align: 'center' });
+  doc.text('PU', 160, y + 6.5, { align: 'right' });
+  doc.text('Total', 186, y + 6.5, { align: 'right' });
+
+  // Document Table Rows
   y += 10;
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(51, 65, 85); // Slate-700
+  
   sale.items.forEach((item: any, index: number) => {
-    if (index % 2 === 0) doc.setFillColor(252, 252, 252);
+    // Alternating rows style
+    if (index % 2 === 0) doc.setFillColor(248, 250, 252); // Slate-50
     else doc.setFillColor(255, 255, 255);
-    doc.rect(margin, y, 170, 8, 'F');
+    doc.rect(margin, y, 170, 9, 'F');
     
-    doc.text(item.name, margin + 2, y + 6);
-    doc.text(item.quantity.toString(), margin + 100, y + 6);
-    doc.text(item.price.toLocaleString(), margin + 120, y + 6);
-    doc.text((item.price * item.quantity).toLocaleString(), margin + 168, y + 6, { align: 'right' });
-    y += 8;
+    // Light bottom divider lines
+    doc.setDrawColor(241, 245, 249); // Slate-100
+    doc.setLineWidth(0.2);
+    doc.line(margin, y + 9, margin + 170, y + 9);
+    
+    // Grid values mapping
+    doc.text(item.name, margin + 3, y + 5.5);
+    doc.text(item.quantity.toString(), 135, y + 5.5, { align: 'center' });
+    doc.text(pdfFormatNum(item.price), 160, y + 5.5, { align: 'right' });
+    doc.text(pdfFormatNum(item.price * item.quantity), 186, y + 5.5, { align: 'right' });
+    y += 9;
   });
 
-  // Summary & Payments
-  y += 10;
-  doc.line(margin + 100, y, margin + 170, y);
-  y += 8;
-  doc.setFontSize(10);
+  // Table Bottom Summary Separator
+  y += 6;
+  doc.setDrawColor(226, 232, 240); // Slate-200
+  doc.setLineWidth(0.4);
+  doc.line(110, y, 190, y);
+  y += 7;
+  
+  // Total Volume Header
+  doc.setFontSize(9.5);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
-  doc.text('TOTAL ARTICLES', margin + 100, y);
-  doc.text(`${sale.totalAmount.toLocaleString()} ${merchant.currency}`, margin + 168, y, { align: 'right' });
+  doc.setTextColor(100, 116, 139); // Slate-500
+  doc.text('TOTAL DE LA COMMANDE', 145, y, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 41, 59); // Slate-800
+  doc.text(`${pdfFormatNum(sale.totalAmount)} ${merchant.currency}`, 186, y, { align: 'right' });
 
-  // Payments History in PDF
+  // Payments List
   if (sale.payments && sale.payments.length > 0) {
-    y += 10;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('HISTORIQUE DES PAIEMENTS:', margin + 100, y);
+    y += 7;
+    doc.setDrawColor(241, 245, 249); // Slate-100
+    doc.setLineWidth(0.3);
+    doc.line(110, y, 190, y);
     y += 5;
-    doc.setFont('helvetica', 'normal');
+    
     doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(148, 163, 184); // Slate-400
+    doc.text('HISTORIQUE DES PAIEMENTS', 145, y, { align: 'right' });
+    y += 4.5;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(71, 85, 105); // Slate-600
     sale.payments.forEach((p: any) => {
       const pDate = p.date?.seconds 
         ? format(new Date(p.date.seconds * 1000), 'dd/MM/yy')
         : format(new Date(p.date), 'dd/MM/yy');
-      doc.text(`${pDate} - ${p.method.toUpperCase()}`, margin + 100, y);
-      doc.text(`${p.amount.toLocaleString()}`, margin + 168, y, { align: 'right' });
+      doc.text(`${pDate} - ${p.method.toUpperCase()}`, 145, y, { align: 'right' });
+      doc.text(`${pdfFormatNum(p.amount)} ${merchant.currency}`, 186, y, { align: 'right' });
       y += 4;
     });
-    doc.line(margin + 100, y, margin + 170, y);
-    y += 6;
+    
+    y += 2;
+    doc.setDrawColor(226, 232, 240); // Slate-200
+    doc.setLineWidth(0.5);
+    doc.line(110, y, 190, y);
+    y += 7;
   } else {
-    y += 10;
+    y += 7;
+    doc.setDrawColor(226, 232, 240); // Slate-200
+    doc.setLineWidth(0.5);
+    doc.line(110, y, 190, y);
+    y += 7;
   }
 
-  doc.setFontSize(12);
+  // Outstanding/Remaining Debt Highlight Info
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text(sale.balance > 0 ? 'RESTE À PAYER' : 'TOTAL PAYÉ', margin + 100, y);
-  doc.setTextColor(sale.balance > 0 ? 255 : 0, sale.balance > 0 ? 0 : 128, 0);
+  doc.setTextColor(30, 41, 59); // Slate-800
+  
+  const isPending = sale.balance !== undefined && sale.balance > 0;
+  doc.text(isPending ? 'RESTE À PAYER' : 'TOTAL PAYÉ (SOLDE)', 145, y, { align: 'right' });
+  
+  if (isPending) {
+    doc.setTextColor(220, 38, 38); // Red-600 (Outstanding)
+  } else {
+    doc.setTextColor(22, 163, 74); // Green-600 (Fully cleared)
+  }
+  
   const displayAmount = sale.balance !== undefined ? (sale.balance > 0 ? sale.balance : sale.paidAmount) : sale.totalAmount;
-  doc.text(`${(displayAmount || 0).toLocaleString()} ${merchant.currency}`, margin + 168, y, { align: 'right' });
+  doc.text(`${pdfFormatNum(displayAmount || 0)} ${merchant.currency}`, 186, y, { align: 'right' });
 
-  // Footer
+  // Centered Universal Page Footer
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(150, 150, 150);
+  doc.setTextColor(148, 163, 184); // Slate-400
   doc.text('Généré via Acom Technologie - Studio Acom POS', 105, 280, { align: 'center' });
 
   if (action === 'print') {
-    printPDF(doc);
+    printPDF(doc, `facture_A4_${sale.id.slice(0, 8)}.pdf`);
   } else {
     doc.save(`facture_${sale.id.slice(0, 8)}.pdf`);
   }
@@ -305,123 +416,157 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
 const generateA4QuotePDF = (merchant: Merchant, quote: any, action: 'print' | 'download' = 'download') => {
   const doc = new jsPDF();
   const margin = 20;
-  let y = 20;
-
-  // Header - Merchant Info
+  
+  // Track vertical coordinates independently to prevent any overlap
+  let leftY = 20;
+  
+  // Left Side Header - Company Information and Logo
   if (merchant.logo) {
     try {
       const imgData = merchant.logo;
       const format = imgData.startsWith('data:image/png') ? 'PNG' : (imgData.startsWith('data:image/webp') ? 'WEBP' : 'JPEG');
-      doc.addImage(imgData, format, margin, y, 30, 30, undefined, 'FAST');
-      y += 35;
+      doc.addImage(imgData, format, margin, leftY, 26, 26, undefined, 'FAST');
+      leftY += 32;
     } catch (e) {
       console.error('Error adding logo to PDF', e);
     }
   }
 
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
-  doc.text(merchant.name, margin, y);
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  y += 10;
-  if (merchant.address) { doc.text(merchant.address, margin, y); y += 5; }
-  if (merchant.phone) { doc.text(`Tél: ${merchant.phone}`, margin, y); y += 5; }
-  if (merchant.email) { doc.text(`Email: ${merchant.email}`, margin, y); y += 5; }
-
-  // Title
-  y = 20;
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 120, 215); // Blue for quotes
-  doc.text('DEVIS', 190, y, { align: 'right' });
+  doc.setTextColor(30, 41, 59); // Slate-800
+  doc.text(merchant.name, margin, leftY);
+  leftY += 7;
   
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  y += 6;
-  doc.text(`N°: QT-${quote.id.slice(0, 8).toUpperCase()}`, 190, y, { align: 'right' });
-  y += 5;
+  doc.setTextColor(100, 116, 139); // Slate-500
+  if (merchant.address) { doc.text(merchant.address, margin, leftY); leftY += 4.5; }
+  if (merchant.phone) { doc.text(`Tél: ${merchant.phone}`, margin, leftY); leftY += 4.5; }
+  if (merchant.email) { doc.text(`Email: ${merchant.email}`, margin, leftY); leftY += 4.5; }
+
+  // Right Side Header - Quote Title and validity dates
+  let rightY = 20;
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(14, 116, 144); // Cyan/Teal-700 theme
+  doc.text('DEVIS', 190, rightY, { align: 'right' });
+  rightY += 10;
+  
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105); // Slate-600
+  doc.text(`N° Devis : QT-${quote.id.slice(0, 8).toUpperCase()}`, 190, rightY, { align: 'right' });
+  rightY += 5.5;
+  
   const dateStr = quote.createdAt?.seconds 
     ? format(new Date(quote.createdAt.seconds * 1000), 'dd/MM/yyyy') 
     : format(new Date(quote.createdAt || Date.now()), 'dd/MM/yyyy');
-  doc.text(`Date émission: ${dateStr}`, 190, y, { align: 'right' });
+  doc.text(`Date émission : ${dateStr}`, 190, rightY, { align: 'right' });
+  rightY += 5.5;
   
   const expiryStr = quote.validUntil?.seconds
     ? format(new Date(quote.validUntil.seconds * 1000), 'dd/MM/yyyy')
     : quote.validUntil ? format(new Date(quote.validUntil), 'dd/MM/yyyy') : '-';
-  y += 5;
-  doc.text(`Valide jusqu'au: ${expiryStr}`, 190, y, { align: 'right' });
+  doc.text(`Valide jusqu'au : ${expiryStr}`, 190, rightY, { align: 'right' });
+  rightY += 5.5;
 
-  // Client Info
-  y += 20;
+  // Set the start position of Client Quote info with maximum safety margin
+  let y = Math.max(leftY, rightY) + 12;
+
+  // Quote Recipient Client Block
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
-  doc.text('DEVIS POUR:', margin, y);
+  doc.setFontSize(10);
+  doc.setTextColor(100, 116, 139); // Slate-500
+  doc.text('DEVIS POUR :', margin, y);
   y += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.text(quote.customerName || 'Client prospect', margin, y);
-  if (quote.customerPhone) { y += 5; doc.text(`Tél: ${quote.customerPhone}`, margin, y); }
-  if (quote.customerAddress) { y += 5; doc.text(`Adresse: ${quote.customerAddress}`, margin, y); }
-
-  // Table Header
-  y += 15;
-  doc.setFillColor(240, 245, 250);
-  doc.rect(margin, y, 170, 10, 'F');
+  
   doc.setFont('helvetica', 'bold');
-  doc.text('Description', margin + 2, y + 7);
-  doc.text('Qté', margin + 100, y + 7);
-  doc.text('PU', margin + 120, y + 7);
-  doc.text('Total', margin + 168, y + 7, { align: 'right' });
+  doc.setFontSize(12);
+  doc.setTextColor(15, 23, 42); // Slate-900 (Client Name)
+  doc.text(quote.customerName || 'Client prospect', margin, y);
+  y += 5;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(71, 85, 105); // Slate-600
+  if (quote.customerPhone) { doc.text(`Tél : ${quote.customerPhone}`, margin, y); y += 4.5; }
+  if (quote.customerAddress) { doc.text(`Adresse : ${quote.customerAddress}`, margin, y); y += 4.5; }
 
-  // Table Content
+  // Quote Table Header
+  y += 8;
+  doc.setFillColor(241, 245, 249); // Slate-100 fill
+  doc.rect(margin, y, 170, 10, 'F');
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(71, 85, 105); // Slate-600
+  doc.text('Description', margin + 3, y + 6.5);
+  doc.text('Qté', 135, y + 6.5, { align: 'center' });
+  doc.text('PU', 160, y + 6.5, { align: 'right' });
+  doc.text('Total', 186, y + 6.5, { align: 'right' });
+
+  // Quote Table Body Content
   y += 10;
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(51, 65, 85); // Slate-700
+  
   quote.items.forEach((item: any, index: number) => {
-    if (index % 2 === 0) doc.setFillColor(252, 252, 252);
+    if (index % 2 === 0) doc.setFillColor(248, 250, 252); // Slate-50
     else doc.setFillColor(255, 255, 255);
-    doc.rect(margin, y, 170, 8, 'F');
+    doc.rect(margin, y, 170, 9, 'F');
     
-    doc.text(item.name, margin + 2, y + 6);
-    doc.text(item.quantity.toString(), margin + 100, y + 6);
-    doc.text(item.price.toLocaleString(), margin + 120, y + 6);
-    doc.text((item.price * item.quantity).toLocaleString(), margin + 168, y + 6, { align: 'right' });
-    y += 8;
+    // Grid boundary fine lines
+    doc.setDrawColor(241, 245, 249); // Slate-100
+    doc.setLineWidth(0.2);
+    doc.line(margin, y + 9, margin + 170, y + 9);
+    
+    // Write aligned item details
+    doc.text(item.name, margin + 3, y + 5.5);
+    doc.text(item.quantity.toString(), 135, y + 5.5, { align: 'center' });
+    doc.text(pdfFormatNum(item.price), 160, y + 5.5, { align: 'right' });
+    doc.text(pdfFormatNum(item.price * item.quantity), 186, y + 5.5, { align: 'right' });
+    y += 9;
   });
 
-  // Summary
-  y += 10;
-  doc.line(margin + 100, y, margin + 170, y);
-  y += 10;
-  doc.setFontSize(12);
+  // Bottom Quote Summary
+  y += 6;
+  doc.setDrawColor(226, 232, 240); // Slate-200
+  doc.setLineWidth(0.4);
+  doc.line(110, y, 190, y);
+  y += 7;
+  
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('MONTANT TOTAL ESTIMÉ', margin + 10, y);
-  doc.setTextColor(0, 120, 215);
-  doc.text(`${quote.totalAmount.toLocaleString()} ${merchant.currency}`, margin + 168, y, { align: 'right' });
+  doc.setTextColor(30, 41, 59); // Slate-800
+  doc.text('MONTANT TOTAL ESTIMÉ', 150, y, { align: 'right' });
+  
+  doc.setTextColor(14, 116, 144); // Cyan/Teal-700
+  doc.text(`${pdfFormatNum(quote.totalAmount)} ${merchant.currency}`, 186, y, { align: 'right' });
 
-  // Status Note
-  y += 20;
-  doc.setFontSize(10);
+  // Expiry or Observation notes
+  y += 15;
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'italic');
-  doc.setTextColor(100, 100, 100);
-  doc.text('Note: Ce document est une estimation tarifaire et ne constitue pas une facture.', margin, y);
+  doc.setTextColor(100, 116, 139); // Slate-500
+  doc.text('Note : Esthétique d\'évaluation tarifaire, ceci n\'est pas une facture finale.', margin, y);
+  
   if (quote.notes) {
-    y += 10;
+    y += 6;
     doc.setFont('helvetica', 'normal');
-    doc.text(`Observations: ${quote.notes}`, margin, y);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Observations : ${quote.notes}`, margin, y);
   }
 
-  // Footer
+  // Footer Center label
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(150, 150, 150);
+  doc.setTextColor(148, 163, 184); // Slate-400
   doc.text('Généré via Acom Technologie - Studio Acom POS', 105, 280, { align: 'center' });
 
   if (action === 'print') {
-    printPDF(doc);
+    printPDF(doc, `devis_A4_${quote.id.slice(0, 8)}.pdf`);
   } else {
     doc.save(`devis_${quote.id.slice(0, 8)}.pdf`);
   }
