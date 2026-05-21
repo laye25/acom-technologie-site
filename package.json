@@ -40,7 +40,8 @@
       "shortcutName": "Acom Gestion Desktop"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "identity": null
     }
   },
   "dependencies": {
