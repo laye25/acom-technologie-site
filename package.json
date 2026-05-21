@@ -25,12 +25,10 @@
     "files": [
       "dist/**/*",
       "desktop/main.cjs",
-      "public/icon.png",
-      "!node_modules/**/*"
+      "public/icon.png"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "public/icon.png"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
