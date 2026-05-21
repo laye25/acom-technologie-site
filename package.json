@@ -7,9 +7,9 @@
   "type": "module",
   "main": "desktop/main.cjs",
   "scripts": {
-    "dev": "tsx server.ts",
-    "start": "node server.ts",
-    "build": "vite build",
+    "dev": "node copy-sqlite.js && tsx server.ts",
+    "start": "node copy-sqlite.js && node server.ts",
+    "build": "node copy-sqlite.js && vite build",
     "build:desktop": "npm run build && electron-builder",
     "preview": "vite preview",
     "clean": "rm -rf dist",

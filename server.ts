@@ -18,6 +18,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  // Ensure SQLite assets are copied to public before serving
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const sourceDir = path.join(process.cwd(), 'node_modules', '@sqlite.org', 'sqlite-wasm', 'dist');
+    const destDir = path.join(process.cwd(), 'public');
+    
+    if (fs.existsSync(sourceDir)) {
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+      }
+      const filesToCopy = [
+        'sqlite3.wasm',
+        'sqlite3-opfs-async-proxy.js',
+        'sqlite3-worker1.mjs'
+      ];
+      for (const file of filesToCopy) {
+        const src = path.join(sourceDir, file);
+        const dest = path.join(destDir, file);
+        if (fs.existsSync(src)) {
+          fs.copyFileSync(src, dest);
+          console.log(`[SQLite Init] Copied ${file} to public/`);
+        }
+      }
+    } else {
+      console.warn(`[SQLite Init] Warning: Source SQLite WASM directory not found at ${sourceDir}`);
+    }
+  } catch (e) {
+    console.error("[SQLite Init] Failed to copy SQLite assets on server start:", e);
+  }
+
   const app = express();
   const PORT = 3000;
 

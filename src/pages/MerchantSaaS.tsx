@@ -18,7 +18,8 @@ import {
   Wrench, HardHat, Car, Users, GraduationCap, Stethoscope, Calendar,
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
-  Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket
+  Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket,
+  Filter, SlidersHorizontal, ArrowUpDown, Tag
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -400,6 +401,26 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   const displayAmount = sale.balance !== undefined ? (sale.balance > 0 ? sale.balance : sale.paidAmount) : sale.totalAmount;
   doc.text(`${pdfFormatNum(displayAmount || 0)} ${merchant.currency}`, 186, y, { align: 'right' });
 
+  // Signature Block
+  y = Math.max(y + 15, 222);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105); // Slate-600
+  doc.text("Signature Client", margin + 15, y);
+  doc.text("Cachet & Signature Vendeur", 190 - 15, y, { align: 'right' });
+
+  y += 4;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184); // Slate-400
+  doc.text("(Précédée de la mention \"Lu et approuvé\")", margin + 15, y);
+
+  y += 18;
+  doc.setDrawColor(226, 232, 240); // Slate-200
+  doc.setLineWidth(0.4);
+  doc.line(margin + 10, y, margin + 65, y);
+  doc.line(190 - 65, y, 190 - 10, y);
+
   // Centered Universal Page Footer
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
@@ -558,6 +579,26 @@ const generateA4QuotePDF = (merchant: Merchant, quote: any, action: 'print' | 'd
     doc.setTextColor(71, 85, 105);
     doc.text(`Observations : ${quote.notes}`, margin, y);
   }
+
+  // Signature Block
+  y = Math.max(y + 15, 222);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(71, 85, 105); // Slate-600
+  doc.text("Signature Client", margin + 15, y);
+  doc.text("Cachet & Signature Vendeur", 190 - 15, y, { align: 'right' });
+
+  y += 4;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7.5);
+  doc.setTextColor(148, 163, 184); // Slate-400
+  doc.text("(Précédée de la mention \"Bon pour accord\")", margin + 15, y);
+
+  y += 18;
+  doc.setDrawColor(226, 232, 240); // Slate-200
+  doc.setLineWidth(0.4);
+  doc.line(margin + 10, y, margin + 65, y);
+  doc.line(190 - 65, y, 190 - 10, y);
 
   // Footer Center label
   doc.setFontSize(8);
@@ -1842,6 +1883,7 @@ const MerchantDashboard = ({
   setActiveTab?: (tab: string) => void
 }) => {
   const [desktopOS, setDesktopOS] = useState<'windows' | 'mac' | 'linux'>('windows');
+  const [fileToRestore, setFileToRestore] = useState<File | null>(null);
 
   // Read from Dexie (Offline-first)
   const products = useLiveQuery(() => 
@@ -2063,6 +2105,70 @@ const MerchantDashboard = ({
       exit={{ opacity: 0, x: -20 }}
       className="space-y-8"
     >
+      {fileToRestore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-black/5 p-6 md:p-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-4 text-rose-600 mb-6">
+              <div className="p-3 bg-rose-50 rounded-2xl">
+                <AlertCircle className="w-8 h-8 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-gray-950 uppercase tracking-tight">Restauration de Base de Données</h3>
+                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest leading-none mt-1">Étape de validation requise</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mb-8">
+              <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-rose-800 leading-relaxed font-semibold">
+                ⚠️ ATTENTION : Restaurer cette base de données SQLite écrasera définitivement toutes vos données locales actuelles (ventes, dépenses, stocks, produits) par celles du fichier téléversé. Cette action est irréversible !
+              </div>
+              
+              <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2 text-xs text-gray-600">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-400 uppercase tracking-wider text-[10px]">Fichier importé :</span>
+                  <span className="font-bold text-gray-950 font-mono text-right truncate max-w-[200px]">{fileToRestore.name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-400 uppercase tracking-wider text-[10px]">Taille :</span>
+                  <span className="font-extrabold text-gray-950">{(fileToRestore.size / 1024 / 1024).toFixed(2)} Mo</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setFileToRestore(null)}
+                className="flex-1 px-6 py-4 border border-gray-100 hover:border-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-500 hover:text-gray-700 transition-all cursor-pointer text-center"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  const file = fileToRestore;
+                  setFileToRestore(null);
+                  const toastId = toast.loading('Restauration et importation en cours...');
+                  try {
+                    const { restoreSQLiteDB } = await import('../services/sqliteService');
+                    const success = await restoreSQLiteDB(file);
+                    if (success) {
+                      toast.success('Restauration réussie ! Chargement des nouvelles données...', { id: toastId });
+                    } else {
+                      toast.error('Échec de la restauration (format .sqlite3 invalide)', { id: toastId });
+                    }
+                  } catch (err) {
+                    console.error(err);
+                    toast.error('Restauration impossible', { id: toastId });
+                  }
+                }}
+                className="flex-1 px-6 py-4 bg-rose-600 hover:bg-rose-700 rounded-2xl text-xs font-black uppercase tracking-widest text-white transition-all shadow-lg shadow-rose-600/10 hover:shadow-rose-600/20 active:scale-[0.98] cursor-pointer text-center"
+              >
+                Confirmer l'import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DailyBriefing 
         merchantId={merchant.id} 
         data={{ sales, products, expenses }} 
@@ -2085,11 +2191,12 @@ const MerchantDashboard = ({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {merchant.licenseType === 'local' && (
-              <button 
-                onClick={async () => {
+            <button 
+              onClick={async () => {
+                const toastId = toast.loading('Génération du fichier de base de données SQLite...');
+                try {
                   const { exportSQLiteDB } = await import('../services/sqliteService');
-                  const file = await exportSQLiteDB();
+                  const file = await exportSQLiteDB(merchant.id);
                   if (file) {
                     const url = URL.createObjectURL(file);
                     const a = document.createElement('a');
@@ -2099,50 +2206,38 @@ const MerchantDashboard = ({
                     a.click();
                     document.body.removeChild(a);
                     URL.revokeObjectURL(url);
-                    toast.success('Base de données SQLite exportée !');
+                    toast.success('Base de données SQLite exportée !', { id: toastId });
                   } else {
-                    toast.error('Échec de l\'exportation SQLite');
+                    toast.error('Échec de l\'exportation SQLite (base de données introuvable)', { id: toastId });
                   }
-                }}
-                className="flex items-center gap-2 px-6 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-100 transition-all group"
-                title="Exporter la base de données SQLite pour une utilisation Desktop"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Exporter (.sqlite3)
-              </button>
-            )}
+                } catch (err) {
+                  console.error(err);
+                  toast.error('Échec de l\'exportation SQLite', { id: toastId });
+                }
+              }}
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-100 transition-all group cursor-pointer"
+              title="Exporter la base de données SQLite pour une utilisation Desktop"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Exporter (.sqlite3)
+            </button>
             
-            {merchant.licenseType === 'local' && (
-              <label className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink hover:border-primary/30 transition-all cursor-pointer group">
-                <Upload className="w-3.5 h-3.5" />
-                Restaurer
-                <input 
-                  type="file" 
-                  accept=".sqlite3" 
-                  className="hidden" 
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    
-                    const confirmRestore = window.confirm("ATTENTION: Restaurer une base de données écrasera toutes vos données locales actuelles. Continuer ?");
-                    if (!confirmRestore) return;
-
-                    const toastId = toast.loading('Restauration de la base de données...');
-                    try {
-                      const { restoreSQLiteDB } = await import('../services/sqliteService');
-                      const success = await restoreSQLiteDB(file);
-                      if (success) {
-                        toast.success('Restauration réussie ! Redémarrage...', { id: toastId });
-                      } else {
-                        toast.error('Échec de la restauration', { id: toastId });
-                      }
-                    } catch (err) {
-                      toast.error('Erreur lors de la restauration', { id: toastId });
-                    }
-                  }}
-                />
-              </label>
-            )}
+            <label className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink hover:border-primary/30 transition-all cursor-pointer group">
+              <Upload className="w-3.5 h-3.5" />
+              Restaurer
+              <input 
+                type="file" 
+                accept=".sqlite3" 
+                className="hidden" 
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setFileToRestore(file);
+                  // Clear value so the same file can be selected again
+                  e.target.value = '';
+                }}
+              />
+            </label>
 
             {!(merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? (
               <button 
@@ -3972,13 +4067,72 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [searchTerm, setSearchTerm] = useState('');
   const [showReceiptModal, setShowReceiptModal] = useState<{ show: boolean, saleData: any } | null>(null);
 
+  // Smart filters states
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'lowstock'>('instock');
+  const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest'>('name');
+
   const products = useLiveQuery(() => 
     db.products.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    products.forEach(p => {
+      if (p.category) cats.add(p.category);
+    });
+    return Array.from(cats).sort((a, b) => a.localeCompare(b));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
-    return products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) && Number(p.stockQuantity || 0) > 0);
-  }, [products, searchTerm]);
+    let result = [...products];
+
+    // Search filter (name, SKU, category, or description match)
+    if (searchTerm.trim() !== '') {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(term) || 
+        (p.sku && p.sku.toLowerCase().includes(term)) ||
+        (p.category && p.category.toLowerCase().includes(term)) ||
+        (p.description && p.description.toLowerCase().includes(term))
+      );
+    }
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      result = result.filter(p => p.category === selectedCategory);
+    }
+
+    // Stock Filter
+    if (stockFilter === 'instock') {
+      result = result.filter(p => Number(p.stockQuantity || 0) > 0);
+    } else if (stockFilter === 'lowstock') {
+      result = result.filter(p => {
+        const stock = Number(p.stockQuantity || 0);
+        const minLevel = Number(p.minStockLevel || 5);
+        return stock > 0 && stock <= minLevel;
+      });
+    }
+
+    // Sort order
+    if (sortBy === 'name') {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'price_asc') {
+      result.sort((a, b) => a.price - b.price);
+    } else if (sortBy === 'price_desc') {
+      result.sort((a, b) => b.price - a.price);
+    } else if (sortBy === 'stock_desc') {
+      result.sort((a, b) => (b.stockQuantity || 0) - (a.stockQuantity || 0));
+    } else if (sortBy === 'newest') {
+      result.sort((a, b) => {
+        const dateA = a.id; // fallback comparison
+        const dateB = b.id;
+        return dateB.localeCompare(dateA);
+      });
+    }
+
+    return result;
+  }, [products, searchTerm, selectedCategory, stockFilter, sortBy]);
 
   const addToCart = (product: MerchantProduct) => {
     setCart(prev => {
@@ -4071,42 +4225,213 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
-            placeholder="Rechercher un produit par nom ou SKU..."
+            placeholder="Rechercher un produit par nom, SKU ou catégorie..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-12 pr-4 py-4 bg-white border border-black/5 rounded-[1.5rem] text-sm focus:ring-4 focus:ring-primary/10 shadow-sm outline-none transition-all"
           />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredProducts.map((product) => (
-            <button
-              key={product.id}
-              onClick={() => addToCart(product)}
-              className="bg-white p-4 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all text-left group relative overflow-hidden"
-            >
-              <div className="w-full aspect-square bg-gray-50 rounded-2xl mb-3 flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-105 transition-transform">
-                {product.image ? (
-                  <OptimizedImage src={product.image} alt={product.name} width={300} className="w-full h-full object-cover" />
-                ) : (
-                  <Package className="w-8 h-8 text-gray-200" />
-                )}
+
+        {/* Filtres Intelligents */}
+        <div className="space-y-4 bg-gray-50/50 p-4 rounded-3xl border border-black/5">
+          {/* Ligne 1: Catégories (Filtre rapide) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5" />
+                Catégories de l'établissement
+              </span>
+              {selectedCategory !== 'all' && (
+                <button 
+                  onClick={() => setSelectedCategory('all')} 
+                  className="text-[10px] font-bold text-primary hover:underline"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </div>
+            
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                  selectedCategory === 'all'
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200 shadow-sm'
+                }`}
+              >
+                <span>Tous</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  selectedCategory === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {products.length}
+                </span>
+              </button>
+
+              {categories.map((cat) => {
+                const count = products.filter(p => p.category === cat).length;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                      selectedCategory === cat
+                        ? 'bg-primary text-white border-primary shadow-sm'
+                        : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200 shadow-sm'
+                    }`}
+                  >
+                    <span>{cat}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                      selectedCategory === cat ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Ligne 2: Disponibilité & Tri */}
+          <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between border-t border-black/5 pt-3">
+            {/* Disponibilité Segmented Control */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Filtrer Stock :</span>
+              <div className="bg-white border border-black/5 rounded-2xl p-1 flex gap-1 shadow-sm">
+                <button
+                  onClick={() => setStockFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                    stockFilter === 'all'
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  Tout
+                </button>
+                <button
+                  onClick={() => setStockFilter('instock')}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                    stockFilter === 'instock'
+                      ? 'bg-emerald-500 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  En Stock
+                </button>
+                <button
+                  onClick={() => setStockFilter('lowstock')}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                    stockFilter === 'lowstock'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>Alerte Stock</span>
+                  {products.filter(p => {
+                    const st = Number(p.stockQuantity || 0);
+                    const ml = Number(p.minStockLevel || 5);
+                    return st > 0 && st <= ml;
+                  }).length > 0 && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${stockFilter === 'lowstock' ? 'bg-white' : 'bg-amber-500 animate-pulse'}`} />
+                  )}
+                </button>
               </div>
-              <h4 className="font-bold text-sm text-gray-900 truncate leading-tight">{product.name}</h4>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-sm text-primary font-black">{product.price.toLocaleString()} <span className="text-[10px] opacity-60 font-mono">{merchant.currency}</span></p>
-                <div className="px-2 py-0.5 bg-gray-50 rounded-lg border border-gray-100">
-                  <p className="text-[9px] font-mono font-bold text-gray-400">STOCK: {product.stockQuantity || 0}</p>
+            </div>
+
+            {/* Tri Selector & Stats Info */}
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              {/* Tri Selector */}
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Trier par :</span>
+                <div className="relative flex-1 md:flex-none">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="appearance-none bg-white border border-black/5 rounded-2xl pl-3 pr-8 py-1.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/10 shadow-sm cursor-pointer w-full"
+                  >
+                    <option value="name">Nom (A-Z)</option>
+                    <option value="price_asc">Prix : Croissant</option>
+                    <option value="price_desc">Prix : Décroissant</option>
+                    <option value="stock_desc">Niveau de Stock</option>
+                    <option value="name">Défaut</option>
+                  </select>
+                  <ArrowUpDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
                 </div>
               </div>
-              
-              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg">
-                  <Plus className="w-4 h-4" />
-                </div>
+
+              {/* Résumé badge */}
+              <div className="bg-primary/5 text-primary text-[10px] font-black px-3 py-1.5 rounded-2xl border border-primary/10 tracking-wider whitespace-nowrap">
+                {filteredProducts.length} PRODUITS
               </div>
-            </button>
-          ))}
+            </div>
+          </div>
         </div>
+
+        {filteredProducts.length === 0 ? (
+          <div className="bg-white rounded-[2rem] border border-black/5 p-12 text-center shadow-sm">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-gray-300" />
+            </div>
+            <p className="text-gray-500 font-bold text-sm">Aucun produit ne correspond à vos filtres</p>
+            <p className="text-gray-400 text-xs mt-1">Essayez de réinitialiser les critères ou de modifier votre recherche.</p>
+            <button 
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedCategory('all');
+                setStockFilter('all');
+                setSortBy('name');
+              }} 
+              className="mt-4 px-4 py-2 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20 transition-all"
+            >
+              Réinitialiser tous les filtres
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredProducts.map((product) => (
+              <button
+                key={product.id}
+                onClick={() => addToCart(product)}
+                className="bg-white p-4 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all text-left group relative overflow-hidden flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-full aspect-square bg-gray-50 rounded-2xl mb-3 flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-105 transition-transform">
+                    {product.image ? (
+                      <OptimizedImage src={product.image} alt={product.name} width={300} className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="w-8 h-8 text-gray-200" />
+                    )}
+                  </div>
+                  <h4 className="font-bold text-sm text-gray-900 truncate leading-tight">{product.name}</h4>
+                  {product.sku && (
+                    <p className="text-[9px] font-mono font-bold text-gray-400 mt-0.5 uppercase">SKU: {product.sku}</p>
+                  )}
+                  {product.category && (
+                    <div className="mt-1">
+                      <span className="text-[9px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md font-bold uppercase">{product.category}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
+                  <p className="text-sm text-primary font-black">{product.price.toLocaleString()} <span className="text-[10px] opacity-60 font-mono">{merchant.currency}</span></p>
+                  <div className={`px-2 py-0.5 rounded-lg border ${
+                    (product.stockQuantity || 0) <= (product.minStockLevel || 5)
+                      ? 'bg-amber-50 text-amber-600 border-amber-100'
+                      : 'bg-gray-50 text-gray-400 border-gray-100'
+                  }`}>
+                    <p className="text-[9px] font-mono font-bold">STOCK: {product.stockQuantity || 0}</p>
+                  </div>
+                </div>
+                
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="w-full lg:w-[400px]">
@@ -5492,6 +5817,296 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       });
   }, [expenses, financialSummary.totalExpenses]);
 
+  // Export financial transactions to CSV
+  const exportToCSV = () => {
+    try {
+      const headers = ['Date', 'Type de flux', 'Catégorie', 'Description', 'Montant', 'Devise', 'Moyen de paiement / Statut'];
+      
+      const transactions: any[] = [];
+      
+      sales.forEach(s => {
+        const t = s.createdAt?.seconds ? s.createdAt.seconds * 1000 : new Date(s.createdAt).getTime();
+        transactions.push({
+          timestamp: t,
+          date: s.createdAt,
+          type: 'Entrée (Vente)',
+          category: 'Vente de produits',
+          description: s.items?.map((it: any) => `${it.name} (x${it.quantity})`).join(', ') + (s.customerName ? ` - Client: ${s.customerName}` : ''),
+          amount: s.totalAmount,
+          status: s.balance > 0 ? `Reste à recouvrir: ${s.balance}` : 'Encaissé entièrement'
+        });
+      });
+
+      expenses.forEach(e => {
+        const t = e.createdAt?.seconds ? e.createdAt.seconds * 1000 : new Date(e.createdAt).getTime();
+        transactions.push({
+          timestamp: t,
+          date: e.createdAt,
+          type: 'Sortie (Dépense)',
+          category: e.category || 'Général',
+          description: e.description || '',
+          amount: e.amount,
+          status: (e as any).paymentMethod || 'Espèces'
+        });
+      });
+
+      // Sort chronological descending (newest first)
+      transactions.sort((a, b) => b.timestamp - a.timestamp);
+
+      // Map to rows with semi-colons for perfect French Excel support
+      const csvRows = [
+        headers.join(';'),
+        ...transactions.map(t => {
+          const dateStr = t.date?.seconds 
+            ? format(new Date(t.date.seconds * 1000), 'dd/MM/yyyy HH:mm')
+            : format(new Date(t.date), 'dd/MM/yyyy HH:mm');
+          
+          const typeClean = (t.type || '').replace(/;/g, ',').replace(/"/g, '""');
+          const categoryClean = (t.category || '').replace(/;/g, ',').replace(/"/g, '""');
+          const descClean = (t.description || '').replace(/;/g, ',').replace(/"/g, '""');
+          const statusClean = (t.status || '').replace(/;/g, ',').replace(/"/g, '""');
+          
+          return `"${dateStr}";"${typeClean}";"${categoryClean}";"${descClean}";"${t.amount}";"${merchant.currency}";"${statusClean}"`;
+        })
+      ];
+
+      const csvContent = "\uFEFF" + csvRows.join("\n"); // UTF-8 BOM byte
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `rapport_financier_${merchant.name.toLowerCase().replace(/\s+/g, '_')}_${format(new Date(), 'dd-MM-yyyy')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Rapport exporté sous format CSV !');
+    } catch (error) {
+      console.error(error);
+      toast.error("Échec de l'exportation CSV.");
+    }
+  };
+
+  // Export financial report to beautiful PDF
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF();
+      const margin = 20;
+      let y = 20;
+
+      // Header Brand Accent
+      doc.setFillColor(30, 41, 59); // Slate-800
+      doc.rect(margin, y, 170, 1.5, 'F');
+      y += 8;
+
+      // Header Title
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 41, 59); // Slate-800
+      doc.text('RAPPORT FINANCIER', margin, y);
+      
+      // Right metadata
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105); // Slate-600
+      doc.text(`Généré le : ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 190, y, { align: 'right' });
+      y += 5.5;
+      doc.text(`Établissement : ${merchant.name}`, 190, y, { align: 'right' });
+      y += 12;
+
+      // Divider line
+      doc.setDrawColor(226, 232, 240); // Slate-200
+      doc.setLineWidth(0.4);
+      doc.line(margin, y, 190, y);
+      y += 10;
+
+      // Section: Synthèse Financière (Financial Summary)
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42); // Slate-900
+      doc.text('SYNTHÈSE DE LA PÉRIODE', margin, y);
+      y += 6;
+
+      // KPI boxes renderer helper
+      const drawKpi = (label: string, value: number, x: number, yPos: number, width: number, height: number, colorArr: [number, number, number]) => {
+        // Background card
+        doc.setFillColor(250, 250, 250);
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.2);
+        doc.roundedRect(x, yPos, width, height, 2.5, 2.5, 'FD');
+
+        // Color ribbon side
+        doc.setFillColor(...colorArr);
+        doc.rect(x, yPos, 2, height, 'F');
+
+        // Text
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(100, 116, 139); // Slate-500
+        doc.text(label.toUpperCase(), x + 5, yPos + 6);
+
+        doc.setFontSize(9.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 41, 59); // Slate-800
+        doc.text(`${pdfFormatNum(value)} ${merchant.currency}`, x + 5, yPos + 13);
+      };
+
+      const boxWidth = 53;
+      const boxHeight = 18;
+      const bGap = 55;
+
+      // Draw first row of KPIs
+      drawKpi('Chiffre d\'Affaires', financialSummary.totalRevenue, margin, y, boxWidth, boxHeight, [99, 102, 241]); // Indigo
+      drawKpi('Total Encaissé', financialSummary.totalCollected, margin + bGap, y, boxWidth, boxHeight, [16, 185, 129]); // Emerald
+      drawKpi('Reste à Recouvrer', financialSummary.totalPending, margin + bGap * 2, y, boxWidth, boxHeight, [245, 158, 11]); // Amber
+
+      y += boxHeight + 4;
+
+      // Draw second row of KPIs
+      drawKpi('Charges & Dépenses', financialSummary.totalExpenses, margin, y, boxWidth, boxHeight, [244, 63, 94]); // Rose
+      drawKpi('Résultat Fiscal (Profit)', financialSummary.netProfit, margin + bGap, y, boxWidth, boxHeight, [59, 130, 246]); // Blue
+      
+      y += boxHeight + 14;
+
+      // Write Category Breakdown summary if there's any expense
+      if (categoryData.length > 0) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(71, 85, 105);
+        doc.text('RÉPARTITION MAJEURE DES DÉPENSES', margin, y);
+        y += 5;
+
+        // Display category items side-by-side
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        const catStrList = categoryData.map(c => `${c.name}: ${pdfFormatNum(c.value)} ${merchant.currency} (${c.percentage}%)`);
+        doc.text(catStrList.slice(0, 3).join('   |   '), margin, y);
+        y += 11;
+      }
+
+      // Section: Detailed Tables
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42); // Slate-900
+      doc.text('DERNIÈRES OPÉRATIONS DE REVENUS (VENTES)', margin, y);
+      y += 5;
+
+      // Sales Table Header
+      doc.setFillColor(248, 250, 252); // Slate-50
+      doc.rect(margin, y, 170, 6, 'F');
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139); // Slate-500
+      doc.text('Date', margin + 3, y + 4.5);
+      doc.text('Client', margin + 25, y + 4.5);
+      doc.text('Statut de Paiement', margin + 95, y + 4.5);
+      doc.text('Montant', 190 - 3, y + 4.5, { align: 'right' });
+      
+      y += 6;
+
+      // Render top 5 sales
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85); // Slate-700
+      
+      const topSales = [...sales].sort((a, b) => {
+        const tA = a.createdAt?.seconds ? a.createdAt.seconds : new Date(a.createdAt).getTime() / 1000;
+        const tB = b.createdAt?.seconds ? b.createdAt.seconds : new Date(b.createdAt).getTime() / 1000;
+        return tB - tA;
+      }).slice(0, 5);
+
+      if (topSales.length === 0) {
+        doc.text('Aucune vente enregistrée', margin + 3, y + 4.5);
+        y += 8;
+      } else {
+        topSales.forEach(s => {
+          const dateStr = s.createdAt?.seconds 
+            ? format(new Date(s.createdAt.seconds * 1000), 'dd/MM/yyyy')
+            : format(new Date(s.createdAt), 'dd/MM/yyyy');
+          
+          doc.text(dateStr, margin + 3, y + 4.5);
+          doc.text(s.customerName || 'Client de passage', margin + 25, y + 4.5);
+          doc.text(s.balance > 0 ? `Incomplet (Reste ${pdfFormatNum(s.balance)})` : 'Payé complétement', margin + 95, y + 4.5);
+          doc.text(`${pdfFormatNum(s.totalAmount)} ${merchant.currency}`, 190 - 3, y + 4.5, { align: 'right' });
+          
+          y += 6;
+          doc.setDrawColor(241, 245, 249);
+          doc.setLineWidth(0.2);
+          doc.line(margin, y, 190, y);
+        });
+        y += 8;
+      }
+
+      // Expenses Section
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42); // Slate-900
+      doc.text('DERNIÈRES OPÉRATIONS DE CHARGES (DÉPENSES)', margin, y);
+      y += 5;
+
+      // Expenses Table Header
+      doc.setFillColor(248, 250, 252); // Slate-50
+      doc.rect(margin, y, 170, 6, 'F');
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(100, 116, 139); // Slate-500
+      doc.text('Date', margin + 3, y + 4.5);
+      doc.text('Catégorie', margin + 25, y + 4.5);
+      doc.text('Description / Motif', margin + 65, y + 4.5);
+      doc.text('Montant', 190 - 3, y + 4.5, { align: 'right' });
+      
+      y += 6;
+
+      // Render top 5 expenses
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85); // Slate-700
+
+      const topExpenses = [...expenses].sort((a, b) => {
+        const tA = a.createdAt?.seconds ? a.createdAt.seconds : new Date(a.createdAt).getTime() / 1000;
+        const tB = b.createdAt?.seconds ? b.createdAt.seconds : new Date(b.createdAt).getTime() / 1000;
+        return tB - tA;
+      }).slice(0, 5);
+
+      if (topExpenses.length === 0) {
+        doc.text('Aucune dépense enregistrée', margin + 3, y + 4.5);
+        y += 8;
+      } else {
+        topExpenses.forEach(e => {
+          const dateStr = e.createdAt?.seconds 
+            ? format(new Date(e.createdAt.seconds * 1000), 'dd/MM/yyyy')
+            : format(new Date(e.createdAt), 'dd/MM/yyyy');
+          
+          const expDesc = e.description && e.description.length > 42 ? e.description.substring(0, 40) + '...' : (e.description || '-');
+          
+          doc.text(dateStr, margin + 3, y + 4.5);
+          doc.text(e.category, margin + 25, y + 4.5);
+          doc.text(expDesc, margin + 65, y + 4.5);
+          doc.text(`${pdfFormatNum(e.amount)} ${merchant.currency}`, 190 - 3, y + 4.5, { align: 'right' });
+          
+          y += 6;
+          doc.setDrawColor(241, 245, 249);
+          doc.setLineWidth(0.2);
+          doc.line(margin, y, 190, y);
+        });
+        y += 8;
+      }
+
+      // Final signature row of financial balance
+      y = Math.min(265, Math.max(y + 10, 255));
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(148, 163, 184); // Slate-400
+      doc.text(`Rapport financier généré électroniquement par ACOM Technologie. Établissement : ${merchant.name}`, 105, y, { align: 'center' });
+
+      doc.save(`rapport_financier_${merchant.name.toLowerCase().replace(/\s+/g, '_')}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
+      toast.success('Rapport exporté sous format PDF !');
+    } catch (error) {
+      console.error(error);
+      toast.error('Échec de la génération du PDF.');
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.98 }}
@@ -5504,11 +6119,17 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
           <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Analyse de performance et rentabilité</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-5 py-2.5 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-md transition-all flex items-center gap-2">
+          <button 
+            onClick={exportToCSV}
+            className="px-5 py-2.5 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
+          >
             <BarChart3 className="w-3 h-3" />
             Exporter CSV
           </button>
-          <button className="px-5 py-2.5 bg-ink text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2">
+          <button 
+            onClick={exportToPDF}
+            className="px-5 py-2.5 bg-ink text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2 cursor-pointer"
+          >
             <FileText className="w-3 h-3 text-primary" />
             Rapport PDF
           </button>
