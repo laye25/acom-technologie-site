@@ -724,7 +724,7 @@ const MerchantSaaS = () => {
 
         {/* Content */}
         <AnimatePresence mode="wait">
-          {activeTab === 'dashboard' && <MerchantDashboard key="dashboard" merchant={merchant} onUpdate={setMerchant} showUpgradeModal={showUpgradeModal} setShowUpgradeModal={setShowUpgradeModal} />}
+          {activeTab === 'dashboard' && <MerchantDashboard key="dashboard" merchant={merchant} onUpdate={setMerchant} showUpgradeModal={showUpgradeModal} setShowUpgradeModal={setShowUpgradeModal} setActiveTab={setActiveTab} />}
           {activeTab === 'inventory' && <InventoryManager key="inventory" merchant={merchant} setShowUpgradeModal={setShowUpgradeModal} />}
           {activeTab === 'suppliers' && <SupplierManager key="suppliers" merchant={merchant} />}
           {activeTab === 'pos' && <MerchantPOS key="pos" merchant={merchant} setShowUpgradeModal={setShowUpgradeModal} />}
@@ -1648,12 +1648,14 @@ const MerchantDashboard = ({
   merchant, 
   onUpdate,
   showUpgradeModal,
-  setShowUpgradeModal
+  setShowUpgradeModal,
+  setActiveTab
 }: { 
   merchant: Merchant, 
   onUpdate: (m: Merchant) => void,
   showUpgradeModal: boolean,
-  setShowUpgradeModal: (val: boolean) => void
+  setShowUpgradeModal: (val: boolean) => void,
+  setActiveTab?: (tab: string) => void
 }) => {
   const [desktopOS, setDesktopOS] = useState<'windows' | 'mac' | 'linux'>('windows');
 
@@ -2845,7 +2847,14 @@ const MerchantDashboard = ({
                         <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 shadow-sm mb-3 uppercase tracking-[0.2em]">
                           CRITIQUE
                         </span>
-                        <button onClick={() => { setCurrentProduct(product); setIsRestocking(true); }} className="text-[10px] font-black text-primary hover:text-primary-hover uppercase tracking-[0.2em] transition-colors">Réapprovisionner</button>
+                        {setActiveTab && (
+                          <button 
+                            onClick={() => setActiveTab('inventory')} 
+                            className="text-[10px] font-black text-primary hover:text-primary-hover uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
+                          >
+                            Réapprovisionner
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -2963,6 +2972,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
   useEffect(() => {
     syncService.syncProducts(merchant.id);
     syncService.syncCategories(merchant.id);
+    syncService.syncSales(merchant.id);
   }, [merchant.id]);
 
   const products = useLiveQuery(() => 
@@ -2975,6 +2985,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
 
   const movements = useLiveQuery(() => 
     db.movements.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
+  , [merchant.id]) || [];
+
+  const sales = useLiveQuery(() => 
+    db.sales.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
   const loading = false;
@@ -2997,6 +3011,29 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
     
     return { totalItems, totalQuantity, lowStock, outOfStock, totalValue };
   }, [products]);
+
+  // Dynamic Stock Health Indicators
+  const theoreticalProfit = useMemo(() => {
+    if (products.length === 0) return 0;
+    const totalPurchaseValue = products.reduce((acc, p) => acc + ((p.costPrice || 0) * Number(p.stockQuantity || 0)), 0);
+    const totalRetailValue = products.reduce((acc, p) => acc + (p.price * Number(p.stockQuantity || 0)), 0);
+    if (totalRetailValue > 0) {
+      return Math.max(0, Math.min(100, Math.round(((totalRetailValue - totalPurchaseValue) / totalRetailValue) * 100)));
+    }
+    const simpleMargins = products.map(p => p.price > 0 ? Math.max(0, ((p.price - (p.costPrice || 0)) / p.price) * 100) : 0);
+    const sumSimple = simpleMargins.reduce((acc, val) => acc + val, 0);
+    return Math.max(0, Math.min(100, Math.round(sumSimple / products.length)));
+  }, [products]);
+
+  const rotationStock = useMemo(() => {
+    const totalUnitsSold = sales.reduce((sum, s) => sum + (s.items ? s.items.reduce((acc: number, item: any) => acc + Number(item.quantity || 0), 0) : 0), 0);
+    const totalStock = products.reduce((acc, p) => acc + Number(p.stockQuantity || 0), 0);
+    if (totalStock === 0 && totalUnitsSold === 0) return 0;
+    if (totalStock === 0) return 100;
+    const ratio = (totalUnitsSold / (totalUnitsSold + totalStock)) * 100;
+    // Map to a realistic performance range or direct proportion, with a minimum representation helper
+    return Math.max(12, Math.min(100, Math.round(ratio)));
+  }, [sales, products]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3277,8 +3314,8 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
               
               <div className="space-y-5">
                 <HealthIndicator label="Disponibilité" value={products.length > 0 ? (products.filter(p => Number(p.stockQuantity || 0) > 0).length / products.length * 100).toFixed(0) : '0'} color="primary" />
-                <HealthIndicator label="Rentabilité théorique" value="85" color="blue" />
-                <HealthIndicator label="Rotation de stock" value="62" color="purple" />
+                <HealthIndicator label="Rentabilité théorique" value={theoreticalProfit.toString()} color="blue" />
+                <HealthIndicator label="Rotation de stock" value={rotationStock.toString()} color="purple" />
               </div>
 
               <div className="mt-8 pt-8 border-t border-white/10 grid grid-cols-2 gap-4">
