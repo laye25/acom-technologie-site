@@ -16,7 +16,8 @@ export const initSQLite = async () => {
           ('__TAURI__' in window) || 
           (window.process && (window.process as any).type) || 
           (navigator && navigator.userAgent.toLowerCase().includes('electron')) || 
-          window.location.protocol === 'file:'
+          window.location.protocol === 'file:' ||
+          window.location.protocol === 'app:'
         );
         if (isDesktop) {
           if (file.endsWith('.wasm')) {

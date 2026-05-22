@@ -13,7 +13,7 @@ const Login = () => {
 
   const from = location.state?.from?.pathname + (location.state?.from?.search || '') || '/dashboard';
 
-  const isDesktop = ('__TAURI__' in window) || (window && window.process && window.process.type) || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:';
+  const isDesktop = ('__TAURI__' in window) || (window && window.process && window.process.type) || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:' || window.location.protocol === 'app:';
   
   // Redirect if already logged in
   React.useEffect(() => {
