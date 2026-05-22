@@ -39,8 +39,8 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     win.loadURL('http://localhost:3000');
   } else {
-    win.loadURL('app://index.html').catch(err => {
-      console.error('Failed to load custom protocol app://index.html', err);
+    win.loadURL('app://localhost/index.html').catch(err => {
+      console.error('Failed to load custom protocol app://localhost/index.html', err);
     });
   }
 }
