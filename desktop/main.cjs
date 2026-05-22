@@ -9,6 +9,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
+      webSecurity: false,
     }
   });
 
@@ -17,13 +18,17 @@ function createWindow() {
     win.setIcon(iconPath);
   }
 
-  // In production, load the built index.html
+  // In production, load the built index.html using loadFile for cross-platform resilience
   // In development, load the dev server URL
-  const startUrl = process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:3000' 
-    : `file://${path.join(__dirname, '../dist/index.html')}`;
-
-  win.loadURL(startUrl);
+  if (process.env.NODE_ENV === 'development') {
+    win.loadURL('http://localhost:3000');
+  } else {
+    const indexPath = path.join(__dirname, '../dist/index.html');
+    console.log('Loading production desktop build from:', indexPath);
+    win.loadFile(indexPath).catch(err => {
+      console.error('Failed to load local HTML file:', err);
+    });
+  }
 }
 
 app.whenReady().then(createWindow);
