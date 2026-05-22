@@ -1,6 +1,7 @@
-const { app, BrowserWindow, protocol, dialog } = require('electron');
+const { app, BrowserWindow, protocol, dialog, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 
 // Global exception handler for the main process to show direct error popups instead of failing silently
 process.on('uncaughtException', (err) => {
@@ -92,52 +93,38 @@ app.whenReady().then(() => {
       // remove any leading slashes or relative path segments
       joinedPath = joinedPath.replace(/^\/+/, '').replace(/^\.\/+/, '');
       
+      // Normalize index.html prefixes that might occur in some asset resolution cases
+      if (joinedPath.startsWith('index.html/')) {
+        joinedPath = joinedPath.substring(11);
+      } else if (joinedPath.startsWith('index.html\\')) {
+        joinedPath = joinedPath.substring(11);
+      }
+      
       if (!joinedPath || joinedPath === '.' || joinedPath === 'index.html') {
         joinedPath = 'index.html';
       }
       
-      const filePath = path.join(__dirname, '../dist', joinedPath);
-      const data = await fs.promises.readFile(filePath);
+      let filePath = path.join(__dirname, '../dist', joinedPath);
       
-      // Auto-detect correct mime-type for all assets (essential for ES Modules & WASM compatibility)
-      let contentType = 'text/html';
-      const ext = path.extname(filePath).toLowerCase();
-      if (ext === '.js' || ext === '.mjs') contentType = 'application/javascript';
-      else if (ext === '.css') contentType = 'text/css';
-      else if (ext === '.json') contentType = 'application/json';
-      else if (ext === '.png') contentType = 'image/png';
-      else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
-      else if (ext === '.svg') contentType = 'image/svg+xml';
-      else if (ext === '.wasm') contentType = 'application/wasm';
-      else if (ext === '.woff') contentType = 'font/woff';
-      else if (ext === '.woff2') contentType = 'font/woff2';
-      else if (ext === '.ttf') contentType = 'font/ttf';
-      else if (ext === '.otf') contentType = 'font/otf';
-      else if (ext === '.ico') contentType = 'image/x-icon';
-      else if (ext === '.html') contentType = 'text/html';
-      
-      return new Response(data, {
-        headers: { 'content-type': contentType }
-      });
-    } catch (error) {
-      console.error(`Failed to handle app request for ${request.url}:`, error);
-      
-      // Fallback to index.html ONLY for routed directions (paths without filename extensions)
-      const url = new URL(request.url);
-      const ext = path.extname(url.pathname).toLowerCase();
-      
-      if (!ext || ext === '.html') {
-        try {
-          const fallbackData = await fs.promises.readFile(path.join(__dirname, '../dist/index.html'));
-          return new Response(fallbackData, {
-            headers: { 'content-type': 'text/html' }
-          });
-        } catch (fallbackError) {
-          return new Response('Not Found', { status: 404 });
+      // Fallback to index.html for Single Page App client-side routing and virtual directions (paths without extensions)
+      if (!fs.existsSync(filePath)) {
+        const ext = path.extname(filePath).toLowerCase();
+        if (!ext || ext === '.html') {
+          filePath = path.join(__dirname, '../dist/index.html');
         }
       }
       
-      return new Response(`Asset Not Found: ${url.pathname}`, { status: 404 });
+      // Use net.fetch which automatically detects perfect MIME types (important for ES Modules & WASM compatibility)
+      return net.fetch(pathToFileURL(filePath).toString());
+    } catch (error) {
+      console.error(`Failed to handle app request for ${request.url}:`, error);
+      
+      try {
+        const fallbackPath = path.join(__dirname, '../dist/index.html');
+        return net.fetch(pathToFileURL(fallbackPath).toString());
+      } catch (fallbackError) {
+        return new Response('Fatal Error', { status: 500 });
+      }
     }
   });
 
