@@ -669,30 +669,75 @@ export const dbService = {
   },
   stockMovements: {
     async addStock(merchantId: string, productId: string, quantity: number, reason: string, performedBy: string, cost?: number) {
-      const product = await merchantProductRepository.getById(productId);
+      // 1. Get product locally first
+      let product = await db.products.get(productId);
+      
+      // Fallback to remote if not found locally
+      if (!product) {
+        try {
+          product = await merchantProductRepository.getById(productId) as any;
+          if (product) {
+            // Save it locally
+            await db.products.put({ ...product, syncStatus: 'synced' } as any);
+          }
+        } catch (error) {
+          console.warn('Could not fetch product from cloud:', error);
+        }
+      }
+
       if (!product) throw new Error('Produit non trouvé');
 
-      const currentStock = Number(product.stockQuantity || (product as any).stock_quantity || 0);
+      const currentStock = Number(product.stockQuantity !== undefined ? product.stockQuantity : (product as any).stock_quantity || 0);
       const newStock = currentStock + Number(quantity);
 
-      await merchantProductRepository.update(productId, { stockQuantity: newStock } as any);
-      // Update local product
+      // 2. ALWAYS update locally first immediately!
       await db.products.update(productId, { stockQuantity: newStock, updatedAt: new Date() });
 
+      // 3. SQLite Mirroring for Local/Heavy data
+      try {
+        const { sqliteHelper } = await import('./sqliteService');
+        await sqliteHelper.insertProduct({ ...product, stockQuantity: newStock, updatedAt: new Date() });
+      } catch (e) {
+        console.warn('SQLite mirroring failed:', e);
+      }
+
       const user = auth.currentUser;
-      const movementId = await stockMovementRepository.create({
-        merchantId,
-        owner_id: user?.uid,
-        ownerId: user?.uid,
-        productId,
-        type: 'in',
-        quantity,
-        previousQuantity: currentStock,
-        newQuantity: newStock,
-        reason,
-        performedBy
-      } as any);
-      // Update local movement
+      const merchant = merchantId ? await db.merchants.get(merchantId) : null;
+      
+      // 4. Update cloud product if not local license
+      if (merchant?.licenseType !== 'local') {
+        try {
+          await merchantProductRepository.update(productId, { stockQuantity: newStock } as any);
+        } catch (error) {
+          console.warn('Could not update remote product stock, will sync later (Offline/Quota):', error);
+        }
+      }
+
+      // 5. Create stock movement
+      let movementId = uuidv4();
+      if (merchant?.licenseType !== 'local') {
+        try {
+          const remoteMovementId = await stockMovementRepository.create({
+            merchantId,
+            owner_id: user?.uid,
+            ownerId: user?.uid,
+            productId,
+            type: 'in',
+            quantity,
+            previousQuantity: currentStock,
+            newQuantity: newStock,
+            reason,
+            performedBy
+          } as any);
+          if (remoteMovementId) {
+            movementId = remoteMovementId;
+          }
+        } catch (error) {
+          console.warn('Could not create remote stock movement:', error);
+        }
+      }
+
+      // Record movement locally
       await db.movements.put({
         id: movementId,
         merchantId,
@@ -706,17 +751,29 @@ export const dbService = {
         createdAt: new Date()
       });
 
+      // 6. Record expense if there is a cost
       if (cost && cost > 0) {
-        const expenseId = await merchantExpenseRepository.create({
-          merchantId,
-          owner_id: user?.uid,
-          ownerId: user?.uid,
-          title: `Approvisionnement: ${product.name}`,
-          amount: cost,
-          category: 'Stock',
-          date: new Date().toISOString().split('T')[0]
-        } as any);
-        // Update local expense
+        let expenseId = uuidv4();
+        if (merchant?.licenseType !== 'local') {
+          try {
+            const remoteExpenseId = await merchantExpenseRepository.create({
+              merchantId,
+              owner_id: user?.uid,
+              ownerId: user?.uid,
+              title: `Approvisionnement: ${product.name}`,
+              amount: cost,
+              category: 'Stock',
+              date: new Date().toISOString().split('T')[0]
+            } as any);
+            if (remoteExpenseId) {
+              expenseId = remoteExpenseId;
+            }
+          } catch (error) {
+            console.warn('Could not create remote expense:', error);
+          }
+        }
+
+        // Record expense locally
         await db.expenses.put({
           id: expenseId,
           merchantId,
