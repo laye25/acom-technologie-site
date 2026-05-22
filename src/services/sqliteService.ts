@@ -12,6 +12,18 @@ export const initSQLite = async () => {
       print: console.log,
       printErr: console.error,
       locateFile: (file: string) => {
+        const isDesktop = typeof window !== 'undefined' && (
+          ('__TAURI__' in window) || 
+          (window.process && (window.process as any).type) || 
+          (navigator && navigator.userAgent.toLowerCase().includes('electron')) || 
+          window.location.protocol === 'file:'
+        );
+        if (isDesktop) {
+          if (file.endsWith('.wasm')) {
+            return 'sqlite3.wasm';
+          }
+          return file;
+        }
         if (file.endsWith('.wasm')) {
           return '/sqlite3.wasm';
         }
