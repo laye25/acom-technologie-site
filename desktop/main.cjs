@@ -1,6 +1,17 @@
-const { app, BrowserWindow, protocol } = require('electron');
+const { app, BrowserWindow, protocol, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// Global exception handler for the main process to show direct error popups instead of failing silently
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception in Main Process:', err);
+  if (app.isReady()) {
+    dialog.showErrorBox(
+      'Acom Gestion Desktop - Erreur Inattendue',
+      `Une erreur interne est survenue dans le processus principal :\n\n${err.stack || err.message || err}`
+    );
+  }
+});
 
 // Register custom protocol BEFORE app is ready to act as a standard secure scheme
 protocol.registerSchemesAsPrivileged([
@@ -33,6 +44,24 @@ function createWindow() {
   if (fs.existsSync(iconPath)) {
     win.setIcon(iconPath);
   }
+
+  // Add a standard shortcut to open developer tools instantly in production/testing
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      win.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
+  // Log load failure details to help diagnose white screen issues
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error(`Page failed to load: ${validatedURL} (${errorCode}: ${errorDescription})`);
+  });
+
+  // Log renderer process crashes or termination
+  win.webContents.on('render-process-gone', (event, details) => {
+    console.error('Renderer process gone or crashed:', details);
+  });
 
   // In production, load the built index.html using our custom secure 'app' scheme
   // In development, load the dev server URL
@@ -80,22 +109,35 @@ app.whenReady().then(() => {
       else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
       else if (ext === '.svg') contentType = 'image/svg+xml';
       else if (ext === '.wasm') contentType = 'application/wasm';
+      else if (ext === '.woff') contentType = 'font/woff';
+      else if (ext === '.woff2') contentType = 'font/woff2';
+      else if (ext === '.ttf') contentType = 'font/ttf';
+      else if (ext === '.otf') contentType = 'font/otf';
+      else if (ext === '.ico') contentType = 'image/x-icon';
       else if (ext === '.html') contentType = 'text/html';
       
       return new Response(data, {
         headers: { 'content-type': contentType }
       });
     } catch (error) {
-      console.error('Failed to handle app request:', error);
-      // Fallback to index.html for Single Page App client-side routing
-      try {
-        const fallbackData = await fs.promises.readFile(path.join(__dirname, '../dist/index.html'));
-        return new Response(fallbackData, {
-          headers: { 'content-type': 'text/html' }
-        });
-      } catch (fallbackError) {
-        return new Response('Not Found', { status: 404 });
+      console.error(`Failed to handle app request for ${request.url}:`, error);
+      
+      // Fallback to index.html ONLY for routed directions (paths without filename extensions)
+      const url = new URL(request.url);
+      const ext = path.extname(url.pathname).toLowerCase();
+      
+      if (!ext || ext === '.html') {
+        try {
+          const fallbackData = await fs.promises.readFile(path.join(__dirname, '../dist/index.html'));
+          return new Response(fallbackData, {
+            headers: { 'content-type': 'text/html' }
+          });
+        } catch (fallbackError) {
+          return new Response('Not Found', { status: 404 });
+        }
       }
+      
+      return new Response(`Asset Not Found: ${url.pathname}`, { status: 404 });
     }
   });
 
