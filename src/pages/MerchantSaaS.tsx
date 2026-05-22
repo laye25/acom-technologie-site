@@ -1991,6 +1991,13 @@ const MerchantDashboard = ({
 
     const sumSales = (list: MerchantSale[]) => list.reduce((acc, s) => acc + s.totalAmount, 0);
     const sumExpenses = (list: MerchantExpense[]) => list.reduce((acc, e) => acc + e.amount, 0);
+    const sumCOGS = (list: MerchantSale[]) => list.reduce((acc, sale) => {
+      return acc + (sale.items || []).reduce((itemAcc, item) => {
+        const product = products.find(p => p.id === item.productId);
+        const cost = (item as any).costPrice || (product?.costPrice || 0);
+        return itemAcc + ((item.quantity || 0) * cost);
+      }, 0);
+    }, 0);
 
     // Point 6: Aggregation - Use aggregated stats if available, otherwise fallback to in-memory calculation
     const revenue = merchantStats?.revenue ? {
@@ -2017,7 +2024,11 @@ const MerchantDashboard = ({
       total: sumExpenses(expenses)
     };
 
-    const netProfit = revenue.total - expensesStats.total;
+    const cogsTotal = merchantStats?.cogs?.total ? merchantStats.cogs.total : sumCOGS(sales);
+    const cogsMonth = merchantStats?.cogs?.month && merchantStats.lastMonth === thisMonth ? merchantStats.cogs.month : sumCOGS(salesMonth);
+
+    const netProfit = revenue.total - cogsTotal - expensesStats.total;
+    const netProfitMonth = revenue.month - cogsMonth - expensesStats.month;
 
     // Specialized counts
     const activeInterventions = interventions.filter((i: any) => i.status !== 'completed').length;
@@ -2028,10 +2039,17 @@ const MerchantDashboard = ({
     const totalPatients = patients.length;
     const appointmentsToday = appointments.filter((a: any) => getIsoDate(a.createdAt).startsWith(today)).length;
 
+    const totalStockValue = products.reduce((acc, p) => acc + (Number(p.price || 0) * Number(p.stockQuantity || 0)), 0);
+    const totalStockProfit = products.reduce((acc, p) => acc + ((Number(p.price || 0) - Number(p.costPrice || 0)) * Number(p.stockQuantity || 0)), 0);
+
     return {
       revenue,
       expenses: expensesStats,
       netProfit,
+      netProfitMonth,
+      grossProfitMonth: revenue.month - cogsMonth,
+      totalStockValue,
+      totalStockProfit,
       lowStockCount: products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length,
       totalProducts: products.length,
       specialized: {
@@ -2508,13 +2526,20 @@ const MerchantDashboard = ({
         />
       )}
       <>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {(merchant.type === 'boutique' || !merchant.type) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+            <StatCard title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
+            <StatCard title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
+          </div>
+        )}
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${(merchant.type === 'boutique' || !merchant.type) ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
 
         {merchant.type === 'boutique' || !merchant.type ? (
           <>
             <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description="Ce mois-ci" />
+            <StatCard title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-indigo-600" bgColor="bg-indigo-50" description="Ce mois-ci - Hors dépenses" />
             <StatCard title="Dépenses" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description="Ce mois-ci" />
-            <StatCard title="Bénéfice Net" value={stats.netProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Total cumulé" />
+            <StatCard title="Bénéfice Net" value={stats.netProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description="Ce mois-ci" />
             <StatCard title="Stock Faible" value={stats.lowStockCount} icon={AlertCircle} color={stats.lowStockCount > 0 ? "text-amber-600" : "text-emerald-600"} bgColor={stats.lowStockCount > 0 ? "bg-amber-50" : "bg-emerald-50"} description={`${stats.totalProducts} produits au total`} />
           </>
         ) : (
@@ -3162,22 +3187,61 @@ const AccountingRow = ({ label, value, currency, icon: Icon, color }: any) => (
   </div>
 );
 
-const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, description }: any) => (
-  <div className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
-    <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform"></div>
-    <div className={`w-16 h-16 ${bgColor} rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform relative z-10 border border-black/5`}>
-      <Icon className={`w-8 h-8 ${color}`} />
+const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, description, isLarge }: any) => {
+  const formattedValue = typeof value === 'number' ? value.toLocaleString() : String(value || '0');
+  const textLength = formattedValue.length + (currency ? currency.length : 0);
+  
+  // Decide responsive style based on content density and card layout size
+  let fontSizeClass = 'text-3xl sm:text-4xl';
+  if (isLarge) {
+    if (textLength > 18) {
+      fontSizeClass = 'text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl';
+    } else if (textLength > 14) {
+      fontSizeClass = 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl';
+    } else {
+      fontSizeClass = 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl';
+    }
+  } else {
+    if (textLength > 16) {
+      fontSizeClass = 'text-sm sm:text-base md:text-lg lg:text-base min-[1400px]:text-lg';
+    } else if (textLength > 12) {
+      fontSizeClass = 'text-lg sm:text-xl md:text-2xl lg:text-xl min-[1400px]:text-2xl';
+    } else if (textLength > 9) {
+      fontSizeClass = 'text-xl sm:text-2xl md:text-3xl lg:text-2xl min-[1400px]:text-3xl';
+    }
+  }
+
+  return (
+    <div className={`bg-white p-6 sm:p-8 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col justify-between h-full ${isLarge ? 'min-h-[200px] sm:min-h-[260px]' : 'min-h-[220px]'}`}>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform"></div>
+      
+      <div>
+        <div className={`w-12 h-12 sm:w-14 sm:h-14 ${bgColor} rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform relative z-10 border border-black/5`}>
+          <Icon className={`w-6 h-6 sm:w-7 sm:h-7 ${color}`} />
+        </div>
+        <p className="text-[10px] sm:text-xs font-black text-gray-400 mb-2 uppercase tracking-[0.2em] relative z-10 line-clamp-1">{title}</p>
+      </div>
+
+      <div className="mt-auto relative z-10">
+        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 items-end">
+          <span className={`${fontSizeClass} font-black text-ink tracking-tighter block break-all leading-none`}>
+            {formattedValue}
+          </span>
+          {currency && (
+            <span className={`${isLarge ? 'text-xs sm:text-sm md:text-base' : 'text-[10px] sm:text-xs'} font-black text-gray-400 uppercase tracking-widest break-keep`}>
+              {currency}
+            </span>
+          )}
+        </div>
+        {description && (
+          <p className="text-[9px] sm:text-[10px] text-gray-400 mt-3 font-mono font-bold uppercase tracking-widest relative z-10 line-clamp-2">
+            {description}
+          </p>
+        )}
+      </div>
     </div>
-    <p className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-[0.2em] relative z-10">{title}</p>
-    <div className="flex items-baseline space-x-2 relative z-10">
-      <p className="text-4xl font-black text-ink tracking-tighter">
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </p>
-      {currency && <span className="text-sm font-black text-gray-400 uppercase tracking-widest">{currency}</span>}
-    </div>
-    {description && <p className="text-[10px] text-gray-400 mt-4 font-mono font-bold uppercase tracking-widest relative z-10">{description}</p>}
-  </div>
-);
+  );
+};
 
 // --- Inventory Manager ---
 // --- Inventory Sub-components ---
@@ -3246,6 +3310,9 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [showNewSubCatInput, setShowNewSubCatInput] = useState(false);
+  
+  const [productLimit, setProductLimit] = useState(10);
+  const [movementLimit, setMovementLimit] = useState(10);
 
   // Products loaded from Dexie via useLiveQuery
   useEffect(() => {
@@ -3492,7 +3559,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                         </td>
                       </tr>
                     ) : (
-                      filteredProducts.map((product) => {
+                      filteredProducts.slice(0, productLimit).map((product) => {
                         const isLow = Number(product.stockQuantity || 0) > 0 && Number(product.stockQuantity || 0) <= (Number(product.minStockLevel) || 5);
                         const isOut = Number(product.stockQuantity || 0) <= 0;
                         
@@ -3574,6 +3641,16 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     )}
                   </tbody>
                 </table>
+                {filteredProducts.length > productLimit && (
+                  <div className="p-4 flex justify-center border-t border-gray-100">
+                    <button 
+                      onClick={() => setProductLimit(prev => prev + 10)}
+                      className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                    >
+                      Voir plus
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -3687,7 +3764,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {movements.map((m: any) => {
+                {movements.slice(0, movementLimit).map((m: any) => {
                   const product = products.find(p => p.id === m.productId);
                   return (
                     <tr key={m.id} className="hover:bg-gray-50/50 transition-colors">
@@ -3725,6 +3802,16 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                 })}
               </tbody>
             </table>
+            {movements.length > movementLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setMovementLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -4057,7 +4144,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
 // --- Merchant POS ---
 const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, setShowUpgradeModal?: (s: boolean) => void }) => {
   const { user } = useAuth();
-  const [cart, setCart] = useState<{ productId: string, name: string, quantity: number, price: number }[]>([]);
+  const [cart, setCart] = useState<{ productId: string, name: string, quantity: number, price: number, costPrice: number }[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile_money' | 'split'>('cash');
@@ -4066,10 +4153,22 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showReceiptModal, setShowReceiptModal] = useState<{ show: boolean, saleData: any } | null>(null);
+  const [cartError, setCartError] = useState<string | null>(null);
+  const cartErrorTimeoutRef = useRef<any>(null);
+
+  const triggerCartError = (message: string) => {
+    setCartError(message);
+    if (cartErrorTimeoutRef.current) {
+      clearTimeout(cartErrorTimeoutRef.current);
+    }
+    cartErrorTimeoutRef.current = setTimeout(() => {
+      setCartError(null);
+    }, 5000);
+  };
 
   // Smart filters states
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'lowstock'>('instock');
+  const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'lowstock' | 'outofstock'>('instock');
   const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest'>('name');
 
   const products = useLiveQuery(() => 
@@ -4112,6 +4211,8 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         const minLevel = Number(p.minStockLevel || 5);
         return stock > 0 && stock <= minLevel;
       });
+    } else if (stockFilter === 'outofstock') {
+      result = result.filter(p => Number(p.stockQuantity || 0) <= 0);
     }
 
     // Sort order
@@ -4135,6 +4236,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   }, [products, searchTerm, selectedCategory, stockFilter, sortBy]);
 
   const addToCart = (product: MerchantProduct) => {
+    if (Number(product.stockQuantity || 0) <= 0) {
+      triggerCartError("ARTICLE EN RUPTURE, LA VENTE EST ANNULÉE.");
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
@@ -4144,7 +4249,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         }
         return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { productId: product.id, name: product.name, quantity: 1, price: product.price }];
+      return [...prev, { productId: product.id, name: product.name, quantity: 1, price: product.price, costPrice: product.costPrice || 0 }];
     });
   };
 
@@ -4335,6 +4440,19 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                     <span className={`w-1.5 h-1.5 rounded-full ${stockFilter === 'lowstock' ? 'bg-white' : 'bg-amber-500 animate-pulse'}`} />
                   )}
                 </button>
+                <button
+                  onClick={() => setStockFilter('outofstock')}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                    stockFilter === 'outofstock'
+                      ? 'bg-rose-500 text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>Rupture</span>
+                  {products.filter(p => Number(p.stockQuantity || 0) <= 0).length > 0 && (
+                    <span className={`w-1.5 h-1.5 rounded-full ${stockFilter === 'outofstock' ? 'bg-white' : 'bg-rose-500 animate-pulse'}`} />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -4450,6 +4568,37 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               {merchant.licenseType === 'local' ? 'Mode Local' : 'Sync Cloud'}
             </div>
           </div>
+
+          <AnimatePresence>
+            {cartError && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -10 }}
+                animate={{ opacity: 1, height: "auto", y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mb-6 p-4 bg-rose-50 border border-rose-100/80 rounded-2xl flex items-start gap-3 shadow-md relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-4 h-4 text-rose-600 animate-pulse" />
+                </div>
+                <div className="flex-1 min-w-0 pr-6">
+                  <p className="text-[11px] font-black text-rose-900 uppercase tracking-wide leading-snug">
+                    {cartError}
+                  </p>
+                  <p className="text-[8px] text-rose-500 font-black uppercase tracking-widest mt-1">
+                    Sélection annulée par précaution
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCartError(null)}
+                  className="absolute top-2 right-2 p-1 text-rose-400 hover:text-rose-600 rounded-lg hover:bg-rose-100 transition-all cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="space-y-4 mb-8 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
             {cart.length === 0 ? (
@@ -4647,12 +4796,13 @@ const PaymentMethodBtn = ({ active, onClick, label }: any) => (
 
 // --- Merchant Audit Log ---
 const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
+  const [auditLimit, setAuditLimit] = useState(10);
   const products = useLiveQuery(() => 
     db.products.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
   const movements = useLiveQuery(() => 
-    db.movements.where('merchantId').equals(merchant.id).reverse().limit(50).toArray()
+    db.movements.where('merchantId').equals(merchant.id).reverse().toArray()
   , [merchant.id]) || [];
 
   const loading = false;
@@ -4692,7 +4842,7 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {movements.map((m: any) => {
+                {movements.slice(0, auditLimit).map((m: any) => {
                   const product = products.find(p => p.id === m.productId);
                   return (
                     <tr key={m.id} className="hover:bg-gray-50/50 transition-colors group">
@@ -4737,6 +4887,16 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
                 })}
               </tbody>
             </table>
+            {movements.length > auditLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setAuditLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -4912,6 +5072,7 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [newExpense, setNewExpense] = useState({ title: '', amount: 0, category: 'Général', description: '' });
   const [saving, setSaving] = useState(false);
+  const [expenseLimit, setExpenseLimit] = useState(10);
 
   // const expenseOptions = useMemo(() => ({
   //   where: [['merchantId', '==', merchant.id]],
@@ -4997,7 +5158,7 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
                   </td>
                 </tr>
               ) : (
-                expenses.map((expense) => (
+                expenses.slice(0, expenseLimit).map((expense) => (
                   <tr key={expense.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <p className="font-black text-ink text-sm leading-tight">{expense.title}</p>
@@ -5038,6 +5199,16 @@ const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
               )}
             </tbody>
           </table>
+          {expenses.length > expenseLimit && (
+            <div className="p-4 flex justify-center border-t border-gray-100">
+              <button 
+                onClick={() => setExpenseLimit(prev => prev + 10)}
+                className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+              >
+                Voir plus
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -5097,6 +5268,10 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
   const [selectedQuote, setSelectedQuote] = useState<MerchantQuote | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<MerchantSale | null>(null);
+
+  const [invoiceLimit, setInvoiceLimit] = useState(10);
+  const [pendingLimit, setPendingLimit] = useState(10);
+  const [quoteLimit, setQuoteLimit] = useState(10);
 
   const sales = useLiveQuery(() => 
     db.sales.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
@@ -5174,7 +5349,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   {sales.length === 0 ? (
                     <tr><td colSpan={5} className="py-20 text-center text-gray-400 text-sm">Aucune facture enregistrée</td></tr>
                   ) : (
-                    sales.map((sale) => (
+                    sales.slice(0, invoiceLimit).map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50/50 transition-colors group">
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-2">
@@ -5268,6 +5443,16 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   )}
                 </tbody>
               </table>
+              {sales.length > invoiceLimit && (
+                <div className="p-4 flex justify-center border-t border-gray-100">
+                  <button 
+                    onClick={() => setInvoiceLimit(prev => prev + 10)}
+                    className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                  >
+                    Voir plus
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -5299,7 +5484,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   {sales.filter(s => s.balance !== undefined && s.balance > 0).length === 0 ? (
                     <tr><td colSpan={5} className="py-20 text-center text-gray-400 text-sm italic uppercase tracking-widest font-black opacity-40">Toutes les créances sont recouvrées !</td></tr>
                   ) : (
-                    sales.filter(s => s.balance !== undefined && s.balance > 0).map((sale) => (
+                    sales.filter(s => s.balance !== undefined && s.balance > 0).slice(0, pendingLimit).map((sale) => (
                       <tr key={sale.id} className="hover:bg-rose-50/20 transition-colors group">
                         <td className="px-8 py-6">
                           <p className="text-[11px] font-mono font-black text-ink">#INV-{sale.id.slice(0, 8).toUpperCase()}</p>
@@ -5364,6 +5549,16 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   )}
                 </tbody>
               </table>
+              {sales.filter(s => s.balance !== undefined && s.balance > 0).length > pendingLimit && (
+                <div className="p-4 flex justify-center border-t border-gray-100">
+                  <button 
+                    onClick={() => setPendingLimit(prev => prev + 10)}
+                    className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                  >
+                    Voir plus
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -5403,7 +5598,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   {quotes.length === 0 ? (
                     <tr><td colSpan={5} className="py-20 text-center text-gray-400 text-sm">Aucun devis enregistré</td></tr>
                   ) : (
-                    quotes.map((quote) => (
+                    quotes.slice(0, quoteLimit).map((quote) => (
                       <tr key={quote.id} className="hover:bg-gray-50/50 transition-colors group">
                         <td className="px-8 py-6">
                           <p className="text-[11px] font-mono font-black text-ink">#QT-{quote.id.slice(0, 8).toUpperCase()}</p>
@@ -5470,6 +5665,16 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   )}
                 </tbody>
               </table>
+              {quotes.length > quoteLimit && (
+                <div className="p-4 flex justify-center border-t border-gray-100">
+                  <button 
+                    onClick={() => setQuoteLimit(prev => prev + 10)}
+                    className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                  >
+                    Voir plus
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -5758,17 +5963,27 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
 const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
   const sales = useLiveQuery(() => db.sales.where('merchantId').equals(merchant.id).toArray(), [merchant.id]) || [];
   const expenses = useLiveQuery(() => db.expenses.where('merchantId').equals(merchant.id).toArray(), [merchant.id]) || [];
+  const products = useLiveQuery(() => db.products.where('merchantId').equals(merchant.id).toArray(), [merchant.id]) || [];
 
   const financialSummary = useMemo(() => {
     const totalRevenue = sales.reduce((acc, s) => acc + s.totalAmount, 0);
     const totalCollected = sales.reduce((acc, s) => acc + (s.paidAmount !== undefined ? s.paidAmount : s.totalAmount), 0);
     const totalPending = sales.reduce((acc, s) => acc + (s.balance || 0), 0);
     const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
-    const netProfit = totalCollected - totalExpenses;
+    
+    const totalCOGS = sales.reduce((acc, sale) => {
+      return acc + (sale.items || []).reduce((itemAcc, item) => {
+        const product = products.find(p => p.id === item.productId);
+        const cost = (item as any).costPrice || (product?.costPrice || 0);
+        return itemAcc + ((item.quantity || 0) * cost);
+      }, 0);
+    }, 0);
+
+    const netProfit = totalCollected - totalCOGS - totalExpenses;
     const margin = totalCollected > 0 ? (netProfit / totalCollected) * 100 : 0;
 
-    return { totalRevenue, totalCollected, totalPending, totalExpenses, netProfit, margin };
-  }, [sales, expenses]);
+    return { totalRevenue, totalCollected, totalPending, totalExpenses, netProfit, margin, totalCOGS };
+  }, [sales, expenses, products]);
 
   const monthlyData = useMemo(() => {
     // Group sales and expenses by month for the last 6 months
@@ -5792,14 +6007,22 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       const rev = monthSales.reduce((acc, s) => acc + s.totalAmount, 0);
       const exp = monthExpenses.reduce((acc, e) => acc + e.amount, 0);
       
+      const cogs = monthSales.reduce((acc, sale) => {
+        return acc + (sale.items || []).reduce((itemAcc, item) => {
+          const product = products.find(p => p.id === item.productId);
+          const cost = (item as any).costPrice || (product?.costPrice || 0);
+          return itemAcc + ((item.quantity || 0) * cost);
+        }, 0);
+      }, 0);
+      
       return {
         name: label,
         Revenus: rev,
         Dépenses: exp,
-        Profit: rev - exp
+        Profit: rev - cogs - exp
       };
     });
-  }, [sales, expenses]);
+  }, [sales, expenses, products]);
 
   const categoryData = useMemo(() => {
     const categories: Record<string, number> = {};
@@ -5962,8 +6185,9 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       y += boxHeight + 4;
 
       // Draw second row of KPIs
-      drawKpi('Charges & Dépenses', financialSummary.totalExpenses, margin, y, boxWidth, boxHeight, [244, 63, 94]); // Rose
-      drawKpi('Résultat Fiscal (Profit)', financialSummary.netProfit, margin + bGap, y, boxWidth, boxHeight, [59, 130, 246]); // Blue
+      drawKpi('Coût Achat (Marchandises)', financialSummary.totalCOGS || 0, margin, y, boxWidth, boxHeight, [245, 158, 11]); // Amber
+      drawKpi('Charges & Dépenses', financialSummary.totalExpenses, margin + bGap, y, boxWidth, boxHeight, [244, 63, 94]); // Rose
+      drawKpi('Résultat Fiscal (Profit)', financialSummary.netProfit, margin + bGap * 2, y, boxWidth, boxHeight, [59, 130, 246]); // Blue
       
       y += boxHeight + 14;
 
@@ -6141,8 +6365,9 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
         <ReportKPI cardColor="primary" label="Ventes Totales" value={financialSummary.totalRevenue} currency={merchant.currency} icon={DollarSign} />
         <ReportKPI cardColor="emerald" label="Total Encaissé" value={financialSummary.totalCollected} currency={merchant.currency} icon={CheckCircle} />
         <ReportKPI cardColor="amber" label="Reste à Recouvrer" value={financialSummary.totalPending} currency={merchant.currency} icon={Clock} />
+        <ReportKPI cardColor="orange" label="Coût d'Achat" value={financialSummary.totalCOGS || 0} currency={merchant.currency} icon={ShoppingCart} />
         <ReportKPI cardColor="rose" label="Total Dépenses" value={financialSummary.totalExpenses} currency={merchant.currency} icon={TrendingDown} />
-        <ReportKPI cardColor="blue" label="Profit (Cash)" value={financialSummary.netProfit} currency={merchant.currency} icon={TrendingUp} />
+        <ReportKPI cardColor="blue" label="Bénéfice Net" value={financialSummary.netProfit} currency={merchant.currency} icon={TrendingUp} />
       </div>
 
       {/* Charts Section */}
@@ -6232,6 +6457,8 @@ const ReportKPI = ({ label, value, currency, suffix, icon: Icon, trend, cardColo
     rose: 'bg-rose-50 text-rose-500 border-rose-100',
     emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     blue: 'bg-blue-50 text-blue-500 border-blue-100',
+    amber: 'bg-amber-50 text-amber-500 border-amber-100',
+    orange: 'bg-orange-50 text-orange-500 border-orange-100',
   };
 
   return (
@@ -6912,6 +7139,7 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'calendar'>('calendar');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [interventionLimit, setInterventionLimit] = useState(10);
 
   const interventions = useLiveQuery(() => 
     db.interventions.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
@@ -7097,7 +7325,7 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {interventions.map((item: any) => (
+                {interventions.slice(0, interventionLimit).map((item: any) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex items-center space-x-4">
@@ -7155,6 +7383,16 @@ const ServiceManager = ({ merchant }: { merchant: Merchant }) => {
                 ))}
               </tbody>
             </table>
+            {interventions.length > interventionLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setInterventionLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : viewMode === 'kanban' ? (
@@ -7460,6 +7698,7 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [projectLimit, setProjectLimit] = useState(10);
 
   const projects = useLiveQuery(() => 
     db.projects.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
@@ -7625,48 +7864,60 @@ const ProjectManager = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {projects.map((project: any) => (
-            <div 
-              key={project.id} 
-              onClick={() => setSelectedProject(project)}
-              className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-2xl transition-all group/card relative overflow-hidden cursor-pointer"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover/card:scale-110 transition-transform"></div>
-              
-              <div className="flex justify-between items-start mb-8 relative z-10">
-                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 group-hover/card:scale-110 transition-transform">
-                  <HardHat className="w-8 h-8 text-primary" />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {projects.slice(0, projectLimit).map((project: any) => (
+              <div 
+                key={project.id} 
+                onClick={() => setSelectedProject(project)}
+                className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-2xl transition-all group/card relative overflow-hidden cursor-pointer"
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover/card:scale-110 transition-transform"></div>
+                
+                <div className="flex justify-between items-start mb-8 relative z-10">
+                  <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 group-hover/card:scale-110 transition-transform">
+                    <HardHat className="w-8 h-8 text-primary" />
+                  </div>
+                  <div className="flex items-center space-x-2 opacity-0 group-hover/card:opacity-100 transition-all">
+                    <button onClick={(e) => { e.stopPropagation(); setCurrentProject(project); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl border border-transparent hover:border-primary/20 transition-all shadow-sm"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(project.id); }} className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl border border-transparent hover:border-rose-200 transition-all shadow-sm"><Trash2 className="w-4 h-4" /></button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2 opacity-0 group-hover/card:opacity-100 transition-all">
-                  <button onClick={(e) => { e.stopPropagation(); setCurrentProject(project); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl border border-transparent hover:border-primary/20 transition-all shadow-sm"><Edit2 className="w-4 h-4" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(project.id); }} className="p-2.5 hover:bg-rose-50 text-rose-500 rounded-xl border border-transparent hover:border-rose-200 transition-all shadow-sm"><Trash2 className="w-4 h-4" /></button>
+                
+                <h3 className="text-2xl font-black text-ink mb-2 leading-tight relative z-10 tracking-tight">{project.name}</h3>
+                <div className="flex items-center text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mb-8 relative z-10">
+                  <MapPin className="w-3.5 h-3.5 mr-2 text-primary" /> 
+                  {project.location}
+                </div>
+                
+                <div className="flex justify-between items-center pt-8 border-t border-dashed border-gray-100 relative z-10">
+                  <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                    project.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                    project.status === 'active' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-200'
+                  }`}>
+                    {project.status === 'planned' ? 'PLANIFIÉ' : project.status === 'active' ? 'EN COURS' : project.status === 'on-hold' ? 'EN PAUSE' : 'TERMINÉ'}
+                  </span>
+                  <div className="text-right">
+                    <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Budget</p>
+                    <p className="font-black text-xl text-ink tracking-tighter">
+                      {project.budget.toLocaleString()} 
+                      <span className="text-[10px] text-gray-400 font-mono ml-1 uppercase">{merchant.currency}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
-              
-              <h3 className="text-2xl font-black text-ink mb-2 leading-tight relative z-10 tracking-tight">{project.name}</h3>
-              <div className="flex items-center text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mb-8 relative z-10">
-                <MapPin className="w-3.5 h-3.5 mr-2 text-primary" /> 
-                {project.location}
-              </div>
-              
-              <div className="flex justify-between items-center pt-8 border-t border-dashed border-gray-100 relative z-10">
-                <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
-                  project.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                  project.status === 'active' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-200'
-                }`}>
-                  {project.status === 'planned' ? 'PLANIFIÉ' : project.status === 'active' ? 'EN COURS' : project.status === 'on-hold' ? 'EN PAUSE' : 'TERMINÉ'}
-                </span>
-                <div className="text-right">
-                  <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Budget</p>
-                  <p className="font-black text-xl text-ink tracking-tighter">
-                    {project.budget.toLocaleString()} 
-                    <span className="text-[10px] text-gray-400 font-mono ml-1 uppercase">{merchant.currency}</span>
-                  </p>
-                </div>
-              </div>
+            ))}
+          </div>
+          {projects.length > projectLimit && (
+            <div className="flex justify-center mt-6">
+              <button 
+                onClick={() => setProjectLimit(prev => prev + 10)}
+                className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-xs rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+              >
+                Voir plus
+              </button>
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -7762,6 +8013,7 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [vehicleLimit, setVehicleLimit] = useState(10);
 
   const vehicles = useLiveQuery(() => 
     db.vehicles.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
@@ -7821,7 +8073,7 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {vehicles.map((v: any) => (
+                {vehicles.slice(0, vehicleLimit).map((v: any) => (
                   <tr key={v.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex flex-col">
@@ -7855,6 +8107,16 @@ const FleetManager = ({ merchant }: { merchant: Merchant }) => {
                 ))}
               </tbody>
             </table>
+            {vehicles.length > vehicleLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setVehicleLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -7943,6 +8205,7 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [employeeLimit, setEmployeeLimit] = useState(10);
 
   const employees = useLiveQuery(() => 
     db.employees.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
@@ -8003,7 +8266,7 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {employees.map((emp: any) => (
+                {employees.slice(0, employeeLimit).map((emp: any) => (
                   <tr key={emp.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex items-center space-x-5">
@@ -8045,6 +8308,16 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
                 ))}
               </tbody>
             </table>
+            {employees.length > employeeLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setEmployeeLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -8161,6 +8434,7 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentStudent, setCurrentStudent] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [studentLimit, setStudentLimit] = useState(10);
 
   const students = useLiveQuery(() => 
     db.students.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
@@ -8220,7 +8494,7 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {students.map((s: any) => (
+                {students.slice(0, studentLimit).map((s: any) => (
                   <tr key={s.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex items-center space-x-4">
@@ -8258,6 +8532,16 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
                 ))}
               </tbody>
             </table>
+            {students.length > studentLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setStudentLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -8341,6 +8625,7 @@ const MedicalManager = ({ merchant }: { merchant: Merchant }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentPatient, setCurrentPatient] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [patientLimit, setPatientLimit] = useState(10);
 
   const patients = useLiveQuery(() => 
     db.patients.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
@@ -8400,7 +8685,7 @@ const MedicalManager = ({ merchant }: { merchant: Merchant }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {patients.map((p: any) => (
+                {patients.slice(0, patientLimit).map((p: any) => (
                   <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex items-center space-x-4">
@@ -8444,6 +8729,16 @@ const MedicalManager = ({ merchant }: { merchant: Merchant }) => {
                 ))}
               </tbody>
             </table>
+            {patients.length > patientLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setPatientLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -8539,6 +8834,7 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentAppointment, setCurrentAppointment] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [appointmentLimit, setAppointmentLimit] = useState(10);
 
   const appointments = useLiveQuery(() => 
     db.appointments.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
@@ -8599,7 +8895,7 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {appointments.map((app: any) => (
+                {appointments.slice(0, appointmentLimit).map((app: any) => (
                   <tr key={app.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <div className="flex flex-col">
@@ -8641,6 +8937,16 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
                 ))}
               </tbody>
             </table>
+            {appointments.length > appointmentLimit && (
+              <div className="p-4 flex justify-center border-t border-gray-100">
+                <button 
+                  onClick={() => setAppointmentLimit(prev => prev + 10)}
+                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                >
+                  Voir plus
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

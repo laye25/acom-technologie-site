@@ -557,6 +557,7 @@ export interface MerchantSaleItem {
   name: string;
   quantity: number;
   price: number;
+  costPrice?: number;
   total: number;
 }
 
