@@ -46,7 +46,12 @@ import { Elements } from '@stripe/react-stripe-js';
 import { PaymentForm } from '../components/PaymentForm';
 import { LogOut } from 'lucide-react';
 
-const isDesktop = (typeof window !== 'undefined' && ('__TAURI__' in window)) || (typeof window !== 'undefined' && window.process && window.process.type) || (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('electron')) || (typeof window !== 'undefined' && (window.location.protocol === 'file:' || window.location.protocol === 'app:'));
+const isDesktop = typeof window !== 'undefined' && (
+  ('__TAURI__' in window) || 
+  (window.process && (window.process as any).type) || 
+  (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
+  (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
+);
 
 const printPDF = (doc: jsPDF, filename = 'document_imprimer.pdf') => {
   try {

@@ -47,7 +47,12 @@ import { CommandPalette } from './components/CommandPalette';
 import { Toaster } from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 
-const isDesktop = ('__TAURI__' in window) || (window && window.process && window.process.type) || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:' || window.location.protocol === 'app:';
+const isDesktop = typeof window !== 'undefined' && (
+  ('__TAURI__' in window) || 
+  (window.process && (window.process as any).type) || 
+  (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
+  (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
+);
 const Router = isDesktop ? HashRouter : BrowserRouter;
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {

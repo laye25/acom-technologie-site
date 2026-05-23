@@ -14,12 +14,21 @@
     <div id="root"></div>
     <script>
       // Automatically detect if we are in SaaS/Desktop mode
-      const isElectron = window && window.process && window.process.type || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:';
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isElectron;
-      if (isSaaSDomain) {
-        document.title = "Acom Gestion Desktop";
-      } else {
-        document.title = "Acom Studio";
+      try {
+        const isDesktopApp = typeof window !== 'undefined' && (
+          ('__TAURI__' in window) || 
+          (window.process && window.process.type) || 
+          (navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
+          (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
+        );
+        const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktopApp;
+        if (isSaaSDomain) {
+          document.title = "Acom Gestion Desktop";
+        } else {
+          document.title = "Acom Studio";
+        }
+      } catch (e) {
+        console.error("Error in theme detection:", e);
       }
     </script>
     <script type="module" src="/src/main.tsx"></script>
