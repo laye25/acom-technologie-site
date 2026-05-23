@@ -118,12 +118,6 @@ const printPDF = (doc: jsPDF, filename = 'document_imprimer.pdf') => {
 
 
 const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpaid' | 'quote', data: any) => {
-  const printWindow = window.open("", "_blank", "width=850,height=900");
-  if (!printWindow) {
-    toast.error("Le bloqueur de fenêtres de votre navigateur a bloqué l'impression directe. Veuillez autoriser les fenêtres pop-up.");
-    return;
-  }
-
   const fmt = (num: number) => {
     if (num === undefined || num === null || isNaN(num)) return '0';
     const parts = Math.round(num).toString().split('.');
@@ -644,15 +638,31 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     `;
   }
 
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+  let printFrame = document.getElementById('print-iframe') as HTMLIFrameElement;
+  if (!printFrame) {
+    printFrame = document.createElement('iframe');
+    printFrame.id = 'print-iframe';
+    printFrame.style.position = 'absolute';
+    printFrame.style.top = '-9999px';
+    printFrame.style.left = '-9999px';
+    printFrame.style.width = '850px';
+    printFrame.style.height = '900px';
+    printFrame.style.visibility = 'hidden';
+    document.body.appendChild(printFrame);
+  }
 
-  // Give the browser window resources/images a brief 300ms moment to mount, then execute print
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-    printWindow.close();
-  }, 300);
+  const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+  if (frameDoc) {
+    frameDoc.open();
+    frameDoc.write(htmlContent);
+    frameDoc.close();
+    
+    // Give the browser window resources/images a brief moment to mount, then execute print
+    setTimeout(() => {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+    }, 400);
+  }
 };
 
 const pdfFormatNum = (num: number) => {
