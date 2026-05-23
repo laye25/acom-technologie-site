@@ -21,9 +21,9 @@ export const initSQLite = async () => {
         );
         if (isDesktop) {
           if (file.endsWith('.wasm')) {
-            return 'sqlite3.wasm';
+            return '/sqlite3.wasm';
           }
-          return file;
+          return `/${file}`;
         }
         if (file.endsWith('.wasm')) {
           return '/sqlite3.wasm';

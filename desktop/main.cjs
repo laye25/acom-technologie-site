@@ -98,7 +98,7 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
+  app.whenReady().then(() => {
   // Register the protocol handler after app.whenReady
   protocol.handle('app', async (request) => {
     try {
@@ -128,13 +128,25 @@ app.whenReady().then(() => {
       }
       
       let filePath = path.join(__dirname, '../dist', joinedPath);
+      let ext = path.extname(filePath).toLowerCase();
       
-      // Check if file exists. If not, handle SPA routing or return 404
-      if (!fs.existsSync(filePath)) {
-        const ext = path.extname(filePath).toLowerCase();
-        // If it looks like a route (no extension) or specifically requesting .html, fallback to index.html
-        if (!ext || ext === '.html') {
+      // Check if file exists and is not a directory
+      let exists = false;
+      let isDir = false;
+      try {
+        const stat = fs.statSync(filePath);
+        exists = true;
+        isDir = stat.isDirectory();
+      } catch (e) {
+        exists = false;
+      }
+
+      // If it's a directory or doesn't exist, we might need a fallback
+      if (!exists || isDir) {
+        // Only fallback to SPA index.html if it looks like a route (no extension or .html)
+        if (!ext || ext === '.html' || isDir) {
           filePath = path.join(__dirname, '../dist/index.html');
+          ext = '.html';
           if (!fs.existsSync(filePath)) {
             return new Response('index.html Not Found', { status: 404 });
           }
@@ -144,38 +156,21 @@ app.whenReady().then(() => {
         }
       }
       
-      // Read the file securely using patched fs module that fully supports ASAR archives
-      const data = await fs.promises.readFile(filePath);
-      
-      // Auto-detect correct MIME type for ES Modules & WASM compatibility
-      const ext = path.extname(filePath).toLowerCase();
+      // Read the file securely using sync fs which has 100% stable ASAR support in all Electron versions
+      const data = fs.readFileSync(filePath);
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
       
       return new Response(data, {
         headers: {
           'content-type': contentType,
           'access-control-allow-origin': '*',
-          'x-content-type-options': 'nosniff'
+          'x-content-type-options': 'nosniff',
+          'Cross-Origin-Embedder-Policy': 'require-corp',
+          'Cross-Origin-Opener-Policy': 'same-origin'
         }
       });
     } catch (error) {
       console.error(`Failed to handle app request for ${request.url}:`, error);
-      
-      try {
-        const fallbackPath = path.join(__dirname, '../dist/index.html');
-        if (fs.existsSync(fallbackPath)) {
-          const fallbackData = await fs.promises.readFile(fallbackPath);
-          return new Response(fallbackData, {
-            headers: { 
-              'content-type': 'text/html; charset=utf-8',
-              'access-control-allow-origin': '*'
-            }
-          });
-        }
-      } catch (fallbackError) {
-        console.error('Failed to load fallback index.html:', fallbackError);
-      }
-      
       return new Response(`Internal Server Error: ${error.message || error}`, { status: 500 });
     }
   });
