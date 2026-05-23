@@ -60,7 +60,8 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       webSecurity: false,
-    }
+        preload: path.join(__dirname, 'preload.js')
+      }
   });
 
   const iconPath = path.join(__dirname, '../public/icon.png');
