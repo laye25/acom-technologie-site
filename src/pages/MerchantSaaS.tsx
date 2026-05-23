@@ -4698,7 +4698,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             <option value="">(Aucune)</option>
                             {Array.from(new Set([
                               ...(categories.find(c => c.name.toLowerCase() === currentProduct?.category?.toLowerCase())?.subCategories || []),
-                              ...(products.filter(p => p.category && typeof p.category === 'string' && p.category.toLowerCase() === currentProduct?.category?.toLowerCase()).map(p => p.subCategory))
+                              ...(products.filter(p => p.category && p.category.toLowerCase() === currentProduct?.category?.toLowerCase()).map(p => p.subCategory))
                             ].filter(Boolean))).map(sub => (
                               <option key={sub as string} value={sub as string}>{sub}</option>
                             ))}
@@ -4846,7 +4846,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const categories = useMemo(() => {
     const cats = new Set<string>();
     products.forEach(p => {
-      if (p.category && typeof p.category === 'string') cats.add(p.category);
+      if (p.category) cats.add(p.category);
     });
     return Array.from(cats).sort((a, b) => a.localeCompare(b));
   }, [products]);
@@ -4855,7 +4855,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     if (selectedCategory === 'all') return [];
     const subs = new Set<string>();
     products.forEach(p => {
-      if (p.category === selectedCategory && p.subCategory && typeof p.subCategory === 'string') {
+      if (p.category === selectedCategory && p.subCategory) {
         subs.add(p.subCategory);
       }
     });
@@ -4874,11 +4874,11 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
       result = result.filter(p => 
-        (p.name && typeof p.name === 'string' && p.name.toLowerCase().includes(term)) || 
-        (p.sku && typeof p.sku === 'string' && p.sku.toLowerCase().includes(term)) ||
-        (p.category && typeof p.category === 'string' && p.category.toLowerCase().includes(term)) ||
-        (p.subCategory && typeof p.subCategory === 'string' && p.subCategory.toLowerCase().includes(term)) ||
-        (p.description && typeof p.description === 'string' && p.description.toLowerCase().includes(term))
+        p.name.toLowerCase().includes(term) || 
+        (p.sku && p.sku.toLowerCase().includes(term)) ||
+        (p.category && p.category.toLowerCase().includes(term)) ||
+        (p.subCategory && p.subCategory.toLowerCase().includes(term)) ||
+        (p.description && p.description.toLowerCase().includes(term))
       );
     }
 
