@@ -4184,6 +4184,22 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                     <span className="text-[9px] font-mono font-black text-primary uppercase tracking-[0.15em]">
                                       {product.category}
                                     </span>
+                                    {product.sizes && (
+                                      <>
+                                        <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                        <span className="text-[9px] font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                          T: {product.sizes}
+                                        </span>
+                                      </>
+                                    )}
+                                    {product.colors && (
+                                      <>
+                                        <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                        <span className="text-[9px] font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                          C: {product.colors}
+                                        </span>
+                                      </>
+                                    )}
                                     {(product as any).syncStatus && (
                                       <>
                                         <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
@@ -4757,6 +4773,29 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Tailles (Optionnel)</label>
+                    <input 
+                      type="text" 
+                      value={currentProduct?.sizes || ''} 
+                      onChange={e => setCurrentProduct({...currentProduct!, sizes: e.target.value})} 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-sm" 
+                      placeholder="ex: S, M, L, XL ou 38, 39, 40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Couleur (Optionnel)</label>
+                    <input 
+                      type="text" 
+                      value={currentProduct?.colors || ''} 
+                      onChange={e => setCurrentProduct({...currentProduct!, colors: e.target.value})} 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-sm" 
+                      placeholder="ex: Noir, Blanc, Bleu, Rouge"
+                    />
+                  </div>
+                </div>
               </form>
 
               <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
@@ -5266,8 +5305,14 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                     <p className="text-[9px] font-mono font-bold text-gray-400 mt-0.5 uppercase">SKU: {product.sku}</p>
                   )}
                   {product.category && (
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap gap-1">
                       <span className="text-[9px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md font-bold uppercase">{product.category}</span>
+                      {product.sizes && (
+                        <span className="text-[9px] font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md font-bold">T: {product.sizes}</span>
+                      )}
+                      {product.colors && (
+                        <span className="text-[9px] font-mono bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-md font-bold">C: {product.colors}</span>
+                      )}
                     </div>
                   )}
                 </div>

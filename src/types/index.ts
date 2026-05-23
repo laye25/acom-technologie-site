@@ -550,6 +550,8 @@ export interface MerchantProduct {
   image?: string;
   createdAt: any;
   updatedAt: any;
+  sizes?: string;
+  colors?: string;
 }
 
 export interface MerchantSaleItem {

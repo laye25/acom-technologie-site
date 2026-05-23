@@ -58,7 +58,9 @@ export const initSQLite = async () => {
         category TEXT,
         stock INTEGER,
         syncStatus TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        sizes TEXT,
+        colors TEXT
       );
 
       CREATE TABLE IF NOT EXISTS merchant_sales (
@@ -80,6 +82,14 @@ export const initSQLite = async () => {
         createdAt TEXT
       );
     `);
+
+    // Run safe migrations for existing desktop databases
+    try {
+      db.exec("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
+    } catch (_) {}
+    try {
+      db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
+    } catch (_) {}
 
     return db;
   } catch (e) {
@@ -113,7 +123,9 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
         category TEXT,
         stock INTEGER,
         syncStatus TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        sizes TEXT,
+        colors TEXT
       );
 
       CREATE TABLE IF NOT EXISTS merchant_sales (
@@ -136,13 +148,21 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
       );
     `);
 
+    // Run safe migrations for existing desktop databases
+    try {
+      db.exec("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
+    } catch (_) {}
+    try {
+      db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
+    } catch (_) {}
+
     // Insert all into SQLite in a single transaction
     db.exec('BEGIN TRANSACTION;');
 
     for (const p of products) {
       const pAny = p as any;
       db.exec({
-        sql: 'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        sql: 'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         bind: [
           pAny.id,
           pAny.merchantId,
@@ -151,7 +171,9 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
           pAny.category || '',
           pAny.stockQuantity || 0,
           pAny.syncStatus || 'local-only',
-          pAny.updatedAt?.toString() || new Date().toISOString()
+          pAny.updatedAt?.toString() || new Date().toISOString(),
+          pAny.sizes || '',
+          pAny.colors || ''
         ]
       });
     }
@@ -317,7 +339,9 @@ export const populateDexieFromSQLite = async () => {
         stockQuantity: Number(p.stock || 0),
         syncStatus: p.syncStatus || 'local-only',
         createdAt: p.updatedAt || new Date().toISOString(),
-        updatedAt: p.updatedAt || new Date().toISOString()
+        updatedAt: p.updatedAt || new Date().toISOString(),
+        sizes: p.sizes || '',
+        colors: p.colors || ''
       }));
       await dexieDb.products.bulkPut(mappedProducts as any[]);
       console.log(`Imported ${mappedProducts.length} products to Dexie`);
