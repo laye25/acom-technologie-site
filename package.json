@@ -25,7 +25,7 @@
     "files": [
       "dist/**/*",
       "desktop/main.cjs",
-      "desktop/preload.js",
+      "desktop/preload.cjs",
       "public/icon.png"
     ],
     "win": {
