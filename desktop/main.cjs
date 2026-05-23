@@ -3,6 +3,28 @@ const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 
+// Comprehensive MIME type mapping for static physical assets inside Electron/ASAR
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.wasm': 'application/wasm',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+  '.eot': 'application/vnd.ms-fontobject',
+  '.txt': 'text/plain; charset=utf-8'
+};
+
 // Global exception handler for the main process to show direct error popups instead of failing silently
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception in Main Process:', err);
@@ -106,25 +128,54 @@ app.whenReady().then(() => {
       
       let filePath = path.join(__dirname, '../dist', joinedPath);
       
-      // Fallback to index.html for Single Page App client-side routing and virtual directions (paths without extensions)
+      // Check if file exists. If not, handle SPA routing or return 404
       if (!fs.existsSync(filePath)) {
         const ext = path.extname(filePath).toLowerCase();
+        // If it looks like a route (no extension) or specifically requesting .html, fallback to index.html
         if (!ext || ext === '.html') {
           filePath = path.join(__dirname, '../dist/index.html');
+          if (!fs.existsSync(filePath)) {
+            return new Response('index.html Not Found', { status: 404 });
+          }
+        } else {
+          // File does not exist and it is an asset, return 404
+          return new Response(`Asset Not Found: ${joinedPath}`, { status: 404 });
         }
       }
       
-      // Use net.fetch which automatically detects perfect MIME types (important for ES Modules & WASM compatibility)
-      return net.fetch(pathToFileURL(filePath).toString());
+      // Read the file securely using patched fs module that fully supports ASAR archives
+      const data = await fs.promises.readFile(filePath);
+      
+      // Auto-detect correct MIME type for ES Modules & WASM compatibility
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+      
+      return new Response(data, {
+        headers: {
+          'content-type': contentType,
+          'access-control-allow-origin': '*',
+          'x-content-type-options': 'nosniff'
+        }
+      });
     } catch (error) {
       console.error(`Failed to handle app request for ${request.url}:`, error);
       
       try {
         const fallbackPath = path.join(__dirname, '../dist/index.html');
-        return net.fetch(pathToFileURL(fallbackPath).toString());
+        if (fs.existsSync(fallbackPath)) {
+          const fallbackData = await fs.promises.readFile(fallbackPath);
+          return new Response(fallbackData, {
+            headers: { 
+              'content-type': 'text/html; charset=utf-8',
+              'access-control-allow-origin': '*'
+            }
+          });
+        }
       } catch (fallbackError) {
-        return new Response('Fatal Error', { status: 500 });
+        console.error('Failed to load fallback index.html:', fallbackError);
       }
+      
+      return new Response(`Internal Server Error: ${error.message || error}`, { status: 500 });
     }
   });
 
