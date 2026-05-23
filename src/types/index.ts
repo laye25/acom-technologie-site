@@ -561,6 +561,8 @@ export interface MerchantSaleItem {
   price: number;
   costPrice?: number;
   total: number;
+  sizes?: string;
+  colors?: string;
 }
 
 export interface MerchantQuoteItem {
@@ -569,6 +571,8 @@ export interface MerchantQuoteItem {
   quantity: number;
   price: number;
   total: number;
+  sizes?: string;
+  colors?: string;
 }
 
 export interface MerchantQuote {

@@ -19,7 +19,7 @@ import {
   Briefcase, ClipboardList, ClipboardCheck, UserPlus, Building2, Check, Zap, Minus,
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
   Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket,
-  Filter, SlidersHorizontal, ArrowUpDown, Tag
+  Filter, SlidersHorizontal, ArrowUpDown, Tag, Scissors, Palette
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -234,7 +234,12 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
         <tr>
           <td>
             <div class="text-bold">${it.name.replace(/"/g, '&quot;')}</div>
-            <div style="font-size: 9px; color: #444;">${fmt(it.price)} ${merchant.currency} / u</div>
+            ${(it.sizes || it.colors) ? `
+              <div style="font-size: 8.5px; color: #475569; background: #eef2f6; padding: 1px 4px; display: inline-block; border-radius: 3px; font-weight: bold; margin-top: 2px;">
+                ${it.sizes ? `T: ${it.sizes}` : ''} ${it.sizes && it.colors ? '|' : ''} ${it.colors ? `C: ${it.colors}` : ''}
+              </div>
+            ` : ''}
+            <div style="font-size: 9px; color: #444; margin-top: 2px;">${fmt(it.price)} ${merchant.currency} / u</div>
           </td>
           <td class="text-center">${it.quantity}</td>
           <td class="text-right">${fmt(it.price * it.quantity)}</td>
@@ -573,7 +578,15 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
       <tbody>
         ${(data.items || []).map((it: any) => `
           <tr>
-            <td style="font-weight: 600; color: #0f172a;">${it.name.replace(/"/g, '&quot;')}</td>
+            <td style="font-weight: 600; color: #0f172a;">
+              <div>${it.name.replace(/"/g, '&quot;')}</div>
+              ${(it.sizes || it.colors) ? `
+                <div style="font-size: 9px; color: #4b5563; font-weight: normal; margin-top: 4px; display: flex; gap: 6px;">
+                  ${it.sizes ? `<span style="background: #eff6ff; color: #1d4ed8; font-weight: bold; padding: 1px 5px; border-radius: 4px; font-family: monospace;">T: ${it.sizes}</span>` : ''}
+                  ${it.colors ? `<span style="background: #ecfdf5; color: #047857; font-weight: bold; padding: 1px 5px; border-radius: 4px; font-family: monospace;">C: ${it.colors}</span>` : ''}
+                </div>
+              ` : ''}
+            </td>
             <td class="text-right">${fmt(it.price)} ${merchant.currency}</td>
             <td class="text-center">${it.quantity}</td>
             <td class="text-right" style="font-weight: 700;">${fmt(it.price * it.quantity)} ${merchant.currency}</td>
@@ -734,12 +747,24 @@ const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'do
   y += 5;
 
   // Items
-  doc.setFont('helvetica', 'normal');
   sale.items.forEach((item: any) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
     doc.text(item.name.substring(0, 20), margin, y);
     doc.text(item.quantity.toString(), 45, y);
     doc.text(`${pdfFormatNum(item.price * item.quantity)}`, 75, y, { align: 'right' });
     y += 4;
+
+    const hasDetails = !!(item.sizes || item.colors);
+    if (hasDetails) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6.5);
+      const detailParts: string[] = [];
+      if (item.sizes) detailParts.push(`Taille: ${item.sizes}`);
+      if (item.colors) detailParts.push(`Couleur: ${item.colors}`);
+      doc.text(detailParts.join(' | '), margin, y - 1);
+      y += 3.5;
+    }
   });
 
   y += 2;
@@ -887,22 +912,44 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   doc.setTextColor(51, 65, 85); // Slate-700
   
   sale.items.forEach((item: any, index: number) => {
+    const hasDetails = !!(item.sizes || item.colors);
+    const rowHeight = hasDetails ? 13 : 9;
+
     // Alternating rows style
     if (index % 2 === 0) doc.setFillColor(248, 250, 252); // Slate-50
     else doc.setFillColor(255, 255, 255);
-    doc.rect(margin, y, 170, 9, 'F');
+    doc.rect(margin, y, 170, rowHeight, 'F');
     
     // Light bottom divider lines
     doc.setDrawColor(241, 245, 249); // Slate-100
     doc.setLineWidth(0.2);
-    doc.line(margin, y + 9, margin + 170, y + 9);
+    doc.line(margin, y + rowHeight, margin + 170, y + rowHeight);
     
     // Grid values mapping
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(51, 65, 85); // Slate-700
     doc.text(item.name, margin + 3, y + 5.5);
+
+    if (hasDetails) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139); // Slate-500
+      const detailParts: string[] = [];
+      if (item.sizes) detailParts.push(`Taille: ${item.sizes}`);
+      if (item.colors) detailParts.push(`Couleur: ${item.colors}`);
+      doc.text(detailParts.join(' | '), margin + 3, y + 9.5);
+      
+      // Reset font for standard columns
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(51, 65, 85); // Slate-700
+    }
+
     doc.text(item.quantity.toString(), 135, y + 5.5, { align: 'center' });
     doc.text(pdfFormatNum(item.price), 160, y + 5.5, { align: 'right' });
     doc.text(pdfFormatNum(item.price * item.quantity), 186, y + 5.5, { align: 'right' });
-    y += 9;
+    y += rowHeight;
   });
 
   // Table Bottom Summary Separator
@@ -1110,21 +1157,43 @@ const generateA4QuotePDF = (merchant: Merchant, quote: any, action: 'print' | 'd
   doc.setTextColor(51, 65, 85); // Slate-700
   
   quote.items.forEach((item: any, index: number) => {
+    const hasDetails = !!(item.sizes || item.colors);
+    const rowHeight = hasDetails ? 13 : 9;
+
     if (index % 2 === 0) doc.setFillColor(248, 250, 252); // Slate-50
     else doc.setFillColor(255, 255, 255);
-    doc.rect(margin, y, 170, 9, 'F');
+    doc.rect(margin, y, 170, rowHeight, 'F');
     
     // Grid boundary fine lines
     doc.setDrawColor(241, 245, 249); // Slate-100
     doc.setLineWidth(0.2);
-    doc.line(margin, y + 9, margin + 170, y + 9);
+    doc.line(margin, y + rowHeight, margin + 170, y + rowHeight);
     
     // Write aligned item details
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(51, 65, 85); // Slate-700
     doc.text(item.name, margin + 3, y + 5.5);
+
+    if (hasDetails) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139); // Slate-500
+      const detailParts: string[] = [];
+      if (item.sizes) detailParts.push(`Taille: ${item.sizes}`);
+      if (item.colors) detailParts.push(`Couleur: ${item.colors}`);
+      doc.text(detailParts.join(' | '), margin + 3, y + 9.5);
+      
+      // Reset font for standard columns
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(51, 65, 85); // Slate-700
+    }
+
     doc.text(item.quantity.toString(), 135, y + 5.5, { align: 'center' });
     doc.text(pdfFormatNum(item.price), 160, y + 5.5, { align: 'right' });
     doc.text(pdfFormatNum(item.price * item.quantity), 186, y + 5.5, { align: 'right' });
-    y += 9;
+    y += rowHeight;
   });
 
   // Bottom Quote Summary
@@ -4850,7 +4919,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
 // --- Merchant POS ---
 const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, setShowUpgradeModal?: (s: boolean) => void }) => {
   const { user } = useAuth();
-  const [cart, setCart] = useState<{ productId: string, name: string, quantity: number, price: number, costPrice: number }[]>([]);
+  const [cart, setCart] = useState<{ productId: string, name: string, quantity: number, price: number, costPrice: number, sizes?: string, colors?: string }[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile_money' | 'split'>('cash');
@@ -4877,10 +4946,48 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'lowstock' | 'outofstock'>('instock');
   const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest'>('name');
+  const [selectedSize, setSelectedSize] = useState<string>('all');
+  const [selectedColor, setSelectedColor] = useState<string>('all');
 
   const products = useLiveQuery(() => 
     db.products.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
+
+  const availableSizes = useMemo(() => {
+    const list = new Set<string>();
+    const categoryFiltered = products.filter(p => {
+      const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
+      const matchSubCat = selectedSubCategory === 'all' || p.subCategory === selectedSubCategory;
+      return matchCat && matchSubCat;
+    });
+    categoryFiltered.forEach(p => {
+      if (p.sizes) {
+        p.sizes.split(',').forEach(s => {
+          const trimmed = s.trim();
+          if (trimmed) list.add(trimmed.toUpperCase());
+        });
+      }
+    });
+    return Array.from(list).sort();
+  }, [products, selectedCategory, selectedSubCategory]);
+
+  const availableColors = useMemo(() => {
+    const list = new Set<string>();
+    const categoryFiltered = products.filter(p => {
+      const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
+      const matchSubCat = selectedSubCategory === 'all' || p.subCategory === selectedSubCategory;
+      return matchCat && matchSubCat;
+    });
+    categoryFiltered.forEach(p => {
+      if (p.colors) {
+        p.colors.split(',').forEach(c => {
+          const trimmed = c.trim();
+          if (trimmed) list.add(trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase());
+        });
+      }
+    });
+    return Array.from(list).sort();
+  }, [products, selectedCategory, selectedSubCategory]);
 
   const categories = useMemo(() => {
     const cats = new Set<string>();
@@ -4901,15 +5008,23 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     return Array.from(subs).sort((a, b) => a.localeCompare(b));
   }, [products, selectedCategory]);
 
-  // Reset subcategory when category changes
+  // Reset subcategory, sizes and colors when category changes
   useEffect(() => {
     setSelectedSubCategory('all');
+    setSelectedSize('all');
+    setSelectedColor('all');
   }, [selectedCategory]);
+
+  // Reset sizes and colors when subcategory changes
+  useEffect(() => {
+    setSelectedSize('all');
+    setSelectedColor('all');
+  }, [selectedSubCategory]);
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
-    // Search filter (name, SKU, category, or description match)
+    // Search filter (name, SKU, category, description, sizes or colors match)
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
       result = result.filter(p => 
@@ -4917,7 +5032,9 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         (p.sku && p.sku.toLowerCase().includes(term)) ||
         (p.category && p.category.toLowerCase().includes(term)) ||
         (p.subCategory && p.subCategory.toLowerCase().includes(term)) ||
-        (p.description && p.description.toLowerCase().includes(term))
+        (p.description && p.description.toLowerCase().includes(term)) ||
+        (p.sizes && p.sizes.toLowerCase().includes(term)) ||
+        (p.colors && p.colors.toLowerCase().includes(term))
       );
     }
 
@@ -4943,6 +5060,16 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       result = result.filter(p => Number(p.stockQuantity || 0) <= 0);
     }
 
+    // Size Filter
+    if (selectedSize !== 'all') {
+      result = result.filter(p => p.sizes && p.sizes.split(',').map(s => s.trim().toUpperCase()).includes(selectedSize));
+    }
+
+    // Color Filter
+    if (selectedColor !== 'all') {
+      result = result.filter(p => p.colors && p.colors.split(',').map(c => c.trim().toUpperCase()).includes(selectedColor.toUpperCase()));
+    }
+
     // Sort order
     if (sortBy === 'name') {
       result.sort((a, b) => a.name.localeCompare(b.name));
@@ -4961,7 +5088,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     }
 
     return result;
-  }, [products, searchTerm, selectedCategory, selectedSubCategory, stockFilter, sortBy]);
+  }, [products, searchTerm, selectedCategory, selectedSubCategory, stockFilter, sortBy, selectedSize, selectedColor]);
 
   const addToCart = (product: MerchantProduct) => {
     if (Number(product.stockQuantity || 0) <= 0) {
@@ -4977,7 +5104,15 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         }
         return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      return [...prev, { productId: product.id, name: product.name, quantity: 1, price: product.price, costPrice: product.costPrice || 0 }];
+      return [...prev, { 
+        productId: product.id, 
+        name: product.name, 
+        quantity: 1, 
+        price: product.price, 
+        costPrice: product.costPrice || 0,
+        sizes: product.sizes || '',
+        colors: product.colors || ''
+      }];
     });
   };
 
@@ -5177,6 +5312,115 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             </div>
           )}
 
+          {/* Ligne 1.8: Tailles et Couleurs */}
+          {(availableSizes.length > 0 || availableColors.length > 0) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-3 border-t border-black/5">
+              {availableSizes.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <Scissors className="w-3.5 h-3.5 text-gray-400" />
+                      Filtrer par Taille
+                    </span>
+                    {selectedSize !== 'all' && (
+                      <button 
+                        onClick={() => setSelectedSize('all')} 
+                        className="text-[9px] font-bold text-primary hover:underline-offset-4 hover:underline"
+                      >
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+                    <button
+                      onClick={() => setSelectedSize('all')}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                        selectedSize === 'all'
+                          ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
+                          : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
+                      }`}
+                    >
+                      Toutes
+                    </button>
+                    {availableSizes.map(size => {
+                      const count = products.filter(p => p.sizes && p.sizes.split(',').map(s => s.trim().toUpperCase()).includes(size)).length;
+                      return (
+                        <button
+                          key={size}
+                          onClick={() => setSelectedSize(size)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                            selectedSize === size
+                              ? 'bg-primary text-white border-primary shadow-sm'
+                              : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200'
+                          }`}
+                        >
+                          <span>{size}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                            selectedSize === size ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {availableColors.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-gray-400" />
+                      Filtrer par Couleur
+                    </span>
+                    {selectedColor !== 'all' && (
+                      <button 
+                        onClick={() => setSelectedColor('all')} 
+                        className="text-[9px] font-bold text-primary hover:underline-offset-4 hover:underline"
+                      >
+                        Réinitialiser
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+                    <button
+                      onClick={() => setSelectedColor('all')}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                        selectedColor === 'all'
+                          ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
+                          : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
+                      }`}
+                    >
+                      Toutes
+                    </button>
+                    {availableColors.map(color => {
+                      const count = products.filter(p => p.colors && p.colors.split(',').map(c => c.trim().toUpperCase()).includes(color.toUpperCase())).length;
+                      return (
+                        <button
+                          key={color}
+                          onClick={() => setSelectedColor(color)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                            selectedColor === color
+                              ? 'bg-primary text-white border-primary shadow-sm'
+                              : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200'
+                          }`}
+                        >
+                          <span>{color}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                            selectedColor === color ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Ligne 2: Disponibilité & Tri */}
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between border-t border-black/5 pt-3">
             {/* Disponibilité Segmented Control */}
@@ -5278,6 +5522,8 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 setSelectedCategory('all');
                 setStockFilter('all');
                 setSortBy('name');
+                setSelectedSize('all');
+                setSelectedColor('all');
               }} 
               className="mt-4 px-4 py-2 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20 transition-all"
             >
@@ -5399,9 +5645,17 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl border border-gray-100 group">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
-                    <p className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
-                      {item.quantity} x {item.price.toLocaleString()} {merchant.currency}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <p className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
+                        {item.quantity} x {item.price.toLocaleString()} {merchant.currency}
+                      </p>
+                      {item.sizes && (
+                        <span className="text-[9px] font-mono font-semibold bg-blue-50 text-blue-600 px-1 py-0.5 rounded">T: {item.sizes}</span>
+                      )}
+                      {item.colors && (
+                        <span className="text-[9px] font-mono font-semibold bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded">C: {item.colors}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <p className="text-sm font-black text-ink">{(item.price * item.quantity).toLocaleString()}</p>
@@ -7406,9 +7660,17 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
 
   const addItem = (product?: MerchantProduct) => {
     if (product) {
-      setItems([...items, { productId: product.id, name: product.name, quantity: 1, price: product.price, total: product.price }]);
+      setItems([...items, { 
+        productId: product.id, 
+        name: product.name, 
+        quantity: 1, 
+        price: product.price, 
+        total: product.price,
+        sizes: product.sizes || '',
+        colors: product.colors || ''
+      }]);
     } else {
-      setItems([...items, { name: '', quantity: 1, price: 0, total: 0 }]);
+      setItems([...items, { name: '', quantity: 1, price: 0, total: 0, sizes: '', colors: '' }]);
     }
   };
 
@@ -7581,48 +7843,73 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
 
             <div className="space-y-3">
                {items.map((item, idx) => (
-                 <div key={idx} className="flex flex-wrap md:flex-nowrap gap-3 items-end p-4 bg-gray-50 rounded-2xl border border-gray-100 group transition-all hover:bg-white hover:border-primary/20">
-                    <div className="flex-1 min-w-[200px] space-y-1">
-                      <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Désignation</label>
-                      <input 
-                        type="text" 
-                        value={item.name}
-                        onChange={e => updateItem(idx, { name: e.target.value })}
-                        className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl text-xs font-bold font-mono outline-none focus:border-primary/50"
-                        placeholder="Nom de l'article"
-                      />
-                    </div>
-                    <div className="w-24 space-y-1">
-                      <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Qté</label>
-                      <input 
-                        type="number" 
-                        value={item.quantity}
-                        onChange={e => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl text-xs font-black font-mono outline-none text-center"
-                      />
-                    </div>
-                    <div className="w-32 space-y-1">
-                      <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Prix Unitaire</label>
-                      <input 
-                        type="text" 
-                        value={item.price === 0 ? '' : item.price}
-                        onChange={e => updateItem(idx, { price: parseFloat(e.target.value.replace(/\D/g, '')) || 0 })}
-                        className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl text-xs font-black font-mono outline-none text-right"
-                      />
-                    </div>
-                    <div className="w-32 space-y-1">
-                      <label className="text-[8px] font-black uppercase tracking-widest text-primary ml-1">Total</label>
-                      <div className="w-full px-4 py-3 bg-primary/5 border border-primary/10 rounded-xl text-xs font-black font-mono text-right text-primary">
-                        {item.total.toLocaleString()}
+                 <div key={idx} className="flex flex-col gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100 group transition-all hover:bg-white hover:border-primary/20">
+                    <div className="flex flex-wrap md:flex-nowrap gap-3 items-end">
+                      <div className="flex-1 min-w-[200px] space-y-1">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Désignation</label>
+                        <input 
+                          type="text" 
+                          value={item.name}
+                          onChange={e => updateItem(idx, { name: e.target.value })}
+                          className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl text-xs font-bold font-mono outline-none focus:border-primary/50"
+                          placeholder="Nom de l'article"
+                        />
                       </div>
+                      <div className="w-24 space-y-1">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Qté</label>
+                        <input 
+                          type="number" 
+                          value={item.quantity}
+                          onChange={e => updateItem(idx, { quantity: parseFloat(e.target.value) || 0 })}
+                          className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl text-xs font-black font-mono outline-none text-center"
+                        />
+                      </div>
+                      <div className="w-32 space-y-1">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Prix Unitaire</label>
+                        <input 
+                          type="text" 
+                          value={item.price === 0 ? '' : item.price}
+                          onChange={e => updateItem(idx, { price: parseFloat(e.target.value.replace(/\D/g, '')) || 0 })}
+                          className="w-full px-4 py-3 bg-white border border-black/5 rounded-xl text-xs font-black font-mono outline-none text-right"
+                        />
+                      </div>
+                      <div className="w-32 space-y-1">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-primary ml-1">Total</label>
+                        <div className="w-full px-4 py-3 bg-primary/5 border border-primary/10 rounded-xl text-xs font-black font-mono text-right text-primary">
+                          {item.total.toLocaleString()}
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => removeItem(idx)}
+                        className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button 
-                      type="button" 
-                      onClick={() => removeItem(idx)}
-                      className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100/50">
+                       <div className="space-y-1">
+                         <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Taille (Optionnel)</label>
+                         <input 
+                           type="text" 
+                           value={item.sizes || ''} 
+                           onChange={e => updateItem(idx, { sizes: e.target.value })} 
+                           className="w-full px-4 py-2 bg-white border border-black/5 rounded-xl text-xs font-semibold font-mono outline-none placeholder:text-gray-300" 
+                           placeholder="ex: M, XL, 42"
+                         />
+                       </div>
+                       <div className="space-y-1">
+                         <label className="text-[8px] font-black uppercase tracking-widest text-gray-400 ml-1">Couleur (Optionnel)</label>
+                         <input 
+                           type="text" 
+                           value={item.colors || ''} 
+                           onChange={e => updateItem(idx, { colors: e.target.value })} 
+                           className="w-full px-4 py-2 bg-white border border-black/5 rounded-xl text-xs font-semibold font-mono outline-none placeholder:text-gray-300" 
+                           placeholder="ex: Noir, Rouge"
+                         />
+                       </div>
+                    </div>
                  </div>
                ))}
                {items.length === 0 && (

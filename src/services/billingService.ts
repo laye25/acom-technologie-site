@@ -17,7 +17,9 @@ export const billingService = {
         name: item.name,
         quantity: item.quantity,
         price: item.price,
-        total: item.total
+        total: item.total,
+        sizes: item.sizes,
+        colors: item.colors
       })),
       totalAmount: quote.totalAmount,
       paymentMethod: 'cash', // Default to cash, user can change later if needed
