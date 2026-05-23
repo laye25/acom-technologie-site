@@ -408,28 +408,14 @@ export const restoreSQLiteDB = async (file: File) => {
 export const syncPhysicalFile = async () => {
   if (!db) return;
   try {
-    const isElectron = typeof window !== 'undefined' && typeof (window as any).require !== 'undefined' && navigator.userAgent.includes('Electron');
-    if (!isElectron) return;
-
-    const fs = (window as any).require('fs');
-    const path = (window as any).require('path');
+    const electronAPI = (window as any).electronAPI;
+    const isElectronNew = !!electronAPI;
+    const isElectronOld = typeof window !== 'undefined' && typeof (window as any).require !== 'undefined' && navigator.userAgent.includes('Electron');
     
-    // Instead of directly using 'electron' which might be context isolated, 
-    // we use APPDATA env var as fallback or just require
-    const processVars = (window as any).process;
-    if (!processVars) return;
+    if (!isElectronNew && !isElectronOld) return;
 
-    const appData = processVars.env.APPDATA || (processVars.platform === 'darwin' ? processVars.env.HOME + '/Library/Application Support' : '/var/local');
-    const folderPath = path.join(appData, 'AcomGestion');
-    
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true });
-    }
-
-    const dbPath = path.join(folderPath, 'data.sqlite');
-    
     // Export DB
-    let uint8Array;
+    let uint8Array: Uint8Array;
     if (db.export) {
         uint8Array = db.export();
     } else {
@@ -440,8 +426,30 @@ export const syncPhysicalFile = async () => {
         uint8Array = new Uint8Array(arrayBuffer);
     }
 
-    fs.writeFileSync(dbPath, uint8Array);
-    console.log(`Database anchored to physical file: ${dbPath}`);
+    if (isElectronNew && typeof electronAPI.syncPhysicalFile === 'function') {
+      console.log('Syncing SQLite via secure Electron IPC bridge...');
+      const result = await electronAPI.syncPhysicalFile(uint8Array.buffer);
+      console.log('IPC sync result:', result);
+      return;
+    }
+
+    if (isElectronOld) {
+      const fs = (window as any).require('fs');
+      const path = (window as any).require('path');
+      const processVars = (window as any).process;
+      if (!processVars) return;
+
+      const appData = processVars.env.APPDATA || (processVars.platform === 'darwin' ? processVars.env.HOME + '/Library/Application Support' : '/var/local');
+      const folderPath = path.join(appData, 'AcomGestion');
+      
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath, { recursive: true });
+      }
+
+      const dbPath = path.join(folderPath, 'data.sqlite');
+      fs.writeFileSync(dbPath, uint8Array);
+      console.log(`Database anchored to physical file (fallback): ${dbPath}`);
+    }
   } catch (e) {
     console.error('Failed to sync physical SQLite file:', e);
   }

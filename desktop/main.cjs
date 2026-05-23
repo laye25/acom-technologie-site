@@ -57,8 +57,8 @@ function createWindow() {
     height: 800,
     title: 'Acom Gestion Desktop',
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
       webSecurity: false,
         preload: path.join(__dirname, 'preload.js')
       }
@@ -99,6 +99,30 @@ function createWindow() {
 }
 
   app.whenReady().then(() => {
+  // Expose physical file synchronization over secure IPC
+  const { ipcMain } = require('electron');
+  ipcMain.handle('sync-physical-file', async (event, arrayBuffer) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
+      const folderPath = path.join(appData, 'AcomGestion');
+      
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath, { recursive: true });
+      }
+
+      const dbPath = path.join(folderPath, 'data.sqlite');
+      const buffer = Buffer.from(arrayBuffer);
+      fs.writeFileSync(dbPath, buffer);
+      console.log(`[IPC] Database anchored to physical file: ${dbPath}`);
+      return { success: true, path: dbPath };
+    } catch (error) {
+      console.error('[IPC] Failed to sync physical SQLite file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Register the protocol handler after app.whenReady
   protocol.handle('app', async (request) => {
     try {
