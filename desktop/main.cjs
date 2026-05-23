@@ -160,14 +160,24 @@ function createWindow() {
       const data = fs.readFileSync(filePath);
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
       
-      return new Response(data, {
-        headers: {
-          'content-type': contentType,
-          'access-control-allow-origin': '*',
-          'x-content-type-options': 'nosniff',
-          'Cross-Origin-Embedder-Policy': 'require-corp',
-          'Cross-Origin-Opener-Policy': 'same-origin'
-        }
+      const headers = {
+        'content-type': contentType,
+        'access-control-allow-origin': '*',
+        'access-control-allow-headers': '*',
+        'access-control-allow-methods': '*',
+        'x-content-type-options': 'nosniff',
+        'Cross-Origin-Resource-Policy': 'cross-origin'
+      };
+
+      // Only apply COEP and COOP headers on non-HTML payloads (like Web Workers or scripts if necessary)
+      // Forcing them on index.html isolates the page and blocks ALL standard cross-origin requests like Firebase, Fonts, or external links
+      if (ext !== '.html') {
+        headers['Cross-Origin-Embedder-Policy'] = 'require-corp';
+        headers['Cross-Origin-Opener-Policy'] = 'same-origin';
+      }
+
+      return new Response(new Uint8Array(data), {
+        headers
       });
     } catch (error) {
       console.error(`Failed to handle app request for ${request.url}:`, error);
