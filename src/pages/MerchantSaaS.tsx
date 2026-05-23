@@ -638,31 +638,46 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     `;
   }
 
-  let printFrame = document.getElementById('print-iframe') as HTMLIFrameElement;
-  if (!printFrame) {
-    printFrame = document.createElement('iframe');
-    printFrame.id = 'print-iframe';
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    printFrame.style.width = '850px';
-    printFrame.style.height = '900px';
-    printFrame.style.visibility = 'hidden';
-    document.body.appendChild(printFrame);
+  let printWindow = window.open("", "_blank", "width=850,height=900,menubar=no,toolbar=no,location=no,status=no");
+  
+  if (!printWindow) {
+    // Fallback using iframe if popup is strictly blocked in this environment (e.g., some strict Electron configurations)
+    let printFrame = document.getElementById('print-iframe') as HTMLIFrameElement;
+    if (!printFrame) {
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'print-iframe';
+      printFrame.style.position = 'absolute';
+      printFrame.style.top = '-9999px';
+      printFrame.style.left = '-9999px';
+      printFrame.style.width = '850px';
+      printFrame.style.height = '900px';
+      printFrame.style.visibility = 'hidden';
+      document.body.appendChild(printFrame);
+    }
+    
+    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(htmlContent);
+      frameDoc.close();
+      setTimeout(() => {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+      }, 500);
+    }
+    return;
   }
 
-  const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
-  if (frameDoc) {
-    frameDoc.open();
-    frameDoc.write(htmlContent);
-    frameDoc.close();
-    
-    // Give the browser window resources/images a brief moment to mount, then execute print
-    setTimeout(() => {
-      printFrame.contentWindow?.focus();
-      printFrame.contentWindow?.print();
-    }, 400);
-  }
+  printWindow.document.open();
+  printWindow.document.write(htmlContent);
+  printWindow.document.close();
+
+  printWindow.focus();
+  setTimeout(() => {
+    printWindow?.print();
+    // In some Desktop wrappers, we might need to close the window after printing
+    // printWindow.close() can be called if needed, but standard print dialog pauses execution.
+  }, 500);
 };
 
 const pdfFormatNum = (num: number) => {
@@ -3687,24 +3702,24 @@ const MerchantDashboard = ({
             <>
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h3 className="text-xl font-black text-ink">Alertes Stock</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Niveaux critiques détectés</p>
+                  <h3 className="text-xl font-black text-ink">Articles en Rupture</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Stock actuellement épuisé</p>
                 </div>
                 <span className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black rounded-full border border-rose-100 shadow-sm">
-                  {stats.lowStockCount.toString().padStart(2, '0')} ALERTES
+                  {products.filter(p => Number(p.stockQuantity || 0) <= 0).length.toString().padStart(2, '0')} RUPTURES
                 </span>
               </div>
               <div className="space-y-4">
-                {products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length === 0 ? (
+                {products.filter(p => Number(p.stockQuantity || 0) <= 0).length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center bg-emerald-50/30 rounded-[2rem] border border-dashed border-emerald-200">
                     <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100">
                       <CheckCircle className="w-10 h-10 text-emerald-500" />
                     </div>
-                    <p className="text-emerald-600 font-black uppercase tracking-widest">Tout est en stock !</p>
-                    <p className="text-xs text-emerald-500/60 mt-2 font-mono font-bold">Niveaux optimaux</p>
+                    <p className="text-emerald-600 font-black uppercase tracking-widest">Aucune Rupture !</p>
+                    <p className="text-xs text-emerald-500/60 mt-2 font-mono font-bold">Stocks disponibles</p>
                   </div>
                 ) : (
-                  products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).map((product) => (
+                  products.filter(p => Number(p.stockQuantity || 0) <= 0).slice(0, 5).map((product) => (
                     <div key={product.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-rose-100 hover:shadow-xl transition-all group relative overflow-hidden">
                       <div className="absolute inset-y-0 left-0 w-1 bg-rose-500"></div>
                       <div className="flex items-center space-x-5">
@@ -3725,7 +3740,7 @@ const MerchantDashboard = ({
                       </div>
                       <div className="flex flex-col items-end">
                         <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 shadow-sm mb-3 uppercase tracking-[0.2em]">
-                          CRITIQUE
+                          ÉPUISÉ
                         </span>
                         {setActiveTab && (
                           <button 
@@ -4835,6 +4850,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
 
   // Smart filters states
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'lowstock' | 'outofstock'>('instock');
   const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest'>('name');
 
@@ -4850,6 +4866,22 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     return Array.from(cats).sort((a, b) => a.localeCompare(b));
   }, [products]);
 
+  const subCategories = useMemo(() => {
+    if (selectedCategory === 'all') return [];
+    const subs = new Set<string>();
+    products.forEach(p => {
+      if (p.category === selectedCategory && p.subCategory) {
+        subs.add(p.subCategory);
+      }
+    });
+    return Array.from(subs).sort((a, b) => a.localeCompare(b));
+  }, [products, selectedCategory]);
+
+  // Reset subcategory when category changes
+  useEffect(() => {
+    setSelectedSubCategory('all');
+  }, [selectedCategory]);
+
   const filteredProducts = useMemo(() => {
     let result = [...products];
 
@@ -4860,6 +4892,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         p.name.toLowerCase().includes(term) || 
         (p.sku && p.sku.toLowerCase().includes(term)) ||
         (p.category && p.category.toLowerCase().includes(term)) ||
+        (p.subCategory && p.subCategory.toLowerCase().includes(term)) ||
         (p.description && p.description.toLowerCase().includes(term))
       );
     }
@@ -4867,6 +4900,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     // Category filter
     if (selectedCategory !== 'all') {
       result = result.filter(p => p.category === selectedCategory);
+      // Subcategory filter
+      if (selectedSubCategory !== 'all') {
+        result = result.filter(p => p.subCategory === selectedSubCategory);
+      }
     }
 
     // Stock Filter
@@ -4900,7 +4937,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     }
 
     return result;
-  }, [products, searchTerm, selectedCategory, stockFilter, sortBy]);
+  }, [products, searchTerm, selectedCategory, selectedSubCategory, stockFilter, sortBy]);
 
   const addToCart = (product: MerchantProduct) => {
     if (Number(product.stockQuantity || 0) <= 0) {
@@ -5063,6 +5100,58 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               })}
             </div>
           </div>
+
+          {/* Ligne 1.5: Sous-catégories (Filtre rapide) */}
+          {selectedCategory !== 'all' && subCategories.length > 0 && (
+            <div className="space-y-2 pt-3 border-t border-black/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Tag className="w-3 h-3" />
+                  Sous-catégories associées
+                </span>
+              </div>
+              
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+                <button
+                  onClick={() => setSelectedSubCategory('all')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all border ${
+                    selectedSubCategory === 'all'
+                      ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
+                      : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
+                  }`}
+                >
+                  <span>Toutes</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                    selectedSubCategory === 'all' ? 'bg-primary/20 text-primary' : 'bg-gray-50 text-gray-400'
+                  }`}>
+                    {products.filter(p => p.category === selectedCategory).length}
+                  </span>
+                </button>
+
+                {subCategories.map((subCat) => {
+                  const count = products.filter(p => p.category === selectedCategory && p.subCategory === subCat).length;
+                  return (
+                    <button
+                      key={subCat}
+                      onClick={() => setSelectedSubCategory(subCat)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all border ${
+                        selectedSubCategory === subCat
+                          ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
+                          : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
+                      }`}
+                    >
+                      <span>{subCat}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                        selectedSubCategory === subCat ? 'bg-primary/20 text-primary' : 'bg-gray-50 text-gray-400'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Ligne 2: Disponibilité & Tri */}
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between border-t border-black/5 pt-3">
@@ -5387,7 +5476,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                   <div className="grid grid-cols-2 gap-2">
                     <button 
                       onClick={() => {
-                        generateReceiptPDF(merchant, showReceiptModal.saleData, 'print');
+                        printDirectHTML(merchant, 'receipt', showReceiptModal.saleData);
                       }}
                       className="py-3 bg-amber-500 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-amber-600 transition-all flex items-center justify-center gap-1.5"
                     >
@@ -5412,7 +5501,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                   <div className="grid grid-cols-2 gap-2">
                     <button 
                       onClick={() => {
-                        generateA4InvoicePDF(merchant, showReceiptModal.saleData, 'print');
+                        printDirectHTML(merchant, 'invoice', showReceiptModal.saleData);
                       }}
                       className="py-3 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
                     >
@@ -6348,7 +6437,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   CLIENT: <span className="text-ink font-bold font-sans">{activePrintDoc.item.customerName || 'Client POS'}</span>
                 </div>
                 <div className="text-primary font-mono font-bold">
-                  TOTAL: <span>{activePrintDoc.item.totalAmount.toLocaleString()} {merchant.currency}</span>
+                  TOTAL: <span>{Number(activePrintDoc.item.totalAmount || 0).toLocaleString()} {merchant.currency}</span>
                 </div>
               </div>
 
@@ -6407,45 +6496,6 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                         <button 
                           onClick={() => generateA4InvoicePDF(merchant, activePrintDoc.item, 'download', 'invoice')}
                           className="flex-1 py-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                          PDF
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* OPTION 3: Impayé & Créance (Format A4 avec Relance) */}
-                    <div className="p-4 bg-white hover:bg-rose-50/10 border border-gray-100 hover:border-rose-200 rounded-2xl transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
-                      <div className="flex items-start gap-3">
-                        <div className="p-3 bg-rose-50 text-rose-500 rounded-xl relative group-hover:scale-105 transition-transform">
-                          <AlertCircle className="w-5 h-5" />
-                          {activePrintDoc.item.balance > 0 && (
-                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full animate-pulse" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-bold text-ink text-sm">Avis d'Impayé & Créance (A4 Spécial)</h4>
-                            {activePrintDoc.item.balance > 0 && (
-                              <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-full text-[8px] font-black uppercase tracking-wider font-mono">
-                                Reste: {activePrintDoc.item.balance.toLocaleString()} {merchant.currency}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 max-w-sm mt-0.5">Pour les créances non soldées. Ajoute une mention rouge "AVIS DE DETTE" et un message formel appelant au recouvrement rapide.</p>
-                        </div>
-                      </div>
-                      <div className="flex sm:flex-col gap-2 min-w-[120px]">
-                        <button 
-                          onClick={() => printDirectHTML(merchant, 'unpaid', activePrintDoc.item)}
-                          className="flex-1 py-1.5 px-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          Imprimer
-                        </button>
-                        <button 
-                          onClick={() => generateA4InvoicePDF(merchant, activePrintDoc.item, 'download', 'unpaid')}
-                          className="flex-1 py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
                         >
                           <Download className="w-3.5 h-3.5" />
                           PDF
