@@ -67,7 +67,8 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  // Return the error info instead of throwing it, to allow callers to gracefully return their fallback (like null)
+  return errInfo;
 }
 
 /**
