@@ -7,12 +7,20 @@ interface NetworkStatusIndicatorProps {
   plan?: string;
 }
 
+const isDesktopMode = typeof window !== 'undefined' && (
+  ('__TAURI__' in window) || 
+  (window.process && (window.process as any).type) || 
+  (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
+  (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
+);
+
 export const NetworkStatusIndicator = ({ position = 'bottom-right', plan }: NetworkStatusIndicatorProps) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
-  const isLocalPlan = plan === 'LOCAL';
+  const isLocalPlan = plan === 'LOCAL' || isDesktopMode;
+  const showQuotaExceeded = isQuotaExceeded && !isLocalPlan;
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -62,7 +70,7 @@ export const NetworkStatusIndicator = ({ position = 'bottom-right', plan }: Netw
       <div className="flex items-center gap-2">
         <div 
           className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
-            isQuotaExceeded
+            showQuotaExceeded
               ? 'bg-rose-50 text-rose-600 border border-rose-100'
               : isLocalPlan 
                 ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
@@ -70,15 +78,15 @@ export const NetworkStatusIndicator = ({ position = 'bottom-right', plan }: Netw
                   ? 'bg-blue-50 text-blue-600' 
                   : 'bg-rose-50 text-rose-600'
           }`} 
-          title={isQuotaExceeded ? "Quota Firestore Exceeded" : isLocalPlan ? "Licence Locale" : isOnline ? "Cloud Connecté" : "Cloud Déconnecté"}
+          title={showQuotaExceeded ? "Quota Firestore Exceeded" : isLocalPlan ? "Licence Locale" : isOnline ? "Cloud Connecté" : "Cloud Déconnecté"}
         >
-          {isQuotaExceeded ? <CloudOff className="w-4 h-4" /> : isLocalPlan ? <HardDrive className="w-4 h-4" /> : isOnline ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
+          {showQuotaExceeded ? <CloudOff className="w-4 h-4" /> : isLocalPlan ? <HardDrive className="w-4 h-4" /> : isOnline ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
           <span className="hidden md:inline">
-            {isQuotaExceeded ? 'Quota Épuisé (Offline)' : isLocalPlan ? 'Mode Local' : isOnline ? 'Sync Cloud' : 'Mode Local'}
+            {showQuotaExceeded ? 'Quota Épuisé (Offline)' : isLocalPlan ? 'Mode Local' : isOnline ? 'Sync Cloud' : 'Mode Local'}
           </span>
         </div>
         
-        {pendingCount > 0 && !isQuotaExceeded && (
+        {pendingCount > 0 && !showQuotaExceeded && (
           <div className="flex items-center gap-1.5 px-3 py-2.5 bg-amber-50 text-amber-600 rounded-xl text-[11px] font-black uppercase tracking-widest animate-pulse">
             <RefreshCw className="w-3 h-3 animate-spin" />
             <span>{pendingCount} En attente</span>
@@ -94,23 +102,28 @@ export const NetworkStatusIndicator = ({ position = 'bottom-right', plan }: Netw
 
   return (
     <div className={`fixed ${positionClasses} flex flex-col gap-2 items-end`}>
-      {isQuotaExceeded && (
+      {showQuotaExceeded && (
         <div className="bg-rose-600 text-white px-4 py-2 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 animate-pulse">
           <CloudOff className="w-3 h-3" />
           Quota Firestore épuisé - Mode Lecture seule
         </div>
       )}
-      {pendingCount > 0 && !isQuotaExceeded && (
+      {pendingCount > 0 && !showQuotaExceeded && (
         <div className="bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
           <RefreshCw className="w-3 h-3 animate-spin" />
           {pendingCount} modifications locales non synchronisées
         </div>
       )}
-      <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-xs font-bold uppercase tracking-wider transition-all ${isQuotaExceeded ? 'bg-rose-700 text-white' : (isOnline ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white')}`}>
-        {isQuotaExceeded ? (
+      <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-xs font-bold uppercase tracking-wider transition-all ${showQuotaExceeded ? 'bg-rose-700 text-white' : (isLocalPlan ? 'bg-emerald-600 text-white' : isOnline ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white')}`}>
+        {showQuotaExceeded ? (
           <>
             <CloudOff className="w-4 h-4" />
             <span>Quota Épuisé</span>
+          </>
+        ) : isLocalPlan ? (
+          <>
+            <HardDrive className="w-4 h-4" />
+            <span>Mode Local</span>
           </>
         ) : isOnline ? (
           <>
