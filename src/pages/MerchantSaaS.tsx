@@ -657,17 +657,20 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
   }
 
   let printFrame = document.getElementById('print-iframe') as HTMLIFrameElement;
-  if (!printFrame) {
-    printFrame = document.createElement('iframe');
-    printFrame.id = 'print-iframe';
-    printFrame.style.position = 'absolute';
-    printFrame.style.top = '-9999px';
-    printFrame.style.left = '-9999px';
-    printFrame.style.width = '850px';
-    printFrame.style.height = '900px';
-    printFrame.style.visibility = 'hidden';
-    document.body.appendChild(printFrame);
+  if (printFrame) {
+    printFrame.parentNode?.removeChild(printFrame);
   }
+
+  printFrame = document.createElement('iframe');
+  printFrame.id = 'print-iframe';
+  printFrame.style.position = 'fixed';
+  printFrame.style.top = '-9999px';
+  printFrame.style.left = '-9999px';
+  printFrame.style.width = '850px';
+  printFrame.style.height = '1100px';
+  printFrame.style.border = 'none';
+  printFrame.style.opacity = '0.01';
+  document.body.appendChild(printFrame);
 
   const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
   if (frameDoc) {
@@ -677,9 +680,34 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     
     // Give the browser window resources/images a brief moment to mount, then execute print
     setTimeout(() => {
-      printFrame.contentWindow?.focus();
-      printFrame.contentWindow?.print();
-    }, 400);
+      try {
+        if (!printFrame?.contentWindow) {
+          throw new Error("No contentWindow found on print iframe");
+        }
+        
+        // In Acom Gestion Desktop (Electron), iframe.print() silently fails without throwing.
+        // We MUST force the fallback if isDesktop is true.
+        if (isDesktop) {
+          throw new Error("Electron context detected. Forcing PDF download fallback.");
+        }
+
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        toast.success("Aperçu d'impression ouvert !", { position: 'top-center' });
+      } catch (err) {
+        console.warn("Iframe direct printing bypassed or failed, triggering PDF fallback...", err);
+        toast.success("Génération du PDF pour Acom Gestion Desktop...", { duration: 3000, position: 'top-center' });
+        
+        // Automatic high-quality PDF generation fallback based on document type
+        if (type === 'receipt') {
+          generateReceiptPDF(merchant, data, 'download');
+        } else if (type === 'invoice' || type === 'unpaid') {
+          generateA4InvoicePDF(merchant, data, 'download', type);
+        } else if (type === 'quote') {
+          generateA4QuotePDF(merchant, data, 'download');
+        }
+      }
+    }, 500);
   }
 };
 
@@ -4959,6 +4987,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   , [merchant.id]) || [];
 
   const availableSizes = useMemo(() => {
+    if (selectedCategory === 'all') return []; // Hide sizes to prevent confusing mix of laptop and shoe sizes
     const list = new Set<string>();
     const categoryFiltered = products.filter(p => {
       const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
@@ -4977,6 +5006,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   }, [products, selectedCategory, selectedSubCategory]);
 
   const availableColors = useMemo(() => {
+    if (selectedCategory === 'all') return []; // Hide colors to prevent confusing mixture if no category is isolated
     const list = new Set<string>();
     const categoryFiltered = products.filter(p => {
       const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
