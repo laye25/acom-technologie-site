@@ -685,10 +685,31 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
           throw new Error("No contentWindow found on print iframe");
         }
         
-        // In Acom Gestion Desktop (Electron), iframe.print() silently fails without throwing.
-        // We MUST force the fallback if isDesktop is true.
+        // In Acom Gestion Desktop (Electron), iframe.print() might fail or be blocked.
+        // We can try to open a new popup window, write HTML there, and invoke print.
         if (isDesktop) {
-          throw new Error("Electron context detected. Forcing PDF download fallback.");
+          const printWin = window.open('', '_blank', 'width=800,height=900');
+          if (printWin) {
+            printWin.document.open();
+            printWin.document.write(htmlContent);
+            printWin.document.close();
+            
+            setTimeout(() => {
+              try {
+                printWin.focus();
+                printWin.print();
+                // Optionally close after print dialog appears
+                // printWin.close(); 
+              } catch (e) {
+                console.error("Popup window print failed:", e);
+              }
+            }, 800);
+            
+            toast.success("Impression en cours...", { position: 'top-center' });
+            return; // Done
+          } else {
+             console.warn("Popup blocked, falling back to normal iframe print.");
+          }
         }
 
         printFrame.contentWindow.focus();
@@ -696,15 +717,16 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
         toast.success("Aperçu d'impression ouvert !", { position: 'top-center' });
       } catch (err) {
         console.warn("Iframe direct printing bypassed or failed, triggering PDF fallback...", err);
-        toast.success("Génération du PDF pour Acom Gestion Desktop...", { duration: 3000, position: 'top-center' });
+        toast.success("Génération de l'aperçu d'impression en cours...", { duration: 3000, position: 'top-center' });
         
         // Automatic high-quality PDF generation fallback based on document type
+        // Use 'print' action which handles both web (window.open PDF with autoPrint) and desktop (safe download)
         if (type === 'receipt') {
-          generateReceiptPDF(merchant, data, 'download');
+          generateReceiptPDF(merchant, data, 'print');
         } else if (type === 'invoice' || type === 'unpaid') {
-          generateA4InvoicePDF(merchant, data, 'download', type);
+          generateA4InvoicePDF(merchant, data, 'print', type);
         } else if (type === 'quote') {
-          generateA4QuotePDF(merchant, data, 'download');
+          generateA4QuotePDF(merchant, data, 'print');
         }
       }
     }, 500);
