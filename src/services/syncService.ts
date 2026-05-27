@@ -534,12 +534,9 @@ export const syncService = {
       const timeConstraints: any[] = [];
       if (lastSyncStr) {
         timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
-      } else {
-        // Initial sync: last 30 days
-        timeConstraints.push(where('updated_at', '>=', new Date(Date.now() - 86400000 * 30)));
       }
 
-      console.log(`Syncing ${collectionName}... ${lastSyncStr ? '(Delta)' : '(Initial 30d)'}`);
+      console.log(`Syncing ${collectionName}... ${lastSyncStr ? '(Delta)' : '(Full Initial Sync)'}`);
       
       const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
         protected collectionName = collectionName;
@@ -587,7 +584,15 @@ export const syncService = {
       { name: 'appointments', table: db.appointments },
       { name: 'merchant_suppliers', table: db.suppliers },
       { name: 'stock_movements', table: db.movements },
-      { name: 'merchant_categories', table: db.categories }
+      { name: 'merchant_categories', table: db.categories },
+      { name: 'teachers', table: db.teachers },
+      { name: 'classes', table: db.classes },
+      { name: 'subjects', table: db.subjects },
+      { name: 'grades', table: db.grades },
+      { name: 'parents', table: db.parents },
+      { name: 'attendance', table: db.attendance },
+      { name: 'communications', table: db.communications },
+      { name: 'ai_insights', table: db.ai_insights }
     ];
     
     for (const col of collections) {

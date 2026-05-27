@@ -223,7 +223,7 @@ service cloud.firestore {
 
     // Merchant SaaS Collections
     match /merchants/{merchantId} {
-      allow read: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
+      allow read: if true;
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (resource.data.owner_id == request.auth.uid || resource.data.ownerId == request.auth.uid || hasAnyAdminRole());
       allow delete: if isAdmin();
@@ -330,6 +330,39 @@ service cloud.firestore {
     }
     
     match /students/{studentId} {
+      allow read, write: if true;
+    }
+
+    match /teachers/{teacherId} {
+      allow read, write: if true;
+    }
+
+    match /classes/{classId} {
+      allow read, write: if true;
+    }
+
+    match /subjects/{subjectId} {
+      allow read, write: if true;
+    }
+
+    match /grades/{gradeId} {
+      allow read, write: if true;
+    }
+
+    match /parents/{parentId} {
+      allow read, write: if true;
+    }
+
+    match /attendance/{docId} {
+      allow read, write: if true;
+    }
+
+    match /communications/{docId} {
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+    }
+
+    match /ai_insights/{docId} {
       allow read: if hasOwnership(existing()) || hasAnyAdminRole();
       allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }

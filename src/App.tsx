@@ -58,10 +58,12 @@ const Router = isDesktop ? HashRouter : BrowserRouter;
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, profile, loading, isAdmin, isManager } = useAuth();
   const location = useLocation();
+  const activeTeacherId = localStorage.getItem('activeTeacherId');
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-medium text-gray-500">Chargement de votre session...</div>;
-  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (adminOnly && !(isAdmin || isManager)) return <Navigate to="/" />;
+  if (!user && !activeTeacherId) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!user && activeTeacherId && adminOnly) return <Navigate to="/" />; // Teachers cannot access adminOnly routes
+  if (user && adminOnly && !(isAdmin || isManager)) return <Navigate to="/" />;
 
   return <>{children}</>;
 };
@@ -73,9 +75,10 @@ function AppContent() {
   // Détection du sous-domaine SaaS (ou simulation via ?mode=saas)
   const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || (typeof window !== 'undefined' && isDesktop);
 
-  // Pour le SaaS, on cache le header et le footer pour faire plus "Application"
-  const hideNavbar = isEditor || isSaaSDomain;
-  const hideFooter = isEditor || isSaaSDomain;
+  // Pour le SaaS et la session Enseignant, on cache le header et le footer pour faire plus "Application" personnalisé
+  const isTeacherSession = typeof window !== 'undefined' && !!localStorage.getItem('activeTeacherId');
+  const hideNavbar = isEditor || isSaaSDomain || isTeacherSession;
+  const hideFooter = isEditor || isSaaSDomain || isTeacherSession;
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 selection:bg-primary-light selection:text-primary">

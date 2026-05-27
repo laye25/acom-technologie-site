@@ -53,7 +53,7 @@ const defaultSolutions = [
     iconName: "GraduationCap",
     color: "bg-indigo-500",
     image: "https://picsum.photos/seed/school/800/600",
-    link: "/merchant/saas?type=scolaire"
+    link: "/school/saas"
   },
   {
     title: "Gestion médicale (cliniques / hôpitaux)",

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { db as firestoreDb } from '../firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 // import { isSupabaseConfigured } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -8,7 +10,7 @@ import { Mail, Lock, User, ArrowRight, LogIn, UserPlus } from 'lucide-react';
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuth();
+  const { user, signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword, signOut } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
 
   const from = location.state?.from?.pathname + (location.state?.from?.search || '') || '/dashboard';
@@ -131,6 +133,64 @@ const Login = () => {
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       
       if (isLogin) {
+        const usernameInput = formData.email.trim().toLowerCase();
+        
+        if (!usernameInput.includes('@') || usernameInput.startsWith('prof_')) {
+          // System generates 'prof_...' for teachers. Authenticate primarily via Firestore for cross-device support
+          
+          let matchingTeacher = null;
+          
+          try {
+            // First try with Firestore
+            const q = query(collection(firestoreDb, 'teachers'), where('username', '==', usernameInput));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              const doc = querySnapshot.docs[0];
+              matchingTeacher = { id: doc.id, ...doc.data() };
+              
+              // Cache it locally so subsequent offline lookups work 
+              const { db: localDb } = await import('../db/db');
+              if (matchingTeacher) {
+                await localDb.teachers?.put(matchingTeacher);
+              }
+            } else {
+               // Fallback: Check local Dexie DB in case we are fully offline
+               const { db: localDb } = await import('../db/db');
+               const allTeachers = await localDb.teachers?.toArray() || [];
+               matchingTeacher = allTeachers.find((t: any) => t.username?.toLowerCase() === usernameInput);
+            }
+          } catch (err) {
+             console.log("Firestore error or offline, falling back to local DB", err);
+             // Fallback: Check local Dexie DB
+             const { db: localDb } = await import('../db/db');
+             const allTeachers = await localDb.teachers?.toArray() || [];
+             matchingTeacher = allTeachers.find((t: any) => t.username?.toLowerCase() === usernameInput);
+          }
+          
+          if (matchingTeacher && matchingTeacher.password?.trim() === formData.password.trim()) {
+             const teacher = matchingTeacher;
+             
+             // Sign out of previous Firebase session if any to avoid administrator/teacher session conflicts
+             try {
+               await signOut();
+             } catch (signOutErr) {
+               console.warn("Could not sign out of previous Firebase session:", signOutErr);
+             }
+
+             localStorage.setItem('activeTeacherId', teacher.id);
+             // Also store the merchant ID in case it's needed globally
+             const mId = teacher.merchantId || teacher.merchant_id;
+             if (mId) {
+               localStorage.setItem('merchantId', mId);
+             }
+             navigate('/merchant/saas');
+             return;
+          } else {
+             throw new Error("Identifiant ou Code PIN incorrect.");
+          }
+        }
+
         await signInWithEmail(formData.email, formData.password);
         navigate(targetUrl);
       } else {
@@ -220,16 +280,16 @@ const Login = () => {
           </AnimatePresence>
 
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Email</label>
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Email / Identifiant</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input 
-                type="email" 
+                type="text" 
                 name="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="votre@email.com"
+                placeholder="votre@email.com ou prof_..."
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" 
               />
             </div>

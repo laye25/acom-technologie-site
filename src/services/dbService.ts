@@ -21,6 +21,7 @@ import { projectRepository } from '../data/repositories/project.repository';
 import { vehicleRepository } from '../data/repositories/vehicle.repository';
 import { employeeRepository } from '../data/repositories/employee.repository';
 import { studentRepository } from '../data/repositories/student.repository';
+import { teacherRepository } from '../data/repositories/teacher.repository';
 import { patientRepository } from '../data/repositories/patient.repository';
 import { appointmentRepository } from '../data/repositories/appointment.repository';
 import { designRepository } from '../data/repositories/design.repository';
@@ -894,6 +895,28 @@ export const dbService = {
     async delete(id: string) {
       await studentRepository.delete(id);
       await db.students.delete(id);
+    }
+  },
+  teachers: {
+    async save(teacher: any) {
+      const user = auth.currentUser;
+      const data = {
+        ...teacher,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
+      let id = teacher.id;
+      if (teacher.id) {
+        await teacherRepository.update(teacher.id, data);
+      } else {
+        id = await teacherRepository.create(data as any);
+      }
+      await db.teachers.put({ ...data, id, updatedAt: new Date() } as any);
+      return id;
+    },
+    async delete(id: string) {
+      await teacherRepository.delete(id);
+      await db.teachers.delete(id);
     }
   },
   patients: {

@@ -35,10 +35,21 @@ export class StudioAcomDB extends Dexie {
   studio_acom_products!: Table<any>;
   variants!: Table<any>;
   design_requests!: Table<any>;
+  teachers!: Table<any>;
+  classes!: Table<any>;
+  subjects!: Table<any>;
+  grades!: Table<any>;
+  parents!: Table<any>;
+  attendance!: Table<any>;
+  communications!: Table<any>;
+  ai_insights!: Table<any>;
+  schedules!: Table<any>;
+  homeworks!: Table<any>;
+  discipline_records!: Table<any>;
 
   constructor() {
     super('StudioAcomDB');
-    this.version(14).stores({
+    this.version(18).stores({
       categories: 'id, merchantId, name, syncStatus',
       products: 'id, merchantId, name, category, updatedAt, syncStatus',
       sales: 'id, merchantId, createdAt, syncStatus',
@@ -71,7 +82,18 @@ export class StudioAcomDB extends Dexie {
       studio_acom_categories: 'id, name',
       studio_acom_products: 'id, categoryId, name',
       variants: 'id, productId, name',
-      design_requests: 'id, userId, createdAt'
+      design_requests: 'id, userId, createdAt',
+      teachers: 'id, merchantId, username, updatedAt',
+      classes: 'id, merchantId, updatedAt',
+      subjects: 'id, merchantId, updatedAt',
+      grades: 'id, merchantId, studentId, subjectId, teacherId, classId, syncStatus, updatedAt',
+      parents: 'id, merchantId, studentId, updatedAt',
+      attendance: 'id, merchantId, studentId, classId, date, status, syncStatus, updatedAt',
+      communications: 'id, merchantId, targetAudience, date, syncStatus, updatedAt',
+      ai_insights: 'id, merchantId, studentId, type, date, syncStatus, updatedAt',
+      schedules: 'id, merchantId, classId, dayOfWeek, syncStatus, updatedAt',
+      homeworks: 'id, merchantId, classId, subjectId, dueDate, syncStatus, updatedAt',
+      discipline_records: 'id, merchantId, studentId, type, date, syncStatus, updatedAt'
     });
   }
 }

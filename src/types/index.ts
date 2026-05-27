@@ -522,6 +522,8 @@ export interface Merchant {
   phone?: string;
   email?: string;
   currency: string;
+  academicPeriods?: string[];
+  academicPeriodType?: 'trimestriel' | 'semestriel' | 'bimestriel' | 'custom';
   createdAt: any;
   updatedAt: any;
 }
