@@ -49,7 +49,7 @@ export class StudioAcomDB extends Dexie {
 
   constructor() {
     super('StudioAcomDB');
-    this.version(18).stores({
+    this.version(19).stores({
       categories: 'id, merchantId, name, syncStatus',
       products: 'id, merchantId, name, category, updatedAt, syncStatus',
       sales: 'id, merchantId, createdAt, syncStatus',
@@ -87,7 +87,7 @@ export class StudioAcomDB extends Dexie {
       classes: 'id, merchantId, updatedAt',
       subjects: 'id, merchantId, updatedAt',
       grades: 'id, merchantId, studentId, subjectId, teacherId, classId, syncStatus, updatedAt',
-      parents: 'id, merchantId, studentId, updatedAt',
+      parents: 'id, merchantId, studentId, phone, updatedAt',
       attendance: 'id, merchantId, studentId, classId, date, status, syncStatus, updatedAt',
       communications: 'id, merchantId, targetAudience, date, syncStatus, updatedAt',
       ai_insights: 'id, merchantId, studentId, type, date, syncStatus, updatedAt',

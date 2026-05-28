@@ -135,59 +135,140 @@ const Login = () => {
       if (isLogin) {
         const usernameInput = formData.email.trim().toLowerCase();
         
-        if (!usernameInput.includes('@') || usernameInput.startsWith('prof_')) {
-          // System generates 'prof_...' for teachers. Authenticate primarily via Firestore for cross-device support
+        if (!usernameInput.includes('@') || usernameInput.startsWith('prof_') || usernameInput.startsWith('e_') || usernameInput.startsWith('p_') || /^\+?[0-9\s-]+$/.test(usernameInput)) {
+          // Check Teacher, Parent, or Student logins first since they don't use standard email authentication
           
           let matchingTeacher = null;
+          let matchingParent = null;
+          let matchingStudent = null;
           
           try {
-            // First try with Firestore
-            const q = query(collection(firestoreDb, 'teachers'), where('username', '==', usernameInput));
-            const querySnapshot = await getDocs(q);
+            const { db: localDb } = await import('../db/db');
             
-            if (!querySnapshot.empty) {
-              const doc = querySnapshot.docs[0];
-              matchingTeacher = { id: doc.id, ...doc.data() };
-              
-              // Cache it locally so subsequent offline lookups work 
-              const { db: localDb } = await import('../db/db');
-              if (matchingTeacher) {
-                await localDb.teachers?.put(matchingTeacher);
+            // 1. Try to find teacher
+            if (usernameInput.startsWith('prof_') || !usernameInput.startsWith('e_') && !usernameInput.startsWith('p_') && !/^\+?[0-9\s-]+$/.test(usernameInput)) {
+              try {
+                const q = query(collection(firestoreDb, 'teachers'), where('username', '==', usernameInput));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                  const doc = querySnapshot.docs[0];
+                  matchingTeacher = { id: doc.id, ...doc.data() };
+                  await localDb.teachers?.put(matchingTeacher);
+                } else {
+                  const allTeachers = await localDb.teachers?.toArray() || [];
+                  matchingTeacher = allTeachers.find((t: any) => t.username?.toLowerCase() === usernameInput);
+                }
+              } catch (err) {
+                const allTeachers = await localDb.teachers?.toArray() || [];
+                matchingTeacher = allTeachers.find((t: any) => t.username?.toLowerCase() === usernameInput);
               }
-            } else {
-               // Fallback: Check local Dexie DB in case we are fully offline
-               const { db: localDb } = await import('../db/db');
-               const allTeachers = await localDb.teachers?.toArray() || [];
-               matchingTeacher = allTeachers.find((t: any) => t.username?.toLowerCase() === usernameInput);
             }
+            
+            // 2. Try to find parent
+            if (!matchingTeacher) {
+              try {
+                const q1 = query(collection(firestoreDb, 'parents'), where('username', '==', usernameInput));
+                const snap1 = await getDocs(q1);
+                if (!snap1.empty) {
+                  const doc = snap1.docs[0];
+                  matchingParent = { id: doc.id, ...doc.data() };
+                  await localDb.parents?.put(matchingParent);
+                } else {
+                  const q2 = query(collection(firestoreDb, 'parents'), where('phone', '==', usernameInput));
+                  const snap2 = await getDocs(q2);
+                  if (!snap2.empty) {
+                    const doc = snap2.docs[0];
+                    matchingParent = { id: doc.id, ...doc.data() };
+                    await localDb.parents?.put(matchingParent);
+                  } else {
+                    const cleanInput = usernameInput.replace(/[^0-9]/g, '');
+                    if (cleanInput.length > 5) {
+                      const q3 = query(collection(firestoreDb, 'parents'), where('phone', '==', cleanInput));
+                      const snap3 = await getDocs(q3);
+                      if (!snap3.empty) {
+                        const doc = snap3.docs[0];
+                        matchingParent = { id: doc.id, ...doc.data() };
+                        await localDb.parents?.put(matchingParent);
+                      }
+                    }
+                  }
+                }
+              } catch (err) {
+                console.warn("Firestore parent check error, falling back locally:", err);
+              }
+
+              if (!matchingParent) {
+                const allParents = await localDb.parents?.toArray() || [];
+                const cleanInput = usernameInput.replace(/[^0-9]/g, '');
+                matchingParent = allParents.find((p: any) => {
+                  const cleanPhone = (p.phone || '').replace(/[^0-9]/g, '');
+                  return (p.username?.toLowerCase() === usernameInput) || (cleanPhone && cleanPhone === cleanInput && cleanInput.length > 5);
+                });
+              }
+            }
+            
+            // 3. Try to find student
+            if (!matchingTeacher && !matchingParent) {
+              try {
+                const q1 = query(collection(firestoreDb, 'students'), where('studentUsername', '==', usernameInput));
+                const snap1 = await getDocs(q1);
+                if (!snap1.empty) {
+                  const doc = snap1.docs[0];
+                  matchingStudent = { id: doc.id, ...doc.data() };
+                  await localDb.students?.put(matchingStudent);
+                } else {
+                  const q2 = query(collection(firestoreDb, 'students'), where('username', '==', usernameInput));
+                  const snap2 = await getDocs(q2);
+                  if (!snap2.empty) {
+                    const doc = snap2.docs[0];
+                    matchingStudent = { id: doc.id, ...doc.data() };
+                    await localDb.students?.put(matchingStudent);
+                  }
+                }
+              } catch (err) {
+                console.warn("Firestore student check error, falling back locally:", err);
+              }
+
+              if (!matchingStudent) {
+                const allStudents = await localDb.students?.toArray() || [];
+                matchingStudent = allStudents.find((s: any) => 
+                  (s.studentUsername?.toLowerCase() === usernameInput) || 
+                  (s.username?.toLowerCase() === usernameInput)
+                );
+              }
+            }
+            
           } catch (err) {
-             console.log("Firestore error or offline, falling back to local DB", err);
-             // Fallback: Check local Dexie DB
-             const { db: localDb } = await import('../db/db');
-             const allTeachers = await localDb.teachers?.toArray() || [];
-             matchingTeacher = allTeachers.find((t: any) => t.username?.toLowerCase() === usernameInput);
+            console.error("Local database retrieval error:", err);
           }
           
-          if (matchingTeacher && matchingTeacher.password?.trim() === formData.password.trim()) {
-             const teacher = matchingTeacher;
-             
-             // Sign out of previous Firebase session if any to avoid administrator/teacher session conflicts
-             try {
-               await signOut();
-             } catch (signOutErr) {
-               console.warn("Could not sign out of previous Firebase session:", signOutErr);
-             }
+          // Sign out of potential previous session to avoid security token overlap
+          try {
+            await signOut();
+          } catch (signOutErr) {
+            console.warn("Sign out err:", signOutErr);
+          }
 
-             localStorage.setItem('activeTeacherId', teacher.id);
-             // Also store the merchant ID in case it's needed globally
-             const mId = teacher.merchantId || teacher.merchant_id;
-             if (mId) {
-               localStorage.setItem('merchantId', mId);
-             }
-             navigate('/merchant/saas');
-             return;
+          if (matchingTeacher && matchingTeacher.password?.trim() === formData.password.trim()) {
+            localStorage.setItem('activeTeacherId', matchingTeacher.id);
+            const mId = matchingTeacher.merchantId || matchingTeacher.merchant_id;
+            if (mId) localStorage.setItem('merchantId', mId);
+            navigate('/merchant/saas');
+            return;
+          } else if (matchingParent && (matchingParent.password?.trim() === formData.password.trim() || (matchingParent as any).pin?.trim() === formData.password.trim())) {
+            localStorage.setItem('activeParentId', matchingParent.phone || matchingParent.id);
+            const mId = matchingParent.merchantId || matchingParent.merchant_id;
+            if (mId) localStorage.setItem('merchantId', mId);
+            navigate('/merchant/saas');
+            return;
+          } else if (matchingStudent && (matchingStudent.studentPassword?.trim() === formData.password.trim() || matchingStudent.password?.trim() === formData.password.trim())) {
+            localStorage.setItem('activeStudentId', matchingStudent.id);
+            const mId = matchingStudent.merchantId || matchingStudent.merchant_id;
+            if (mId) localStorage.setItem('merchantId', mId);
+            navigate('/merchant/saas');
+            return;
           } else {
-             throw new Error("Identifiant ou Code PIN incorrect.");
+            throw new Error("Identifiant ou Code PIN incorrect.");
           }
         }
 

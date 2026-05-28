@@ -8,6 +8,7 @@ import { syncService } from '../services/syncService';
 import { geminiService } from '../services/geminiService';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ParentPortalSimulation } from '../components/ParentPortalSimulation';
+import { StudentPortalSimulation } from '../components/StudentPortalSimulation';
 import { Merchant, MerchantProduct, MerchantSale, MerchantQuote, MerchantQuoteItem, MerchantExpense, MerchantSupplier, MerchantPlan } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -52,6 +53,7 @@ import { PaymentForm } from '../components/PaymentForm';
 import { LogOut } from 'lucide-react';
 import { ScheduleManager } from '../components/admin/ScheduleManager';
 import { SchoolScheduleManager } from '../components/admin/SchoolScheduleManager';
+import { StudentPortalsManager } from '../components/admin/StudentPortalsManager';
 
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
@@ -1423,7 +1425,11 @@ const MerchantSaaS = () => {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loggedTeacherProfile, setLoggedTeacherProfile] = useState<any>(null);
+  const [loggedParentProfile, setLoggedParentProfile] = useState<any>(null);
+  const [loggedStudentProfile, setLoggedStudentProfile] = useState<any>(null);
   const activeTeacherId = typeof window !== 'undefined' ? localStorage.getItem('activeTeacherId') : null;
+  const activeParentId = typeof window !== 'undefined' ? localStorage.getItem('activeParentId') : null;
+  const activeStudentId = typeof window !== 'undefined' ? localStorage.getItem('activeStudentId') : null;
   
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -1487,14 +1493,94 @@ const MerchantSaaS = () => {
   useEffect(() => {
     const fetchMerchant = async () => {
       const activeTeacherId = localStorage.getItem('activeTeacherId');
-      if (!user && !activeTeacherId) return;
+      const activeParentId = localStorage.getItem('activeParentId');
+      const activeStudentId = localStorage.getItem('activeStudentId');
+      if (!user && !activeTeacherId && !activeParentId && !activeStudentId) return;
       try {
         setLoadingMerchant(true);
         setError(null);
         
         let finalMerchant = null;
 
-        if (activeTeacherId) {
+        if (activeStudentId) {
+          // Student Login active session
+          const student = await db.students?.where('id').equals(activeStudentId).first();
+          if (student) {
+            setLoggedStudentProfile({
+              id: student.id,
+              name: `${student.firstName || ''} ${student.lastName || ''}`,
+              firstName: student.firstName || '',
+              lastName: student.lastName || '',
+              phone: student.phone || '',
+              studentUsername: student.studentUsername || student.username || '',
+              studentPassword: student.studentPassword || student.password || '',
+              student: student
+            });
+            const mId = student.merchantId || student.merchant_id;
+            if (mId) {
+              const mLocal = await db.merchants.filter((m: any) => m.id === mId).first();
+              finalMerchant = mLocal;
+            }
+          }
+        } else if (activeParentId) {
+          // Parent Login active session
+          const allStudents = await db.students?.toArray() || [];
+          const matchingStudents = allStudents.filter((student: any) => {
+            const parentChoice = student.primaryParentContact || 'father';
+            let resolvedPhone = '';
+            if (parentChoice === 'father') {
+              resolvedPhone = student.fatherPhone;
+            } else if (parentChoice === 'mother') {
+              resolvedPhone = student.motherPhone;
+            } else {
+              resolvedPhone = student.guardianPhone || student.parentContact || '';
+            }
+            const phone = resolvedPhone || student.parentContact || '';
+            const key = phone.replace(/[^0-9+A-Za-z]/g, '');
+            return key === activeParentId || phone === activeParentId;
+          });
+
+          if (matchingStudents.length > 0) {
+            const exemplar = matchingStudents[0];
+            const parentChoice = exemplar.primaryParentContact || 'father';
+            let parentName = '';
+            if (parentChoice === 'father') parentName = exemplar.fatherName || `Père de ${exemplar.firstName}`;
+            else if (parentChoice === 'mother') parentName = exemplar.motherName || `Mère de ${exemplar.firstName}`;
+            else parentName = exemplar.guardianName || `Tuteur de ${exemplar.firstName}`;
+
+            const parts = parentName.trim().split(' ');
+            
+            // Look up in db.parents for customized PIN/username
+            let customUsername = activeParentId;
+            let customPassword = '';
+            const dbParent = await db.parents?.where('phone').equals(exemplar.fatherPhone || exemplar.motherPhone || exemplar.guardianPhone || exemplar.parentContact || '').first();
+            if (dbParent) {
+              customUsername = dbParent.username || activeParentId;
+              customPassword = dbParent.password || dbParent.pin || '';
+            }
+
+            const parentObj = {
+              id: activeParentId,
+              name: parentName,
+              firstName: parts[0] || '?',
+              lastName: parts.slice(1).join(' ') || '',
+              phone: exemplar.parentContact || exemplar.fatherPhone || exemplar.motherPhone || exemplar.guardianPhone || activeParentId,
+              username: customUsername,
+              password: customPassword,
+              studentsAmount: matchingStudents.length,
+              childrenNames: matchingStudents.map(s => `${s.firstName || s.name} ${s.lastName || ''}`),
+              children: matchingStudents
+            };
+
+            setLoggedParentProfile(parentObj);
+            
+            const mId = exemplar.merchantId || exemplar.merchant_id;
+            if (mId) {
+              let mLocal = await db.merchants.filter((m: any) => m.id === mId).first();
+              finalMerchant = mLocal;
+            }
+          }
+        } else if (activeTeacherId) {
           // It's a teacher login
           let teacher = await db.teachers?.where('id').equals(activeTeacherId).first();
           if (!teacher) {
@@ -1568,7 +1654,7 @@ const MerchantSaaS = () => {
       }
     };
     fetchMerchant();
-  }, [user, activeTeacherId]);
+  }, [user, activeTeacherId, activeParentId, activeStudentId]);
 
   const isCloudSyncEnabled = merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM';
   
@@ -1637,6 +1723,7 @@ const MerchantSaaS = () => {
           { id: 'schedule', label: 'Emploi du Temps', icon: Calendar, group: 'Administration Scolaire' },
           { id: 'grades', label: 'Portail Enseignant', icon: PenTool, group: 'Administration Scolaire' },
           { id: 'parents', label: 'Portail Parents', icon: Users, group: 'Administration Scolaire' },
+          { id: 'student-portals', label: 'Portails Élèves', icon: Key, group: 'Administration Scolaire' },
           { id: 'attendance', label: 'Présences', icon: ClipboardCheck, group: 'Administration Scolaire' },
           { id: 'communication', label: 'Communication', icon: MessageSquare, group: 'Administration Scolaire' },
           { id: 'ai', label: 'A.I. Éducation', icon: Zap, group: 'Administration Scolaire' },
@@ -1712,6 +1799,34 @@ const MerchantSaaS = () => {
       <TeacherDashboardWrapper 
         teacher={loggedTeacherProfile} 
         merchant={merchant || { id: loggedTeacherProfile.merchantId || loggedTeacherProfile.merchant_id || 'fallback-id', name: 'ACOM Éducation', type: 'scolaire', plan: 'STANDARD' }} 
+      />
+    );
+  }
+
+  if (loggedParentProfile) {
+    return (
+      <ParentPortalSimulation 
+        parent={loggedParentProfile} 
+        merchant={merchant || { id: 'fallback-id', name: 'ACOM Éducation', type: 'scolaire', plan: 'STANDARD' }} 
+        onClose={() => {
+          localStorage.removeItem('activeParentId');
+          localStorage.removeItem('merchantId');
+          window.location.href = '/login';
+        }}
+      />
+    );
+  }
+
+  if (loggedStudentProfile) {
+    return (
+      <StudentPortalSimulation 
+        student={loggedStudentProfile} 
+        merchant={merchant || { id: 'fallback-id', name: 'ACOM Éducation', type: 'scolaire', plan: 'STANDARD' }} 
+        onClose={() => {
+          localStorage.removeItem('activeStudentId');
+          localStorage.removeItem('merchantId');
+          window.location.href = '/login';
+        }}
       />
     );
   }
@@ -1851,6 +1966,7 @@ const MerchantSaaS = () => {
           {activeTab === 'schedule' && <SchoolScheduleManager key="schedule" merchantId={merchant.id} />}
           {activeTab === 'grades' && <TeacherGradePortal key="grades" merchant={merchant} />}
           {activeTab === 'parents' && <ParentsManager key="parents" merchant={merchant} />}
+          {activeTab === 'student-portals' && <StudentPortalsManager key="student-portals" merchant={merchant} />}
           {activeTab === 'attendance' && <AttendanceManager key="attendance" merchant={merchant} />}
           {activeTab === 'communication' && <CommunicationManager key="communication" merchant={merchant} />}
           {activeTab === 'ai' && <AIEducationManager key="ai" merchant={merchant} />}
@@ -3189,7 +3305,7 @@ Message d'origine: "${currentTxt}"`;
                 }}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider shadow-lg cursor-pointer shrink-0 transition-all flex items-center gap-2"
               >
-                <CheckCircle2 className="w-4 h-4" />
+                <CheckCircle className="w-4 h-4" />
                 <span>Valider tout comme Envoyé</span>
               </button>
             </div>
@@ -13381,9 +13497,38 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
   const [selectedEmailParent, setSelectedEmailParent] = useState<any>(null);
   const [emailSending, setEmailSending] = useState(false);
   const [customEmailBody, setCustomEmailBody] = useState('');
+  const [editingParent, setEditingParent] = useState<any>(null);
+  const [parentUsername, setParentUsername] = useState('');
+  const [parentPassword, setParentPassword] = useState('');
+
+  const handleSaveParentEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingParent) return;
+    try {
+      await dbService.parents.save({
+        id: editingParent.id,
+        merchantId: merchant.id,
+        phone: editingParent.phone,
+        name: editingParent.name,
+        username: parentUsername,
+        password: parentPassword,
+        updatedAt: new Date().toISOString()
+      });
+      // Trigger a success toast
+      toast.success("Identifiants de l'Espace Parent mis à jour !");
+      setEditingParent(null);
+    } catch (err) {
+      console.error("Error saving parent credentials:", err);
+      toast.error("Erreur lors de la mise à jour des identifiants");
+    }
+  };
   
   const students = useLiveQuery(() => 
     db.students?.where('merchantId').equals(merchant.id || '').toArray()
+  , [merchant.id]) || [];
+
+  const dbParents = useLiveQuery(() => 
+    db.parents?.where('merchantId').equals(merchant.id || '').toArray()
   , [merchant.id]) || [];
 
   const parents = React.useMemo(() => {
@@ -13418,7 +13563,9 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
             phone: phone,
             studentsAmount: 0,
             childrenNames: [],
-            children: []
+            children: [],
+            username: '',
+            password: ''
           });
         }
         parentMap.get(key).studentsAmount += 1;
@@ -13427,8 +13574,33 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
       }
     });
 
-    return Array.from(parentMap.values()).sort((a: any, b: any) => b.studentsAmount - a.studentsAmount);
-  }, [students]);
+    const list = Array.from(parentMap.values());
+    list.forEach((p: any) => {
+      const dbRecord = dbParents.find((dbP: any) => dbP.phone === p.phone || dbP.id === p.id);
+      if (dbRecord) {
+        p.username = dbRecord.username || p.id;
+        p.password = dbRecord.password || dbRecord.pin || p.password;
+      } else {
+        // Auto-generate credentials for Espace Parent if not existing
+        const genUsername = p.phone.replace(/[^0-9]/g, '') || p.id;
+        const genPassword = Math.floor(100000 + Math.random() * 900000).toString();
+        p.username = genUsername;
+        p.password = genPassword;
+        // background save
+        dbService.parents.save({
+          id: p.id,
+          merchantId: merchant.id,
+          phone: p.phone,
+          name: p.name,
+          username: genUsername,
+          password: genPassword,
+          updatedAt: new Date().toISOString()
+        }).catch(err => console.error("Error auto-configuring parent CL:", err));
+      }
+    });
+
+    return list.sort((a: any, b: any) => b.studentsAmount - a.studentsAmount);
+  }, [students, dbParents, merchant.id]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -13474,7 +13646,7 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                   <th className="px-8 py-5">Parent / Tuteur (Auto-Détecté)</th>
                   <th className="px-8 py-5">Contact</th>
                   <th className="px-8 py-5">Enfants Associés</th>
-                  <th className="px-8 py-5 text-right">Actions</th>
+                  <th className="px-8 py-5 text-right">Espace & Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -13486,7 +13658,11 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                           {p.firstName?.[0] || '?'}{p.lastName?.[0] || '?'}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-gray-900 text-sm">{p.name}</span>
+                          <span className="font-bold text-gray-900 text-sm leading-tight">{p.name}</span>
+                          <span className="text-[10px] text-gray-400 font-mono tracking-wider mt-1 flex items-center gap-1.5 flex-wrap">
+                            Identifiant: <span className="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{p.username}</span> 
+                            Code PIN: <span className="font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{p.password}</span>
+                          </span>
                         </div>
                       </div>
                     </td>
@@ -13497,13 +13673,14 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                         <span className="text-[10px] text-gray-400 font-medium">{p.childrenNames.join(', ')}</span>
                       </div>
                     </td>
-                    <td className="px-8 py-5 text-right space-x-2 flex justify-end">
-                      <div className="flex items-center gap-2">
+                    <td className="px-8 py-5 text-right space-x-2 flex justify-end items-center">
+                      <div className="flex items-center gap-1.5 mr-2">
                         <button 
                           onClick={() => {
                             const titleText = merchant.name || "ACOM Éducation";
-                            const pin = Math.floor(100000 + Math.random() * 900000).toString();
-                            const msg = `Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : *${p.id}*\n🔑 Code PIN : *${pin}*\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`;
+                            const pin = p.password || 'Non configuré';
+                            const identifiant = p.username || p.id;
+                            const msg = `Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : *${identifiant}*\n🔑 Code PIN : *${pin}*\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`;
                             const encoded = encodeURIComponent(msg);
                             const cleanPhone = p.phone ? p.phone.replace(/[^0-9+]/g, '') : '';
                             const target = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encoded}` : `https://web.whatsapp.com/send?text=${encoded}`;
@@ -13518,8 +13695,9 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                         <button 
                           onClick={() => {
                              const titleText = merchant.name || "ACOM Éducation";
-                             const pin = Math.floor(100000 + Math.random() * 900000).toString();
-                             setCustomEmailBody(`Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : *${p.id}*\n🔑 Code PIN : *${pin}*\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`);
+                             const pin = p.password || 'Non configuré';
+                             const identifiant = p.username || p.id;
+                             setCustomEmailBody(`Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : ${identifiant}\n🔑 Code PIN : ${pin}\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`);
                              setSelectedEmailParent(p);
                           }}
                           className="inline-flex p-2 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-xl text-[10px] items-center gap-1.5 border border-blue-200 cursor-pointer shadow-sm transition-colors"
@@ -13527,13 +13705,25 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                         >
                           <Mail className="w-3.5 h-3.5" />
                         </button>
+                        <button 
+                          onClick={() => {
+                            setEditingParent(p);
+                            setParentUsername(p.username);
+                            setParentPassword(p.password);
+                          }}
+                          className="p-2 bg-gray-50 hover:bg-gray-200 text-gray-600 rounded-xl transition-all border border-gray-100 cursor-pointer"
+                          title="Modifier les identifiants d'accès"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                       <button 
                         onClick={() => setSelectedParent(p)}
-                        className="inline-flex py-2 px-3 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors items-center gap-1.5 border border-indigo-200 cursor-pointer shadow-sm"
+                        className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold rounded-xl transition-all text-xs flex items-center justify-center gap-1 border border-indigo-200 shadow-sm"
+                        title="Accéder immédiatement à son Espace Parent"
                       >
-                        <LayoutDashboard className="w-3.5 h-3.5" />
-                        <span>Simuler</span>
+                        <span>Espace</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </td>
                   </tr>
@@ -13551,6 +13741,60 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
           onClose={() => setSelectedParent(null)} 
         />
       )}
+
+      {/* Edit Parent Credentials Dialog */}
+      <AnimatePresence>
+        {editingParent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.92 }} className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
+              <div className="p-6 bg-slate-50 border-b border-gray-100 flex justify-between items-center font-sans">
+                <div className="flex items-center gap-2">
+                  <Edit2 className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-lg font-bold text-gray-900">Modifier Accès Parent</h3>
+                </div>
+                <button onClick={() => setEditingParent(null)} className="text-gray-400 hover:text-gray-950"><X className="w-5 h-5" /></button>
+              </div>
+
+              <form onSubmit={handleSaveParentEdit} className="p-6 space-y-4 font-sans">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Parent / Tuteur</label>
+                  <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-gray-800 text-sm">
+                    {editingParent.name} ({editingParent.phone})
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Identifiant de connexion</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={parentUsername}
+                    onChange={e => setParentUsername(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-sans outline-none focus:ring-2 focus:ring-indigo-150"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Code PIN de sécurité</label>
+                  <input 
+                    type="text" 
+                    required
+                    maxLength={6}
+                    value={parentPassword}
+                    onChange={e => setParentPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-indigo-150"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4 border-t border-gray-100 font-sans">
+                  <button type="button" onClick={() => setEditingParent(null)} className="flex-1 py-2.5 text-xs border border-gray-200 rounded-xl font-bold text-gray-600 hover:bg-slate-50 transition-colors">Annuler</button>
+                  <button type="submit" className="flex-1 py-2.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all">Enregistrer</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {selectedEmailParent && (
@@ -13587,7 +13831,7 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                   <textarea
                     rows={8}
                     className="w-full px-4 py-3 bg-slate-50 border border-gray-200 text-gray-800 text-xs font-sans rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-150 outline-none resize-none"
-                    value={customEmailBody || `Bonjour,\n\nVous avez accès à l'espace parent pour suivre le parcours scolaire de votre enfant sur la plateforme ${merchant.name || 'ACOM Éducation'} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : ${selectedEmailParent.id}\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${merchant.name || 'ACOM Éducation'}`}
+                    value={customEmailBody || `Bonjour,\n\nVous avez accès à l'espace parent pour suivre le parcours scolaire de votre enfant sur la plateforme ${merchant.name || 'ACOM Éducation'} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : ${selectedEmailParent.username || selectedEmailParent.id}\n🔑 Code PIN : ${selectedEmailParent.password || 'Non configuré'}\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${merchant.name || 'ACOM Éducation'}`}
                     onChange={e => setCustomEmailBody(e.target.value)}
                   />
                 </div>
@@ -14524,6 +14768,12 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
   const allMerchantClasses = useLiveQuery(() => 
     db.classes?.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
+
+  const parentCredentials = useLiveQuery(async () => {
+    const parentPhone = student.fatherPhone || student.motherPhone || student.guardianPhone || student.parentContact || '';
+    if (!parentPhone) return null;
+    return await db.parents?.where('phone').equals(parentPhone).first();
+  }, [student]) || null;
 
   // Find class object corresponding to student's class
   const studentClassObj = React.useMemo(() => {
@@ -16779,6 +17029,99 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                     <div>
                       <span className="text-[10px] text-gray-400 font-black block uppercase tracking-widest mb-1">Téléphone de l'Élève</span>
                       <span className="font-bold text-gray-900">{student.phone || '---'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 1.5 : Accès Portaux (Élève & Parents) */}
+                <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-gray-150 shadow-sm space-y-6">
+                  <h3 className="font-black text-sm uppercase tracking-wider text-indigo-900 pb-3 border-b border-gray-100 flex items-center gap-2">
+                    <Key className="w-5 h-5 text-indigo-600" /> IDENTIFIANTS & ACCÈS PORTAILS (ÉLÈVE / PARENTS)
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Portail Élève Credentials */}
+                    <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
+                        <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Portail Élève</span>
+                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-150/50 px-2 py-0.5 rounded">Généré au dossier</span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Identifiant Élève</label>
+                          <div className="flex justify-between items-center bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs font-mono font-black">
+                            <span>{student.studentUsername || student.username || 'Non configuré'}</span>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(student.studentUsername || student.username || '');
+                                toast.success("Identifiant élève copié !");
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black uppercase tracking-wider shrink-0"
+                            >
+                              Copier
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Code PIN d'Accès</label>
+                          <div className="flex justify-between items-center bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs font-mono font-black">
+                            <span>{student.studentPassword || student.password || 'Non configuré'}</span>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(student.studentPassword || student.password || '');
+                                toast.success("Code PIN élève copié !");
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 text-[10px] font-black uppercase tracking-wider shrink-0"
+                            >
+                              Copier
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Portail Parent Credentials */}
+                    <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-emerald-100">
+                        <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">Portail Parents</span>
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100/50 px-2 py-0.5 rounded">Généré au dossier</span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Identifiant Parent (Téléphone ou Login)</label>
+                          <div className="flex justify-between items-center bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs font-mono font-black">
+                            <span>{parentCredentials?.username || student.parentContact || 'Non configuré'}</span>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(parentCredentials?.username || student.parentContact || '');
+                                toast.success("Identifiant parent copié !");
+                              }}
+                              className="text-emerald-700 hover:text-emerald-900 text-[10px] font-black uppercase tracking-wider shrink-0"
+                            >
+                              Copier
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase block mb-1">Code PIN d'Accès</label>
+                          <div className="flex justify-between items-center bg-white border border-gray-200 px-3 py-2 rounded-xl text-xs font-mono font-black">
+                            <span>{parentCredentials?.password || 'Non configuré'}</span>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(parentCredentials?.password || '');
+                                toast.success("Code PIN parent copié !");
+                              }}
+                              className="text-emerald-700 hover:text-emerald-900 text-[10px] font-black uppercase tracking-wider shrink-0"
+                            >
+                              Copier
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

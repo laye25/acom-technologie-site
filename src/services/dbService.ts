@@ -22,6 +22,7 @@ import { vehicleRepository } from '../data/repositories/vehicle.repository';
 import { employeeRepository } from '../data/repositories/employee.repository';
 import { studentRepository } from '../data/repositories/student.repository';
 import { teacherRepository } from '../data/repositories/teacher.repository';
+import { parentRepository } from '../data/repositories/parent.repository';
 import { patientRepository } from '../data/repositories/patient.repository';
 import { appointmentRepository } from '../data/repositories/appointment.repository';
 import { designRepository } from '../data/repositories/design.repository';
@@ -883,7 +884,70 @@ export const dbService = {
         owner_id: user?.uid,
         ownerId: user?.uid
       };
+      
       let id = student.id;
+      
+      // Automatic generation of portal credentials for Student and Parent
+      if (!student.id) {
+        // Generate Student Portal credentials
+        const cleanStudentName = (((student as any).firstName || '') + ((student as any).lastName || ''))
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, "");
+        const randSuffix = Math.floor(100 + Math.random() * 900);
+        const generatedStudentUsername = `e_${cleanStudentName || 'eleve'}${randSuffix}`;
+        const generatedStudentPassword = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        (data as any).studentUsername = generatedStudentUsername;
+        (data as any).studentPassword = generatedStudentPassword;
+        (data as any).username = generatedStudentUsername;
+        (data as any).password = generatedStudentPassword;
+
+        // Generate Parent Portal credentials
+        const parentChoice = (student as any).primaryParentContact || 'father';
+        let parentPhone = '';
+        let parentName = '';
+        if (parentChoice === 'father') {
+          parentPhone = (student as any).fatherPhone || (student as any).parentContact || '';
+          parentName = (student as any).fatherName || `Père de ${(student as any).firstName || ''}`;
+        } else if (parentChoice === 'mother') {
+          parentPhone = (student as any).motherPhone || (student as any).parentContact || '';
+          parentName = (student as any).motherName || `Mère de ${(student as any).firstName || ''}`;
+        } else {
+          parentPhone = (student as any).guardianPhone || (student as any).parentContact || '';
+          parentName = (student as any).guardianName || `Tuteur de ${(student as any).firstName || ''}`;
+        }
+
+        if (!parentPhone) {
+          parentPhone = (student as any).parentContact || (student as any).fatherPhone || (student as any).motherPhone || (student as any).guardianPhone || '';
+        }
+        
+        // Ensure parent name is fallback-friendly
+        const finalParentName = parentName || (student.lastName ? `Parent de ${(student as any).firstName || ''} ${student.lastName || ''}` : "Parent d'élève");
+
+        const cleanParentName = finalParentName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+        const sanitizedPhone = parentPhone.replace(/[^0-9]/g, '');
+        const generatedParentUsername = sanitizedPhone || `p_${cleanParentName || 'parent'}`;
+        const generatedParentPassword = Math.floor(100000 + Math.random() * 900000).toString();
+
+        if (parentPhone) {
+          const existingParent = await db.parents?.where('phone').equals(parentPhone).first();
+          if (!existingParent) {
+            const parentId = `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            await db.parents?.put({
+              id: parentId,
+              merchantId: student.merchantId || '',
+              phone: parentPhone,
+              name: finalParentName,
+              username: generatedParentUsername,
+              password: generatedParentPassword,
+              updatedAt: new Date().toISOString()
+            });
+          }
+        }
+      }
+
       if (student.id) {
         await studentRepository.update(student.id, data);
       } else {
@@ -917,6 +981,28 @@ export const dbService = {
     async delete(id: string) {
       await teacherRepository.delete(id);
       await db.teachers.delete(id);
+    }
+  },
+  parents: {
+    async save(parent: any) {
+      const user = auth.currentUser;
+      const data = {
+        ...parent,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
+      let id = parent.id;
+      if (parent.id) {
+        await parentRepository.update(parent.id, data);
+      } else {
+        id = await parentRepository.create(data as any);
+      }
+      await db.parents.put({ ...data, id, updatedAt: new Date() } as any);
+      return id;
+    },
+    async delete(id: string) {
+      await parentRepository.delete(id);
+      await db.parents.delete(id);
     }
   },
   patients: {

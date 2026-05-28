@@ -1,30 +1,23 @@
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import {
   X, LayoutDashboard, FileText, Calendar, 
-  Clock, BookOpen, CreditCard, Bell, 
-  ShieldAlert, ShieldCheck, Bus, Utensils,
-  LogOut, Download, AlertTriangle, CheckCircle2, ChevronRight, EyeOff
+  Clock, BookOpen, Bell, ShieldAlert,
+  LogOut, Download, AlertTriangle, CheckCircle2, ChevronRight, User, Key, Users, Share2, EyeOff
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
-export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: any, merchant: any, onClose: () => void }) => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedChild, setSelectedChild] = useState(parent?.children?.[0] || null);
+export const StudentPortalSimulation = ({ student, merchant, onClose }: { student: any, merchant: any, onClose: () => void }) => {
+  const [activeTab, setActiveTab ] = useState('dashboard');
   const [scheduleViewType, setScheduleViewType] = useState<'grid' | 'day' | 'flow'>('grid');
   const [selectedDay, setSelectedDay] = useState<string>(() => {
     const daysMap = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
     const dName = daysMap[new Date().getDay()];
     return dName === 'Dimanche' ? 'Lundi' : dName;
   });
-
-  const attendances = useLiveQuery(() => 
-    selectedChild ? db.attendance?.where('studentId').equals(selectedChild.id).reverse().sortBy('date') : []
-  , [selectedChild?.id]) || [];
-
-  const absences = attendances.filter(a => a.status === 'absent');
-  const lates = attendances.filter(a => a.status === 'late');
+  const studentData = student?.student || student;
 
   const studentClasses = useLiveQuery(() => 
     merchant?.id ? db.classes?.where('merchantId').equals(merchant.id).toArray() : []
@@ -34,35 +27,55 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
     merchant?.id ? db.schedules?.where('merchantId').equals(merchant.id).toArray() : []
   , [merchant?.id]) || [];
 
-  const selectedChildClass = useMemo(() => {
-    if (!selectedChild) return null;
-    const childClassId = selectedChild.classId;
-    const childGrade = selectedChild.grade || selectedChild.class;
-    return studentClasses.find((c: any) => c.id === childClassId || c.name === childGrade);
-  }, [studentClasses, selectedChild]);
+  const studentClassObj = useMemo(() => {
+    if (!studentData) return null;
+    return studentClasses.find((c: any) => c.id === studentData.classId || c.name === studentData.grade);
+  }, [studentClasses, studentData]);
 
   const classSchedules = useMemo(() => {
-    if (!selectedChild) return [];
-    const childClassId = selectedChild.classId;
-    const childGrade = selectedChild.grade || selectedChild.class;
+    if (!studentData?.classId && !studentData?.grade) return [];
     return schedules.filter((s: any) => {
-      const matchesClassId = childClassId && s.classId === childClassId;
+      const matchesClassId = studentData.classId && s.classId === studentData.classId;
       const matchedClass = studentClasses.find(c => c.id === s.classId);
-      const matchesClassName = matchedClass && matchedClass.name === childGrade;
+      const matchesClassName = matchedClass && matchedClass.name === studentData.grade;
       return matchesClassId || matchesClassName;
     });
-  }, [schedules, studentClasses, selectedChild]);
+  }, [schedules, studentClasses, studentData]);
+
+  const attendances = useLiveQuery(() => 
+    studentData?.id ? db.attendance?.where('studentId').equals(studentData.id).reverse().sortBy('date') : []
+  , [studentData?.id]) || [];
+
+  const homeworks = useLiveQuery(() => 
+    merchant?.id ? db.homeworks?.where('merchantId').equals(merchant.id).toArray() : []
+  , [merchant?.id]) || [];
+
+  const studentGrades = useLiveQuery(() => 
+    studentData?.id ? db.grades?.where('studentId').equals(studentData.id).toArray() : []
+  , [studentData?.id]) || [];
+
+  const parentCredentials = useLiveQuery(async () => {
+    const parentPhone = studentData?.fatherPhone || studentData?.motherPhone || studentData?.guardianPhone || studentData?.parentContact || '';
+    if (!parentPhone) return null;
+    return await db.parents?.where('phone').equals(parentPhone).first();
+  }, [studentData]) || null;
+
+  const absences = attendances.filter(a => a.status === 'absent');
+  const lates = attendances.filter(a => a.status === 'late');
 
   const tabs = [
-    { id: 'dashboard', label: 'Vue Générale', icon: LayoutDashboard },
-    { id: 'academics', label: 'Notes & Résultats', icon: FileText },
-    { id: 'attendance', label: 'Absences & Retards', icon: Clock },
+    { id: 'dashboard', label: 'Espace Accueil', icon: LayoutDashboard },
+    { id: 'academics', label: 'Mes Notes & Résultats', icon: FileText },
+    { id: 'attendance', label: 'Feuille d\'Absence', icon: Clock },
     { id: 'schedule', label: 'Emploi du Temps', icon: Calendar },
     { id: 'homework', label: 'Cahier de Texte', icon: BookOpen },
-    { id: 'finance', label: 'Scolarité & Paiements', icon: CreditCard },
-    { id: 'discipline', label: 'Vie Scolaire', icon: ShieldAlert },
-    { id: 'transport', label: 'Transport / Cantine', icon: Bus }
+    { id: 'parent-access', label: 'Accès Mes Parents', icon: Users }
   ];
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copié !`);
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -71,115 +84,89 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
           <div className="space-y-6 animate-fade-in">
             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black text-slate-800">Bulletins & Notes de {selectedChild?.name || 'l\'élève'}</h3>
+                <h3 className="text-xl font-black text-slate-800">Mon Relevé de Notes</h3>
                 <button className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors">
                   <Download className="w-4 h-4" />
-                  <span>Télécharger Bulletin</span>
+                  <span>Imprimer le Relevé</span>
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200/60">
-                  <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Mathématiques</span>
-                  <div className="flex items-end gap-3 mt-2">
-                    <span className="text-3xl font-black text-emerald-600">16.5</span>
-                    <span className="text-sm font-bold text-slate-500 pb-1">/ 20</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2 font-medium">Examen Semestriel - Excellents résultats</p>
+
+              {studentGrades.length === 0 ? (
+                <div className="text-center py-12 text-slate-400">
+                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-30 text-slate-500" />
+                  <p className="text-sm font-medium">Aucune note n'a encore été saisie pour ce trimestre.</p>
                 </div>
-                <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200/60">
-                  <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Français</span>
-                  <div className="flex items-end gap-3 mt-2">
-                    <span className="text-3xl font-black text-blue-600">14.0</span>
-                    <span className="text-sm font-bold text-slate-500 pb-1">/ 20</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2 font-medium">Devoir sur table - En progression</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {studentGrades.map((g: any, idx: number) => (
+                    <div key={g.id || idx} className="p-4 bg-slate-50 rounded-2xl border border-gray-200/60 flex justify-between items-center">
+                      <div>
+                        <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{g.subjectName || g.subjectId || 'Matière'}</span>
+                        <h4 className="font-bold text-slate-800 text-sm mt-0.5">{g.assessmentName || 'Évaluation'}</h4>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">{g.term || 'Trimestre 1'}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-end gap-1.5 justify-end">
+                          <span className="text-2xl font-black text-indigo-600">{Number(g.value).toFixed(1)}</span>
+                          <span className="text-xs font-bold text-slate-500 pb-1">/ 20</span>
+                        </div>
+                        <span className="text-[9px] font-bold uppercase py-0.5 px-2 bg-indigo-50 text-indigo-700 rounded">Coef: {g.coefficient || 2}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         );
-      case 'finance':
-        return (
-          <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-6 rounded-3xl text-white shadow-lg">
-                <span className="text-[10px] uppercase font-black tracking-widest text-indigo-200">Total à payer (Année)</span>
-                <div className="text-3xl font-black mt-2">850,000 <span className="text-lg opacity-80">{merchant?.currency || 'FCFA'}</span></div>
-              </div>
-              <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Déjà réglé</span>
-                <div className="text-3xl font-black text-emerald-600 mt-2">450,000 <span className="text-lg opacity-60 text-slate-400">{merchant?.currency || 'FCFA'}</span></div>
-              </div>
-              <div className="bg-rose-50 p-6 rounded-3xl border border-rose-100 shadow-sm">
-                <span className="text-[10px] uppercase font-black tracking-widest text-rose-500">Reste à payer</span>
-                <div className="text-3xl font-black text-rose-600 mt-2">400,000 <span className="text-lg opacity-60 text-rose-400">{merchant?.currency || 'FCFA'}</span></div>
-              </div>
-            </div>
-            
-            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-black text-slate-800 mb-6">Prochaine Échéance</h3>
-              <div className="p-5 bg-orange-50 border border-orange-100 rounded-2xl flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-orange-900">Mensualité de Février</h4>
-                  <p className="text-sm text-orange-700 mt-1">À régler avant le 05 Février</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-xl font-black text-orange-600">85,000 {merchant?.currency || 'FCFA'}</div>
-                  <button className="mt-2 px-6 py-2 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md transition-all">
-                    Payer via Mobile Money
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+
       case 'attendance':
-        const filteredAttendances = attendances.filter(a => a.status === 'absent' || a.status === 'late');
         return (
           <div className="space-y-6 animate-fade-in">
-             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-black text-slate-800 mb-6">Registre des Présences</h3>
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+              <h3 className="text-lg font-black text-slate-800 mb-6">Mon Registre de Présence</h3>
               <div className="space-y-3">
-                {filteredAttendances.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic text-center py-8">Aucune absence ou retard enregistré.</p>
+                {attendances.length === 0 ? (
+                  <p className="text-sm text-gray-500 italic text-center py-8">Assiduité parfaite ! Aucune absence ni retard enregistré.</p>
                 ) : (
-                  filteredAttendances.map(a => (
-                    <div key={a.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-gray-100">
+                  attendances.map((a: any, idx: number) => (
+                    <div key={a.id || idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-gray-100">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${a.status === 'absent' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>
                           {a.status === 'absent' ? <AlertTriangle className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-800 text-sm">{a.status === 'absent' ? 'Absence - Journée / Cours' : 'Retard'}</h4>
+                          <h4 className="font-bold text-slate-800 text-sm">{a.status === 'absent' ? 'Absence Signalée' : 'Retard Noté'}</h4>
                           <p className="text-xs text-slate-500 mt-0.5">Le {new Date(a.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                         </div>
                       </div>
-                      {a.status === 'absent' && (
-                        <button className="px-4 py-2 bg-white border border-gray-200 text-slate-600 rounded-xl text-xs font-bold shadow-sm hover:bg-gray-50">
-                          Justifier
-                        </button>
-                      )}
+                      <div className="text-right">
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${a.isJustified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {a.isJustified ? 'Justifié' : 'Injustified'}
+                        </span>
+                      </div>
                     </div>
                   ))
                 )}
               </div>
-             </div>
+            </div>
           </div>
         );
+
       case 'schedule':
         return (
           <div className="space-y-6 animate-fade-in">
             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                  <h3 className="text-lg font-black text-slate-800">Emploi du Temps de {selectedChild?.firstName || selectedChild?.name || 'l\'élève'}</h3>
+                  <h3 className="text-lg font-black text-slate-800">Mon Emploi du Temps</h3>
                   <p className="text-sm text-gray-500 font-medium mt-0.5">
-                    Classe : <strong className="text-indigo-600 font-extrabold">{selectedChild?.grade || selectedChild?.class || 'Non spécifiée'}</strong>
+                    Classe : <strong className="text-indigo-600 font-extrabold">{studentData?.grade || 'Non spécifiée'}</strong>
                   </p>
                 </div>
 
                 {/* Switcher pour le Type de Présentation Calendrier */}
-                {selectedChildClass?.schedulePublished && classSchedules.length > 0 && (
+                {studentClassObj?.schedulePublished && classSchedules.length > 0 && (
                   <div className="flex bg-slate-100 p-1 rounded-2xl border border-gray-150 inline-flex self-start">
                     <button 
                       onClick={() => setScheduleViewType('grid')}
@@ -202,18 +189,18 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
                   </div>
                 )}
               </div>
-
-              {!selectedChildClass?.schedulePublished ? (
-                <div className="text-center py-12 bg-amber-50/50 rounded-2xl border border-amber-200 text-amber-800 font-medium">
+              
+              {!studentClassObj?.schedulePublished ? (
+                <div className="text-center py-12 bg-amber-50/50 rounded-2xl border border-amber-200 text-amber-800">
                   <EyeOff className="w-12 h-12 mx-auto mb-3 text-amber-500 animate-pulse" />
                   <p className="text-sm font-bold text-amber-900">Emploi du temps non publié</p>
-                  <p className="text-xs text-amber-700 mt-1 max-w-md mx-auto">L'emploi du temps officiel de cette classe n'a pas encore été publié officiellement par l'administration ou est en cours d'élaboration.</p>
+                  <p className="text-xs text-amber-700 mt-1 max-w-md mx-auto">L'emploi du temps officiel de votre classe n'a pas encore été publié officiellement par l'administration ou est en cours d'élaboration.</p>
                 </div>
               ) : classSchedules.length === 0 ? (
-                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-gray-150 text-slate-400 font-medium">
+                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-gray-150 text-slate-400">
                   <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30 text-indigo-500" />
-                  <p className="text-sm font-bold text-slate-700">Aucun emploi du temps officiel n'est disponible ou n'a encore été défini pour cette classe.</p>
-                  <p className="text-xs text-slate-500 mt-1">L'administration scolaire est chargée de programmer l'emploi du temps.</p>
+                  <p className="text-sm font-bold text-slate-700">Aucun emploi du temps officiel n'est disponible ou n'a encore été défini pour la classe {studentData?.grade || 'de l\'élève'}.</p>
+                  <p className="text-xs text-slate-500 mt-1">Veuillez contacter l'administration de l'établissement pour la programmation horologique.</p>
                 </div>
               ) : (
                 <div>
@@ -225,7 +212,7 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
                       
                       const getSubjectSubColor = (n: string) => {
                         const k = (n || '').toLowerCase();
-                        if (k.includes('math')) return 'bg-emerald-50 text-emerald-850 border-emerald-250';
+                        if (k.includes('math')) return 'bg-emerald-50 text-emerald-800 border-emerald-250';
                         if (k.includes('fran') || k.includes('lettre')) return 'bg-blue-50 text-blue-800 border-blue-200';
                         if (k.includes('phys') || k.includes('chim')) return 'bg-amber-50 text-amber-850 border-amber-200';
                         if (k.includes('svt') || k.includes('sci')) return 'bg-teal-50 text-teal-800 border-teal-200';
@@ -251,7 +238,7 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
                             <p className="text-[9px] font-black text-rose-600 uppercase mt-2 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-lg text-center">❌ Cours Annulé</p>
                           ) : isReplaced ? (
                             <div className="mt-2 space-y-0.5 bg-purple-50/50 border border-purple-100 p-1.5 rounded-xl">
-                              <p className="text-[8px] font-black text-purple-700 uppercase tracking-wider text-center flex items-center justify-center gap-0.5">🔄 Enseignant Remplaçant</p>
+                              <p className="text-[8px] font-black text-purple-700 uppercase tracking-wider text-center flex items-center justify-center gap-0.5">🔄 Remplaçant Assigné</p>
                               <p className="text-[10px] text-purple-900 font-black text-center mt-0.5">{s.replacementTeacherName || 'M. Diop'}</p>
                             </div>
                           ) : (
@@ -383,6 +370,104 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
             </div>
           </div>
         );
+
+      case 'homework':
+        const validHomeworks = homeworks.filter((h: any) => h.grade === studentData.grade || h.classId === studentData.classId);
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+              <h3 className="text-lg font-black text-slate-800 mb-6">Mon Cahier de Texte</h3>
+              
+              {validHomeworks.length === 0 ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-150">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Mathématiques</span>
+                      <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">Pour Demain</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">Faire les exercices d'application 4 et 5 du chapitre de trigonométrie.</p>
+                  </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-150">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-purple-500">Français</span>
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Pour Vendredi</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">Terminer la lecture de l'œuvre au programme et rédiger une synthèse de l'acte III.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {validHomeworks.map((h: any, idx: number) => (
+                    <div key={h.id || idx} className="p-4 bg-slate-50 rounded-2xl border border-indigo-100">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">{h.subjectName || 'Général'}</span>
+                        <span className="text-xs text-rose-500 font-bold">À rendre pour le: {new Date(h.dueDate).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-sm mb-1">{h.title}</h4>
+                      <p className="text-slate-600 text-xs leading-relaxed">{h.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'parent-access':
+        const parentPhone = studentData?.fatherPhone || studentData?.motherPhone || studentData?.guardianPhone || studentData?.parentContact || 'Non renseigné';
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm max-w-2xl">
+              <h3 className="text-xl font-black text-slate-800 mb-2 flex items-center gap-2">
+                <Users className="w-6 h-6 text-indigo-600" />
+                Accès de mes Parents
+              </h3>
+              <p className="text-slate-500 text-xs leading-relaxed mb-6">
+                Chaque élève possède son propre accès tuteur associé. Partagez ces clés de connexion avec vos parents pour qu'ils se connectent à leur espace de suivi dédié.
+              </p>
+
+              <div className="p-5 bg-gradient-to-br from-indigo-50 to-indigo-100/50 border border-indigo-100 rounded-2xl space-y-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase font-black text-slate-400">Nom du Parent</span>
+                  <p className="font-black text-slate-800 text-sm">{studentData?.fatherName || studentData?.motherName || studentData?.guardianName || "Tuteur Académique"}</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white p-3 rounded-xl border border-indigo-50">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Identifiant Tuteur</span>
+                    <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg font-mono text-xs font-black">
+                      <span className="truncate">{parentCredentials?.username || parentPhone.replace(/[^0-9]/g, '') || parentPhone}</span>
+                      <button onClick={() => handleCopy(parentCredentials?.username || parentPhone.replace(/[^0-9]/g, '') || parentPhone, "Identifiant")} className="text-indigo-600 hover:text-indigo-800 text-[10px] uppercase font-bold tracking-wider shrink-0 ml-2">Copier</button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-indigo-50">
+                    <span className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Code PIN d'Accès</span>
+                    <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg font-mono text-xs font-black">
+                      <span>{parentCredentials?.password || "Aucun configuré"}</span>
+                      {parentCredentials?.password && (
+                        <button onClick={() => handleCopy(parentCredentials.password, "Code PIN")} className="text-indigo-600 hover:text-indigo-800 text-[10px] uppercase font-bold tracking-wider shrink-0 ml-2">Copier</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => {
+                    const id = parentCredentials?.username || parentPhone.replace(/[^0-9]/g, '') || parentPhone;
+                    const pin = parentCredentials?.password || "---";
+                    const shareText = `Bonjour parent de ${studentData.firstName}. Voici tes codes de connexion pour suivre mon dossier scolaire sur le Portail Parents : \nIdentifiant: ${id}\nCode PIN: ${pin}\nLien: ${window.location.origin}/login`;
+                    handleCopy(shareText, "Message de partage");
+                  }} 
+                  className="w-full py-3 bg-indigo-600 hover:bg-slate-950 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer">
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Préparer le partage WhatsApp de mes Parents</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'dashboard':
       default:
         return (
@@ -391,71 +476,62 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                 <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center"><FileText className="w-6 h-6" /></div>
                 <div>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Moyenne Générale</p>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Ma Moyenne Générale</p>
                   <p className="text-2xl font-black text-slate-800">-- <span className="text-sm font-bold text-slate-400">/ 20</span></p>
                 </div>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                 <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center"><AlertTriangle className="w-6 h-6" /></div>
                 <div>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Absences & Retards</p>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Mes Absences/Retards</p>
                   <p className="text-2xl font-black text-slate-800">{absences.length + lates.length} <span className="text-sm font-bold text-slate-400">fiches</span></p>
                 </div>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center"><CreditCard className="w-6 h-6" /></div>
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center"><BookOpen className="w-6 h-6" /></div>
                 <div>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Scolarité</p>
-                  <p className="text-sm font-black text-emerald-600 mt-1">À jour</p>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Cahier de Texte</p>
+                  <p className="text-2xl font-black text-slate-800">{homeworks.length || 2} <span className="text-sm font-bold text-slate-400">tâches</span></p>
                 </div>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center"><CheckCircle2 className="w-6 h-6" /></div>
                 <div>
-                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Discipline</p>
-                  <p className="text-sm font-black text-slate-800 mt-1">Exemplaire</p>
+                  <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Conduite/Discipline</p>
+                  <p className="text-sm font-black text-slate-800 mt-1">Excellente</p>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Bell className="w-5 h-5 text-indigo-500" /> Notifications Récentes</h3>
+                <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Bell className="w-5 h-5 text-indigo-500" /> Notifications & Infos Établissement</h3>
                 <div className="space-y-4">
                   <div className="flex gap-3 items-start border-b border-gray-50 pb-4">
                     <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5" />
                     <div>
-                      <p className="text-sm font-bold text-slate-800">Bulletin du 1er Trimestre disponible</p>
-                      <p className="text-xs text-slate-500 mt-1">Le bulletin de {selectedChild?.name || 'l\'élève'} a été publié par l'administration.</p>
-                      <button className="mt-2 text-[10px] font-black uppercase text-indigo-600 hover:text-indigo-800 tracking-widest flex items-center gap-1">Télécharger PDF <ChevronRight className="w-3 h-3" /></button>
+                      <p className="text-sm font-bold text-slate-800">Bienvenue sur ton Espace Portail Élève</p>
+                      <p className="text-xs text-slate-500 mt-1">Accède à tes notes, cahier de texte et absences en temps réel. Partage tes codes tuteurs en cliquant sur "Accès Mes Parents".</p>
                     </div>
                   </div>
                   <div className="flex gap-3 items-start border-b border-gray-50 pb-4">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5" />
                     <div>
-                      <p className="text-sm font-bold text-slate-800">Avis de Réunion Parents-Professeurs</p>
-                      <p className="text-xs text-slate-500 mt-1">La réunion du 2ème trimestre est prévue le 15 Février à 14h00.</p>
+                      <p className="text-sm font-bold text-slate-800">Cahier de texte à jour</p>
+                      <p className="text-xs text-slate-500 mt-1">Consulte tes devoirs réguliers affectés par tes professeurs.</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><BookOpen className="w-5 h-5 text-purple-500" /> Cahier de Texte (Aujourd'hui)</h3>
-                <div className="space-y-3">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-100">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mathématiques</span>
-                      <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-md">Pour Demain</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">Faire les exercices 12 et 13 page 45.</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-100">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Histoire-Géo</span>
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Pour Lundi</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">Apprendre la leçon sur la Révolution Industrielle.</p>
+                <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Key className="w-5 h-5 text-indigo-500" /> Vos Clés de Connexion</h3>
+                <div className="space-y-4 text-xs">
+                  <p className="text-slate-500">Conservez précieusement ces identifiants pour vos prochains accès scolaires depuis n'importe quel écran :</p>
+                  <div className="p-4 bg-slate-50 rounded-xl space-y-2 border border-gray-150">
+                    <div className="flex justify-between items-center"><span className="font-bold text-slate-500">Type de Compte :</span> <strong className="text-slate-800 uppercase text-[10px] bg-slate-200 px-2 rounded">Élève</strong></div>
+                    <div className="flex justify-between items-center"><span className="font-bold text-slate-500">Identifiant Unique :</span> <strong className="text-indigo-600 font-mono mt-0.5">{studentData?.studentUsername || studentData?.username || 'Inconnu'}</strong></div>
+                    <div className="flex justify-between items-center"><span className="font-bold text-slate-500">Code PIN :</span> <strong className="text-slate-900 font-mono mt-0.5">{studentData?.studentPassword || studentData?.password || '---'}</strong></div>
                   </div>
                 </div>
               </div>
@@ -474,15 +550,12 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
         className="w-full h-full bg-slate-50 flex flex-col md:flex-row relative shadow-2xl"
       >
-        <div className="w-full md:w-80 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
-          <div className="p-6 border-b border-gray-100 bg-indigo-900 text-white relative overflow-hidden shrink-0">
-            <div className="absolute right-0 top-0 opacity-10 translate-x-4 -translate-y-4">
-              <ShieldCheck className="w-32 h-32" />
-            </div>
+        <div className="w-full md:w-80 bg-slate-950 border-r border-slate-800 flex flex-col h-full shrink-0 text-white">
+          <div className="p-6 border-b border-slate-800 bg-indigo-950 text-white relative overflow-hidden shrink-0">
             <div className="relative z-10 flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-black tracking-tight">Portail Parents</h2>
-                <p className="text-xs font-medium text-indigo-200">{merchant?.businessName || 'Établissement'}</p>
+                <h2 className="text-xl font-black tracking-tight">Portail Élèves</h2>
+                <p className="text-xs font-medium text-indigo-200">{merchant?.businessName || 'Espace Élève'}</p>
               </div>
               <button onClick={onClose} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
                 <X className="w-5 h-5" />
@@ -490,43 +563,16 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
             </div>
 
             <div className="bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/10 shrink-0">
-              <p className="text-[9px] uppercase tracking-widest font-black text-indigo-200 mb-2">Compte Connecté</p>
+              <p className="text-[9px] uppercase tracking-widest font-black text-indigo-300 mb-2">Mon Profil Scolaire</p>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center font-black text-white shadow-inner">
-                  {parent?.name?.charAt(0) || '?'}
+                  {studentData?.firstName?.charAt(0) || '?'}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-sm truncate">{parent?.name || 'Tuteur'}</p>
-                  <p className="text-xs text-indigo-200 truncate">{parent?.phone || 'Téléphone non renseigné'}</p>
+                  <p className="font-bold text-sm truncate">{studentData?.firstName} {studentData?.lastName}</p>
+                  <p className="text-xs text-indigo-200 truncate">Classe: {studentData?.grade || 'Non assigné'}</p>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className="p-4 border-b border-gray-100 shrink-0">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Dossier Élève</label>
-            <div className="space-y-2">
-              {parent?.children?.map((child: any, idx: number) => (
-                <button
-                  key={child.id || idx}
-                  onClick={() => setSelectedChild(child)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                    selectedChild?.id === child.id || (!selectedChild?.id && idx === 0)
-                      ? 'bg-indigo-50 border border-indigo-100 text-indigo-700 shadow-sm' 
-                      : 'bg-white border border-gray-100 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
-                    selectedChild?.id === child.id || (!selectedChild?.id && idx === 0) ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'
-                  }`}>
-                    {(child.name || child.firstName || '?').charAt(0)}
-                  </div>
-                  <div className="text-left min-w-0">
-                    <p className="font-bold text-sm leading-tight truncate">{child.name || `${child.firstName} ${child.lastName}`}</p>
-                    <p className="text-[10px] font-mono font-bold opacity-70 truncate">Classe: {child.class || 'Non assigné'}</p>
-                  </div>
-                </button>
-              ))}
             </div>
           </div>
 
@@ -538,19 +584,19 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
                   activeTab === tab.id 
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' 
-                    : 'text-slate-600 hover:bg-slate-100'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
                 }`}
               >
-                <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-white' : 'text-slate-400'}`} />
+                <tab.icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-white' : 'text-slate-500'}`} />
                 {tab.label}
               </button>
             ))}
           </div>
 
-          <div className="p-4 border-t border-gray-100 shrink-0">
-            <button onClick={onClose} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-bold transition-colors text-slate-600">
+          <div className="p-4 border-t border-slate-900 shrink-0">
+            <button onClick={onClose} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 hover:bg-rose-950 hover:text-rose-400 rounded-xl text-sm font-bold transition-colors text-slate-400">
               <LogOut className="w-4 h-4" />
-              <span>Quitter le simulateur</span>
+              <span>Se déconnecter</span>
             </button>
           </div>
         </div>
