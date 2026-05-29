@@ -12527,6 +12527,11 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentTeacher, setCurrentTeacher] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
+  // States for search and filtering
+  const [teachersSearchQuery, setTeachersSearchQuery] = useState('');
+  const [teachersSelectedSubject, setTeachersSelectedSubject] = useState('Tous');
+  const [teachersSelectedClass, setTeachersSelectedClass] = useState('Tous');
+
   // Teacher portal states
   const [activeTeacherView, setActiveTeacherView] = useState<any>(null);
   const [selectedEmailTeacher, setSelectedEmailTeacher] = useState<any>(null);
@@ -12548,6 +12553,52 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
   const storedGrades = useLiveQuery(() => 
     db.grades?.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
+
+  // Compute unique classes and subjects dynamically from teachers list
+  const uniqueSubjects = useMemo(() => {
+    const subjects = new Set<string>();
+    teachers.forEach((t: any) => {
+      if (t.subject) subjects.add(t.subject);
+    });
+    return ['Tous', ...Array.from(subjects).sort()];
+  }, [teachers]);
+
+  const uniqueClassesFromTeachers = useMemo(() => {
+    const classNames = new Set<string>();
+    teachers.forEach((t: any) => {
+      if (t.className) classNames.add(t.className);
+    });
+    return ['Tous', ...Array.from(classNames).sort()];
+  }, [teachers]);
+
+  const filteredTeachers = useMemo(() => {
+    return teachers.filter((t: any) => {
+      const q = teachersSearchQuery.trim().toLowerCase();
+      const fName = (t.firstName || '').toLowerCase();
+      const lName = (t.lastName || '').toLowerCase();
+      const full = `${fName} ${lName}`;
+      const reversedFull = `${lName} ${fName}`;
+      const subject = (t.subject || '').toLowerCase();
+      const className = (t.className || '').toLowerCase();
+      const phone = (t.phone || '').toLowerCase();
+      const email = (t.email || '').toLowerCase();
+
+      const matchesSearch = !q ||
+        fName.includes(q) ||
+        lName.includes(q) ||
+        full.includes(q) ||
+        reversedFull.includes(q) ||
+        subject.includes(q) ||
+        className.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q);
+
+      const matchesSubject = teachersSelectedSubject === 'Tous' || t.subject === teachersSelectedSubject;
+      const matchesClass = teachersSelectedClass === 'Tous' || t.className === teachersSelectedClass;
+
+      return matchesSearch && matchesSubject && matchesClass;
+    });
+  }, [teachers, teachersSearchQuery, teachersSelectedSubject, teachersSelectedClass]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -12600,7 +12651,13 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 animate-fade-in">
         <div>
           <h2 className="text-2xl font-bold text-ink">Gestion des Enseignants</h2>
-          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Effectif: {teachers.length.toString().padStart(3, '0')}</p>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">
+            {filteredTeachers.length !== teachers.length ? (
+              <span>Affichés : {filteredTeachers.length} / {teachers.length} enseignants</span>
+            ) : (
+              <span>Effectif: {teachers.length.toString().padStart(3, '0')}</span>
+            )}
+          </p>
         </div>
         <button 
           id="add-new-teacher-btn"
@@ -12613,6 +12670,83 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
           <Plus className="w-4 h-4" />
           <span>Nouvel Enseignant</span>
         </button>
+      </div>
+
+      {/* Dynamic Search & Filtering Toolbar */}
+      <div className="bg-slate-50 border border-black/5 p-4 rounded-3xl gap-4 flex flex-col md:flex-row items-stretch md:items-center justify-between shadow-sm">
+        {/* Search Field */}
+        <div className="relative flex-grow max-w-full md:max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par nom, matière, téléphone..."
+            value={teachersSearchQuery}
+            onChange={(e) => setTeachersSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-2xl text-xs font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          />
+          {teachersSearchQuery && (
+            <button
+              onClick={() => setTeachersSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black hover:scale-110 transition-transform"
+              title="Effacer la recherche"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Subject Filter */}
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Matière :</span>
+            <select
+              value={teachersSelectedSubject}
+              onChange={(e) => setTeachersSelectedSubject(e.target.value)}
+              className="text-xs font-extrabold text-slate-700 bg-transparent focus:outline-none pr-1 cursor-pointer"
+            >
+              {uniqueSubjects.map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject === 'Tous' ? 'Toutes les matières' : subject}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Class Filter */}
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+            <Filter className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Classe :</span>
+            <select
+              value={teachersSelectedClass}
+              onChange={(e) => setTeachersSelectedClass(e.target.value)}
+              className="text-xs font-extrabold text-slate-700 bg-transparent focus:outline-none pr-1 cursor-pointer"
+            >
+              {uniqueClassesFromTeachers.map((className) => (
+                <option key={className} value={className}>
+                  {className === 'Tous' ? 'Toutes' : className}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reset button */}
+          {(teachersSelectedSubject !== 'Tous' || teachersSelectedClass !== 'Tous' || teachersSearchQuery) && (
+            <button
+              onClick={() => {
+                setTeachersSearchQuery('');
+                setTeachersSelectedSubject('Tous');
+                setTeachersSelectedClass('Tous');
+              }}
+              className="px-3 py-2 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm"
+              title="Réinitialiser tous les filtres"
+            >
+              <X className="w-3 h-3" />
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
@@ -12629,7 +12763,28 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {teachers.map((t: any) => (
+              {filteredTeachers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-8 py-16 text-center text-gray-400 font-medium">
+                    <div className="flex flex-col items-center justify-center space-y-3">
+                      <Search className="w-8 h-8 text-gray-300 animate-pulse" />
+                      <p className="text-sm font-bold text-gray-650">Aucun enseignant ne correspond à vos critères de recherche.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTeachersSearchQuery('');
+                          setTeachersSelectedSubject('Tous');
+                          setTeachersSelectedClass('Tous');
+                        }}
+                        className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black uppercase tracking-wider text-[10px] rounded-xl transition-all"
+                      >
+                        Effacer les filtres
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredTeachers.map((t: any) => (
                 <tr key={t.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="px-8 py-5">
                     <div className="flex items-center space-x-4">
@@ -12717,7 +12872,7 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
@@ -13057,6 +13212,10 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
   const [currentClass, setCurrentClass] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
+  // States for search and filtering
+  const [classSearchQuery, setClassSearchQuery] = useState('');
+  const [classSelectedLevel, setClassSelectedLevel] = useState('Tous');
+
   const [isManualLevel, setIsManualLevel] = useState(false);
   const [isManualName, setIsManualName] = useState(false);
 
@@ -13079,6 +13238,41 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
   const classes = useLiveQuery(() => 
     db.classes?.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
   , [merchant.id]) || [];
+
+  // Compute unique levels directly from classes
+  const uniqueLevels = useMemo(() => {
+    const levels = new Set<string>();
+    classes.forEach((c: any) => {
+      if (c.level) levels.add(c.level);
+    });
+    return ['Tous', ...Array.from(levels).sort()];
+  }, [classes]);
+
+  const filteredClasses = useMemo(() => {
+    return classes.filter((c: any) => {
+      const q = classSearchQuery.trim().toLowerCase();
+      const name = (c.name || '').toLowerCase();
+      const level = (c.level || '').toLowerCase();
+      const tutor = (c.tutor || '').toLowerCase();
+      
+      // Concat subjects names to search in them
+      const subjectsStr = (c.subjects || []).map((s: any) => {
+        if (typeof s === 'string') return s;
+        if (s && typeof s === 'object') return s.name || s.subject || '';
+        return '';
+      }).join(' ').toLowerCase();
+
+      const matchesSearch = !q ||
+        name.includes(q) ||
+        level.includes(q) ||
+        tutor.includes(q) ||
+        subjectsStr.includes(q);
+
+      const matchesLevel = classSelectedLevel === 'Tous' || c.level === classSelectedLevel;
+
+      return matchesSearch && matchesLevel;
+    });
+  }, [classes, classSearchQuery, classSelectedLevel]);
 
   const getSmartDefaultCoef = (subName: string, grade: string) => {
     const s = subName.toLowerCase();
@@ -13131,41 +13325,119 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {classes.map((c: any) => (
-          <div key={c.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
-             <button onClick={() => { setCurrentClass(c); setIsEditing(true); }} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity bg-gray-50 rounded-xl"><Edit2 className="w-4 h-4" /></button>
-             <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-4 border border-amber-100">
-               <BookOpen className="w-6 h-6" />
-             </div>
-             <div className="text-xs text-amber-500 font-bold uppercase tracking-widest mb-1">{c.level || 'Niveau'}</div>
-             <h3 className="text-xl font-black text-gray-900 leading-tight mb-4">{c.name}</h3>
-             
-             <div className="flex items-center justify-between text-sm text-gray-500 bg-gray-50 p-3 rounded-xl mb-4">
-               <div className="flex items-center gap-2"><Users className="w-4 h-4" /> Capacité</div>
-               <span className="font-mono font-bold text-gray-900">{c.capacity} places</span>
-             </div>
+      {/* Dynamic Search & Filtering Toolbar */}
+      <div className="bg-slate-50 border border-black/5 p-4 rounded-3xl gap-4 flex flex-col md:flex-row items-stretch md:items-center justify-between shadow-sm">
+        {/* Search Field */}
+        <div className="relative flex-grow max-w-full md:max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par classe, tuteur, matière..."
+            value={classSearchQuery}
+            onChange={(e) => setClassSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-2xl text-xs font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          />
+          {classSearchQuery && (
+            <button
+              onClick={() => setClassSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black hover:scale-110 transition-transform"
+              title="Effacer la recherche"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
-             {/* Affichage intelligent des matières affectées à la classe */}
-             <div className="border-t border-gray-100/80 pt-4">
-               <div className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2 flex justify-between items-center">
-                 <span>Matières ({c.subjects?.length || 0})</span>
-               </div>
-               {c.subjects && c.subjects.length > 0 ? (
-                 <div className="flex flex-wrap gap-1.5 max-h-[84px] overflow-y-auto pr-1">
-                   {c.subjects.map((sub: string, index: number) => (
-                     <span key={index} className="inline-flex items-center bg-indigo-50/70 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-indigo-100/50">
-                       {sub}
-                     </span>
-                   ))}
-                 </div>
-               ) : (
-                 <p className="text-[11px] text-gray-400 italic">Aucune matière affectée. Veuillez en ajouter.</p>
-               )}
-             </div>
+        {/* Filter Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Level Filter */}
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Niveau :</span>
+            <select
+              value={classSelectedLevel}
+              onChange={(e) => setClassSelectedLevel(e.target.value)}
+              className="text-xs font-extrabold text-slate-700 bg-transparent focus:outline-none pr-1 cursor-pointer"
+            >
+              {uniqueLevels.map((lvl) => (
+                <option key={lvl} value={lvl}>
+                  {lvl === 'Tous' ? 'Tous les niveaux' : lvl}
+                </option>
+              ))}
+            </select>
           </div>
-        ))}
+
+          {/* Reset button */}
+          {(classSelectedLevel !== 'Tous' || classSearchQuery) && (
+            <button
+              onClick={() => {
+                setClassSearchQuery('');
+                setClassSelectedLevel('Tous');
+              }}
+              className="px-3 py-2 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm"
+              title="Réinitialiser tous les filtres"
+            >
+              <X className="w-3 h-3" />
+              Reset
+            </button>
+          )}
+        </div>
       </div>
+
+      {filteredClasses.length === 0 ? (
+        <div className="bg-white rounded-[2rem] border border-black/5 p-16 text-center text-gray-400 font-medium">
+          <div className="flex flex-col items-center justify-center space-y-3 p-4">
+            <BookOpen className="w-10 h-10 text-gray-300 animate-pulse" />
+            <p className="text-sm font-bold text-gray-650">Aucune classe ne correspond à vos critères de recherche.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setClassSearchQuery('');
+                setClassSelectedLevel('Tous');
+              }}
+              className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black uppercase tracking-wider text-[10px] rounded-xl transition-all shadow-sm"
+            >
+              Effacer les filtres
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredClasses.map((c: any) => (
+            <div key={c.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
+               <button onClick={() => { setCurrentClass(c); setIsEditing(true); }} className="absolute top-4 right-4 p-2 text-gray-400 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity bg-gray-50 rounded-xl"><Edit2 className="w-4 h-4" /></button>
+               <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-4 border border-amber-100">
+                 <BookOpen className="w-6 h-6" />
+               </div>
+               <div className="text-xs text-amber-500 font-bold uppercase tracking-widest mb-1">{c.level || 'Niveau'}</div>
+               <h3 className="text-xl font-black text-gray-900 leading-tight mb-4">{c.name}</h3>
+               
+               <div className="flex items-center justify-between text-sm text-gray-500 bg-gray-50 p-3 rounded-xl mb-4">
+                 <div className="flex items-center gap-2"><Users className="w-4 h-4" /> Capacité</div>
+                 <span className="font-mono font-bold text-gray-900">{c.capacity} places</span>
+               </div>
+  
+               {/* Affichage intelligent des matières affectées à la classe */}
+               <div className="border-t border-gray-100/80 pt-4">
+                 <div className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2 flex justify-between items-center">
+                   <span>Matières ({c.subjects?.length || 0})</span>
+                 </div>
+                 {c.subjects && c.subjects.length > 0 ? (
+                   <div className="flex flex-wrap gap-1.5 max-h-[84px] overflow-y-auto pr-1">
+                     {c.subjects.map((sub: string, index: number) => (
+                       <span key={index} className="inline-flex items-center bg-indigo-50/70 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-indigo-100/50">
+                         {sub}
+                       </span>
+                     ))}
+                   </div>
+                 ) : (
+                   <p className="text-[11px] text-gray-400 italic">Aucune matière affectée. Veuillez en ajouter.</p>
+                 )}
+               </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <AnimatePresence>
         {isEditing && (
@@ -19740,11 +20012,63 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
   const [studentLimit, setStudentLimit] = useState(10);
   const [showAcademicRecord, setShowAcademicRecord] = useState<any>(null);
 
+  // States for search and filters
+  const [studentsSearchQuery, setStudentsSearchQuery] = useState('');
+  const [studentsSelectedGrade, setStudentsSelectedGrade] = useState('Tous');
+  const [studentsSelectedStatus, setStudentsSelectedStatus] = useState('Tous');
+
   const students = useLiveQuery(() => 
     db.students.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
   , [merchant.id]) || [];
 
   const loading = false;
+
+  // Extract unique classes dynamically
+  const uniqueClassGrades = useMemo(() => {
+    const grades = new Set<string>();
+    students.forEach((s: any) => {
+      if (s.grade) {
+        grades.add(s.grade);
+      }
+    });
+    return ['Tous', ...Array.from(grades).sort()];
+  }, [students]);
+
+  // Combined search and filter logic
+  const filteredStudents = useMemo(() => {
+    return students.filter((s: any) => {
+      // 1. Search Query filter (matches first name, last name, matricule, parent contact, parents names)
+      const q = studentsSearchQuery.trim().toLowerCase();
+      const fName = (s.firstName || '').toLowerCase();
+      const lName = (s.lastName || '').toLowerCase();
+      const full = `${fName} ${lName}`;
+      const reversedFull = `${lName} ${fName}`;
+      const mat = (s.matricule || '').toLowerCase();
+      const contact = (s.parentContact || '').toLowerCase();
+      const father = (s.fatherName || '').toLowerCase();
+      const mother = (s.motherName || '').toLowerCase();
+      const guardian = (s.guardianName || '').toLowerCase();
+
+      const matchesSearch = !q || 
+        fName.includes(q) || 
+        lName.includes(q) || 
+        full.includes(q) ||
+        reversedFull.includes(q) ||
+        mat.includes(q) || 
+        contact.includes(q) ||
+        father.includes(q) ||
+        mother.includes(q) ||
+        guardian.includes(q);
+
+      // 2. Class / Grade filter
+      const matchesGrade = studentsSelectedGrade === 'Tous' || s.grade === studentsSelectedGrade;
+
+      // 3. Status filter ('active' or 'inactive')
+      const matchesStatus = studentsSelectedStatus === 'Tous' || s.status === studentsSelectedStatus;
+
+      return matchesSearch && matchesGrade && matchesStatus;
+    });
+  }, [students, studentsSearchQuery, studentsSelectedGrade, studentsSelectedStatus]);
 
   const handleSave = async (updatedStudent: any) => {
     setSaving(true);
@@ -19767,7 +20091,13 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-ink">Gestion des Étudiants</h2>
-          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Effectif: {students.length.toString().padStart(3, '0')}</p>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">
+            {filteredStudents.length !== students.length ? (
+              <span>Affichés : {filteredStudents.length} / {students.length} inscrits</span>
+            ) : (
+              <span>Effectif total : {students.length.toString().padStart(3, '0')}</span>
+            )}
+          </p>
         </div>
         <button 
           onClick={() => {
@@ -19781,68 +20111,165 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
         </button>
       </div>
 
+      {/* Dynamic Search & Filtering Toolbar */}
+      <div className="bg-slate-50 border border-slate-150 p-4 rounded-3xl gap-4 flex flex-col md:flex-row items-stretch md:items-center justify-between shadow-sm">
+        {/* Search Field */}
+        <div className="relative flex-grow max-w-full md:max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par nom, matricule, parent..."
+            value={studentsSearchQuery}
+            onChange={(e) => setStudentsSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-2xl text-xs font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
+          />
+          {studentsSearchQuery && (
+            <button
+              onClick={() => setStudentsSearchQuery('')}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black hover:scale-110 transition-transform"
+              title="Effacer la recherche"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Class / Grade filter selection */}
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-black uppercase text-gray-400">Niveau :</span>
+            <select
+              value={studentsSelectedGrade}
+              onChange={(e) => setStudentsSelectedGrade(e.target.value)}
+              className="text-xs font-extrabold text-slate-700 bg-transparent focus:outline-none pr-1 cursor-pointer"
+            >
+              {uniqueClassGrades.map((grade) => (
+                <option key={grade} value={grade}>
+                  {grade === 'Tous' ? 'Tous les niveaux' : grade}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Registration Status filter selection */}
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+            <Filter className="w-3.5 h-3.5 text-gray-400" />
+            <span className="text-[10px] font-black uppercase text-gray-400">Statut :</span>
+            <select
+              value={studentsSelectedStatus}
+              onChange={(e) => setStudentsSelectedStatus(e.target.value)}
+              className="text-xs font-extrabold text-slate-700 bg-transparent focus:outline-none pr-1 cursor-pointer"
+            >
+              <option value="Tous">Tous les statuts</option>
+              <option value="active">Actif (Inscrit)</option>
+              <option value="inactive">Inactif</option>
+            </select>
+          </div>
+
+          {/* Clear Filters Indicator Button */}
+          {(studentsSelectedGrade !== 'Tous' || studentsSelectedStatus !== 'Tous' || studentsSearchQuery) && (
+            <button
+              onClick={() => {
+                setStudentsSearchQuery('');
+                setStudentsSelectedGrade('Tous');
+                setStudentsSelectedStatus('Tous');
+              }}
+              className="px-3.5 py-2 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm"
+              title="Réinitialiser tous les filtres"
+            >
+              <X className="w-3.5 h-3.5" />
+              Réinitialiser
+            </button>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
         <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                  <th className="px-8 py-5">Étudiant</th>
-                  <th className="px-8 py-5">Classe / Niveau</th>
-                  <th className="px-8 py-5">Contact Parent</th>
-                  <th className="px-8 py-5">Statut</th>
-                  <th className="px-8 py-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {students.slice(0, studentLimit).map((s: any) => (
-                  <tr key={s.id} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black text-sm border border-blue-100 group-hover:scale-110 transition-transform">
-                          {s.firstName[0]}{s.lastName[0]}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-gray-900 text-sm leading-tight">{s.firstName} {s.lastName}</span>
-                          <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">MAT: {s.matricule || s.id?.substring(0, 8)}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[9px] font-black rounded-full uppercase tracking-widest border border-gray-200">
-                        {s.grade}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex items-center text-[10px] font-black text-ink">
-                        <Phone className="w-3 h-3 mr-2 opacity-40 text-primary" /> 
-                        {s.parentContact || '---'}
-                      </div>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                        s.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-400 border-gray-200'
-                      }`}>
-                        {s.status === 'active' ? 'INSCRIT' : 'INACTIF'}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button onClick={() => setShowAcademicRecord(s)} title="Dossier Académique" className="p-2.5 hover:bg-indigo-50 text-indigo-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-indigo-100">
-                          <FileText className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => { setCurrentStudent(s); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+            {filteredStudents.length === 0 ? (
+              <div className="py-16 text-center bg-slate-50/50 flex flex-col items-center justify-center p-6 border-b border-gray-100">
+                <span className="text-3xl mb-3">🔍</span>
+                <p className="font-extrabold text-slate-700 text-sm">Aucun étudiant trouvé</p>
+                <p className="text-xs text-gray-450 mt-1 max-w-sm">
+                  Essayez d'ajuster votre recherche ou filtrez par une autre classe ou un autre statut pour trouver le profil recherché.
+                </p>
+                {(studentsSelectedGrade !== 'Tous' || studentsSelectedStatus !== 'Tous' || studentsSearchQuery) && (
+                  <button
+                    onClick={() => {
+                      setStudentsSearchQuery('');
+                      setStudentsSelectedGrade('Tous');
+                      setStudentsSelectedStatus('Tous');
+                    }}
+                    className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-colors shadow-sm"
+                  >
+                    Effacer les filtres et recommencer
+                  </button>
+                )}
+              </div>
+            ) : (
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                    <th className="px-8 py-5">Étudiant</th>
+                    <th className="px-8 py-5">Classe / Niveau</th>
+                    <th className="px-8 py-5">Contact Parent</th>
+                    <th className="px-8 py-5">Statut</th>
+                    <th className="px-8 py-5 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {students.length > studentLimit && (
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredStudents.slice(0, studentLimit).map((s: any) => (
+                    <tr key={s.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="px-8 py-5">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black text-sm border border-blue-100 group-hover:scale-110 transition-transform">
+                            {(s.firstName || '?')[0]}{(s.lastName || '?')[0]}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900 text-sm leading-tight">{s.firstName || ''} {s.lastName || ''}</span>
+                            <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">MAT: {s.matricule || s.id?.substring(0, 8)}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[9px] font-black rounded-full uppercase tracking-widest border border-gray-200">
+                          {s.grade || 'Non spécifié'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5">
+                        <div className="flex items-center text-[10px] font-black text-ink">
+                          <Phone className="w-3 h-3 mr-2 opacity-40 text-primary" /> 
+                          {s.parentContact || '---'}
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                          s.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-400 border-gray-200'
+                        }`}>
+                          {s.status === 'active' ? 'INSCRIT' : 'INACTIF'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <button onClick={() => setShowAcademicRecord(s)} title="Dossier Académique" className="p-2.5 hover:bg-indigo-50 text-indigo-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-indigo-100">
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => { setCurrentStudent(s); setIsEditing(true); }} className="p-2.5 hover:bg-primary/10 text-primary rounded-xl opacity-0 group-hover:opacity-100 transition-all border border-transparent hover:border-primary/20">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {filteredStudents.length > studentLimit && (
               <div className="p-4 flex justify-center border-t border-gray-100">
                 <button 
                   onClick={() => setStudentLimit(prev => prev + 10)}
