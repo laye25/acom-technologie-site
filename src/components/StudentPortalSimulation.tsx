@@ -19,26 +19,81 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
   });
   const studentData = student?.student || student;
 
+  const resolvedMerchantId = useMemo(() => {
+    return merchant?.id && merchant.id !== 'fallback-id' 
+      ? merchant.id 
+      : (studentData?.merchantId || studentData?.merchant_id || localStorage.getItem('merchantId') || '');
+  }, [merchant, studentData]);
+
+  // Proactive Sync on Portal Session load
+  React.useEffect(() => {
+    if (resolvedMerchantId) {
+      console.log("[StudentPortal] Triggering proactive SaaS collection synchronization with merchant:", resolvedMerchantId);
+      import('../services/syncService').then(({ syncService }) => {
+        syncService.syncSchoolPortalData(resolvedMerchantId, true);
+      }).catch(err => {
+        console.error("[StudentPortal] Fail to trigger proactive sync:", err);
+      });
+    }
+  }, [resolvedMerchantId]);
+
   const studentClasses = useLiveQuery(() => 
-    merchant?.id ? db.classes?.where('merchantId').equals(merchant.id).toArray() : []
-  , [merchant?.id]) || [];
+    resolvedMerchantId ? db.classes?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
+
+  const subjects = useLiveQuery(() => 
+    resolvedMerchantId ? db.subjects?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
+
+  const subjectsMap = useMemo(() => {
+    const m = new Map<string, string>();
+    subjects.forEach((s: any) => {
+      m.set(s.id, s.name);
+    });
+    return m;
+  }, [subjects]);
 
   const schedules = useLiveQuery(() => 
-    merchant?.id ? db.schedules?.where('merchantId').equals(merchant.id).toArray() : []
-  , [merchant?.id]) || [];
+    resolvedMerchantId ? db.schedules?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
 
   const studentClassObj = useMemo(() => {
     if (!studentData) return null;
-    return studentClasses.find((c: any) => c.id === studentData.classId || c.name === studentData.grade);
+    const isClassNameSimilar = (name1: string, name2: string) => {
+      if (!name1 || !name2) return false;
+      const clean = (s: string) => s.toString().toLowerCase().replace(/^(classe\s*:\s*|classe\s*)/gi, '').trim();
+      const c1 = clean(name1);
+      const c2 = clean(name2);
+      return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+    };
+    const studentGrade = studentData.grade || studentData.class;
+    const studentClassId = studentData.classId || studentData.class_id;
+    return studentClasses.find((c: any) => 
+      (studentClassId && c.id === studentClassId) || 
+      isClassNameSimilar(c.name, studentGrade)
+    );
   }, [studentClasses, studentData]);
 
   const classSchedules = useMemo(() => {
-    if (!studentData?.classId && !studentData?.grade) return [];
+    if (!studentData?.classId && !studentData?.class_id && !studentData?.grade && !studentData?.class) return [];
+    const studentGrade = studentData.grade || studentData.class;
+    const studentClassId = studentData.classId || studentData.class_id;
+    
+    const isClassNameSimilar = (name1: string, name2: string) => {
+      if (!name1 || !name2) return false;
+      const clean = (s: string) => s.toString().toLowerCase().replace(/^(classe\s*:\s*|classe\s*)/gi, '').trim();
+      const c1 = clean(name1);
+      const c2 = clean(name2);
+      return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+    };
+
     return schedules.filter((s: any) => {
-      const matchesClassId = studentData.classId && s.classId === studentData.classId;
+      const matchesClassId = studentClassId && s.classId === studentClassId;
       const matchedClass = studentClasses.find(c => c.id === s.classId);
-      const matchesClassName = matchedClass && matchedClass.name === studentData.grade;
-      return matchesClassId || matchesClassName;
+      const matchesClassName = matchedClass && isClassNameSimilar(matchedClass.name, studentGrade);
+      const sClassIdStr = (s.classId || '').toString();
+      const matchesDirectNameLike = isClassNameSimilar(sClassIdStr, studentGrade);
+      return matchesClassId || matchesClassName || matchesDirectNameLike;
     });
   }, [schedules, studentClasses, studentData]);
 
@@ -47,8 +102,34 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
   , [studentData?.id]) || [];
 
   const homeworks = useLiveQuery(() => 
-    merchant?.id ? db.homeworks?.where('merchantId').equals(merchant.id).toArray() : []
-  , [merchant?.id]) || [];
+    resolvedMerchantId ? db.homeworks?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
+
+  const validHomeworks = useMemo(() => {
+    if (!homeworks) return [];
+    const isClassNameSimilar = (name1: string, name2: string) => {
+      if (!name1 || !name2) return false;
+      const clean = (s: string) => s.toString().toLowerCase().replace(/^(classe\s*:\s*|classe\s*)/gi, '').trim();
+      const c1 = clean(name1);
+      const c2 = clean(name2);
+      return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+    };
+    return homeworks.filter((h: any) => {
+      const matchesClassId = studentClassObj && h.classId === studentClassObj.id;
+      const studentClassId = studentData?.classId || studentData?.class_id;
+      const matchesStudentClassId = studentClassId && h.classId === studentClassId;
+      
+      const studentGrade = studentData?.grade || studentData?.class;
+      const hClassIdStr = (h.classId || '').toString();
+      const matchesStudentGrade = studentGrade && (
+        isClassNameSimilar(studentGrade, h.grade) || 
+        isClassNameSimilar(studentGrade, h.class) || 
+        isClassNameSimilar(studentGrade, hClassIdStr)
+      );
+      
+      return matchesClassId || matchesStudentClassId || matchesStudentGrade;
+    });
+  }, [homeworks, studentClassObj, studentData]);
 
   const studentGrades = useLiveQuery(() => 
     studentData?.id ? db.grades?.where('studentId').equals(studentData.id).toArray() : []
@@ -92,28 +173,69 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
               </div>
 
               {studentGrades.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
+                <div className="text-center py-12 text-slate-450">
                   <FileText className="w-12 h-12 mx-auto mb-3 opacity-30 text-slate-500" />
                   <p className="text-sm font-medium">Aucune note n'a encore été saisie pour ce trimestre.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {studentGrades.map((g: any, idx: number) => (
-                    <div key={g.id || idx} className="p-4 bg-slate-50 rounded-2xl border border-gray-200/60 flex justify-between items-center">
-                      <div>
-                        <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">{g.subjectName || g.subjectId || 'Matière'}</span>
-                        <h4 className="font-bold text-slate-800 text-sm mt-0.5">{g.assessmentName || 'Évaluation'}</h4>
-                        <p className="text-xs text-slate-500 mt-1 font-medium">{g.term || 'Trimestre 1'}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-end gap-1.5 justify-end">
-                          <span className="text-2xl font-black text-indigo-600">{Number(g.value).toFixed(1)}</span>
-                          <span className="text-xs font-bold text-slate-500 pb-1">/ 20</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {studentGrades.map((g: any, idx: number) => {
+                    const subjectName = subjectsMap.get(g.subjectId) || g.subjectId || 'Matière';
+                    
+                    const scoreD1 = g.devoir1 !== undefined && g.devoir1 !== '' ? Number(g.devoir1) : null;
+                    const scoreD2 = g.devoir2 !== undefined && g.devoir2 !== '' ? Number(g.devoir2) : null;
+                    const scoreCompo = g.compo !== undefined && g.compo !== '' ? Number(g.compo) : null;
+                    
+                    const devSum = (scoreD1 !== null ? scoreD1 : 0) + (scoreD2 !== null ? scoreD2 : 0);
+                    const devCount = (scoreD1 !== null ? 1 : 0) + (scoreD2 !== null ? 1 : 0);
+                    const devAvg = devCount > 0 ? devSum / devCount : null;
+                    
+                    let average: number | null = null;
+                    if (devAvg !== null && scoreCompo !== null) {
+                      average = (devAvg + scoreCompo * 2) / 3;
+                    } else if (devAvg !== null) {
+                      average = devAvg;
+                    } else if (scoreCompo !== null) {
+                      average = scoreCompo;
+                    }
+
+                    return (
+                      <div key={g.id || idx} className="p-5 bg-slate-50 rounded-2xl border border-gray-150 flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-3 border-b border-gray-150 pb-2">
+                          <div>
+                            <span className="text-[10px] uppercase font-black tracking-widest text-indigo-600 font-extrabold">{subjectName}</span>
+                            <p className="text-xs text-slate-500 mt-0.5 font-bold">{g.term || 'Trimestre 1'}</p>
+                          </div>
+                          {average !== null && (
+                            <div className="text-right">
+                              <span className="text-[8px] uppercase font-bold text-slate-400 block mb-0.5">Moyenne</span>
+                              <span className="text-xs font-black px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-150">
+                                {average.toFixed(2)} / 20
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <span className="text-[9px] font-bold uppercase py-0.5 px-2 bg-indigo-50 text-indigo-700 rounded">Coef: {g.coefficient || 2}</span>
+                        
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-white p-2 rounded-xl border border-gray-100 text-center shadow-xs">
+                            <span className="text-[8px] uppercase font-bold text-slate-400 block">Devoir 1</span>
+                            <span className="text-xs font-black text-slate-700">{scoreD1 !== null ? scoreD1.toFixed(1) : '-'}</span>
+                            <span className="text-[8px] text-slate-500 font-bold block">/20</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-xl border border-gray-100 text-center shadow-xs">
+                            <span className="text-[8px] uppercase font-bold text-slate-400 block">Devoir 2</span>
+                            <span className="text-xs font-black text-slate-700">{scoreD2 !== null ? scoreD2.toFixed(1) : '-'}</span>
+                            <span className="text-[8px] text-slate-500 font-bold block">/20</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-xl border border-gray-100 text-center shadow-xs border-indigo-100 bg-indigo-50/20">
+                            <span className="text-[8px] uppercase font-bold text-indigo-600 block">Comp.</span>
+                            <span className="text-xs font-black text-indigo-700">{scoreCompo !== null ? scoreCompo.toFixed(1) : '-'}</span>
+                            <span className="text-[8px] text-indigo-500 font-bold block">/20</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -121,15 +243,16 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
         );
 
       case 'attendance':
+        const filteredAttendances = attendances.filter(a => a.status === 'absent' || a.status === 'late');
         return (
           <div className="space-y-6 animate-fade-in">
             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
               <h3 className="text-lg font-black text-slate-800 mb-6">Mon Registre de Présence</h3>
               <div className="space-y-3">
-                {attendances.length === 0 ? (
+                {filteredAttendances.length === 0 ? (
                   <p className="text-sm text-gray-500 italic text-center py-8">Assiduité parfaite ! Aucune absence ni retard enregistré.</p>
                 ) : (
-                  attendances.map((a: any, idx: number) => (
+                  filteredAttendances.map((a: any, idx: number) => (
                     <div key={a.id || idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-gray-100">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${a.status === 'absent' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'}`}>
@@ -166,7 +289,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                 </div>
 
                 {/* Switcher pour le Type de Présentation Calendrier */}
-                {studentClassObj?.schedulePublished && classSchedules.length > 0 && (
+                {(studentClassObj?.schedulePublished !== false) && classSchedules.length > 0 && (
                   <div className="flex bg-slate-100 p-1 rounded-2xl border border-gray-150 inline-flex self-start">
                     <button 
                       onClick={() => setScheduleViewType('grid')}
@@ -190,7 +313,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                 )}
               </div>
               
-              {!studentClassObj?.schedulePublished ? (
+              {studentClassObj?.schedulePublished === false ? (
                 <div className="text-center py-12 bg-amber-50/50 rounded-2xl border border-amber-200 text-amber-800">
                   <EyeOff className="w-12 h-12 mx-auto mb-3 text-amber-500 animate-pulse" />
                   <p className="text-sm font-bold text-amber-900">Emploi du temps non publié</p>
@@ -372,27 +495,19 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
         );
 
       case 'homework':
-        const validHomeworks = homeworks.filter((h: any) => h.grade === studentData.grade || h.classId === studentData.classId);
         return (
           <div className="space-y-6 animate-fade-in">
-            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-black text-slate-800 mb-6">Mon Cahier de Texte</h3>
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm col-span-1">
+              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-indigo-500" /> Mon Cahier de Texte
+              </h3>
               
               {validHomeworks.length === 0 ? (
                 <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-150">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Mathématiques</span>
-                      <span className="text-[10px] font-bold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-md">Pour Demain</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">Faire les exercices d'application 4 et 5 du chapitre de trigonométrie.</p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-150">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-purple-500">Français</span>
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Pour Vendredi</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">Terminer la lecture de l'œuvre au programme et rédiger une synthèse de l'acte III.</p>
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-150 text-center py-10">
+                    <BookOpen className="w-10 h-10 mx-auto text-slate-300 mb-3 animate-pulse" />
+                    <p className="text-sm font-bold text-slate-700">Aucun devoir ou leçon n'a été publié pour l'instant.</p>
+                    <p className="text-xs text-slate-500 mt-1">Consulte régulièrement cet espace pour suivre tes leçons.</p>
                   </div>
                 </div>
               ) : (
@@ -404,7 +519,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                         <span className="text-xs text-rose-500 font-bold">À rendre pour le: {new Date(h.dueDate).toLocaleDateString('fr-FR')}</span>
                       </div>
                       <h4 className="font-bold text-slate-800 text-sm mb-1">{h.title}</h4>
-                      <p className="text-slate-600 text-xs leading-relaxed">{h.description}</p>
+                      <p className="text-slate-600 text-xs leading-relaxed whitespace-pre-wrap">{h.description || h.text || ''}</p>
                     </div>
                   ))}
                 </div>
@@ -491,7 +606,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                 <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center"><BookOpen className="w-6 h-6" /></div>
                 <div>
                   <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Cahier de Texte</p>
-                  <p className="text-2xl font-black text-slate-800">{homeworks.length || 2} <span className="text-sm font-bold text-slate-400">tâches</span></p>
+                  <p className="text-2xl font-black text-slate-800">{validHomeworks.length} <span className="text-sm font-bold text-slate-400">tâches</span></p>
                 </div>
               </div>
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">

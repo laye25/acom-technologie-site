@@ -99,3 +99,84 @@ export class StudioAcomDB extends Dexie {
 }
 
 export const db = new StudioAcomDB();
+
+// Shared flag to disable database hooks during pulls (downward syncs)
+export let isSyncingFromRemote = false;
+
+export function setRemoteSyncState(state: boolean) {
+  isSyncingFromRemote = state;
+}
+
+// Hook to sync local offline writes to Firestore
+if (typeof window !== 'undefined') {
+  const EDUCATIONAL_SYNC_TABLES = [
+    'classes',
+    'subjects',
+    'grades',
+    'attendance',
+    'communications',
+    'ai_insights',
+    'schedules',
+    'homeworks',
+    'discipline_records',
+    'students',
+    'teachers',
+    'parents'
+  ];
+
+  EDUCATIONAL_SYNC_TABLES.forEach(tableName => {
+    const table = (db as any)[tableName];
+    if (!table) return;
+
+    table.hook('creating', (primKey: any, obj: any) => {
+      if (isSyncingFromRemote) return;
+      // Push to Firestore asynchronously
+      import('../services/firestoreService').then(({ firestoreService }) => {
+        const id = primKey || obj.id || crypto.randomUUID();
+        const dataToSave = {
+          ...obj,
+          id,
+          merchant_id: obj.merchantId || obj.merchant_id || '',
+          merchantId: obj.merchantId || obj.merchant_id || ''
+        };
+        firestoreService.save(tableName, dataToSave).catch(err => {
+          console.error(`Auto-creating remote document for [${tableName}] failed:`, err);
+        });
+      }).catch(err => {
+        console.error('Failed to import firestoreService in Dexie hook:', err);
+      });
+    });
+
+    table.hook('updating', (modifications: any, primKey: any, obj: any) => {
+      if (isSyncingFromRemote) return;
+      import('../services/firestoreService').then(({ firestoreService }) => {
+        const id = primKey || obj.id;
+        if (!id) return;
+        const updatedObj = {
+          ...obj,
+          ...modifications,
+          id,
+          merchant_id: modifications.merchantId || obj.merchantId || obj.merchant_id || '',
+          merchantId: modifications.merchantId || obj.merchantId || obj.merchant_id || ''
+        };
+        firestoreService.save(tableName, updatedObj).catch(err => {
+          console.error(`Auto-updating remote document for [${tableName}] failed:`, err);
+        });
+      }).catch(err => {
+        console.error('Failed to import firestoreService in Dexie hook:', err);
+      });
+    });
+
+    table.hook('deleting', (primKey: any) => {
+      if (isSyncingFromRemote) return;
+      import('../services/firestoreService').then(({ firestoreService }) => {
+        if (!primKey) return;
+        firestoreService.delete(tableName, primKey).catch(err => {
+          console.error(`Auto-deleting remote document for [${tableName}] failed:`, err);
+        });
+      }).catch(err => {
+        console.error('Failed to import firestoreService in Dexie hook:', err);
+      });
+    });
+  });
+}

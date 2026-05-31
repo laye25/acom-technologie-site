@@ -59,10 +59,12 @@ const ProtectedRoute = ({ children, adminOnly = false }: { children: React.React
   const { user, profile, loading, isAdmin, isManager } = useAuth();
   const location = useLocation();
   const activeTeacherId = localStorage.getItem('activeTeacherId');
+  const activeParentId = localStorage.getItem('activeParentId');
+  const activeStudentId = localStorage.getItem('activeStudentId');
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-medium text-gray-500">Chargement de votre session...</div>;
-  if (!user && !activeTeacherId) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (!user && activeTeacherId && adminOnly) return <Navigate to="/" />; // Teachers cannot access adminOnly routes
+  if (!user && !activeTeacherId && !activeParentId && !activeStudentId) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!user && (activeTeacherId || activeParentId || activeStudentId) && adminOnly) return <Navigate to="/" />; // Teachers, Parents, and Students cannot access adminOnly routes
   if (user && adminOnly && !(isAdmin || isManager)) return <Navigate to="/" />;
 
   return <>{children}</>;

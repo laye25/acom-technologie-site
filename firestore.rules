@@ -357,14 +357,29 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    match /communications/{docId} {
+    match /schedules/{scheduleId} {
+      allow read, write: if true;
+    }
+
+    match /homeworks/{homeworkId} {
+      allow read, write: if true;
+    }
+
+    match /discipline_records/{recordId} {
+      allow read, write: if true;
+    }
+
+    match /merchant_categories/{categoryId} {
       allow read: if hasOwnership(existing()) || hasAnyAdminRole();
       allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
 
+    match /communications/{docId} {
+      allow read, write: if true;
+    }
+
     match /ai_insights/{docId} {
-      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
-      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+      allow read, write: if true;
     }
     
     match /patients/{patientId} {

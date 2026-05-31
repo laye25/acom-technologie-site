@@ -9,6 +9,7 @@ import { geminiService } from '../services/geminiService';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ParentPortalSimulation } from '../components/ParentPortalSimulation';
 import { StudentPortalSimulation } from '../components/StudentPortalSimulation';
+import { SchoolAccountingSaaS } from '../components/admin/SchoolAccountingSaaS';
 import { Merchant, MerchantProduct, MerchantSale, MerchantQuote, MerchantQuoteItem, MerchantExpense, MerchantSupplier, MerchantPlan } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -23,7 +24,7 @@ import {
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
   Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket,
   Filter, SlidersHorizontal, ArrowUpDown, Tag, Scissors, Palette, ScanLine, PenTool, BookOpen,
-  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key
+  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key, Bus, Utensils
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -1327,7 +1328,7 @@ const TeacherDashboardWrapper = ({ teacher, merchant }: { teacher: any, merchant
   useEffect(() => {
     if (merchant?.id) {
       console.log("Teacher dashboard sync triggered for merchant ID:", merchant.id);
-      syncService.syncAllMerchantData(merchant.id);
+      syncService.syncSchoolPortalData(merchant.id, true);
     }
   }, [merchant?.id]);
 
@@ -1430,6 +1431,107 @@ const MerchantSaaS = () => {
   const activeTeacherId = typeof window !== 'undefined' ? localStorage.getItem('activeTeacherId') : null;
   const activeParentId = typeof window !== 'undefined' ? localStorage.getItem('activeParentId') : null;
   const activeStudentId = typeof window !== 'undefined' ? localStorage.getItem('activeStudentId') : null;
+
+  // Reactively track student profile changes in Dexie (critical for real-time cloud sync updates)
+  const liveStudentProfile = useLiveQuery(async () => {
+    if (!activeStudentId) return null;
+    const student = await db.students?.where('id').equals(activeStudentId).first();
+    if (!student) return null;
+    return {
+      id: student.id,
+      name: `${student.firstName || ''} ${student.lastName || ''}`,
+      firstName: student.firstName || '',
+      lastName: student.lastName || '',
+      phone: student.phone || '',
+      studentUsername: student.studentUsername || student.username || '',
+      studentPassword: student.studentPassword || student.password || '',
+      student: student
+    };
+  }, [activeStudentId]);
+
+  // Reactively track parent profile & matched children in Dexie (critical for real-time cloud sync updates)
+  const liveParentProfile = useLiveQuery(async () => {
+    if (!activeParentId) return null;
+    const allStudents = await db.students?.toArray() || [];
+    const matchingStudents = allStudents.filter((student: any) => {
+      const cleanActiveParent = activeParentId.replace(/[^0-9]/g, '');
+      if (!cleanActiveParent) return false;
+
+      // Extremely robust matching: check any parents' phone lists
+      const phonesToCheck = [
+        student.fatherPhone,
+        student.motherPhone,
+        student.guardianPhone,
+        student.parentContact
+      ].filter(Boolean);
+
+      return phonesToCheck.some((phone: string) => {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        if (!cleanPhone) return false;
+        if (cleanPhone === cleanActiveParent) return true;
+        if (cleanPhone.slice(-9) === cleanActiveParent.slice(-9) && cleanActiveParent.slice(-9).length >= 8) return true;
+        return false;
+      });
+    });
+
+    let parentName = '';
+    let customUsername = activeParentId;
+    let customPassword = '';
+    let dbParent = await db.parents?.where('phone').equals(activeParentId).first();
+    if (!dbParent) {
+      dbParent = await db.parents?.where('username').equals(activeParentId).first();
+    }
+    if (!dbParent) {
+      dbParent = await db.parents?.where('id').equals(activeParentId).first();
+    }
+
+    if (dbParent) {
+      parentName = dbParent.name || '';
+      customUsername = dbParent.username || activeParentId;
+      customPassword = dbParent.password || dbParent.pin || '';
+    }
+
+    if (!parentName && matchingStudents.length > 0) {
+      const exemplar = matchingStudents[0];
+      const parentChoice = exemplar.primaryParentContact || 'father';
+      if (parentChoice === 'father') parentName = exemplar.fatherName || `Père de ${exemplar.firstName}`;
+      else if (parentChoice === 'mother') parentName = exemplar.motherName || `Mère de ${exemplar.firstName}`;
+      else parentName = exemplar.guardianName || `Tuteur de ${exemplar.firstName}`;
+    }
+
+    if (!parentName) {
+      parentName = "Parent d'élève";
+    }
+
+    const parts = parentName.trim().split(' ');
+    const firstStudent = matchingStudents[0];
+
+    return {
+      id: activeParentId,
+      name: parentName,
+      firstName: parts[0] || '?',
+      lastName: parts.slice(1).join(' ') || '',
+      phone: dbParent?.phone || (firstStudent?.parentContact || firstStudent?.fatherPhone || activeParentId),
+      username: customUsername,
+      password: customPassword,
+      studentsAmount: matchingStudents.length,
+      childrenNames: matchingStudents.map(s => `${s.firstName || s.name} ${s.lastName || ''}`),
+      children: matchingStudents
+    };
+  }, [activeParentId]);
+
+  // Sync reactive profiles with component local state
+  useEffect(() => {
+    if (liveStudentProfile) {
+      setLoggedStudentProfile(liveStudentProfile);
+    }
+  }, [liveStudentProfile]);
+
+  useEffect(() => {
+    if (liveParentProfile) {
+      setLoggedParentProfile(liveParentProfile);
+    }
+  }, [liveParentProfile]);
   
   const [searchParams, setSearchParams] = useSearchParams();
   
@@ -1504,7 +1606,19 @@ const MerchantSaaS = () => {
 
         if (activeStudentId) {
           // Student Login active session
-          const student = await db.students?.where('id').equals(activeStudentId).first();
+          let student = await db.students?.where('id').equals(activeStudentId).first();
+          if (!student) {
+            try {
+              const { studentRepository } = await import('../data/repositories/student.repository');
+              const sCloud = await studentRepository.getById(activeStudentId);
+              if (sCloud) {
+                student = sCloud;
+                await db.students.put({ ...sCloud, id: sCloud.id });
+              }
+            } catch (err) {
+              console.error("Failed to fetch student from cloud on page load:", err);
+            }
+          }
           if (student) {
             setLoggedStudentProfile({
               id: student.id,
@@ -1518,7 +1632,19 @@ const MerchantSaaS = () => {
             });
             const mId = student.merchantId || student.merchant_id;
             if (mId) {
-              const mLocal = await db.merchants.filter((m: any) => m.id === mId).first();
+              let mLocal = await db.merchants.filter((m: any) => m.id === mId).first();
+              if (!mLocal) {
+                try {
+                  const { merchantRepository } = await import('../data/repositories/merchant.repository');
+                  const mCloud = await merchantRepository.getById(mId);
+                  if (mCloud) {
+                    mLocal = mCloud;
+                    await db.merchants.put({ ...mCloud, id: mCloud.id });
+                  }
+                } catch (cloudErr) {
+                  console.error("Failed to fetch merchant from cloud for student login:", cloudErr);
+                }
+              }
               finalMerchant = mLocal;
             }
           }
@@ -1526,60 +1652,84 @@ const MerchantSaaS = () => {
           // Parent Login active session
           const allStudents = await db.students?.toArray() || [];
           const matchingStudents = allStudents.filter((student: any) => {
-            const parentChoice = student.primaryParentContact || 'father';
-            let resolvedPhone = '';
-            if (parentChoice === 'father') {
-              resolvedPhone = student.fatherPhone;
-            } else if (parentChoice === 'mother') {
-              resolvedPhone = student.motherPhone;
-            } else {
-              resolvedPhone = student.guardianPhone || student.parentContact || '';
-            }
-            const phone = resolvedPhone || student.parentContact || '';
-            const key = phone.replace(/[^0-9+A-Za-z]/g, '');
-            return key === activeParentId || phone === activeParentId;
+            const cleanActiveParent = activeParentId.replace(/[^0-9]/g, '');
+            if (!cleanActiveParent) return false;
+
+            // Extremely robust matching: check any parents' phone lists
+            const phonesToCheck = [
+              student.fatherPhone,
+              student.motherPhone,
+              student.guardianPhone,
+              student.parentContact
+            ].filter(Boolean);
+
+            return phonesToCheck.some((phone: string) => {
+              const cleanPhone = phone.replace(/[^0-9]/g, '');
+              if (!cleanPhone) return false;
+              if (cleanPhone === cleanActiveParent) return true;
+              if (cleanPhone.slice(-9) === cleanActiveParent.slice(-9) && cleanActiveParent.slice(-9).length >= 8) return true;
+              return false;
+            });
           });
 
-          if (matchingStudents.length > 0) {
-            const exemplar = matchingStudents[0];
-            const parentChoice = exemplar.primaryParentContact || 'father';
-            let parentName = '';
-            if (parentChoice === 'father') parentName = exemplar.fatherName || `Père de ${exemplar.firstName}`;
-            else if (parentChoice === 'mother') parentName = exemplar.motherName || `Mère de ${exemplar.firstName}`;
-            else parentName = exemplar.guardianName || `Tuteur de ${exemplar.firstName}`;
-
-            const parts = parentName.trim().split(' ');
-            
-            // Look up in db.parents for customized PIN/username
-            let customUsername = activeParentId;
-            let customPassword = '';
-            const dbParent = await db.parents?.where('phone').equals(exemplar.fatherPhone || exemplar.motherPhone || exemplar.guardianPhone || exemplar.parentContact || '').first();
-            if (dbParent) {
-              customUsername = dbParent.username || activeParentId;
-              customPassword = dbParent.password || dbParent.pin || '';
-            }
-
-            const parentObj = {
-              id: activeParentId,
-              name: parentName,
-              firstName: parts[0] || '?',
-              lastName: parts.slice(1).join(' ') || '',
-              phone: exemplar.parentContact || exemplar.fatherPhone || exemplar.motherPhone || exemplar.guardianPhone || activeParentId,
-              username: customUsername,
-              password: customPassword,
-              studentsAmount: matchingStudents.length,
-              childrenNames: matchingStudents.map(s => `${s.firstName || s.name} ${s.lastName || ''}`),
-              children: matchingStudents
-            };
-
-            setLoggedParentProfile(parentObj);
-            
-            const mId = exemplar.merchantId || exemplar.merchant_id;
-            if (mId) {
-              let mLocal = await db.merchants.filter((m: any) => m.id === mId).first();
-              finalMerchant = mLocal;
-            }
+          // Look up parent record
+          let dbParent = await db.parents?.where('phone').equals(activeParentId).first();
+          if (!dbParent) {
+            dbParent = await db.parents?.where('username').equals(activeParentId).first();
           }
+          if (!dbParent) {
+            dbParent = await db.parents?.where('id').equals(activeParentId).first();
+          }
+
+          let mId = dbParent?.merchantId || dbParent?.merchant_id || localStorage.getItem('merchantId');
+          if (!mId && matchingStudents.length > 0) {
+            mId = matchingStudents[0].merchantId || matchingStudents[0].merchant_id;
+          }
+
+          if (mId) {
+            let mLocal = await db.merchants.filter((m: any) => m.id === mId).first();
+            if (!mLocal) {
+              try {
+                const { merchantRepository } = await import('../data/repositories/merchant.repository');
+                const mCloud = await merchantRepository.getById(mId);
+                if (mCloud) {
+                  mLocal = mCloud;
+                  await db.merchants.put({ ...mCloud, id: mCloud.id });
+                }
+              } catch (cloudErr) {
+                console.error("Failed to fetch merchant from cloud for parent login:", cloudErr);
+              }
+            }
+            finalMerchant = mLocal;
+          }
+
+          const exam = matchingStudents[0];
+          const parentName = exam 
+            ? (exam.primaryParentContact === 'mother' ? exam.motherName : exam.primaryParentContact === 'guardian' ? exam.guardianName : exam.fatherName)
+            : (dbParent?.name || "Parent d'élève");
+          
+          const parts = (parentName || "Parent").trim().split(' ');
+          let customUsername = activeParentId;
+          let customPassword = '';
+          if (dbParent) {
+            customUsername = dbParent.username || activeParentId;
+            customPassword = dbParent.password || dbParent.pin || '';
+          }
+
+          const parentObj = {
+            id: activeParentId,
+            name: parentName || "Parent",
+            firstName: parts[0] || '?',
+            lastName: parts.slice(1).join(' ') || '',
+            phone: dbParent?.phone || (exam?.parentContact || exam?.fatherPhone || activeParentId),
+            username: customUsername,
+            password: customPassword,
+            studentsAmount: matchingStudents.length,
+            childrenNames: matchingStudents.map(s => `${s.firstName || s.name} ${s.lastName || ''}`),
+            children: matchingStudents
+          };
+
+          setLoggedParentProfile(parentObj);
         } else if (activeTeacherId) {
           // It's a teacher login
           let teacher = await db.teachers?.where('id').equals(activeTeacherId).first();
@@ -1727,7 +1877,14 @@ const MerchantSaaS = () => {
           { id: 'attendance', label: 'Présences', icon: ClipboardCheck, group: 'Administration Scolaire' },
           { id: 'communication', label: 'Communication', icon: MessageSquare, group: 'Administration Scolaire' },
           { id: 'ai', label: 'A.I. Éducation', icon: Zap, group: 'Administration Scolaire' },
-          { id: 'accounting', label: 'Scolarité & Finance', icon: Calculator, group: 'Comptabilité / Finance' },
+          { id: 'fin_kpi', label: 'Tableau de Bord', icon: PieChart, group: 'Comptabilité / Finance' },
+          { id: 'fin_scolarite', label: 'Scolarité (Inscrits)', icon: GraduationCap, group: 'Comptabilité / Finance' },
+          { id: 'fin_caisse', label: 'Journal de Caisse', icon: Banknote, group: 'Comptabilité / Finance' },
+          { id: 'fin_depenses', label: 'Dépenses Générale', icon: TrendingDown, group: 'Comptabilité / Finance' },
+          { id: 'fin_salaires', label: 'Salaires & Personnel', icon: Users, group: 'Comptabilité / Finance' },
+          { id: 'fin_stock', label: 'Fournitures & Uniformes', icon: Package, group: 'Comptabilité / Finance' },
+          { id: 'fin_transport', label: 'Transport Scolaire', icon: Bus, group: 'Comptabilité / Finance' },
+          { id: 'fin_cantine', label: 'Cantine & Repas', icon: Utensils, group: 'Comptabilité / Finance' },
           { id: 'reports', label: 'Rapports', icon: FileText, group: 'Comptabilité / Finance' },
           { id: 'settings', label: 'Réglages', icon: Settings, group: 'Comptabilité / Finance' },
         ];
@@ -1810,6 +1967,8 @@ const MerchantSaaS = () => {
         merchant={merchant || { id: 'fallback-id', name: 'ACOM Éducation', type: 'scolaire', plan: 'STANDARD' }} 
         onClose={() => {
           localStorage.removeItem('activeParentId');
+          localStorage.removeItem('activeStudentId');
+          localStorage.removeItem('activeTeacherId');
           localStorage.removeItem('merchantId');
           window.location.href = '/login';
         }}
@@ -1823,7 +1982,9 @@ const MerchantSaaS = () => {
         student={loggedStudentProfile} 
         merchant={merchant || { id: 'fallback-id', name: 'ACOM Éducation', type: 'scolaire', plan: 'STANDARD' }} 
         onClose={() => {
+          localStorage.removeItem('activeParentId');
           localStorage.removeItem('activeStudentId');
+          localStorage.removeItem('activeTeacherId');
           localStorage.removeItem('merchantId');
           window.location.href = '/login';
         }}
@@ -1949,7 +2110,7 @@ const MerchantSaaS = () => {
           {activeTab === 'pos' && <MerchantPOS key="pos" merchant={merchant} setShowUpgradeModal={setShowUpgradeModal} />}
           {activeTab === 'audit' && <MerchantAuditLog key="audit" merchant={merchant} />}
           {activeTab === 'billing' && <MerchantBilling key="billing" merchant={merchant} />}
-          {activeTab === 'accounting' && <MerchantAccounting key="accounting" merchant={merchant} />}
+          {activeTab.startsWith('fin_') && <MerchantAccounting key="accounting" merchant={merchant} subTab={activeTab.replace('fin_', '')} />}
           {activeTab === 'reports' && <MerchantReports key="reports" merchant={merchant} />}
           {activeTab === 'settings' && <MerchantSettings key="settings" merchant={merchant} onUpdate={(m) => setMerchant(m)} setActiveTab={setActiveTab} />}
           {activeTab === 'build' && <MerchantBuild key="build" merchant={merchant as any} />}
@@ -3927,6 +4088,10 @@ const MerchantDashboard = ({
                     await syncService.syncProducts(merchant.id!);
                     await syncService.syncSales(merchant.id!);
                     await syncService.syncExpenses(merchant.id!);
+                    if (merchant.type === 'scolaire') {
+                      await (syncService as any).pushSchoolPortalData(merchant.id!);
+                      await syncService.syncSchoolPortalData(merchant.id!, true);
+                    }
                     toast.success('Données synchronisées !', { id: toastId });
                   } catch (e) {
                     toast.error('Échec de la synchronisation', { id: toastId });
@@ -7417,7 +7582,11 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
   );
 };
 
-const MerchantAccounting = ({ merchant }: { merchant: Merchant }) => {
+const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?: string }) => {
+  if (merchant.type === 'scolaire') {
+    return <SchoolAccountingSaaS merchant={merchant as any} subTab={subTab} />;
+  }
+
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [newExpense, setNewExpense] = useState({ title: '', amount: 0, category: 'Général', description: '' });
   const [saving, setSaving] = useState(false);
@@ -11370,13 +11539,17 @@ const TeacherDashboardSpace = ({
     db.communications?.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
+  // Load homeworks (for Cahier de Texte)
+  const allHomeworks = useLiveQuery(() => 
+    db.homeworks?.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
+
   const homeworkList = useMemo(() => {
-    return classCommunications.filter((c: any) => 
-      c.type === 'homework' && 
-      c.classId === selectedClassId && 
-      c.subject === activeSubject
+    return allHomeworks.filter((h: any) => 
+      h.classId === selectedClassId && 
+      (h.subjectName === activeSubject || h.subject === activeSubject || h.subjectId === activeSubject)
     );
-  }, [classCommunications, selectedClassId, activeSubject]);
+  }, [allHomeworks, selectedClassId, activeSubject]);
 
   const activeClassObj = useMemo(() => {
     return classes.find((c: any) => c.id === selectedClassId);
@@ -11475,19 +11648,18 @@ const TeacherDashboardSpace = ({
         id: uuidv4(),
         merchantId: merchant.id,
         title: homeworkTitle,
-        text: homeworkDesc,
-        date: new Date().toISOString(),
+        description: homeworkDesc, // mapped appropriately for StudentPortal
         targetAudience: 'students_classes',
         classId: selectedClassId,
-        subject: activeSubject,
+        subjectName: activeSubject, // mapped appropriately for StudentPortal
+        subjectId: activeSubject,
         dueDate: homeworkDueDate,
-        type: 'homework',
-        status: 'published',
+        syncStatus: 'synced',
         updatedAt: new Date().toISOString()
       };
       
-      await db.communications.put(payload);
-      toast.success("Devoir programmé et visible des élèves & parents !");
+      await db.homeworks.put(payload);
+      toast.success("Cahier de Texte programmé et visible des élèves & parents !");
       setHomeworkTitle('');
       setHomeworkDesc('');
       setHomeworkDueDate('');
@@ -11500,8 +11672,8 @@ const TeacherDashboardSpace = ({
 
   const handleDeleteHomework = async (id: string) => {
     try {
-      await db.communications.delete(id);
-      toast.success("Devoir retiré");
+      await db.homeworks.delete(id);
+      toast.success("Cahier de Texte retiré");
     } catch (e) {
       toast.error("Erreur de suppression");
     }
@@ -11679,7 +11851,7 @@ const TeacherDashboardSpace = ({
           onClick={() => setTeacherTab('homework')}
           className={`flex-1 py-2 px-3.5 text-xs font-black rounded-xl transition-all ${teacherTab === 'homework' ? 'bg-white text-indigo-950 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
         >
-          Programmer des Devoirs
+          Cahier de Texte
         </button>
         <button
           id="tab-notifications"
@@ -11844,8 +12016,8 @@ const TeacherDashboardSpace = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-4 bg-white rounded-[2rem] border border-black/5 shadow-sm p-6 md:p-8 space-y-6 self-start">
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-gray-900">Programmer un Devoir</h3>
-              <p className="text-xs text-gray-500">Planifiez un travail ou devoir pour la classe active.</p>
+              <h3 className="text-lg font-bold text-gray-900">Enrichir le Cahier de Texte</h3>
+              <p className="text-xs text-gray-500">Ajouter les cours ou devoirs effectués, visible par les parents et élèves.</p>
             </div>
 
             <form onSubmit={handleAddHomework} className="space-y-4">
@@ -11909,7 +12081,7 @@ const TeacherDashboardSpace = ({
                 className="w-full py-4 bg-primary text-white font-bold rounded-2xl hover:scale-102 transition-all flex items-center justify-center gap-2 text-xs"
               >
                 {submittingHomework ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                <span>Publier le devoir à l'agenda</span>
+                <span>Publier dans le Cahier de Texte</span>
               </button>
             </form>
           </div>
@@ -11917,11 +12089,11 @@ const TeacherDashboardSpace = ({
           <div className="lg:col-span-8 bg-white rounded-[2rem] border border-black/5 shadow-sm p-6 md:p-8 space-y-6">
             <div className="flex justify-between items-center pb-4 border-b border-gray-100">
               <div className="space-y-0.5">
-                <h3 className="text-lg font-bold text-gray-900">Agenda des Devoirs</h3>
-                <p className="text-xs text-gray-400 font-medium">Travaux programmés actifs pour cette classe.</p>
+                <h3 className="text-lg font-bold text-gray-900">Agenda Cahier de Texte</h3>
+                <p className="text-xs text-gray-400 font-medium">Contenu existant et partagé pour cette classe.</p>
               </div>
               <span className="text-xs bg-slate-55 px-3 py-1.5 rounded-xl border font-bold text-slate-700">
-                {homeworkList.length} devoir(s)
+                {homeworkList.length} entrée(s)
               </span>
             </div>
 
@@ -11931,8 +12103,8 @@ const TeacherDashboardSpace = ({
                   <Calendar className="w-6 h-6" />
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-800 text-sm">Aucun devoir programmé</h4>
-                  <p className="text-xs text-gray-500">Formulez un premier devoir à l'aide du formulaire d'ajout.</p>
+                  <h4 className="font-bold text-gray-800 text-sm">Le cahier de texte est vide</h4>
+                  <p className="text-xs text-gray-500">Remplissez le formulaire pour y ajouter un devoir ou une leçon.</p>
                 </div>
               </div>
             ) : (
@@ -11942,20 +12114,16 @@ const TeacherDashboardSpace = ({
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9px] font-bold px-2 py-0.5 rounded uppercase font-mono">
-                          {homework.subject}
+                          {homework.subjectName || homework.subject || 'Général'}
                         </span>
-                        <span className="text-xs text-gray-400 font-bold font-mono">
-                          Programmé le {format(new Date(homework.date), 'dd/MM/yyyy')}
+                        <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 flex items-center rounded-md border border-rose-100/50">
+                          Pour le: {new Date(homework.dueDate).toLocaleDateString('fr-FR')}
                         </span>
                       </div>
                       <h4 className="font-bold text-gray-950 text-base">{homework.title}</h4>
-                      {homework.text && (
-                        <p className="text-xs text-gray-600 font-sans whitespace-pre-wrap leading-relaxed max-w-xl pr-4">{homework.text}</p>
-                      )}
-                      
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <span className="text-rose-600 font-black font-mono text-xs">⚠️ À RENDRE POUR LE : {format(new Date(homework.dueDate), 'dd MMMM yyyy', { locale: fr })}</span>
-                      </div>
+                      <p className="text-xs text-gray-600 font-sans whitespace-pre-wrap leading-relaxed max-w-xl pr-4">
+                        {homework.description || homework.text || ''}
+                      </p>
                     </div>
 
                     <button 
@@ -13749,7 +13917,7 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
 
                 <div className="flex items-center gap-4">
                   <div className="w-1/3 text-sm font-medium text-gray-600">Capacité max :</div>
-                  <input type="number" required value={currentClass?.capacity || ''} onChange={e => setCurrentClass({...currentClass, capacity: Number(e.target.value)})} className="w-2/3 px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                  <input type="number" required value={currentClass?.capacity || ''} onChange={e => setCurrentClass({...currentClass, capacity: Number(e.target.value)})} className="w-2/3 px-4 py-3 rounded-xl border border-gray-150 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
                 </div>
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
@@ -13772,6 +13940,10 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
   const [editingParent, setEditingParent] = useState<any>(null);
   const [parentUsername, setParentUsername] = useState('');
   const [parentPassword, setParentPassword] = useState('');
+
+  // Search & Filter state
+  const [parentsSearchQuery, setParentsSearchQuery] = useState('');
+  const [parentsSelectedClass, setParentsSelectedClass] = useState('Tous');
 
   const handleSaveParentEdit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -13874,12 +14046,61 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
     return list.sort((a: any, b: any) => b.studentsAmount - a.studentsAmount);
   }, [students, dbParents, merchant.id]);
 
+  // Compute unique classes list
+  const uniqueClassesFromParents = useMemo(() => {
+    const classesSet = new Set<string>();
+    parents.forEach((p: any) => {
+      p.children?.forEach((c: any) => {
+        const cls = c.class || c.grade || c.className;
+        if (cls) classesSet.add(cls);
+      });
+    });
+    return ['Tous', ...Array.from(classesSet).sort()];
+  }, [parents]);
+
+  // Filter parents list
+  const filteredParents = useMemo(() => {
+    return parents.filter((p: any) => {
+      const q = parentsSearchQuery.trim().toLowerCase();
+      const parentName = (p.name || '').toLowerCase();
+      const phone = (p.phone || '').toLowerCase();
+      const username = (p.username || '').toLowerCase();
+      
+      // Children search match
+      const childrenMatch = p.children?.some((c: any) => {
+        const fullName = `${c.firstName || ''} ${c.lastName || ''}`.toLowerCase();
+        const usernameMatch = (c.studentUsername || c.username || '').toLowerCase().includes(q);
+        return fullName.includes(q) || usernameMatch;
+      });
+
+      const matchesSearch = !q ||
+        parentName.includes(q) ||
+        phone.includes(q) ||
+        username.includes(q) ||
+        childrenMatch;
+
+      // Class match
+      const matchesClass = parentsSelectedClass === 'Tous' || p.children?.some((c: any) => {
+        const cls = c.class || c.grade || c.className;
+        return cls === parentsSelectedClass;
+      });
+
+      return matchesSearch && matchesClass;
+    });
+  }, [parents, parentsSearchQuery, parentsSelectedClass]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-ink">Portail Parents</h2>
-          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Espaces familiaux auto-générés: {parents.length}</p>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">
+            {parentsSearchQuery || parentsSelectedClass !== 'Tous' ? (
+              <span>Affichés : {filteredParents.length} / {parents.length} parents</span>
+            ) : (
+              <span>Espaces familiaux auto-générés: {parents.length.toString().padStart(3, '0')}</span>
+            )}
+          </p>
         </div>
       </div>
 
@@ -13910,98 +14131,182 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
            </div>
         </div>
       ) : (
-        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                  <th className="px-8 py-5">Parent / Tuteur (Auto-Détecté)</th>
-                  <th className="px-8 py-5">Contact</th>
-                  <th className="px-8 py-5">Enfants Associés</th>
-                  <th className="px-8 py-5 text-right">Espace & Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {parents.map((p: any) => (
-                  <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-10 h-10 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-sm border border-indigo-100">
-                          {p.firstName?.[0] || '?'}{p.lastName?.[0] || '?'}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-gray-900 text-sm leading-tight">{p.name}</span>
-                          <span className="text-[10px] text-gray-400 font-mono tracking-wider mt-1 flex items-center gap-1.5 flex-wrap">
-                            Identifiant: <span className="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{p.username}</span> 
-                            Code PIN: <span className="font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{p.password}</span>
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-sm text-gray-600 font-mono">{p.phone}</td>
-                    <td className="px-8 py-5">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-700">{p.studentsAmount} Enfant(s)</span>
-                        <span className="text-[10px] text-gray-400 font-medium">{p.childrenNames.join(', ')}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-right space-x-2 flex justify-end items-center">
-                      <div className="flex items-center gap-1.5 mr-2">
-                        <button 
-                          onClick={() => {
-                            const titleText = merchant.name || "ACOM Éducation";
-                            const pin = p.password || 'Non configuré';
-                            const identifiant = p.username || p.id;
-                            const msg = `Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : *${identifiant}*\n🔑 Code PIN : *${pin}*\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`;
-                            const encoded = encodeURIComponent(msg);
-                            const cleanPhone = p.phone ? p.phone.replace(/[^0-9+]/g, '') : '';
-                            const target = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encoded}` : `https://web.whatsapp.com/send?text=${encoded}`;
-                            window.open(target, '_blank');
-                            toast.success("WhatsApp préparé avec les accès !");
-                          }}
-                          className="inline-flex p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl text-[10px] items-center gap-1.5 border border-emerald-200 cursor-pointer shadow-sm transition-colors"
-                          title="Envoyer les accès par WhatsApp"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                             const titleText = merchant.name || "ACOM Éducation";
-                             const pin = p.password || 'Non configuré';
-                             const identifiant = p.username || p.id;
-                             setCustomEmailBody(`Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : ${identifiant}\n🔑 Code PIN : ${pin}\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`);
-                             setSelectedEmailParent(p);
-                          }}
-                          className="inline-flex p-2 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-xl text-[10px] items-center gap-1.5 border border-blue-200 cursor-pointer shadow-sm transition-colors"
-                          title="Envoyer les accès par E-mail"
-                        >
-                          <Mail className="w-3.5 h-3.5" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            setEditingParent(p);
-                            setParentUsername(p.username);
-                            setParentPassword(p.password);
-                          }}
-                          className="p-2 bg-gray-50 hover:bg-gray-200 text-gray-600 rounded-xl transition-all border border-gray-100 cursor-pointer"
-                          title="Modifier les identifiants d'accès"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <button 
-                        onClick={() => setSelectedParent(p)}
-                        className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold rounded-xl transition-all text-xs flex items-center justify-center gap-1 border border-indigo-200 shadow-sm"
-                        title="Accéder immédiatement à son Espace Parent"
-                      >
-                        <span>Espace</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
+        <div className="space-y-4">
+          {/* Search and Filters Toolbar */}
+          <div className="bg-slate-50 border border-black/5 p-4 rounded-3xl gap-4 flex flex-col md:flex-row items-stretch md:items-center justify-between shadow-xs">
+            {/* Search Field */}
+            <div className="relative flex-grow max-w-full md:max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Rechercher par parent, enfant, téléphone..."
+                value={parentsSearchQuery}
+                onChange={(e) => setParentsSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 bg-white border border-gray-200 rounded-2xl text-xs font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all shadow-sm"
+              />
+              {parentsSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setParentsSearchQuery('')}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black hover:scale-110 transition-transform"
+                  title="Effacer la recherche"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Controls */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Class Filter */}
+              <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+                <Filter className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Classe Enfant :</span>
+                <select
+                  value={parentsSelectedClass}
+                  onChange={(e) => setParentsSelectedClass(e.target.value)}
+                  className="text-xs font-extrabold text-slate-700 bg-transparent focus:outline-none pr-1 cursor-pointer"
+                >
+                  {uniqueClassesFromParents.map((className) => (
+                    <option key={className} value={className}>
+                      {className === 'Tous' ? 'Toutes' : className}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Reset button */}
+              {(parentsSelectedClass !== 'Tous' || parentsSearchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParentsSearchQuery('');
+                    setParentsSelectedClass('Tous');
+                  }}
+                  className="px-3 py-2 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Réinitialiser tous les filtres"
+                >
+                  <X className="w-3 h-3" />
+                  Effacer
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                    <th className="px-8 py-5">Parent / Tuteur (Auto-Détecté)</th>
+                    <th className="px-8 py-5">Contact</th>
+                    <th className="px-8 py-5">Enfants Associés</th>
+                    <th className="px-8 py-5 text-right">Espace & Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredParents.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-8 py-16 text-center text-gray-400 font-medium">
+                        <div className="flex flex-col items-center justify-center space-y-3">
+                          <Search className="w-8 h-8 text-indigo-300 animate-pulse" />
+                          <p className="text-sm font-bold text-gray-600">Aucun parent ne correspond à vos critères de recherche.</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setParentsSearchQuery('');
+                              setParentsSelectedClass('Tous');
+                            }}
+                            className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black uppercase tracking-wider text-[10px] rounded-xl transition-all cursor-pointer"
+                          >
+                            Effacer les filtres
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredParents.map((p: any) => (
+                      <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
+                        <td className="px-8 py-5">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-10 h-10 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-sm border border-indigo-100">
+                              {p.firstName?.[0] || '?'}{p.lastName?.[0] || '?'}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-900 text-sm leading-tight">{p.name}</span>
+                              <span className="text-[10px] text-gray-400 font-mono tracking-wider mt-1 flex items-center gap-1.5 flex-wrap">
+                                Identifiant: <span className="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">{p.username}</span> 
+                                Code PIN: <span className="font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{p.password}</span>
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5 text-sm text-gray-600 font-mono">{p.phone}</td>
+                        <td className="px-8 py-5">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-gray-700">{p.studentsAmount} Enfant(s)</span>
+                            <span className="text-[10px] text-gray-400 font-medium">{p.childrenNames.join(', ')}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-5 text-right space-x-2 flex justify-end items-center">
+                          <div className="flex items-center gap-1.5 mr-2">
+                            <button 
+                              onClick={() => {
+                                const titleText = merchant.name || "ACOM Éducation";
+                                const pin = p.password || 'Non configuré';
+                                const identifiant = p.username || p.id;
+                                const msg = `Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : *${identifiant}*\n🔑 Code PIN : *${pin}*\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`;
+                                const encoded = encodeURIComponent(msg);
+                                const cleanPhone = p.phone ? p.phone.replace(/[^0-9+]/g, '') : '';
+                                const target = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encoded}` : `https://web.whatsapp.com/send?text=${encoded}`;
+                                window.open(target, '_blank');
+                                toast.success("WhatsApp préparé avec les accès !");
+                              }}
+                              className="inline-flex p-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl text-[10px] items-center gap-1.5 border border-emerald-200 cursor-pointer shadow-sm transition-colors"
+                              title="Envoyer les accès par WhatsApp"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                 const titleText = merchant.name || "ACOM Éducation";
+                                 const pin = p.password || 'Non configuré';
+                                 const identifiant = p.username || p.id;
+                                 setCustomEmailBody(`Bonjour ${p.name},\n\nVoici vos accès personnels pour vous connecter à votre Espace Parent sur ${titleText} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : ${identifiant}\n🔑 Code PIN : ${pin}\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${titleText}`);
+                                 setSelectedEmailParent(p);
+                              }}
+                              className="inline-flex p-2 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white rounded-xl text-[10px] items-center gap-1.5 border border-blue-200 cursor-pointer shadow-sm transition-colors"
+                              title="Envoyer les accès par E-mail"
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setEditingParent(p);
+                                setParentUsername(p.username);
+                                setParentPassword(p.password);
+                              }}
+                              className="p-2 bg-gray-50 hover:bg-gray-200 text-gray-600 rounded-xl transition-all border border-gray-100 cursor-pointer"
+                              title="Modifier les identifiants d'accès"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <button 
+                            onClick={() => setSelectedParent(p)}
+                            className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold rounded-xl transition-all text-xs flex items-center justify-center gap-1 border border-indigo-200 shadow-sm"
+                            title="Accéder immédiatement à son Espace Parent"
+                          >
+                            <span>Espace</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

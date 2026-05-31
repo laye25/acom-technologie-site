@@ -78,6 +78,15 @@ class BackgroundSyncManager {
     });
 
     if (this.merchantId) {
+      if (this.role === 'teacher' || this.role === 'parent' || this.role === 'student' || this.role === 'eleve') {
+        this.addTask({
+            id: 'school_data',
+            name: 'School Data',
+            throttleMs: 1800000, // 30 mins
+            syncFn: () => syncService.syncSchoolPortalData(this.merchantId!),
+            lastSyncKey: `last_sync_school_data_${this.merchantId}`
+        });
+      } else {
         this.addTask({
             id: 'merchant_data',
             name: 'Merchant Data',
@@ -101,6 +110,7 @@ class BackgroundSyncManager {
             syncFn: () => syncService.syncSettings(this.merchantId!),
             lastSyncKey: `last_sync_settings_${this.merchantId}`
         });
+      }
     }
   }
 

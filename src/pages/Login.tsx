@@ -78,6 +78,9 @@ const Login = () => {
         return; // Redirect happens
       }
 
+      localStorage.removeItem('activeTeacherId');
+      localStorage.removeItem('activeParentId');
+      localStorage.removeItem('activeStudentId');
       await signInWithGoogle();
       const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
@@ -167,42 +170,58 @@ const Login = () => {
             // 2. Try to find parent
             if (!matchingTeacher) {
               try {
-                const q1 = query(collection(firestoreDb, 'parents'), where('username', '==', usernameInput));
-                const snap1 = await getDocs(q1);
-                if (!snap1.empty) {
-                  const doc = snap1.docs[0];
-                  matchingParent = { id: doc.id, ...doc.data() };
-                  await localDb.parents?.put(matchingParent);
-                } else {
-                  const q2 = query(collection(firestoreDb, 'parents'), where('phone', '==', usernameInput));
-                  const snap2 = await getDocs(q2);
-                  if (!snap2.empty) {
-                    const doc = snap2.docs[0];
+                const rawInput = usernameInput.trim();
+                const cleanDigits = rawInput.replace(/[^0-9]/g, '');
+                
+                const queriesToRun = [];
+                
+                // Add default queries
+                queriesToRun.push(query(collection(firestoreDb, 'parents'), where('username', '==', rawInput)));
+                queriesToRun.push(query(collection(firestoreDb, 'parents'), where('phone', '==', rawInput)));
+                queriesToRun.push(query(collection(firestoreDb, 'parents'), where('username', '==', rawInput.toLowerCase())));
+                
+                if (cleanDigits) {
+                  queriesToRun.push(query(collection(firestoreDb, 'parents'), where('username', '==', cleanDigits)));
+                  queriesToRun.push(query(collection(firestoreDb, 'parents'), where('phone', '==', cleanDigits)));
+                  
+                  if (cleanDigits.length >= 9) {
+                    const last9 = cleanDigits.slice(-9);
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('username', '==', last9)));
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('phone', '==', last9)));
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('username', '==', `221${last9}`)));
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('phone', '==', `221${last9}`)));
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('username', '==', `+221${last9}`)));
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('phone', '==', `+221${last9}`)));
+                    
+                    const sp1 = `${last9.slice(0, 2)} ${last9.slice(2, 5)} ${last9.slice(5, 7)} ${last9.slice(7)}`;
+                    const sp2 = `+221 ${last9.slice(0, 2)} ${last9.slice(2, 5)} ${last9.slice(5, 7)} ${last9.slice(7)}`;
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('phone', '==', sp1)));
+                    queriesToRun.push(query(collection(firestoreDb, 'parents'), where('phone', '==', sp2)));
+                  }
+                }
+
+                // Run queries in parallel
+                const snapshots = await Promise.all(queriesToRun.map(q => getDocs(q).catch(() => null)));
+                for (const snap of snapshots) {
+                  if (snap && !snap.empty) {
+                    const doc = snap.docs[0];
                     matchingParent = { id: doc.id, ...doc.data() };
                     await localDb.parents?.put(matchingParent);
-                  } else {
-                    const cleanInput = usernameInput.replace(/[^0-9]/g, '');
-                    if (cleanInput.length > 5) {
-                      const q3 = query(collection(firestoreDb, 'parents'), where('phone', '==', cleanInput));
-                      const snap3 = await getDocs(q3);
-                      if (!snap3.empty) {
-                        const doc = snap3.docs[0];
-                        matchingParent = { id: doc.id, ...doc.data() };
-                        await localDb.parents?.put(matchingParent);
-                      }
-                    }
+                    break;
                   }
                 }
               } catch (err) {
                 console.warn("Firestore parent check error, falling back locally:", err);
               }
-
+ 
               if (!matchingParent) {
                 const allParents = await localDb.parents?.toArray() || [];
                 const cleanInput = usernameInput.replace(/[^0-9]/g, '');
                 matchingParent = allParents.find((p: any) => {
                   const cleanPhone = (p.phone || '').replace(/[^0-9]/g, '');
-                  return (p.username?.toLowerCase() === usernameInput) || (cleanPhone && cleanPhone === cleanInput && cleanInput.length > 5);
+                  if (p.username?.toLowerCase() === usernameInput.toLowerCase()) return true;
+                  if (cleanPhone && cleanInput && cleanPhone.slice(-9) === cleanInput.slice(-9) && cleanInput.slice(-9).length >= 8) return true;
+                  return false;
                 });
               }
             }
@@ -210,30 +229,31 @@ const Login = () => {
             // 3. Try to find student
             if (!matchingTeacher && !matchingParent) {
               try {
-                const q1 = query(collection(firestoreDb, 'students'), where('studentUsername', '==', usernameInput));
-                const snap1 = await getDocs(q1);
-                if (!snap1.empty) {
-                  const doc = snap1.docs[0];
-                  matchingStudent = { id: doc.id, ...doc.data() };
-                  await localDb.students?.put(matchingStudent);
-                } else {
-                  const q2 = query(collection(firestoreDb, 'students'), where('username', '==', usernameInput));
-                  const snap2 = await getDocs(q2);
-                  if (!snap2.empty) {
-                    const doc = snap2.docs[0];
+                const queriesToRun = [
+                  query(collection(firestoreDb, 'students'), where('studentUsername', '==', usernameInput)),
+                  query(collection(firestoreDb, 'students'), where('studentUsername', '==', usernameInput.toLowerCase())),
+                  query(collection(firestoreDb, 'students'), where('username', '==', usernameInput)),
+                  query(collection(firestoreDb, 'students'), where('username', '==', usernameInput.toLowerCase()))
+                ];
+
+                const snapshots = await Promise.all(queriesToRun.map(q => getDocs(q).catch(() => null)));
+                for (const snap of snapshots) {
+                  if (snap && !snap.empty) {
+                    const doc = snap.docs[0];
                     matchingStudent = { id: doc.id, ...doc.data() };
                     await localDb.students?.put(matchingStudent);
+                    break;
                   }
-                }
+				}
               } catch (err) {
                 console.warn("Firestore student check error, falling back locally:", err);
               }
-
+ 
               if (!matchingStudent) {
                 const allStudents = await localDb.students?.toArray() || [];
                 matchingStudent = allStudents.find((s: any) => 
-                  (s.studentUsername?.toLowerCase() === usernameInput) || 
-                  (s.username?.toLowerCase() === usernameInput)
+                  (s.studentUsername?.toLowerCase() === usernameInput.toLowerCase()) || 
+                  (s.username?.toLowerCase() === usernameInput.toLowerCase())
                 );
               }
             }
@@ -248,21 +268,28 @@ const Login = () => {
           } catch (signOutErr) {
             console.warn("Sign out err:", signOutErr);
           }
-
+ 
           if (matchingTeacher && matchingTeacher.password?.trim() === formData.password.trim()) {
             localStorage.setItem('activeTeacherId', matchingTeacher.id);
+            localStorage.removeItem('activeParentId');
+            localStorage.removeItem('activeStudentId');
             const mId = matchingTeacher.merchantId || matchingTeacher.merchant_id;
             if (mId) localStorage.setItem('merchantId', mId);
             navigate('/merchant/saas');
             return;
           } else if (matchingParent && (matchingParent.password?.trim() === formData.password.trim() || (matchingParent as any).pin?.trim() === formData.password.trim())) {
-            localStorage.setItem('activeParentId', matchingParent.phone || matchingParent.id);
+            const parentKey = matchingParent.id || (matchingParent.phone || '').replace(/[^0-9]/g, '');
+            localStorage.setItem('activeParentId', parentKey);
+            localStorage.removeItem('activeTeacherId');
+            localStorage.removeItem('activeStudentId');
             const mId = matchingParent.merchantId || matchingParent.merchant_id;
             if (mId) localStorage.setItem('merchantId', mId);
             navigate('/merchant/saas');
             return;
           } else if (matchingStudent && (matchingStudent.studentPassword?.trim() === formData.password.trim() || matchingStudent.password?.trim() === formData.password.trim())) {
             localStorage.setItem('activeStudentId', matchingStudent.id);
+            localStorage.removeItem('activeTeacherId');
+            localStorage.removeItem('activeParentId');
             const mId = matchingStudent.merchantId || matchingStudent.merchant_id;
             if (mId) localStorage.setItem('merchantId', mId);
             navigate('/merchant/saas');
@@ -271,7 +298,10 @@ const Login = () => {
             throw new Error("Identifiant ou Code PIN incorrect.");
           }
         }
-
+ 
+        localStorage.removeItem('activeTeacherId');
+        localStorage.removeItem('activeParentId');
+        localStorage.removeItem('activeStudentId');
         await signInWithEmail(formData.email, formData.password);
         navigate(targetUrl);
       } else {

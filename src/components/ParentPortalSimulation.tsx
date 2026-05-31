@@ -12,6 +12,13 @@ import {
 export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: any, merchant: any, onClose: () => void }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedChild, setSelectedChild] = useState(parent?.children?.[0] || null);
+
+  // Auto-select first child if parent's children array is populated/updated dynamically after sync
+  React.useEffect(() => {
+    if (!selectedChild && parent?.children?.[0]) {
+      setSelectedChild(parent.children[0]);
+    }
+  }, [parent?.children, selectedChild]);
   const [scheduleViewType, setScheduleViewType] = useState<'grid' | 'day' | 'flow'>('grid');
   const [selectedDay, setSelectedDay] = useState<string>(() => {
     const daysMap = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -19,37 +26,118 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
     return dName === 'Dimanche' ? 'Lundi' : dName;
   });
 
+  const resolvedMerchantId = useMemo(() => {
+    return merchant?.id && merchant.id !== 'fallback-id' 
+      ? merchant.id 
+      : (selectedChild?.merchantId || selectedChild?.merchant_id || localStorage.getItem('merchantId') || '');
+  }, [merchant, selectedChild]);
+
+  // Proactive Sync on Portal Session load
+  React.useEffect(() => {
+    if (resolvedMerchantId) {
+      console.log("[ParentPortal] Triggering proactive SaaS collection synchronization with merchant:", resolvedMerchantId);
+      import('../services/syncService').then(({ syncService }) => {
+        syncService.syncSchoolPortalData(resolvedMerchantId, true);
+      }).catch(err => {
+        console.error("[ParentPortal] Fail to trigger proactive sync:", err);
+      });
+    }
+  }, [resolvedMerchantId]);
+
   const attendances = useLiveQuery(() => 
     selectedChild ? db.attendance?.where('studentId').equals(selectedChild.id).reverse().sortBy('date') : []
   , [selectedChild?.id]) || [];
+
+  const homeworks = useLiveQuery(() => 
+    resolvedMerchantId ? db.homeworks?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
 
   const absences = attendances.filter(a => a.status === 'absent');
   const lates = attendances.filter(a => a.status === 'late');
 
   const studentClasses = useLiveQuery(() => 
-    merchant?.id ? db.classes?.where('merchantId').equals(merchant.id).toArray() : []
-  , [merchant?.id]) || [];
+    resolvedMerchantId ? db.classes?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
 
   const schedules = useLiveQuery(() => 
-    merchant?.id ? db.schedules?.where('merchantId').equals(merchant.id).toArray() : []
-  , [merchant?.id]) || [];
+    resolvedMerchantId ? db.schedules?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
+
+  const selectedChildGrades = useLiveQuery(() => 
+    selectedChild?.id ? db.grades?.where('studentId').equals(selectedChild.id).toArray() : []
+  , [selectedChild?.id]) || [];
+
+  const subjects = useLiveQuery(() => 
+    resolvedMerchantId ? db.subjects?.where('merchantId').equals(resolvedMerchantId).toArray() : []
+  , [resolvedMerchantId]) || [];
+
+  const subjectsMap = useMemo(() => {
+    const m = new Map<string, string>();
+    subjects.forEach((s: any) => {
+      m.set(s.id, s.name);
+    });
+    return m;
+  }, [subjects]);
 
   const selectedChildClass = useMemo(() => {
     if (!selectedChild) return null;
-    const childClassId = selectedChild.classId;
+    const isClassNameSimilar = (name1: string, name2: string) => {
+      if (!name1 || !name2) return false;
+      const clean = (s: string) => s.toString().toLowerCase().replace(/^(classe\s*:\s*|classe\s*)/gi, '').trim();
+      const c1 = clean(name1);
+      const c2 = clean(name2);
+      return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+    };
+    const childClassId = selectedChild.classId || selectedChild.class_id;
     const childGrade = selectedChild.grade || selectedChild.class;
-    return studentClasses.find((c: any) => c.id === childClassId || c.name === childGrade);
+    return studentClasses.find((c: any) => (childClassId && c.id === childClassId) || isClassNameSimilar(c.name, childGrade));
   }, [studentClasses, selectedChild]);
+
+  const validHomeworks = useMemo(() => {
+    if (!homeworks || !selectedChild) return [];
+    const isClassNameSimilar = (name1: string, name2: string) => {
+      if (!name1 || !name2) return false;
+      const clean = (s: string) => s.toString().toLowerCase().replace(/^(classe\s*:\s*|classe\s*)/gi, '').trim();
+      const c1 = clean(name1);
+      const c2 = clean(name2);
+      return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+    };
+    return homeworks.filter((h: any) => {
+      const classId = h.classId || h.class_id;
+      const childClassId = selectedChild.classId || selectedChild.class_id;
+      const matchesClassId = childClassId && classId === childClassId;
+      
+      const matchedClass = studentClasses.find((c: any) => c.id === classId);
+      const childGrade = selectedChild.grade || selectedChild.class || '';
+      
+      const matchesClassName = matchedClass && matchedClass.name && childGrade && isClassNameSimilar(matchedClass.name, childGrade);
+      const matchesClassDirect = selectedChildClass && classId === selectedChildClass.id;
+      
+      const hClassIdStr = (classId || '').toString();
+      const matchesDirectNameLike = isClassNameSimilar(hClassIdStr, childGrade);
+
+      return matchesClassId || matchesClassName || matchesClassDirect || matchesDirectNameLike;
+    });
+  }, [homeworks, selectedChildClass, studentClasses, selectedChild]);
 
   const classSchedules = useMemo(() => {
     if (!selectedChild) return [];
-    const childClassId = selectedChild.classId;
+    const isClassNameSimilar = (name1: string, name2: string) => {
+      if (!name1 || !name2) return false;
+      const clean = (s: string) => s.toString().toLowerCase().replace(/^(classe\s*:\s*|classe\s*)/gi, '').trim();
+      const c1 = clean(name1);
+      const c2 = clean(name2);
+      return c1 === c2 || c1.includes(c2) || c2.includes(c1);
+    };
+    const childClassId = selectedChild.classId || selectedChild.class_id;
     const childGrade = selectedChild.grade || selectedChild.class;
     return schedules.filter((s: any) => {
       const matchesClassId = childClassId && s.classId === childClassId;
       const matchedClass = studentClasses.find(c => c.id === s.classId);
-      const matchesClassName = matchedClass && matchedClass.name === childGrade;
-      return matchesClassId || matchesClassName;
+      const matchesClassName = matchedClass && isClassNameSimilar(matchedClass.name, childGrade);
+      const sClassIdStr = (s.classId || '').toString();
+      const matchesDirectNameLike = isClassNameSimilar(sClassIdStr, childGrade);
+      return matchesClassId || matchesClassName || matchesDirectNameLike;
     });
   }, [schedules, studentClasses, selectedChild]);
 
@@ -71,30 +159,79 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
           <div className="space-y-6 animate-fade-in">
             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black text-slate-800">Bulletins & Notes de {selectedChild?.name || 'l\'élève'}</h3>
+                <h3 className="text-xl font-black text-slate-800">Bulletins & Notes de {selectedChild?.firstName || selectedChild?.name || 'l\'élève'}</h3>
                 <button className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl font-bold text-sm hover:bg-indigo-100 transition-colors">
                   <Download className="w-4 h-4" />
                   <span>Télécharger Bulletin</span>
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200/60">
-                  <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Mathématiques</span>
-                  <div className="flex items-end gap-3 mt-2">
-                    <span className="text-3xl font-black text-emerald-600">16.5</span>
-                    <span className="text-sm font-bold text-slate-500 pb-1">/ 20</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2 font-medium">Examen Semestriel - Excellents résultats</p>
+
+              {selectedChildGrades.length === 0 ? (
+                <div className="text-center py-12 text-slate-450">
+                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-30 text-slate-500" />
+                  <p className="text-sm font-medium">Aucune note n'a encore été saisie pour ce trimestre.</p>
                 </div>
-                <div className="p-4 bg-slate-50 rounded-2xl border border-gray-200/60">
-                  <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Français</span>
-                  <div className="flex items-end gap-3 mt-2">
-                    <span className="text-3xl font-black text-blue-600">14.0</span>
-                    <span className="text-sm font-bold text-slate-500 pb-1">/ 20</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2 font-medium">Devoir sur table - En progression</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {selectedChildGrades.map((g: any, idx: number) => {
+                    const subjectName = subjectsMap.get(g.subjectId) || g.subjectId || 'Matière';
+                    
+                    const scoreD1 = g.devoir1 !== undefined && g.devoir1 !== '' ? Number(g.devoir1) : null;
+                    const scoreD2 = g.devoir2 !== undefined && g.devoir2 !== '' ? Number(g.devoir2) : null;
+                    const scoreCompo = g.compo !== undefined && g.compo !== '' ? Number(g.compo) : null;
+                    
+                    const devSum = (scoreD1 !== null ? scoreD1 : 0) + (scoreD2 !== null ? scoreD2 : 0);
+                    const devCount = (scoreD1 !== null ? 1 : 0) + (scoreD2 !== null ? 1 : 0);
+                    const devAvg = devCount > 0 ? devSum / devCount : null;
+                    
+                    let average: number | null = null;
+                    if (devAvg !== null && scoreCompo !== null) {
+                      average = (devAvg + scoreCompo * 2) / 3;
+                    } else if (devAvg !== null) {
+                      average = devAvg;
+                    } else if (scoreCompo !== null) {
+                      average = scoreCompo;
+                    }
+
+                    return (
+                      <div key={g.id || idx} className="p-5 bg-slate-50 rounded-2xl border border-gray-150 flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-3 border-b border-gray-150 pb-2">
+                          <div>
+                            <span className="text-[10px] uppercase font-black tracking-widest text-indigo-600 font-extrabold">{subjectName}</span>
+                            <p className="text-xs text-slate-500 mt-0.5 font-bold">{g.term || 'Trimestre 1'}</p>
+                          </div>
+                          {average !== null && (
+                            <div className="text-right">
+                              <span className="text-[8px] uppercase font-bold text-slate-400 block mb-0.5">Moyenne</span>
+                              <span className="text-xs font-black px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-150">
+                                {average.toFixed(2)} / 20
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-white p-2 rounded-xl border border-gray-100 text-center shadow-xs">
+                            <span className="text-[8px] uppercase font-bold text-slate-400 block">Devoir 1</span>
+                            <span className="text-xs font-black text-slate-700">{scoreD1 !== null ? scoreD1.toFixed(1) : '-'}</span>
+                            <span className="text-[8px] text-slate-500 font-bold block">/20</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-xl border border-gray-100 text-center shadow-xs">
+                            <span className="text-[8px] uppercase font-bold text-slate-400 block">Devoir 2</span>
+                            <span className="text-xs font-black text-slate-700">{scoreD2 !== null ? scoreD2.toFixed(1) : '-'}</span>
+                            <span className="text-[8px] text-slate-500 font-bold block">/20</span>
+                          </div>
+                          <div className="bg-white p-2 rounded-xl border border-gray-100 text-center shadow-xs border-indigo-100 bg-indigo-50/20">
+                            <span className="text-[8px] uppercase font-bold text-indigo-600 block">Comp.</span>
+                            <span className="text-xs font-black text-indigo-700">{scoreCompo !== null ? scoreCompo.toFixed(1) : '-'}</span>
+                            <span className="text-[8px] text-indigo-500 font-bold block">/20</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         );
@@ -166,6 +303,38 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
              </div>
           </div>
         );
+      case 'homework':
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-purple-500" /> Cahier de Texte
+              </h3>
+              
+              {validHomeworks.length === 0 ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-150 text-center py-10">
+                    <BookOpen className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+                    <p className="text-sm font-bold text-slate-700">Aucun devoir ou leçon n'a été publié pour l'instant.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {validHomeworks.map((h: any, idx: number) => (
+                    <div key={h.id || idx} className="p-4 bg-slate-50 rounded-2xl border border-indigo-100">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">{h.subjectName || 'Général'}</span>
+                        <span className="text-xs text-rose-500 font-bold">Pour le: {new Date(h.dueDate).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-800 text-sm mb-1">{h.title}</h4>
+                      <p className="text-slate-600 text-xs leading-relaxed max-w-xl whitespace-pre-wrap">{h.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
       case 'schedule':
         return (
           <div className="space-y-6 animate-fade-in">
@@ -179,7 +348,7 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
                 </div>
 
                 {/* Switcher pour le Type de Présentation Calendrier */}
-                {selectedChildClass?.schedulePublished && classSchedules.length > 0 && (
+                {(selectedChildClass?.schedulePublished !== false) && classSchedules.length > 0 && (
                   <div className="flex bg-slate-100 p-1 rounded-2xl border border-gray-150 inline-flex self-start">
                     <button 
                       onClick={() => setScheduleViewType('grid')}
@@ -203,7 +372,7 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
                 )}
               </div>
 
-              {!selectedChildClass?.schedulePublished ? (
+              {selectedChildClass?.schedulePublished === false ? (
                 <div className="text-center py-12 bg-amber-50/50 rounded-2xl border border-amber-200 text-amber-800 font-medium">
                   <EyeOff className="w-12 h-12 mx-auto mb-3 text-amber-500 animate-pulse" />
                   <p className="text-sm font-bold text-amber-900">Emploi du temps non publié</p>
@@ -441,22 +610,24 @@ export const ParentPortalSimulation = ({ parent, merchant, onClose }: { parent: 
               </div>
 
               <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><BookOpen className="w-5 h-5 text-purple-500" /> Cahier de Texte (Aujourd'hui)</h3>
+                <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><BookOpen className="w-5 h-5 text-purple-500" /> Cahier de Texte</h3>
                 <div className="space-y-3">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-100">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Mathématiques</span>
-                      <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-md">Pour Demain</span>
+                  {validHomeworks.length === 0 ? (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-gray-100 text-center py-6">
+                      <BookOpen className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                      <p className="text-xs font-bold text-slate-500">Aucun devoir ou leçon n'a été publié pour l'instant.</p>
                     </div>
-                    <p className="text-sm font-bold text-slate-700">Faire les exercices 12 et 13 page 45.</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-gray-100">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Histoire-Géo</span>
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Pour Lundi</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">Apprendre la leçon sur la Révolution Industrielle.</p>
-                  </div>
+                  ) : (
+                    validHomeworks.slice(0, 3).map((h: any, idx: number) => (
+                      <div key={h.id || idx} className="p-3 bg-slate-50 rounded-xl border border-gray-100">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">{h.subjectName || 'Général'}</span>
+                          <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-md">Pour le {new Date(h.dueDate).toLocaleDateString('fr-FR')}</span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-700">{h.title}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

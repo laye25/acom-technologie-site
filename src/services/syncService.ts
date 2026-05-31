@@ -1,5 +1,5 @@
 import { Activity } from '../data/repositories/activity.repository';
-import { db } from '../db/db';
+import { db, setRemoteSyncState } from '../db/db';
 import { where, limit, orderBy } from 'firebase/firestore';
 import { merchantSaleRepository } from '../data/repositories/merchant-sale.repository';
 import { merchantExpenseRepository } from '../data/repositories/merchant-expense.repository';
@@ -520,23 +520,23 @@ export const syncService = {
     }
   },
 
-  async syncSaaSCollection(merchantId: string, collectionName: string, localTable: any) {
-    if (!(await this.isOnline(merchantId))) return;
+  async syncSaaSCollection(merchantId: string, collectionName: string, localTable: any, force: boolean = false) {
+    if (!(await this.isOnline(merchantId, force))) return;
     try {
       const lastSyncKey = `last_sync_${collectionName}_${merchantId || 'global'}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
       
-      // Throttle: 30 minutes for SaaS data
-      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 1800000) {
+      // Throttle: 30 minutes for SaaS data unless forced
+      if (!force && lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 1800000) {
         return;
       }
 
       const timeConstraints: any[] = [];
-      if (lastSyncStr) {
+      if (!force && lastSyncStr) {
         timeConstraints.push(where('updated_at', '>=', new Date(parseInt(lastSyncStr, 10))));
       }
 
-      console.log(`Syncing ${collectionName}... ${lastSyncStr ? '(Delta)' : '(Full Initial Sync)'}`);
+      console.log(`Syncing ${collectionName}... ${!force && lastSyncStr ? '(Delta)' : '(Full Sync)'}`);
       
       const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
         protected collectionName = collectionName;
@@ -546,9 +546,27 @@ export const syncService = {
       const mId = merchantId || 'global';
 
       if (mId !== 'global') {
-        remoteData = await repo.getAll([where('merchant_id', '==', mId), ...timeConstraints]);
+        try {
+          remoteData = await repo.getAll([where('merchant_id', '==', mId), ...timeConstraints]);
+        } catch (err1) {
+          console.warn(`[sync] merchant_id query failed for ${collectionName}, trying merchantId fallback`);
+        }
         if (!remoteData || remoteData.length === 0) {
-          remoteData = await repo.getAll([where('merchantId', '==', mId), ...timeConstraints]);
+          try {
+            remoteData = await repo.getAll([where('merchantId', '==', mId), ...timeConstraints]);
+          } catch (err2) {
+            console.warn(`[sync] merchantId query failed for ${collectionName}`);
+          }
+        }
+        
+        // Final fallback if both fail but we really need it
+        if (!remoteData || remoteData.length === 0) {
+           try {
+             // Try without updated_at constraint if it failed because of missing composite index
+             console.log(`[sync] Trying without time constraints for ${collectionName}...`);
+             remoteData = await repo.getAll([where('merchantId', '==', mId)]);
+           } catch (err3) {
+           }
         }
       } else {
         remoteData = await repo.getAll([...timeConstraints]);
@@ -560,13 +578,39 @@ export const syncService = {
           ...d,
           merchantId: d.merchant_id || d.merchantId
         }));
-        await localTable.bulkPut(mappedData);
+        setRemoteSyncState(true);
+        try {
+          await localTable.bulkPut(mappedData);
+        } finally {
+          setRemoteSyncState(false);
+        }
         localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
       } else {
         localStorage.setItem(lastSyncKey, Date.now().toString());
       }
     } catch (error) {
       console.error(`Sync ${collectionName} failed:`, error);
+    }
+  },
+
+  async syncSchoolPortalData(merchantId: string, force: boolean = false) {
+    const collections = [
+      { name: 'students', table: db.students },
+      { name: 'teachers', table: db.teachers },
+      { name: 'classes', table: db.classes },
+      { name: 'subjects', table: db.subjects },
+      { name: 'grades', table: db.grades },
+      { name: 'parents', table: db.parents },
+      { name: 'attendance', table: db.attendance },
+      { name: 'communications', table: db.communications },
+      { name: 'ai_insights', table: db.ai_insights },
+      { name: 'schedules', table: db.schedules },
+      { name: 'homeworks', table: db.homeworks },
+      { name: 'discipline_records', table: db.discipline_records }
+    ];
+    
+    for (const col of collections) {
+      await this.syncSaaSCollection(merchantId, col.name, col.table, force);
     }
   },
 
@@ -592,7 +636,10 @@ export const syncService = {
       { name: 'parents', table: db.parents },
       { name: 'attendance', table: db.attendance },
       { name: 'communications', table: db.communications },
-      { name: 'ai_insights', table: db.ai_insights }
+      { name: 'ai_insights', table: db.ai_insights },
+      { name: 'schedules', table: db.schedules },
+      { name: 'homeworks', table: db.homeworks },
+      { name: 'discipline_records', table: db.discipline_records }
     ];
     
     for (const col of collections) {
@@ -756,6 +803,52 @@ export const syncService = {
       console.log('Push pending data complete.');
     } catch (error) {
       console.error('Push pending data failed:', error);
+    }
+  },
+
+  async pushSchoolPortalData(merchantId: string) {
+    if (!(await this.isOnline(merchantId))) return;
+    try {
+      console.log(`Pushing local school data for merchant ${merchantId} to firestore...`);
+      const { firestoreService } = await import('./firestoreService');
+      
+      const educationalTables = [
+        { name: 'classes', table: db.classes },
+        { name: 'subjects', table: db.subjects },
+        { name: 'grades', table: db.grades },
+        { name: 'attendance', table: db.attendance },
+        { name: 'communications', table: db.communications },
+        { name: 'ai_insights', table: db.ai_insights },
+        { name: 'schedules', table: db.schedules },
+        { name: 'homeworks', table: db.homeworks },
+        { name: 'discipline_records', table: db.discipline_records },
+        { name: 'students', table: db.students },
+        { name: 'teachers', table: db.teachers },
+        { name: 'parents', table: db.parents }
+      ];
+
+      for (const col of educationalTables) {
+        try {
+          const items = await col.table.where('merchantId').equals(merchantId).toArray();
+          console.log(`[pushSchoolPortalData] Found ${items.length} local items in ${col.name} to upload`);
+          
+          for (const item of items) {
+            const dataToSave = {
+              ...item,
+              merchantId,
+              merchant_id: merchantId
+            };
+            if (item.id) {
+              await firestoreService.save(col.name, dataToSave);
+            }
+          }
+        } catch (tableErr) {
+          console.error(`Failed to push local ${col.name} table:`, tableErr);
+        }
+      }
+      console.log('Local school portal data push completed.');
+    } catch (err) {
+      console.error('Error during pushSchoolPortalData:', err);
     }
   },
 
