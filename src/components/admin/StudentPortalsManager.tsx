@@ -135,7 +135,7 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center bg-white p-4 rounded-3xl border border-gray-150 shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-4 items-center bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
@@ -143,7 +143,7 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
             placeholder="Rechercher par nom d'élève, identifiant..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-2xl text-xs outline-none focus:ring-2 focus:ring-indigo-150 font-sans"
+            className="w-full pl-11 pr-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-2xl text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 font-sans"
           />
         </div>
 
@@ -151,7 +151,7 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
           <select
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-2xl text-xs outline-none focus:ring-2 focus:ring-indigo-150 font-sans font-bold"
+            className="w-full px-4 py-2.5 bg-gray-50/50 border border-gray-200 rounded-2xl text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 font-sans font-bold"
           >
             <option value="all">Toutes les classes</option>
             {classes.map((c: any) => (
@@ -163,7 +163,7 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
 
       {/* List / Table */}
       {filteredStudents.length === 0 ? (
-        <div className="bg-white rounded-[2rem] border border-gray-150 shadow-sm p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
           <GraduationCap className="w-12 h-12 text-slate-300 mb-3" />
           <p className="text-slate-500 text-sm font-medium">Aucun élève trouvé.</p>
           <p className="text-xs text-slate-400 mt-1">Créez votre dossier académique pour générer automatiquement son accès portail.</p>
@@ -211,7 +211,7 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
                         </div>
                       </td>
                       <td className="px-8 py-5">
-                        <div className="inline-flex items-center gap-1.5 font-mono text-xs font-black bg-slate-50 text-gray-800 px-3 py-1 rounded-xl border border-gray-150">
+                        <div className="inline-flex items-center gap-1.5 font-mono text-xs font-black bg-slate-50 text-gray-800 px-3 py-1 rounded-xl border border-gray-100">
                           <span>{studentPin}</span>
                           <button
                             onClick={() => handleCopy(studentPin, "Code PIN")}
@@ -305,7 +305,7 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
                     required
                     value={studentUsername}
                     onChange={e => setStudentUsername(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-sans outline-none focus:ring-2 focus:ring-indigo-150"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-sans outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
                   <p className="text-[10px] text-gray-400">Exemple: e_diop223 (Utilisez de préférence des lettres minuscules, chiffres ou souligné)</p>
                 </div>
@@ -318,7 +318,7 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
                     maxLength={10}
                     value={studentPassword}
                     onChange={e => setStudentPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-sans outline-none focus:ring-2 focus:ring-indigo-150 font-mono"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-sans outline-none focus:ring-2 focus:ring-indigo-500/20 font-mono"
                   />
                 </div>
 

@@ -526,6 +526,11 @@ export interface Merchant {
   academicPeriodType?: 'trimestriel' | 'semestriel' | 'bimestriel' | 'custom';
   createdAt: any;
   updatedAt: any;
+  schoolPricing?: {
+    levels: Record<string, any>;
+    classes: Record<string, any>;
+    exceptions: Record<string, any>;
+  };
 }
 
 export interface Category {

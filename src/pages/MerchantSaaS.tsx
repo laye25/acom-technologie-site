@@ -1323,14 +1323,20 @@ const generateA4QuotePDF = (merchant: Merchant, quote: any, action: 'print' | 'd
   }
 };
 
-const TeacherDashboardWrapper = ({ teacher, merchant }: { teacher: any, merchant: any }) => {
+export const TeacherDashboardWrapper = ({ teacher, merchant }: { teacher: any, merchant: any }) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Synchronize class and student data on load for the teacher
   useEffect(() => {
-    if (merchant?.id) {
+    if (merchant?.id && teacher?.id) {
       console.log("Teacher dashboard sync triggered for merchant ID:", merchant.id);
-      syncService.syncSchoolPortalData(merchant.id, true);
+      setIsSyncing(true);
+      syncService.syncTeacherData(merchant.id, teacher.id).finally(() => {
+        setIsSyncing(false);
+        toast.success("Espace enseignant synchronisé", { icon: "🔄", id: "sync" });
+      });
     }
-  }, [merchant?.id]);
+  }, [merchant?.id, teacher?.id]);
 
   const dbClasses = useLiveQuery(() => 
     db.classes?.where('merchantId').equals(merchant?.id || '').toArray()
@@ -1355,12 +1361,12 @@ const TeacherDashboardWrapper = ({ teacher, merchant }: { teacher: any, merchant
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Portabilité Scolaire - Top Navbar de l'école */}
-      <header className="bg-white border-b border-gray-150/80 shadow-sm fixed top-0 left-0 right-0 z-50 py-3.5 px-6 md:px-12">
+      <header className="bg-white border-b border-gray-100 shadow-sm fixed top-0 left-0 right-0 z-50 py-3.5 px-6 md:px-12">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           
           {/* Logo de l'établissement scolaire */}
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-150 flex items-center justify-center shadow-inner overflow-hidden shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shadow-inner overflow-hidden shrink-0">
               {merchant?.logo ? (
                 <img src={merchant.logo} alt={merchant.name} className="w-full h-full object-contain p-1 rounded-xl" />
               ) : (
@@ -1868,10 +1874,10 @@ const MerchantSaaS = () => {
           { id: 'dashboard', label: 'Aperçu', icon: PieChart, group: 'Général' },
           { id: 'students', label: 'Administration', icon: GraduationCap, group: 'Administration Scolaire' },
           { id: 'alerte', label: 'Alerte Parents', icon: Zap, group: 'Administration Scolaire' },
-          { id: 'teachers', label: 'Enseignants', icon: Users, group: 'Administration Scolaire' },
+          { id: 'teachers', label: 'Portail Enseignant', icon: Users, group: 'Administration Scolaire' },
           { id: 'classes', label: 'Pédagogie', icon: BookOpen, group: 'Administration Scolaire' },
           { id: 'schedule', label: 'Emploi du Temps', icon: Calendar, group: 'Administration Scolaire' },
-          { id: 'grades', label: 'Portail Enseignant', icon: PenTool, group: 'Administration Scolaire' },
+          { id: 'grades', label: 'SAISIE RAPIDE DES NOTES', icon: PenTool, group: 'Administration Scolaire' },
           { id: 'parents', label: 'Portail Parents', icon: Users, group: 'Administration Scolaire' },
           { id: 'student-portals', label: 'Portails Élèves', icon: Key, group: 'Administration Scolaire' },
           { id: 'attendance', label: 'Présences', icon: ClipboardCheck, group: 'Administration Scolaire' },
@@ -1885,6 +1891,7 @@ const MerchantSaaS = () => {
           { id: 'fin_stock', label: 'Fournitures & Uniformes', icon: Package, group: 'Comptabilité / Finance' },
           { id: 'fin_transport', label: 'Transport Scolaire', icon: Bus, group: 'Comptabilité / Finance' },
           { id: 'fin_cantine', label: 'Cantine & Repas', icon: Utensils, group: 'Comptabilité / Finance' },
+          { id: 'fin_pricing', label: 'Paramètres Tarifs', icon: DollarSign, group: 'Comptabilité / Finance' },
           { id: 'reports', label: 'Rapports', icon: FileText, group: 'Comptabilité / Finance' },
           { id: 'settings', label: 'Réglages', icon: Settings, group: 'Comptabilité / Finance' },
         ];
@@ -3101,7 +3108,7 @@ const AlertParentsManager = ({ merchant }: { merchant: Merchant }) => {
             </div>
             
             <div className="space-y-4">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-gray-200/60 divide-y divide-gray-150">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-gray-200/60 divide-y divide-gray-100">
                 <div className="pb-2.5">
                   <span className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-widest block">Destinataire (Tuteur)</span>
                   <span className="text-xs font-black text-slate-800">{dashboardDispatchModal.parentName}</span>
@@ -3176,7 +3183,7 @@ const AlertParentsManager = ({ merchant }: { merchant: Merchant }) => {
                 value={broadcastSearchQuery}
                 onChange={(e) => setBroadcastSearchQuery(e.target.value)}
                 placeholder="Rechercher élève ou tuteur..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-150"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
 
@@ -3185,7 +3192,7 @@ const AlertParentsManager = ({ merchant }: { merchant: Merchant }) => {
               <select
                 value={broadcastClassFilter}
                 onChange={(e) => setBroadcastClassFilter(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 appearance-none outline-none focus:ring-2 focus:ring-indigo-150 cursor-pointer"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 appearance-none outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
               >
                 <option value="">Toutes les classes</option>
                 {classes.map((cls: any) => (
@@ -3202,7 +3209,7 @@ const AlertParentsManager = ({ merchant }: { merchant: Merchant }) => {
                 type="date"
                 value={broadcastTargetDate}
                 onChange={(e) => setBroadcastTargetDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 appearance-none outline-none focus:ring-2 focus:ring-indigo-150 cursor-pointer"
+                className="w-full px-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 appearance-none outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
               />
             </div>
 
@@ -3210,7 +3217,7 @@ const AlertParentsManager = ({ merchant }: { merchant: Merchant }) => {
               <select
                 value={broadcastAttendanceFilter}
                 onChange={(e) => setBroadcastAttendanceFilter(e.target.value)}
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 appearance-none outline-none focus:ring-2 focus:ring-indigo-150 cursor-pointer"
+                className="w-full px-4 py-2.5 bg-white border border-gray-200 text-sm rounded-xl font-bold text-gray-900 appearance-none outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
               >
                 <option value="">Présence (Toutes)</option>
                 <option value="absent">Absents</option>
@@ -3956,7 +3963,7 @@ const MerchantDashboard = ({
             </div>
             
             <div className="space-y-4">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-gray-200/60 divide-y divide-gray-150">
+              <div className="bg-slate-50 p-4 rounded-2xl border border-gray-200/60 divide-y divide-gray-100">
                 <div className="pb-2.5">
                   <span className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-widest block">Destinataire (Tuteur)</span>
                   <span className="text-xs font-black text-slate-800">{dashboardDispatchModal.parentName}</span>
@@ -4714,7 +4721,7 @@ const MerchantDashboard = ({
                         </div>
                         <div>
                           <p className="font-black text-ink text-sm leading-tight">{student.name}</p>
-                          <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Classe: {student.class}</p>
+                          <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Classe: {student.class || student.grade || student.class_id || student.classId || 'N/A'}</p>
                         </div>
                       </div>
                       <span className="text-[9px] font-mono font-black text-gray-400 uppercase">{student.enrollmentDate}</span>
@@ -11108,6 +11115,7 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
 
 const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
   const { user } = useAuth();
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [term, setTerm] = useState(merchant.academicPeriods?.[0] || 'Trimestre 1');
@@ -11123,51 +11131,216 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
     db.students?.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
+  const teachers = useLiveQuery(() => 
+    db.teachers?.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
+
   const storedGrades = useLiveQuery(() => 
     db.grades?.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
   // Local state map for fast editing
   const [gradesMap, setGradesMap] = useState<Record<string, { devoir1: string, devoir2: string, compo: string }>>({});
+  const [hasInitializedTeacher, setHasInitializedTeacher] = useState(false);
+  const [isSyncingGrades, setIsSyncingGrades] = useState(false);
 
+  // Pull latest data (classes, students, teachers, grades, etc.) using safe delta sync on mount
   useEffect(() => {
-    // Populate dropdowns defaults
-    if (classes.length > 0 && !selectedClass) {
-      setSelectedClass(classes[0].id);
+    if (merchant.id) {
+      syncService.syncSchoolPortalData(merchant.id, false)
+        .catch(err => console.error("Auto-sync school data error:", err));
     }
-  }, [classes]);
+  }, [merchant.id]);
 
-  useEffect(() => {
-    if (selectedClass) {
-      const currentClassObj = classes.find((c: any) => c.id === selectedClass);
-      const possibleSubjects = currentClassObj?.subjects && currentClassObj.subjects.length > 0
-        ? currentClassObj.subjects
-        : ['Mathématiques', 'Physique-Chimie', 'SVT', 'Français', 'Histoire-Géographie', 'Anglais', 'Éducation Physique'];
-      
-      if (!possibleSubjects.includes(selectedSubject)) {
-        setSelectedSubject(possibleSubjects[0] || '');
+  const handleForceSync = async () => {
+    if (!merchant.id) return;
+    setIsSyncingGrades(true);
+    try {
+      // Force sync true bypasses throttles and retrieves any newly added notes/grades/classes directly from the remote database
+      await syncService.syncSchoolPortalData(merchant.id, true);
+      toast.success("Synchronisation forcée réussie : Les notes et données existantes sont à jour !");
+    } catch (err) {
+      console.error("Force sync grades failed:", err);
+      toast.error("Erreur de synchronisation à distance.");
+    } finally {
+      setIsSyncingGrades(false);
+    }
+  };
+
+  // 1. Resolve selected teacher details
+  const selectedTeacherObj = useMemo(() => {
+    return teachers.find(t => t.id === selectedTeacherId);
+  }, [teachers, selectedTeacherId]);
+
+  // 2. Class options: Always provide all system classes for full offline capability
+  const availableClasses = classes;
+
+  // 3. Subjects list filtered: based on class subjects and selected teacher's focus subject
+  const availableSubjects = useMemo(() => {
+    if (!selectedClass) return [];
+    const currentClassObj = classes.find(c => c.id === selectedClass);
+    
+    let baseSubjects: string[] = [];
+    if (currentClassObj?.subjects && currentClassObj.subjects.length > 0) {
+      baseSubjects = currentClassObj.subjects;
+    } else {
+      baseSubjects = ['Mathématiques', 'Physique-Chimie', 'SVT', 'Français', 'Histoire-Géographie', 'Anglais', 'Éducation Physique'];
+    }
+
+    if (!selectedTeacherId || !selectedTeacherObj) return baseSubjects;
+
+    if (selectedTeacherObj.subject) {
+      const set = new Set<string>();
+      set.add(selectedTeacherObj.subject);
+      baseSubjects.forEach(s => set.add(s));
+      return Array.from(set);
+    }
+    return baseSubjects;
+  }, [classes, selectedClass, selectedTeacherId, selectedTeacherObj]);
+
+  // Format class name beautifully and prevent duplicate "Classe : " prefixes
+  const formatClassName = (name: string) => {
+    if (!name) return '';
+    const clean = name.replace(/^classe\s*:\s*/i, '');
+    return `Classe : ${clean}`;
+  };
+
+  // Synchronized bidirectional handlers
+  const handleTeacherChange = (teacherId: string) => {
+    setSelectedTeacherId(teacherId);
+    if (teacherId) {
+      const teacherObj = teachers.find(t => t.id === teacherId);
+      if (teacherObj) {
+        if (teacherObj.subject) {
+          setSelectedSubject(teacherObj.subject);
+        }
+        // Match a primary or extra class
+        const teacherClass = classes.find(c => 
+          c.id === teacherObj.classId || 
+          c.name === teacherObj.className
+        ) || (teacherObj.extraClasses && classes.find(c => teacherObj.extraClasses.includes(c.id) || teacherObj.extraClasses.includes(c.name)));
+
+        if (teacherClass) {
+          setSelectedClass(teacherClass.id);
+        }
       }
     }
-  }, [selectedClass, classes, selectedSubject]);
+  };
+
+  const handleSubjectChange = (subject: string) => {
+    setSelectedSubject(subject);
+    if (subject) {
+      // Find teacher teaching this subject
+      const matchingTeacher = teachers.find(t => 
+        t.subject === subject && 
+        (selectedClass && (t.classId === selectedClass || t.className === classes.find(c => c.id === selectedClass)?.name))
+      ) || teachers.find(t => t.subject === subject);
+
+      if (matchingTeacher) {
+        setSelectedTeacherId(matchingTeacher.id);
+      }
+    }
+  };
+
+  const handleClassChange = (classId: string) => {
+    setSelectedClass(classId);
+    if (classId) {
+      const classObj = classes.find(c => c.id === classId);
+      // Find a teacher assigned to this class and preferably teaching the current subject, or any subject
+      const matchingTeacher = teachers.find(t => 
+        (t.classId === classId || t.className === classObj?.name) && 
+        (selectedSubject && t.subject === selectedSubject)
+      ) || teachers.find(t => t.classId === classId || t.className === classObj?.name);
+
+      if (matchingTeacher) {
+        setSelectedTeacherId(matchingTeacher.id);
+        if (matchingTeacher.subject) {
+          setSelectedSubject(matchingTeacher.subject);
+        }
+      }
+    }
+  };
+
+  // Populate dynamic default teacher once on initial load to avoid overriding manual selection of "Saisie Directe Admin"
+  useEffect(() => {
+    if (teachers.length > 0 && !hasInitializedTeacher) {
+      setSelectedTeacherId(teachers[0].id);
+      setHasInitializedTeacher(true);
+    }
+  }, [teachers, hasInitializedTeacher]);
+
+  // Handle cascading dropdown state reset on class change
+  useEffect(() => {
+    if (availableClasses.length > 0) {
+      const isStillAvailable = availableClasses.some(c => c.id === selectedClass);
+      if (!selectedClass || !isStillAvailable) {
+        setSelectedClass(availableClasses[0].id);
+      }
+    } else {
+      setSelectedClass('');
+    }
+  }, [availableClasses, selectedClass]);
+
+  // Handle cascading dropdown state reset on subject change
+  useEffect(() => {
+    if (selectedClass) {
+      const isStillAvailable = availableSubjects.includes(selectedSubject);
+      if (!selectedSubject || !isStillAvailable) {
+        setSelectedSubject(availableSubjects[0] || '');
+      }
+    } else {
+      setSelectedSubject('');
+    }
+  }, [selectedClass, availableSubjects, selectedSubject]);
+
+  // Filter student records enrolled in the active selected class with highly robust matching
+  const classStudents = useMemo(() => {
+    if (!selectedClass) return [];
+    const currentClassObj = classes.find(c => c.id === selectedClass);
+    return students.filter((s: any) => {
+      const studentClassVal = (s.classId || s.class_id || s.class || s.grade || '').toString().trim().toLowerCase();
+      const selClassId = selectedClass.trim().toLowerCase();
+      const selClassName = currentClassObj ? currentClassObj.name.trim().toLowerCase() : '';
+      
+      const cleanClassVal = studentClassVal.replace(/^classe\s*:\s*/, '');
+      const cleanClassName = selClassName.replace(/^classe\s*:\s*/, '');
+      
+      return studentClassVal === selClassId || 
+             (selClassName && studentClassVal === selClassName) ||
+             (cleanClassName && cleanClassVal === cleanClassName);
+    });
+  }, [students, selectedClass, classes]);
 
   useEffect(() => {
-    // Init grades form when class and subject changes
-    const initial: any = {};
-    const classStudents = students; // For now all students, we can filter by current class if student has classId
+    // Populate form data maps from historical grade inputs synchronised from the database with maximum robustness
+    const initial: Record<string, { devoir1: string, devoir2: string, compo: string }> = {};
     classStudents.forEach((s: any) => {
-      // Find historical grade if exists
-      const existing = storedGrades.find(g => g.studentId === s.id && g.subjectId === selectedSubject && g.term === term);
+      const existing = storedGrades.find(g => {
+        const gStudent = (g.studentId || g.student_id || '').toString().trim().toLowerCase();
+        const gSubject = (g.subjectId || g.subject_id || g.subject || '').toString().trim().toLowerCase();
+        const gTerm = (g.term || g.periode || '').toString().trim().toLowerCase();
+        
+        const targetStudent = s.id.toString().trim().toLowerCase();
+        const targetSubject = (selectedSubject || '').toString().trim().toLowerCase();
+        const targetTerm = (term || '').toString().trim().toLowerCase();
+        
+        return gStudent === targetStudent && gSubject === targetSubject && gTerm === targetTerm;
+      });
+
       if (existing) {
-        initial[s.id] = { devoir1: existing.devoir1 || '', devoir2: existing.devoir2 || '', compo: existing.compo || '' };
+        initial[s.id] = { 
+          devoir1: existing.devoir1 !== undefined && existing.devoir1 !== null ? existing.devoir1.toString() : '', 
+          devoir2: existing.devoir2 !== undefined && existing.devoir2 !== null ? existing.devoir2.toString() : '', 
+          compo: existing.compo !== undefined && existing.compo !== null ? existing.compo.toString() : '' 
+        };
       } else {
         initial[s.id] = { devoir1: '', devoir2: '', compo: '' };
       }
     });
     setGradesMap(initial);
-  }, [selectedClass, selectedSubject, term, students.length, storedGrades.length]);
+  }, [selectedClass, selectedSubject, term, classStudents, storedGrades]);
 
   const handleGradeChange = (studentId: string, field: 'devoir1' | 'devoir2' | 'compo', value: string) => {
-    // Validation
     if (value !== '' && (isNaN(Number(value)) || Number(value) < 0 || Number(value) > 20)) {
       toast.error('La note doit être entre 0 et 20');
       return;
@@ -11187,13 +11360,25 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
     setIsSaving(true);
     try {
       const updates = Object.entries(gradesMap).map(([studentId, scores]) => {
-        const existing = storedGrades.find(g => g.studentId === studentId && g.subjectId === selectedSubject && g.term === term);
+        const existing = storedGrades.find(g => {
+          const gStudent = (g.studentId || g.student_id || '').toString().trim().toLowerCase();
+          const gSubject = (g.subjectId || g.subject_id || g.subject || '').toString().trim().toLowerCase();
+          const gTerm = (g.term || g.periode || '').toString().trim().toLowerCase();
+          
+          const targetStudent = studentId.toString().trim().toLowerCase();
+          const targetSubject = (selectedSubject || '').toString().trim().toLowerCase();
+          const targetTerm = (term || '').toString().trim().toLowerCase();
+          
+          return gStudent === targetStudent && gSubject === targetSubject && gTerm === targetTerm;
+        });
+
         return {
           id: existing ? existing.id : uuidv4(),
           merchantId: merchant.id,
           studentId,
           classId: selectedClass,
           subjectId: selectedSubject,
+          teacherId: selectedTeacherId || existing?.teacherId || '',
           term,
           devoir1: scores.devoir1,
           devoir2: scores.devoir2,
@@ -11201,8 +11386,14 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
           updatedAt: new Date().toISOString()
         };
       });
-      // Save efficiently using dexie bulkPut
+
       await db.grades.bulkPut(updates);
+      try {
+        const { firestoreService } = await import('../services/firestoreService');
+        for (const up of updates) {
+          await firestoreService.save('grades', up);
+        }
+      } catch(e) {}
       setLastSaved(new Date());
     } catch (e) {
       console.error(e);
@@ -11210,7 +11401,7 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
     setIsSaving(false);
   };
 
-  // Debounced auto-save
+  // Run periodic automated background sync when values are written by the user
   useEffect(() => {
     const handler = setTimeout(() => {
       const hasData = Object.values(gradesMap).some(g => g.devoir1 || g.devoir2 || g.compo);
@@ -11220,6 +11411,11 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
     }, 2000);
     return () => clearTimeout(handler);
   }, [gradesMap]);
+
+  const triggerManualSubmit = async () => {
+    await autoSave();
+    toast.success("Toutes les notes de ce niveau ont été transmises à la Direction générale !");
+  };
 
   const calculateAverage = (gradeObj: { devoir1: string, devoir2: string, compo: string }) => {
     if(!gradeObj) return '-';
@@ -11239,19 +11435,18 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
       return compo.toFixed(2);
     }
     
-    if (countDev > 0) return devAvg.toFixed(2);
-    return '-';
+    return countDev > 0 ? devAvg.toFixed(2) : '-';
   };
 
   const getAppreciation = (avgStr: string) => {
     if (avgStr === '-') return '';
     const avg = parseFloat(avgStr);
-    if (avg >= 16) return <span className="text-emerald-600 font-bold">Excellent</span>;
-    if (avg >= 14) return <span className="text-blue-600 font-semibold">Très Bien</span>;
-    if (avg >= 12) return <span className="text-indigo-600 font-medium">Assez Bien</span>;
-    if (avg >= 10) return <span className="text-gray-600">Passable</span>;
-    if (avg >= 8) return <span className="text-orange-500 font-semibold">Insuffisant</span>;
-    return <span className="text-red-600 font-bold">Médiocre</span>;
+    if (avg >= 16) return <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-xs font-black shadow-sm inline-flex items-center gap-1">✨ Excellent</span>;
+    if (avg >= 14) return <span className="bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-xs font-black shadow-sm inline-flex items-center gap-1">🌸 Très Bien</span>;
+    if (avg >= 12) return <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1 rounded-full text-xs font-black shadow-sm inline-flex items-center gap-1">👍 Assez Bien</span>;
+    if (avg >= 10) return <span className="bg-gray-50 text-gray-700 border border-gray-200 px-3 py-1 rounded-full text-xs font-black shadow-sm inline-flex items-center gap-1">Passable</span>;
+    if (avg >= 8) return <span className="bg-orange-50 text-orange-700 border border-orange-200 px-3 py-1 rounded-full text-xs font-black shadow-sm inline-flex items-center gap-1">⚠️ Insuffisant</span>;
+    return <span className="bg-rose-50 text-rose-700 border border-rose-200 px-3 py-1 rounded-full text-xs font-black shadow-sm inline-flex items-center gap-1">🚨 Médiocre</span>;
   };
 
   return (
@@ -11269,52 +11464,54 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
             <p className="text-indigo-200 mt-1">Ajoutez vos notes à distance, synchronisation automatique dès le retour de la connexion.</p>
           </div>
           
-          <div className="flex flex-wrap bg-indigo-950/50 p-2 rounded-2xl gap-2 border border-indigo-500/20">
+          <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2 bg-indigo-950/40 p-3 rounded-[1.5rem] border border-indigo-500/15 max-w-lg w-full sm:w-auto">
+            {/* 1. SELECTION DE LA CLASSE CONCERNÉE - PREMIÈRE POSITION */}
+            <select 
+              value={selectedClass} 
+              onChange={e => handleClassChange(e.target.value)}
+              className="bg-white text-indigo-950 font-black rounded-xl px-4 py-2.5 text-xs cursor-pointer outline-none shadow-sm w-full transition-all hover:bg-slate-50 border border-slate-100"
+            >
+              <option value="">Sélectionner Classe</option>
+              {availableClasses.map((c: any) => (
+                <option key={c.id} value={c.id}>{formatClassName(c.name)}</option>
+              ))}
+            </select>
+
+            {/* 2. SYSTEME DE PERIODE DIRECTE */}
             <select 
               value={term} 
               onChange={e => setTerm(e.target.value)}
-              className="bg-white text-indigo-900 font-bold rounded-xl px-4 py-2.5 text-sm appearance-none cursor-pointer outline-none min-w-[120px]"
+              className="bg-white text-indigo-950 font-black rounded-xl px-4 py-2.5 text-xs cursor-pointer outline-none shadow-sm w-full transition-all hover:bg-slate-50 border border-slate-100"
             >
               {(merchant.academicPeriods || ['Trimestre 1', 'Trimestre 2', 'Trimestre 3']).map(p => (
                 <option key={p} value={p}>{p}</option>
               ))}
             </select>
-            <select 
-              value={selectedClass} 
-              onChange={e => setSelectedClass(e.target.value)}
-              className="bg-white text-indigo-900 font-bold rounded-xl px-4 py-2.5 text-sm appearance-none cursor-pointer outline-none min-w-[120px]"
-            >
-              <option value="">Sélectionner la classe</option>
-              {classes.map((c: any) => (
-                <option key={c.id} value={c.id}>Classe : {c.name}</option>
-              ))}
-            </select>
+
+            {/* 3. SELECTION DE LA MATIÈRE À EVALUATION DE NOTES */}
             <select 
               value={selectedSubject} 
-              onChange={e => setSelectedSubject(e.target.value)}
-              className="bg-white text-indigo-900 font-bold rounded-xl px-4 py-2.5 text-sm appearance-none cursor-pointer outline-none min-w-[140px]"
+              onChange={e => handleSubjectChange(e.target.value)}
+              className="bg-white text-indigo-950 font-black rounded-xl px-4 py-2.5 text-xs cursor-pointer outline-none shadow-sm w-full transition-all hover:bg-slate-50 border border-slate-100"
             >
-              <option value="">Sélectionner la matière</option>
-              {(() => {
-                const currentClassObj = classes.find((c: any) => c.id === selectedClass);
-                if (currentClassObj?.subjects && currentClassObj.subjects.length > 0) {
-                  return currentClassObj.subjects.map((sub: string) => (
-                    <option key={sub} value={sub}>{sub}</option>
-                  ));
-                }
-                // Fallback standard subjects list if none are configured on the class object
-                return (
-                  <>
-                    <option value="Mathématiques">Mathématiques</option>
-                    <option value="Physique-Chimie">Physique-Chimie</option>
-                    <option value="SVT">SVT</option>
-                    <option value="Français">Français</option>
-                    <option value="Histoire-Géographie">Histoire-Géographie</option>
-                    <option value="Anglais">Anglais</option>
-                    <option value="Éducation Physique">Éducation Physique</option>
-                  </>
-                );
-              })()}
+              <option value="">Sélectionner Matière</option>
+              {availableSubjects.map((sub: string) => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+
+            {/* 4. SELECTION DE L'ENSEIGNANT RECONNU SUR LE DOSSIER */}
+            <select 
+              value={selectedTeacherId} 
+              onChange={e => handleTeacherChange(e.target.value)}
+              className="bg-white text-indigo-950 font-black rounded-xl px-4 py-2.5 text-xs cursor-pointer outline-none shadow-sm w-full transition-all hover:bg-slate-50 border border-slate-100"
+            >
+              <option value="">Saisie Directe Admin</option>
+              {teachers.map(t => (
+                <option key={t.id} value={t.id}>
+                  Enseignant : {t.firstName} {t.lastName || ''}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -11322,25 +11519,39 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
         <div className="bg-indigo-50/50 px-6 py-3 border-b border-indigo-100 flex items-center justify-between">
           <div className="flex items-center gap-4 text-sm font-medium text-gray-600">
             <div className="flex items-center gap-1.5">
-              {isSaving ? (
+              {isSaving || isSyncingGrades ? (
                 <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
               ) : (
                 <CheckCircle className="w-4 h-4 text-emerald-500" />
               )}
-              {isSaving ? 'Enregistrement automatique...' : lastSaved ? `Sauvegardé à ${lastSaved.toLocaleTimeString()}` : 'Prêt pour la saisie'}
+              {isSyncingGrades ? 'Synchronisation forcée en cours...' : isSaving ? 'Enregistrement automatique...' : lastSaved ? `Dernière sauvegarde locale : ${lastSaved.toLocaleTimeString()}` : 'Prêt pour la saisie'}
             </div>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors">
-            <Save className="w-4 h-4" />
-            Soumettre à la Direction
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleForceSync}
+              disabled={isSyncingGrades}
+              className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold shadow-sm transition-colors disabled:opacity-50"
+              title="Actualise et récupère toutes les notes déjà sauvegardées sur le serveur"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGrades ? 'animate-spin' : ''}`} />
+              Récupérer les notes existantes
+            </button>
+            <button 
+              onClick={triggerManualSubmit}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+            >
+              <Save className="w-3.5 h-3.5" />
+              Soumettre à la Direction
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto p-0">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="font-bold text-gray-600 p-4 w-6xs sticky top-0 bg-gray-50 z-10">Élève</th>
+                <th className="font-bold text-gray-600 p-4 sticky top-0 bg-gray-50 z-10 w-1/3">Élève</th>
                 <th className="font-bold text-gray-600 p-4 text-center sticky top-0 bg-gray-50 z-10">Interrogation 1 (/20)</th>
                 <th className="font-bold text-gray-600 p-4 text-center sticky top-0 bg-gray-50 z-10">Interrogation 2 (/20)</th>
                 <th className="font-bold text-indigo-800 p-4 text-center sticky top-0 bg-indigo-50 z-10 border-x border-indigo-100">Composition (/20)</th>
@@ -11349,11 +11560,15 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
               </tr>
             </thead>
             <tbody>
-              {students.length === 0 ? (
+              {classStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500 font-medium">Aucun élève enregistré. Veuillez ajouter des élèves d'abord.</td>
+                  <td colSpan={6} className="p-12 text-center text-gray-450 font-semibold bg-gray-50/20">
+                    <div className="text-2xl mb-2">📁</div>
+                    Aucun élève trouvé pour les sélections actuelles.<br />
+                    Veuillez ajouter des dossiers d'élèves dans l'onglet Administration ou associer la classe concernée.
+                  </td>
                 </tr>
-              ) : students.map((student: any, index: number) => {
+              ) : classStudents.map((student: any) => {
                 const g = gradesMap[student.id] || { devoir1: '', devoir2: '', compo: '' };
                 const avg = calculateAverage(g);
                 const appreciation = getAppreciation(avg);
@@ -11361,8 +11576,15 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
                 return (
                   <tr key={student.id} className="border-b border-gray-50 hover:bg-indigo-50/30 transition-colors">
                     <td className="p-4">
-                      <div className="font-bold text-gray-900">{student.firstName} {student.lastName}</div>
-                      <div className="text-xs text-gray-500 font-mono">MAT-{student.id.padStart(4, '0')}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-850 font-black flex items-center justify-center text-sm shadow-inner uppercase">
+                          {student.firstName?.[0] || ''}{student.lastName?.[0] || ''}
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-900">{student.firstName} {student.lastName}</div>
+                          <div className="text-[10px] text-gray-500 font-mono">MAT-{student.id.substring(0, 8).toUpperCase()}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="p-4 text-center">
                       <input 
@@ -11395,7 +11617,7 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
                       />
                     </td>
                     <td className="p-4 text-center">
-                      <div className={`font-mono font-bold text-lg ${avg !== '-' && parseFloat(avg) < 10 ? 'text-red-500' : 'text-gray-805'}`}>
+                      <div className={`font-mono font-black text-base ${avg !== '-' && parseFloat(avg) < 10 ? 'text-red-500 animate-pulse' : 'text-slate-800'}`}>
                         {avg}
                       </div>
                     </td>
@@ -11410,15 +11632,15 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
         </div>
         
         <div className="bg-gray-50 p-4 border-t border-gray-200 text-xs text-gray-500 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" />
-          Les notes sont sauvegardées localement. Cliquez sur "Soumettre à la Direction" une fois terminé pour validation.
+          <AlertCircle className="w-4 h-4 text-indigo-500" />
+          Les données de saisie rapide sont issues de l'ERP connecté et reliées aux dossiers d'inscription des élèves et des enseignants.
         </div>
       </div>
     </motion.div>
   );
 };
 
-const TeacherDashboardSpace = ({ 
+export const TeacherDashboardSpace = ({ 
   teacher, 
   merchant, 
   classes, 
@@ -11552,8 +11774,8 @@ const TeacherDashboardSpace = ({
   }, [allHomeworks, selectedClassId, activeSubject]);
 
   const activeClassObj = useMemo(() => {
-    return classes.find((c: any) => c.id === selectedClassId);
-  }, [classes, selectedClassId]);
+    return assignedClasses.find((c: any) => c.id === selectedClassId) || classes.find((c: any) => c.id === selectedClassId);
+  }, [classes, assignedClasses, selectedClassId]);
 
   // Filter students belonging strictly to the selected class
   const classStudents = useMemo(() => {
@@ -11626,6 +11848,12 @@ const TeacherDashboardSpace = ({
         };
       });
       await db.grades.bulkPut(updates);
+      try {
+        const { firestoreService } = await import('../services/firestoreService');
+        for (const up of updates) {
+          await firestoreService.save('grades', up);
+        }
+      } catch(e) {}
       setLastSaved(new Date());
       toast.success("Notes de la classe enregistrées avec succès !");
     } catch (err) {
@@ -11659,6 +11887,14 @@ const TeacherDashboardSpace = ({
       };
       
       await db.homeworks.put(payload);
+      
+      try {
+        const { firestoreService } = await import('../services/firestoreService');
+        await firestoreService.save('homeworks', payload);
+      } catch (fsErr) {
+        console.warn("Could not push homework to Firestore", fsErr);
+      }
+
       toast.success("Cahier de Texte programmé et visible des élèves & parents !");
       setHomeworkTitle('');
       setHomeworkDesc('');
@@ -11673,6 +11909,12 @@ const TeacherDashboardSpace = ({
   const handleDeleteHomework = async (id: string) => {
     try {
       await db.homeworks.delete(id);
+      try {
+        const { firestoreService } = await import('../services/firestoreService');
+        await firestoreService.delete('homeworks', id);
+      } catch (fsErr) {
+        console.warn("Could not delete homework from Firestore", fsErr);
+      }
       toast.success("Cahier de Texte retiré");
     } catch (e) {
       toast.error("Erreur de suppression");
@@ -11927,7 +12169,7 @@ const TeacherDashboardSpace = ({
             <div className="flex-1 overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-slate-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-150">
+                  <tr className="bg-slate-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
                     <th className="px-8 py-4">Élève</th>
                     <th className="px-8 py-4 text-center">Devoir 1 (/20)</th>
                     <th className="px-8 py-4 text-center">Devoir 2 (/20)</th>
@@ -11994,7 +12236,7 @@ const TeacherDashboardSpace = ({
           )}
 
           {selectedClassId && classStudents.length > 0 && (
-            <div className="p-6 bg-slate-50 border-t border-gray-150 flex flex-col sm:flex-row items-center justify-between gap-4 font-sans">
+            <div className="p-6 bg-slate-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 font-sans">
               <span className="text-xs text-gray-500 font-medium">
                 {lastSaved ? `Dernière sauvegarde réussie à ${lastSaved.toLocaleTimeString()}` : 'Changements en attente de sauvegarde'}
               </span>
@@ -12110,7 +12352,7 @@ const TeacherDashboardSpace = ({
             ) : (
               <div className="space-y-4">
                 {homeworkList.map((homework: any) => (
-                  <div key={homework.id} className="p-5 border border-gray-100 bg-gray-50/40 rounded-2xl flex flex-col sm:flex-row justify-between items-start gap-4 hover:border-indigo-150 transition-colors">
+                  <div key={homework.id} className="p-5 border border-gray-100 bg-gray-50/40 rounded-2xl flex flex-col sm:flex-row justify-between items-start gap-4 hover:border-indigo-200 transition-colors">
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9px] font-bold px-2 py-0.5 rounded uppercase font-mono">
@@ -12166,7 +12408,7 @@ const TeacherDashboardSpace = ({
           <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm p-6 md:p-8 space-y-6">
             
             {/* Tab Top Row */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-150">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-gray-100">
               <div className="space-y-1">
                 <h3 className="text-xl font-black text-gray-905">Centre de Communication Parents</h3>
                 <p className="text-xs text-slate-500 font-medium">Contactez directement les parents sans quitter votre espace Enseignant.</p>
@@ -12218,7 +12460,7 @@ const TeacherDashboardSpace = ({
                 <div className="lg:col-span-5 space-y-6">
                   
                   {/* 1. Category Selection Card */}
-                  <div className="bg-slate-50 border border-gray-150 rounded-3.5xl p-5 space-y-4">
+                  <div className="bg-slate-50 border border-gray-100 rounded-3.5xl p-5 space-y-4">
                     <span className="text-[10px] font-mono font-black text-indigo-600 uppercase tracking-widest block font-sans">Étape 1 : Type d'alerte</span>
                     <div className="grid grid-cols-3 gap-2">
                       {[
@@ -12270,7 +12512,7 @@ const TeacherDashboardSpace = ({
                         )}
                         onChange={(e) => setCustomMsg(e.target.value)}
                         placeholder="Saisissez ou modifiez librement le message..."
-                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-semibold font-sans resize-none focus:ring-2 focus:ring-indigo-150 leading-relaxed"
+                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl outline-none text-xs font-semibold font-sans resize-none focus:ring-2 focus:ring-indigo-500/20 leading-relaxed"
                       />
                       <span className="text-[9px] text-gray-400 font-sans leading-none block">
                         Balises actives : <strong className="text-slate-650">{`{Nom}`}</strong> (Nom complet), <strong className="text-slate-655">{`{Note}`}</strong> (Moyenne), <strong className="text-slate-655">{`{Matiere}`}</strong>
@@ -12326,7 +12568,7 @@ const TeacherDashboardSpace = ({
                           placeholder="Rechercher un élève..."
                           value={notifSearchQuery}
                           onChange={(e) => setNotifSearchQuery(e.target.value)}
-                          className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-150 rounded-xl outline-none text-xs font-bold focus:bg-white transition-colors"
+                          className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-gray-200 rounded-xl outline-none text-xs font-bold focus:bg-white transition-colors"
                         />
                       </div>
 
@@ -12381,10 +12623,10 @@ const TeacherDashboardSpace = ({
                     </div>
 
                     {/* Scrollable table container */}
-                    <div className="border border-gray-150 rounded-2.5xl overflow-hidden max-h-[350px] overflow-y-auto">
+                    <div className="border border-gray-200 rounded-2.5xl overflow-hidden max-h-[350px] overflow-y-auto">
                       <table className="w-full text-left">
                         <thead>
-                          <tr className="bg-slate-50 border-b border-gray-150 text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">
+                          <tr className="bg-slate-50 border-b border-gray-200 text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">
                             <th className="p-3.5 text-center w-12">Sél.</th>
                             <th className="p-3.5">Élève & Moyenne</th>
                             <th className="p-3.5">Parent d'Élève</th>
@@ -12517,7 +12759,7 @@ const TeacherDashboardSpace = ({
                   </div>
 
                   {/* Bulk footer action dock */}
-                  <div className="p-4 bg-slate-50 border border-gray-150 rounded-2.5xl flex flex-col md:flex-row items-center justify-between gap-4 font-sans mt-2">
+                  <div className="p-4 bg-slate-50 border border-gray-200 rounded-2.5xl flex flex-col md:flex-row items-center justify-between gap-4 font-sans mt-2">
                     <div className="space-y-1 self-start sm:self-center">
                       <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Diffusion groupée</span>
                       <p className="text-xs font-black text-gray-950">
@@ -12637,11 +12879,11 @@ const TeacherDashboardSpace = ({
 
             {/* Past Communications History Log Drawer */}
             {selectedClassId && (
-              <div className="border border-gray-150 rounded-2.5xl overflow-hidden mt-6">
+              <div className="border border-gray-200 rounded-2.5xl overflow-hidden mt-6">
                 <button
                   type="button"
                   onClick={() => setSentLogsExpanded(!sentLogsExpanded)}
-                  className="w-full p-5 bg-slate-50 border-b border-transparent hover:border-gray-150 flex justify-between items-center transition-all outline-none cursor-pointer"
+                  className="w-full p-5 bg-slate-50 border-b border-transparent hover:border-gray-200 flex justify-between items-center transition-all outline-none cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     <Clock className="w-4.5 h-4.5 text-indigo-600" />
@@ -12663,7 +12905,7 @@ const TeacherDashboardSpace = ({
                           <div key={c.id} className="py-3.5 flex justify-between items-start gap-4 hover:bg-slate-50/30 px-2 transition-colors">
                             <div className="space-y-1.5 min-w-0">
                               <div className="flex items-center flex-wrap gap-2">
-                                <span className={`text-[9px] font-black px-2 py-0.5 rounded font-mono uppercase tracking-wider ${c.type === 'whatsapp' ? 'bg-green-50 border border-green-150 text-green-700' : 'bg-slate-900 text-white'}`}>
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded font-mono uppercase tracking-wider ${c.type === 'whatsapp' ? 'bg-green-50 border border-green-100 text-green-700' : 'bg-slate-900 text-white'}`}>
                                   {c.type === 'whatsapp' ? 'WhatsApp' : 'SMS'}
                                 </span>
                                 <span className="text-[10px] text-slate-400 font-bold">{format(new Date(c.date), 'dd/MM/yyyy à HH:mm')}</span>
@@ -12866,7 +13108,7 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Subject Filter */}
-          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm">
             <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Matière :</span>
             <select
@@ -12883,7 +13125,7 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
 
           {/* Class Filter */}
-          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm">
             <Filter className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Classe :</span>
             <select
@@ -13296,7 +13538,7 @@ const TeacherManager = ({ merchant }: { merchant: Merchant }) => {
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Corps du Message (Personnalisable)</label>
                   <textarea
                     rows={8}
-                    className="w-full px-4 py-3 bg-slate-50 border border-gray-200 text-gray-800 text-xs font-sans rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-150 outline-none resize-none"
+                    className="w-full px-4 py-3 bg-slate-50 border border-gray-200 text-gray-800 text-xs font-sans rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
                     value={customEmailBody || `Bonjour ${selectedEmailTeacher.firstName} ${selectedEmailTeacher.lastName},\n\nNous avons le plaisir de vous transmettre vos accès personnels pour vous connecter à votre Espace d'Enseignement sur la plateforme ${merchant.name || 'ACOM Éducation'} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant de connexion : ${selectedEmailTeacher.username || 'Généré'}\n🔑 Mot de passe de sécurité (PIN) : ${selectedEmailTeacher.password || 'Généré'}\n\nDepuis cet espace autonome, vous pourrez renseigner vos notes et planifier de devoirs pour vos élèves.\n\nBonne préparation !\nLa Direction de ${merchant.name || 'ACOM Éducation'}`}
                     onChange={e => setCustomEmailBody(e.target.value)}
                   />
@@ -13465,6 +13707,14 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
       const data = { ...currentClass, merchantId: merchant.id, updatedAt: new Date().toISOString() };
       if (!data.id) data.id = uuidv4();
       await db.classes.put(data);
+
+      try {
+        const { firestoreService } = await import('../services/firestoreService');
+        await firestoreService.save('classes', data);
+      } catch (fsErr) {
+        console.warn("Could not push class to Firestore", fsErr);
+      }
+
       toast.success("Classe enregistrée");
       setIsEditing(false);
     } catch (error) {
@@ -13519,7 +13769,7 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Level Filter */}
-          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm">
             <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Niveau :</span>
             <select
@@ -13917,7 +14167,7 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
 
                 <div className="flex items-center gap-4">
                   <div className="w-1/3 text-sm font-medium text-gray-600">Capacité max :</div>
-                  <input type="number" required value={currentClass?.capacity || ''} onChange={e => setCurrentClass({...currentClass, capacity: Number(e.target.value)})} className="w-2/3 px-4 py-3 rounded-xl border border-gray-150 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
+                  <input type="number" required value={currentClass?.capacity || ''} onChange={e => setCurrentClass({...currentClass, capacity: Number(e.target.value)})} className="w-2/3 px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
                 </div>
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
@@ -14159,7 +14409,7 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
             {/* Filter Controls */}
             <div className="flex flex-wrap items-center gap-3">
               {/* Class Filter */}
-              <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+              <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm">
                 <Filter className="w-3.5 h-3.5 text-gray-400" />
                 <span className="text-[10px] font-black uppercase text-gray-400 font-mono">Classe Enfant :</span>
                 <select
@@ -14347,7 +14597,7 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                     required
                     value={parentUsername}
                     onChange={e => setParentUsername(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-sans outline-none focus:ring-2 focus:ring-indigo-150"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-sans outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
                 </div>
 
@@ -14359,7 +14609,7 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                     maxLength={6}
                     value={parentPassword}
                     onChange={e => setParentPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-indigo-150"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-xl text-sm font-bold font-mono outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
                 </div>
 
@@ -14407,7 +14657,7 @@ const ParentsManager = ({ merchant }: { merchant: Merchant }) => {
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Corps du Message</label>
                   <textarea
                     rows={8}
-                    className="w-full px-4 py-3 bg-slate-50 border border-gray-200 text-gray-800 text-xs font-sans rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-150 outline-none resize-none"
+                    className="w-full px-4 py-3 bg-slate-50 border border-gray-200 text-gray-800 text-xs font-sans rounded-xl focus:bg-white focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
                     value={customEmailBody || `Bonjour,\n\nVous avez accès à l'espace parent pour suivre le parcours scolaire de votre enfant sur la plateforme ${merchant.name || 'ACOM Éducation'} :\n\n🌐 Notre portail : ${window.location.protocol}//${window.location.host}/login\n👤 Identifiant : ${selectedEmailParent.username || selectedEmailParent.id}\n🔑 Code PIN : ${selectedEmailParent.password || 'Non configuré'}\n\nDepuis cet espace, vous pourrez consulter les résultats, les absences, le cahier de texte et effectuer des paiements.\n\nCordialement,\nLa Direction de ${merchant.name || 'ACOM Éducation'}`}
                     onChange={e => setCustomEmailBody(e.target.value)}
                   />
@@ -14511,6 +14761,15 @@ const AttendanceManager = ({ merchant }: { merchant: Merchant }) => {
       // In real scenario we might bulk put, but we can do it one by one or via bulkPut if dexie has it
       if (recordsToSave.length > 0) {
         await db.attendance.bulkPut(recordsToSave);
+        
+        try {
+          const { firestoreService } = await import('../services/firestoreService');
+          for (const rec of recordsToSave) {
+            await firestoreService.save('attendance', rec);
+          }
+        } catch (fsErr) {
+          console.warn("Could not push attendance to Firestore", fsErr);
+        }
       }
       
       toast.success("Appel enregistré avec succès");
@@ -14865,7 +15124,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
                           });
                         }}
                         className={`flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition-all cursor-pointer ${
-                          isActive ? item.activeBg : 'bg-slate-50 border-gray-150 text-slate-500 hover:border-gray-300'
+                          isActive ? item.activeBg : 'bg-slate-50 border-gray-100 text-slate-500 hover:border-gray-200'
                         }`}
                       >
                         <Icon className="w-5 h-5 mb-1 shrink-0" />
@@ -14878,7 +15137,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
 
               {/* Template pill shortcuts */}
               {activeTemplates.length > 0 && (
-                <div className="space-y-1.5 bg-slate-50/70 p-3 rounded-2xl border border-gray-150">
+                <div className="space-y-1.5 bg-slate-50/70 p-3 rounded-2xl border border-gray-100">
                   <span className="text-[9px] font-mono font-black text-slate-500 uppercase tracking-widest block">
                     Modèles rapides suggérés :
                   </span>
@@ -14915,7 +15174,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="ex: Rappel Réunion Rentrée..."
                   value={currentMessage.title}
                   onChange={e => setCurrentMessage({ ...currentMessage, title: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl font-bold text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-150"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl font-bold text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
 
@@ -14930,7 +15189,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="Écrivez le message institutionnel..."
                   value={currentMessage.content}
                   onChange={e => setCurrentMessage({ ...currentMessage, content: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-150 resize-none leading-relaxed"
+                  className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none leading-relaxed"
                 />
               </div>
 
@@ -15100,7 +15359,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
           <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm p-6 md:p-8 space-y-6">
             
             {/* Toolbar row */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-150">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100">
               <div className="space-y-0.5">
                 <h3 className="text-xl font-black text-slate-905">Historique des Messages et Alertes</h3>
                 <p className="text-xs text-slate-500 font-medium">Historique des diffusions officielles enregistrées dans l'établissement.</p>
@@ -15113,7 +15372,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="Rechercher une annonce..."
                   value={searchHistoryQuery}
                   onChange={e => setSearchHistoryQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-gray-200 text-xs rounded-xl outline-none focus:ring-2 focus:ring-indigo-150"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-gray-200 text-xs rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
               </div>
@@ -15146,7 +15405,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
                     return (
                       <div 
                         key={c.id} 
-                        className="bg-slate-50/50 hover:bg-slate-50 p-4 rounded-2.5xl border border-gray-150 flex flex-col sm:flex-row gap-4 items-start transition-all"
+                        className="bg-slate-50/50 hover:bg-slate-50 p-4 rounded-2.5xl border border-gray-100 flex flex-col sm:flex-row gap-4 items-start transition-all"
                       >
                         <div className="w-10 h-10 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center flex-shrink-0">
                           <MessageSquare className="w-5 h-5" />
@@ -15155,11 +15414,11 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
                               {isTargetParents ? (
-                                <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-150 text-indigo-700 text-[9px] font-black rounded-md uppercase font-sans">
+                                <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100/60 text-indigo-700 text-[9px] font-black rounded-md uppercase font-sans">
                                   Parents
                                 </span>
                               ) : isTargetTeachers ? (
-                                <span className="px-2 py-0.5 bg-amber-50 border border-amber-150 text-amber-800 text-[9px] font-black rounded-md uppercase font-sans">
+                                <span className="px-2 py-0.5 bg-amber-50 border border-amber-100/60 text-amber-800 text-[9px] font-black rounded-md uppercase font-sans">
                                   Profs
                                 </span>
                               ) : (
@@ -15597,29 +15856,225 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
   , [merchant.id]) || [];
 
   // 2. Calculations & Integrations Matchers
+  const dbClasses = useLiveQuery(() => 
+    db.classes?.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
+
   const studentPayments = useMemo(() => {
+    const list: any[] = [];
+    const seenReceipts = new Set<string>();
+
+    // 1. Gather and normalize internal payments stored in student profile
+    if (student?.tuitionPayments) {
+      student.tuitionPayments.forEach((p: any) => {
+        const rc = p.receiptNumber || `PAY-${p.id}`;
+        if (!seenReceipts.has(rc)) {
+          seenReceipts.add(rc);
+          list.push({
+            id: p.id,
+            receiptNumber: rc,
+            amount: p.amount,
+            paidAmount: p.amount, // normalize for UI reducing
+            category: p.category || "Versement scolarité",
+            mode: p.mode || "Espèces",
+            date: p.date,
+          });
+        }
+      });
+    }
+
+    // 2. Add ledger matches from global Sales database
     const fullName = `${student.firstName} ${student.lastName}`.toLowerCase().trim();
-    return sales.filter(s => {
-      const matchCustomer = s.customerName?.toLowerCase().trim() === fullName || 
-                           (s.customerPhone && student.parentContact && s.customerPhone === student.parentContact);
-      const matchItems = s.items?.some(i => i.name?.toLowerCase().includes("scolarité") || i.name?.toLowerCase().includes("frais") || i.name?.toLowerCase().includes("inscription") || i.name?.toLowerCase().includes("écolage"));
-      return matchCustomer || matchItems;
+    sales.forEach((s: any) => {
+      const rc = s.receiptNumber || `REC-${s.id.slice(0, 8)}`;
+      if (seenReceipts.has(rc)) return;
+
+      const matchCustomer = s.clientName?.toLowerCase().trim() === fullName ||
+                            s.customerName?.toLowerCase().trim() === fullName || 
+                           (s.customerPhone && student.parentContact && s.customerPhone === student.parentContact) ||
+                           (s.clientPhone && student.parentContact && s.clientPhone === student.parentContact);
+      const matchItems = s.items?.some((i: any) => 
+        i.name?.toLowerCase().includes("scolarité") || 
+        i.name?.toLowerCase().includes("frais") || 
+        i.name?.toLowerCase().includes("inscription") || 
+        i.name?.toLowerCase().includes("écolage") ||
+        i.name?.toLowerCase().includes(student.lastName.toLowerCase())
+      );
+
+      if (matchCustomer || matchItems) {
+        seenReceipts.add(rc);
+        list.push({
+          id: s.id,
+          receiptNumber: rc,
+          amount: s.totalAmount || s.paidAmount || 0,
+          paidAmount: s.paidAmount || s.totalAmount || 0,
+          category: s.items?.[0]?.name || "Frais Scolaires",
+          mode: s.paymentMode || s.paymentMethod || "Espèces",
+          date: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString(),
+        });
+      }
     });
+
+    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [sales, student]);
 
   const totalPaid = useMemo(() => {
     return studentPayments.reduce((sum, p) => sum + (Number(p.paidAmount) || 0), 0);
   }, [studentPayments]);
 
-  const [schoolingTarget, setSchoolingTarget] = useState(() => {
+  const [customSchoolingTarget, setCustomSchoolingTarget] = useState<number | null>(() => {
     const saved = localStorage.getItem(`schooling_target_${student.id}`);
-    return saved ? parseInt(saved, 10) : 350000;
+    return saved ? parseInt(saved, 10) : null;
   });
+
+  const computedSchoolingTarget = useMemo(() => {
+    const pricing: any = merchant.schoolPricing || {};
+    const fallback = {
+      inscription: 25000,
+      scolarite: 135000,
+      uniforme: 15000,
+      transport: 150000,
+      cantine: 90000,
+      internat: 0,
+      monthsDuration: 9,
+      hasTransport: false,
+      hasCanteen: false,
+      hasInternat: false,
+    };
+
+    const mapConfig = (cfg: any) => {
+      const hasTransport = cfg.hasTransport !== undefined ? !!cfg.hasTransport : true;
+      const hasCanteen = cfg.hasCanteen !== undefined ? !!cfg.hasCanteen : true;
+      const hasInternat = cfg.hasInternat !== undefined ? !!cfg.hasInternat : (Number((cfg.annualInternat || '').toString().replace(/\D/g, '')) > 0 || Number(cfg.internat || 0) > 0);
+      return {
+        inscription: Number((cfg.registrationFee || '').toString().replace(/\D/g, '') || fallback.inscription),
+        scolarite: Number((cfg.annualTuition || '').toString().replace(/\D/g, '') || fallback.scolarite),
+        uniforme: Number((cfg.uniformFee || '').toString().replace(/\D/g, '') || fallback.uniforme),
+        transport: hasTransport ? Number((cfg.annualTransport || '').toString().replace(/\D/g, '') || fallback.transport) : 0,
+        cantine: hasCanteen ? Number((cfg.annualCanteen || '').toString().replace(/\D/g, '') || fallback.cantine) : 0,
+        cantineInterne: Number((cfg.annualCanteenInterne || cfg.cantineInterne || cfg.annualCanteen || '').toString().replace(/\D/g, '') || fallback.cantine),
+        internat: hasInternat ? Number((cfg.annualInternat || '').toString().replace(/\D/g, '') || cfg.internat || fallback.internat) : 0,
+        hasTransport,
+        hasCanteen,
+        hasInternat,
+        monthsDuration: Number((cfg.monthsDuration || '').toString().replace(/\D/g, '') || fallback.monthsDuration)
+      };
+    };
+
+    const normalizeStr = (str: string) => {
+      if (!str) return '';
+      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    };
+
+    let baseFees: any = null;
+    if (pricing?.exceptions?.[student.id]) {
+      baseFees = mapConfig(pricing.exceptions[student.id]);
+    }
+
+    if (!baseFees) {
+      const classKey = student.classId || student.class_id || student.class || student.grade;
+      if (classKey && pricing?.classes?.[classKey]) {
+        baseFees = mapConfig(pricing.classes[classKey]);
+      } else {
+        const matchedClass = dbClasses.find(c => c.name === classKey || c.id === classKey);
+        if (matchedClass && pricing?.classes?.[matchedClass.id]) {
+          baseFees = mapConfig(pricing.classes[matchedClass.id]);
+        } else if (matchedClass && pricing?.classes?.[matchedClass.name]) {
+          baseFees = mapConfig(pricing.classes[matchedClass.name]);
+        }
+      }
+    }
+
+    if (!baseFees) {
+      const gradeStr = normalizeStr(student.grade || student.class || '');
+      let levelKey = '';
+      if (gradeStr.includes('mat') || gradeStr.includes('crech') || gradeStr.includes('garde') || gradeStr.includes('maternelle')) {
+        levelKey = 'Maternelle';
+      } else if (gradeStr.includes('ci') || gradeStr.includes('cp') || gradeStr.includes('ce1') || gradeStr.includes('ce2') || gradeStr.includes('cm1') || gradeStr.includes('cm2') || gradeStr.includes('prim')) {
+        levelKey = 'Primaire';
+      } else if (gradeStr.includes('6e') || gradeStr.includes('5e') || gradeStr.includes('4e') || gradeStr.includes('3e') || gradeStr.includes('colleg')) {
+        levelKey = 'Collège';
+      } else if (gradeStr.includes('second') || gradeStr.includes('premier') || gradeStr.includes('terminal') || gradeStr.includes('lyce') || gradeStr.includes('2nd') || gradeStr.includes('1er') || gradeStr.includes('tle') || gradeStr.includes('l2')) {
+        levelKey = 'Lycée';
+      } else if (gradeStr.includes('pro') || gradeStr.includes('format')) {
+        levelKey = 'Formation Professionnelle';
+      }
+
+      if (levelKey && pricing?.levels?.[levelKey]) {
+        baseFees = mapConfig(pricing.levels[levelKey]);
+      }
+    }
+
+    let hasTransport = baseFees ? baseFees.hasTransport : fallback.hasTransport;
+    if (student.hasTransport !== undefined) {
+      hasTransport = !!student.hasTransport;
+    } else if (student.serviceTransport !== undefined) {
+      hasTransport = !!student.serviceTransport;
+    }
+
+    let hasCanteen = baseFees ? baseFees.hasCanteen : fallback.hasCanteen;
+    if (student.hasCanteen !== undefined) {
+      hasCanteen = !!student.hasCanteen;
+    } else if (student.serviceCantine !== undefined) {
+      hasCanteen = !!student.serviceCantine;
+    }
+
+    let hasInternat = baseFees ? baseFees.hasInternat : fallback.hasInternat;
+    if (student.hasInternat !== undefined) {
+      hasInternat = !!student.hasInternat;
+    } else if (student.serviceInternat !== undefined) {
+      hasInternat = !!student.serviceInternat;
+    } else if (student.regime !== undefined) {
+      hasInternat = (student.regime === 'interne');
+    }
+
+    const rawTransport = student.annualTransport !== undefined ? Number(String(student.annualTransport).replace(/\D/g, '')) : (baseFees ? baseFees.transport : fallback.transport);
+    const rawCanteen = student.annualCanteen !== undefined ? Number(String(student.annualCanteen).replace(/\D/g, '')) : (baseFees ? (student.regime === 'interne' ? (baseFees.cantineInterne || baseFees.cantine) : baseFees.cantine) : fallback.cantine);
+    const rawInternat = student.annualInternat !== undefined ? Number(String(student.annualInternat).replace(/\D/g, '')) : (baseFees ? baseFees.internat : fallback.internat);
+
+    const transportValue = hasTransport ? rawTransport : 0;
+    const canteenValue = hasCanteen ? rawCanteen : 0;
+    const internatValue = hasInternat ? rawInternat : 0;
+
+    const currentResult = {
+      ...(baseFees || fallback),
+      transport: transportValue,
+      cantine: canteenValue,
+      internat: internatValue,
+      hasTransport,
+      hasCanteen,
+      hasInternat,
+    };
+
+    if (student.registrationFee !== undefined) {
+      currentResult.inscription = Number(String(student.registrationFee).replace(/\D/g, '')) || currentResult.inscription;
+    }
+    if (student.annualTuition !== undefined) {
+      currentResult.scolarite = Number(String(student.annualTuition).replace(/\D/g, '')) || currentResult.scolarite;
+    }
+    if (student.uniformFee !== undefined) {
+      currentResult.uniforme = Number(String(student.uniformFee).replace(/\D/g, '')) || currentResult.uniforme;
+    }
+    if (student.annualInternat !== undefined) {
+      currentResult.internat = hasInternat ? (Number(String(student.annualInternat).replace(/\D/g, '')) || currentResult.internat) : 0;
+    }
+
+    return (
+      (currentResult.inscription || 0) +
+      (currentResult.scolarite || 0) +
+      (currentResult.uniforme || 0) +
+      (currentResult.transport || 0) +
+      (currentResult.cantine || 0) +
+      (currentResult.internat || 0)
+    );
+  }, [merchant.schoolPricing, dbClasses, student]);
+
+  const schoolingTarget = customSchoolingTarget !== null ? customSchoolingTarget : computedSchoolingTarget;
 
   const handleUpdateTarget = (val: string) => {
     const num = parseInt(val, 10);
     if (!isNaN(num) && num >= 0) {
-      setSchoolingTarget(num);
+      setCustomSchoolingTarget(num);
       localStorage.setItem(`schooling_target_${student.id}`, num.toString());
       toast.success("Objectif de scolarité mis à jour");
     }
@@ -17509,7 +17964,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                 {/* Highlight Stats Dashboard */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Moyenne */}
-                  <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-sm flex items-center gap-4">
+                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
                     <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0">
                       <GraduationCap className="w-6 h-6" />
                     </div>
@@ -17520,7 +17975,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                   </div>
 
                   {/* Assiduité */}
-                  <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-sm flex items-center gap-4">
+                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
                     <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0">
                       <ClipboardCheck className="w-6 h-6" />
                     </div>
@@ -17531,7 +17986,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                   </div>
 
                   {/* Finances */}
-                  <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-sm flex items-center gap-4 sm:col-span-2 lg:col-span-1">
+                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4 sm:col-span-2 lg:col-span-1">
                     <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shrink-0">
                       <DollarSign className="w-6 h-6" />
                     </div>
@@ -17611,7 +18066,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                 </div>
 
                 {/* Section 1.5 : Accès Portaux (Élève & Parents) */}
-                <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-gray-150 shadow-sm space-y-6">
+                <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
                   <h3 className="font-black text-sm uppercase tracking-wider text-indigo-900 pb-3 border-b border-gray-100 flex items-center gap-2">
                     <Key className="w-5 h-5 text-indigo-600" /> IDENTIFIANTS & ACCÈS PORTAILS (ÉLÈVE / PARENTS)
                   </h3>
@@ -17621,7 +18076,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                     <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-4">
                       <div className="flex justify-between items-center pb-2 border-b border-indigo-100">
                         <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Portail Élève</span>
-                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-150/50 px-2 py-0.5 rounded">Généré au dossier</span>
+                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded">Généré au dossier</span>
                       </div>
                       
                       <div className="space-y-3">
@@ -17963,7 +18418,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                   ) : (
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-2 scrollbar-none border border-slate-50 rounded-2xl p-1 bg-slate-50/20">
                       {studentPayments.map((p: any) => (
-                        <div key={p.id} className="p-3 bg-white rounded-xl border border-slate-150 shadow-sm flex justify-between items-center flex-wrap gap-2 text-xs">
+                        <div key={p.id} className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm flex justify-between items-center flex-wrap gap-2 text-xs">
                           <div>
                             <p className="font-black text-slate-900">{p.items?.[0]?.name || 'Frais de Scolarité'}</p>
                             <p className="text-[9px] text-gray-400 font-mono mt-0.5">REF: {p.id?.substring(0,8)} • {p.createdAt ? safeFormatDate(p.createdAt, 'dd/MM/yyyy HH:mm') : 'date inconnue'}</p>
@@ -18464,7 +18919,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                               value={customMsgTitle}
                               onChange={(e) => setCustomMsgTitle(e.target.value)}
                               placeholder="ex: Retard répété en cours..."
-                              className="w-full px-3 py-2 bg-white border border-gray-200 text-xs rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-150"
+                              className="w-full px-3 py-2 bg-white border border-gray-200 text-xs rounded-xl font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
                             />
                           </div>
 
@@ -18477,7 +18932,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                               value={customMsgContent}
                               onChange={(e) => setCustomMsgContent(e.target.value)}
                               placeholder="Rédigez ici votre message libre pour le parent..."
-                              className="w-full px-3 py-2 bg-white border border-gray-200 text-xs rounded-xl font-semibold outline-none resize-none focus:ring-2 focus:ring-indigo-150"
+                              className="w-full px-3 py-2 bg-white border border-gray-200 text-xs rounded-xl font-semibold outline-none resize-none focus:ring-2 focus:ring-indigo-500/20"
                             />
                           </div>
 
@@ -18610,7 +19065,7 @@ const StudentAcademicRecord = ({ student, merchant, onClose }: { student: any, m
                   </button>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 space-y-2">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
                   <p className="text-xs text-slate-500 flex justify-between">
                     <span>Élève : <strong>{activeAdminDispatch.studentName}</strong></span>
                     <span>Destinataire : <strong>{activeAdminDispatch.phone}</strong></span>
@@ -18788,6 +19243,14 @@ const StudentRegisterFormModal = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'profil' | 'parents' | 'academique' | 'finances' | 'smart'>('profil');
   const [editedStudent, setEditedStudent] = useState<any>(() => {
+    const transportVal = student?.hasTransport !== undefined 
+      ? !!student.hasTransport 
+      : (student?.serviceTransport !== undefined ? !!student.serviceTransport : false);
+    
+    const canteenVal = student?.hasCanteen !== undefined 
+      ? !!student.hasCanteen 
+      : (student?.serviceCantine !== undefined ? !!student.serviceCantine : false);
+
     return {
       ...DEFAULT_STUDENT_DATA,
       schoolName: merchant.name || '',
@@ -18795,6 +19258,10 @@ const StudentRegisterFormModal = ({
       matricule: student?.matricule || `MAT-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
       adminSignName: merchant.name || 'Direction',
       ...student,
+      hasTransport: transportVal,
+      serviceTransport: transportVal,
+      hasCanteen: canteenVal,
+      serviceCantine: canteenVal,
     };
   });
 
@@ -18865,6 +19332,96 @@ const StudentRegisterFormModal = ({
   const updateField = (key: string, value: any) => {
     setEditedStudent((prev: any) => {
       const updated = { ...prev, [key]: value };
+      if (key === 'regime') {
+        const reg = value;
+        let regTransport = false;
+        let regCanteen = false;
+        let regInternat = false;
+        if (reg === 'demi-pension') {
+          regCanteen = true;
+        } else if (reg === 'interne') {
+          regCanteen = true;
+          regInternat = true;
+        }
+        updated.hasTransport = regTransport;
+        updated.serviceTransport = regTransport;
+        updated.hasCanteen = regCanteen;
+        updated.serviceCantine = regCanteen;
+        updated.hasInternat = regInternat;
+        updated.serviceInternat = regInternat;
+
+        // Auto-populate exact canteen & internat amounts from database based on the chosen class (if any)
+        const classId = prev.classId || prev.grade;
+        if (merchant?.id && classId) {
+          db.merchants.get(merchant.id).then((currentMerchant) => {
+            if (currentMerchant && currentMerchant.schoolPricing) {
+              const pricing = currentMerchant.schoolPricing;
+              const matchedClass = dbClasses.find(c => c.id === classId || c.name === classId);
+              let tp: any = null;
+              if (matchedClass) {
+                const classPricing = pricing.classes?.[matchedClass.id] || pricing.classes?.[matchedClass.name];
+                const normalizeStr = (str: string) => {
+                    if (!str) return '';
+                    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                };
+                const gradeStr = normalizeStr(matchedClass.name);
+                let levelKey = '';
+                if (gradeStr.includes('mat') || gradeStr.includes('crech') || gradeStr.includes('garde')) {
+                  levelKey = 'Maternelle';
+                } else if (gradeStr.includes('ci') || gradeStr.includes('cp') || gradeStr.includes('ce1') || gradeStr.includes('ce2') || gradeStr.includes('cm1') || gradeStr.includes('cm2') || gradeStr.includes('elemen') || gradeStr.includes('primai')) {
+                  levelKey = 'Primaire';
+                } else if (gradeStr.includes('6eme') || gradeStr.includes('5eme') || gradeStr.includes('4eme') || gradeStr.includes('3eme') || gradeStr.includes('moyen') || gradeStr.includes('colleg') || gradeStr.includes('6e') || gradeStr.includes('5e') || gradeStr.includes('4e') || gradeStr.includes('3e')) {
+                  levelKey = 'Collège';
+                } else if (gradeStr.includes('2nd') || gradeStr.includes('1ere') || gradeStr.includes('tle') || gradeStr.includes('terminale') || gradeStr.includes('lycee') || gradeStr.includes('second')) {
+                  levelKey = 'Lycée';
+                } else if (gradeStr.includes('sup') || gradeStr.includes('licence') || gradeStr.includes('master') || gradeStr.includes('univer') || gradeStr.includes('pro')) {
+                  levelKey = 'Formation Professionnelle';
+                }
+                const levelPricing = pricing.levels?.[levelKey] || pricing.levels?.[matchedClass.level];
+                tp = classPricing || levelPricing;
+              }
+              if (tp) {
+                setEditedStudent((latest: any) => {
+                  let cantineVal = '0';
+                  let internatVal = '0';
+                  let transportVal = '0';
+                  if (reg === 'demi-pension') {
+                    cantineVal = (tp.annualCanteen || '90000').toString();
+                  } else if (reg === 'interne') {
+                    cantineVal = (tp.annualCanteenInterne || tp.annualCanteen || '90000').toString();
+                    internatVal = (tp.annualInternat || tp.internat || '0').toString();
+                  }
+                  return {
+                    ...latest,
+                    annualTransport: transportVal,
+                    annualCanteen: cantineVal,
+                    annualInternat: internatVal
+                  };
+                });
+              }
+            }
+          });
+        } else {
+          updated.annualTransport = '0';
+          updated.annualCanteen = regCanteen ? '90000' : '0';
+          updated.annualInternat = regInternat ? '0' : '0';
+        }
+      }
+      if (key === 'hasTransport' || key === 'serviceTransport') {
+        const val = !!value;
+        updated.hasTransport = val;
+        updated.serviceTransport = val;
+      }
+      if (key === 'hasCanteen' || key === 'serviceCantine') {
+        const val = !!value;
+        updated.hasCanteen = val;
+        updated.serviceCantine = val;
+      }
+      if (key === 'hasInternat' || key === 'serviceInternat') {
+        const val = !!value;
+        updated.hasInternat = val;
+        updated.serviceInternat = val;
+      }
       return updated;
     });
   };
@@ -18995,10 +19552,31 @@ const StudentRegisterFormModal = ({
       setIsPayingOnline(false);
       
       const newRef = `TX-${Math.floor(100000 + Math.random() * 900000)}`;
-      updateField('stripePaid', true);
-      updateField('paymentRef', newRef);
-      updateField('docReceipt', true);
-      updateField('workflowStatus', 'approved');
+      
+      const newPayment = {
+        id: crypto.randomUUID(),
+        amount: parseFloat(editedStudent.registrationFee) || 25000,
+        category: "Frais d'inscription",
+        mode: onlinePayMethod,
+        date: new Date().toISOString(),
+        receiptNumber: newRef,
+        details: {
+          scolarite: 0,
+          transport: 0,
+          cantine: 0,
+          inscription: parseFloat(editedStudent.registrationFee) || 25000,
+          autres: 0
+        }
+      };
+
+      setEditedStudent((prev: any) => ({
+        ...prev,
+        stripePaid: true,
+        paymentRef: newRef,
+        docReceipt: true,
+        workflowStatus: 'approved',
+        tuitionPayments: [...(prev.tuitionPayments || []), newPayment]
+      }));
       
       addLog(`Paiement de scolarité réussi via ${onlinePayMethod.toUpperCase()} | Réf: ${newRef}`);
       toast.success('Paiement reçu en temps réel ! Le reçu a été généré.');
@@ -19263,7 +19841,7 @@ const StudentRegisterFormModal = ({
               {activeTab === 'parents' && (
                 <div className="space-y-6">
                   {/* Parent principal à contacter en priorité */}
-                  <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-150/40 shadow-sm space-y-3">
+                  <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 shadow-sm space-y-3">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="space-y-1">
                         <h4 className="text-sm font-black text-indigo-950 uppercase tracking-wider flex items-center gap-2">
@@ -19452,12 +20030,10 @@ const StudentRegisterFormModal = ({
                           <select 
                             required
                             value={dbClasses.find((c: any) => c.name === editedStudent.grade)?.id || ''} 
-                            onChange={e => {
+                            onChange={async (e) => {
                               const val = e.target.value;
                               const matchedClass = dbClasses.find((c: any) => c.id === val);
                               if (matchedClass) {
-                                updateField('grade', matchedClass.name);
-                                
                                 const mapClassLevelToStudentLevel = (classLevel: string) => {
                                   if (!classLevel) return 'Secondaire';
                                   const norm = classLevel.toLowerCase();
@@ -19468,7 +20044,83 @@ const StudentRegisterFormModal = ({
                                   if (norm.includes('supérieur') || norm.includes('université') || norm.includes('universitaire') || norm.includes('superieur')) return 'Université';
                                   return 'Secondaire';
                                 };
-                                updateField('requestedLevel', mapClassLevelToStudentLevel(matchedClass.level));
+                                const requestedLvl = mapClassLevelToStudentLevel(matchedClass.level);
+
+                                let tp: any = null;
+
+                                // Auto-adopt billing settings fetching latest
+                                if (merchant?.id) {
+                                    const currentMerchant = await db.merchants.get(merchant.id);
+                                    if (currentMerchant && currentMerchant.schoolPricing) {
+                                      const pricing = currentMerchant.schoolPricing;
+                                      const classPricing = pricing.classes?.[matchedClass.id] || pricing.classes?.[matchedClass.name];
+                                      
+                                      const normalizeStr = (str: string) => {
+                                          if (!str) return '';
+                                          return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                                      };
+                                      const gradeStr = normalizeStr(matchedClass.name);
+                                      let levelKey = '';
+                                      if (gradeStr.includes('mat') || gradeStr.includes('crech') || gradeStr.includes('garde')) {
+                                        levelKey = 'Maternelle';
+                                      } else if (gradeStr.includes('ci') || gradeStr.includes('cp') || gradeStr.includes('ce1') || gradeStr.includes('ce2') || gradeStr.includes('cm1') || gradeStr.includes('cm2') || gradeStr.includes('elemen') || gradeStr.includes('primai')) {
+                                        levelKey = 'Primaire';
+                                      } else if (gradeStr.includes('6eme') || gradeStr.includes('5eme') || gradeStr.includes('4eme') || gradeStr.includes('3eme') || gradeStr.includes('moyen') || gradeStr.includes('colleg') || gradeStr.includes('6e') || gradeStr.includes('5e') || gradeStr.includes('4e') || gradeStr.includes('3e')) {
+                                        levelKey = 'Collège';
+                                      } else if (gradeStr.includes('2nd') || gradeStr.includes('1ere') || gradeStr.includes('tle') || gradeStr.includes('terminale') || gradeStr.includes('lycee') || gradeStr.includes('second')) {
+                                        levelKey = 'Lycée';
+                                      } else if (gradeStr.includes('sup') || gradeStr.includes('licence') || gradeStr.includes('master') || gradeStr.includes('univer') || gradeStr.includes('pro')) {
+                                        levelKey = 'Formation Professionnelle';
+                                      }
+                                      
+                                      const levelPricing = pricing.levels?.[levelKey] || pricing.levels?.[matchedClass.level];
+                                      tp = classPricing || levelPricing;
+                                    }
+                                }
+                                
+                                setEditedStudent((prev: any) => {
+                                  const currentRegime = prev.regime || 'externe';
+                                  let regTransport = false;
+                                  let regCanteen = false;
+                                  let regInternat = false;
+                                  if (currentRegime === 'demi-pension') {
+                                    regCanteen = true;
+                                  } else if (currentRegime === 'interne') {
+                                    regCanteen = true;
+                                    regInternat = true;
+                                  }
+                                  
+                                  const pricingFields = tp ? {
+                                    registrationFee: tp.registrationFee?.toString() || prev.registrationFee,
+                                    annualTuition: tp.annualTuition?.toString() || prev.annualTuition,
+                                    uniformFee: tp.uniformFee?.toString() || prev.uniformFee,
+                                    annualTransport: regTransport ? (tp.annualTransport?.toString() || prev.annualTransport) : '0',
+                                    annualCanteen: currentRegime === 'interne' 
+                                      ? (tp.annualCanteenInterne || tp.annualCanteen || '90000').toString() 
+                                      : (currentRegime === 'demi-pension' ? (tp.annualCanteen || '90000').toString() : '0'),
+                                    annualInternat: currentRegime === 'interne' 
+                                      ? (tp.annualInternat || tp.internat || '0').toString() 
+                                      : '0',
+                                    monthsDuration: tp.monthsDuration?.toString() || prev.monthsDuration,
+                                    hasDiscount: 'non',
+                                    discountAmount: '0'
+                                  } : {};
+
+                                  return {
+                                    ...prev,
+                                    grade: matchedClass.name,
+                                    classId: matchedClass.id,
+                                    requestedLevel: requestedLvl,
+                                    hasTransport: regTransport,
+                                    serviceTransport: regTransport,
+                                    hasCanteen: regCanteen,
+                                    serviceCantine: regCanteen,
+                                    hasInternat: regInternat,
+                                    serviceInternat: regInternat,
+                                    ...pricingFields
+                                  };
+                                });
+
                                 addLog(`Classe affectée : ${matchedClass.name} - Niveau associé : ${matchedClass.level}`);
                               } else {
                                 updateField('grade', '');
@@ -19644,6 +20296,100 @@ const StudentRegisterFormModal = ({
                         <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Frais d'inscription annuel (FCFA)</label>
                         <input type="number" value={editedStudent.registrationFee} onChange={e => updateField('registrationFee', e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 outline-none font-mono font-bold text-indigo-700" />
                       </div>
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Scolarité annuelle (FCFA)</label>
+                        <input type="number" value={editedStudent.annualTuition} onChange={e => updateField('annualTuition', e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 outline-none font-mono font-bold text-indigo-700" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Uniforme scolaire (FCFA)</label>
+                        <input type="number" value={editedStudent.uniformFee} onChange={e => updateField('uniformFee', e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 outline-none font-mono font-bold text-indigo-700" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Transport annuel (FCFA)</label>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!editedStudent.hasTransport}
+                              onChange={e => {
+                                const checked = e.target.checked;
+                                updateField('hasTransport', checked);
+                                addLog(`Transport optionnel coché: ${checked}`);
+                              }}
+                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider">Optionnel</span>
+                          </label>
+                        </div>
+                        <input 
+                          type="number" 
+                          disabled={!editedStudent.hasTransport}
+                          value={editedStudent.annualTransport} 
+                          onChange={e => updateField('annualTransport', e.target.value)} 
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 outline-none font-mono font-bold text-indigo-700 disabled:opacity-40 disabled:bg-slate-100" 
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Cantine annuelle (FCFA)</label>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!editedStudent.hasCanteen}
+                              onChange={e => {
+                                const checked = e.target.checked;
+                                updateField('hasCanteen', checked);
+                                addLog(`Cantine optionnelle cochée: ${checked}`);
+                              }}
+                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider">Optionnel</span>
+                          </label>
+                        </div>
+                        <input 
+                          type="number" 
+                          disabled={!editedStudent.hasCanteen}
+                          value={editedStudent.annualCanteen} 
+                          onChange={e => updateField('annualCanteen', e.target.value)} 
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 outline-none font-mono font-bold text-indigo-700 disabled:opacity-40 disabled:bg-slate-100" 
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Internat annuel (FCFA)</label>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!editedStudent.hasInternat}
+                              onChange={e => {
+                                const checked = e.target.checked;
+                                updateField('hasInternat', checked);
+                                if (checked) {
+                                  updateField('regime', 'interne');
+                                }
+                                addLog(`Internat optionnel coché: ${checked}`);
+                              }}
+                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+                            />
+                            <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider">Optionnel</span>
+                          </label>
+                        </div>
+                        <input 
+                          type="number" 
+                          disabled={!editedStudent.hasInternat}
+                          value={editedStudent.annualInternat || ''} 
+                          onChange={e => updateField('annualInternat', e.target.value)} 
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 outline-none font-mono font-bold text-indigo-700 disabled:opacity-40 disabled:bg-slate-100" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Durée (mois)</label>
+                        <input type="number" value={editedStudent.monthsDuration} onChange={e => updateField('monthsDuration', e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 outline-none font-mono font-bold text-indigo-700" style={{ height: '42px' }} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">A-t-il une Bourse ou Réduction ?</label>
                         <div className="grid grid-cols-2 gap-2 mt-1">
@@ -20417,7 +21163,7 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
       </div>
 
       {/* Dynamic Search & Filtering Toolbar */}
-      <div className="bg-slate-50 border border-slate-150 p-4 rounded-3xl gap-4 flex flex-col md:flex-row items-stretch md:items-center justify-between shadow-sm">
+      <div className="bg-slate-50 border border-slate-200 p-4 rounded-3xl gap-4 flex flex-col md:flex-row items-stretch md:items-center justify-between shadow-sm">
         {/* Search Field */}
         <div className="relative flex-grow max-w-full md:max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -20442,7 +21188,7 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Class / Grade filter selection */}
-          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm">
             <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-[10px] font-black uppercase text-gray-400">Niveau :</span>
             <select
@@ -20459,7 +21205,7 @@ const SchoolManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
 
           {/* Registration Status filter selection */}
-          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-150 px-3 py-2 shadow-sm">
+          <div className="flex items-center space-x-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm">
             <Filter className="w-3.5 h-3.5 text-gray-400" />
             <span className="text-[10px] font-black uppercase text-gray-400">Statut :</span>
             <select

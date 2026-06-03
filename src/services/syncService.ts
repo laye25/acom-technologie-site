@@ -614,6 +614,113 @@ export const syncService = {
     }
   },
 
+  async syncStudentData(merchantId: string, studentId: string) {
+    if (!(await this.isOnline(merchantId))) return;
+    try {
+      console.log(`Targeted sync for student ${studentId}...`);
+      
+      const firestore = (await import('../firebase')).db;
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+      const { restoreFromFirestore } = await import('../lib/firestore.utils');
+
+      // Fetch specific student data from massive collections to save quota
+      try {
+        const queries = [
+          { name: 'grades', q: query(collection(firestore, 'grades'), where('studentId', '==', studentId)) },
+          { name: 'attendance', q: query(collection(firestore, 'attendance'), where('studentId', '==', studentId)) },
+          { name: 'discipline_records', q: query(collection(firestore, 'discipline_records'), where('studentId', '==', studentId)) }
+        ];
+        
+        for (const {name, q} of queries) {
+           const snap = await getDocs(q);
+           if (!snap.empty) {
+             const items = snap.docs.map(d => restoreFromFirestore({ id: d.id, ...d.data() }));
+             await (db as any)[name].bulkPut(items);
+           }
+        }
+      } catch(err) {
+        console.warn("Targeted sub-collection sync failed for student", err);
+      }
+      
+      const collections = [
+        { name: 'merchants', table: db.merchants },
+        { name: 'students', table: db.students },
+        { name: 'classes', table: db.classes },
+        { name: 'subjects', table: db.subjects },
+        { name: 'schedules', table: db.schedules },
+        { name: 'homeworks', table: db.homeworks },
+        { name: 'teachers', table: db.teachers },
+        { name: 'communications', table: db.communications }
+      ];
+      
+      for (const col of collections) {
+        await this.syncSaaSCollection(merchantId, col.name, col.table, false); // DELTA SYNC ONLY
+      }
+
+      console.log("Student targeted sync complete");
+    } catch (e) {
+      console.error("Targeted student sync failed", e);
+    }
+  },
+
+  async syncParentData(merchantId: string, parentId: string) {
+    if (!(await this.isOnline(merchantId))) return;
+    try {
+      console.log(`Targeted sync for parent ${parentId}...`);
+
+      const collections = [
+        { name: 'merchants', table: db.merchants },
+        { name: 'parents', table: db.parents },
+        { name: 'classes', table: db.classes },
+        { name: 'subjects', table: db.subjects },
+        { name: 'schedules', table: db.schedules },
+        { name: 'homeworks', table: db.homeworks },
+        { name: 'teachers', table: db.teachers },
+        { name: 'students', table: db.students },
+        { name: 'attendance', table: db.attendance },
+        { name: 'grades', table: db.grades },
+        { name: 'communications', table: db.communications }
+      ];
+      
+      for (const col of collections) {
+        await this.syncSaaSCollection(merchantId, col.name, col.table, false); // DELTA SYNC ONLY to prevent quota exhaustion
+      }
+
+      console.log("Parent targeted sync complete");
+    } catch (e) {
+      console.error("Targeted parent sync failed", e);
+    }
+  },
+
+  async syncTeacherData(merchantId: string, teacherId: string) {
+    if (!(await this.isOnline(merchantId))) return;
+    try {
+      console.log(`Targeted sync for teacher ${teacherId}...`);
+      
+      const collections = [
+        { name: 'merchants', table: db.merchants },
+        { name: 'teachers', table: db.teachers },
+        { name: 'classes', table: db.classes },
+        { name: 'subjects', table: db.subjects },
+        { name: 'schedules', table: db.schedules },
+        { name: 'homeworks', table: db.homeworks },
+        { name: 'students', table: db.students },
+        { name: 'grades', table: db.grades },
+        { name: 'attendance', table: db.attendance },
+        { name: 'discipline_records', table: db.discipline_records },
+        { name: 'communications', table: db.communications }
+      ];
+      
+      for (const col of collections) {
+        await this.syncSaaSCollection(merchantId, col.name, col.table, false); // DELTA SYNC ONLY to prevent quota exhaustion
+      }
+
+      console.log("Teacher targeted sync complete");
+    } catch (e) {
+      console.error("Targeted teacher sync failed", e);
+    }
+  },
+
   async syncAllMerchantData(merchantId: string) {
     const collections = [
       { name: 'merchant_products', table: db.products },

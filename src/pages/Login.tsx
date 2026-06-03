@@ -275,7 +275,7 @@ const Login = () => {
             localStorage.removeItem('activeStudentId');
             const mId = matchingTeacher.merchantId || matchingTeacher.merchant_id;
             if (mId) localStorage.setItem('merchantId', mId);
-            navigate('/merchant/saas');
+            navigate('/portal/teacher');
             return;
           } else if (matchingParent && (matchingParent.password?.trim() === formData.password.trim() || (matchingParent as any).pin?.trim() === formData.password.trim())) {
             const parentKey = matchingParent.id || (matchingParent.phone || '').replace(/[^0-9]/g, '');
@@ -284,7 +284,7 @@ const Login = () => {
             localStorage.removeItem('activeStudentId');
             const mId = matchingParent.merchantId || matchingParent.merchant_id;
             if (mId) localStorage.setItem('merchantId', mId);
-            navigate('/merchant/saas');
+            navigate('/portal/parent');
             return;
           } else if (matchingStudent && (matchingStudent.studentPassword?.trim() === formData.password.trim() || matchingStudent.password?.trim() === formData.password.trim())) {
             localStorage.setItem('activeStudentId', matchingStudent.id);
@@ -292,7 +292,7 @@ const Login = () => {
             localStorage.removeItem('activeParentId');
             const mId = matchingStudent.merchantId || matchingStudent.merchant_id;
             if (mId) localStorage.setItem('merchantId', mId);
-            navigate('/merchant/saas');
+            navigate('/portal/student');
             return;
           } else {
             throw new Error("Identifiant ou Code PIN incorrect.");

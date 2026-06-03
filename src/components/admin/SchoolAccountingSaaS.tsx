@@ -4,13 +4,16 @@ import { dbService } from '../../services/dbService';
 import { syncService } from '../../services/syncService';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'motion/react';
+import { geminiService } from '../../services/geminiService';
 import { 
   DollarSign, TrendingUp, TrendingDown, ClipboardList, BookOpen, AlertCircle, 
   Users, CreditCard, CheckCircle, Smartphone, Banknote, RefreshCw, Plus, 
   Trash2, X, Download, FileText, Check, Package, Car, Utensils, Receipt, 
-  Sparkles, Filter, Search, Printer, Send, Info, Calendar, ShieldCheck, Sliders
+  Sparkles, Filter, Search, Printer, Send, Info, Calendar, ShieldCheck, Sliders,
+  Home
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { SchoolPricingSaaS } from './SchoolPricingSaaS';
 
 interface Merchant {
   id: string;
@@ -20,11 +23,558 @@ interface Merchant {
   currency: string;
 }
 
+const StudentFeeConfigModal = ({
+  student,
+  onClose,
+  onSave,
+  currency,
+  getStudentFees,
+  saving
+}: {
+  student: any;
+  onClose: () => void;
+  onSave: (id: string, bd: any) => void;
+  currency: string;
+  getStudentFees: (st: any) => any;
+  saving: boolean;
+}) => {
+  const currentFees = getStudentFees(student);
+
+  const [months, setMonths] = useState<number>(Number(currentFees.monthsDuration ?? 9));
+  const [inscription, setInscription] = useState<number>(Number(currentFees.inscription ?? 25000));
+  const [scolarite, setScolarite] = useState<number>(Number(currentFees.scolarite ?? 300000));
+  const [uniforme, setUniforme] = useState<number>(Number(currentFees.uniforme ?? 40000));
+  
+  const [hasTransport, setHasTransport] = useState<boolean>(currentFees.hasTransport !== undefined ? !!currentFees.hasTransport : Number(currentFees.transport ?? 0) > 0);
+  const [hasCanteen, setHasCanteen] = useState<boolean>(currentFees.hasCanteen !== undefined ? !!currentFees.hasCanteen : Number(currentFees.cantine ?? 0) > 0);
+  const [hasInternat, setHasInternat] = useState<boolean>(currentFees.hasInternat !== undefined ? !!currentFees.hasInternat : Number(currentFees.internat ?? 0) > 0);
+  
+  const [transport, setTransport] = useState<number>(Number(currentFees.transport) || 60000);
+  const [cantine, setCantine] = useState<number>(Number(currentFees.cantine) || 90000);
+  const [internat, setInternat] = useState<number>(Number(currentFees.internat) || 0);
+
+  const finalTransport = hasTransport ? transport : 0;
+  const finalCantine = hasCanteen ? cantine : 0;
+  const finalInternat = hasInternat ? internat : 0;
+
+  const scolMens = months > 0 ? Math.round(scolarite / months) : 0;
+  const transMens = months > 0 ? Math.round(finalTransport / months) : 0;
+  const cantMens = months > 0 ? Math.round(finalCantine / months) : 0;
+  const internatMens = months > 0 ? Math.round(finalInternat / months) : 0;
+
+  const total = inscription + scolarite + uniforme + finalTransport + finalCantine + finalInternat;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(student.id, {
+      inscription,
+      scolarite,
+      uniforme,
+      transport: finalTransport,
+      cantine: finalCantine,
+      internat: finalInternat,
+      hasTransport,
+      hasCanteen,
+      hasInternat,
+      monthsDuration: months
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md overflow-y-auto">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+        animate={{ opacity: 1, scale: 1, y: 0 }} 
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col font-sans max-h-[92vh]"
+      >
+        {/* Modal Header */}
+        <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-indigo-50/50 shrink-0">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-indigo-700" />
+            <div>
+              <h3 className="text-lg font-black text-indigo-950 uppercase tracking-tight">Fiche de Facturation</h3>
+              <p className="text-[10px] font-bold font-mono text-indigo-600 uppercase tracking-widest mt-0.5">
+                Ajuster les tarifs pour {student.firstName} {student.lastName}
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={onClose} 
+            className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors border shadow-sm text-slate-400 hover:text-slate-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
+          {/* Left panel: Saisies de Tarification */}
+          <div className="flex-1 p-8 space-y-4 max-h-[75vh] min-h-[400px] overflow-y-auto bg-slate-50/10">
+            <p className="text-xs text-slate-500 leading-normal mb-2 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">
+              Modifiez la configuration financière contractuelle de l'élève. Les valeurs mensuelles se recalculent instantanément sur le volet de droite.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="col-span-1 sm:col-span-2">
+                <label className="block text-[10px] font-mono font-black text-indigo-700 uppercase tracking-widest mb-1.5 font-bold">Durée de la formation (mois)</label>
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="12" 
+                  value={months}
+                  onChange={(e) => setMonths(Math.max(1, Number(e.target.value)))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800 bg-indigo-50/20" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5 font-bold">Frais d'Inscription ({currency})</label>
+                <input 
+                  type="number" 
+                  value={inscription}
+                  onChange={(e) => setInscription(Math.max(0, Number(e.target.value)))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5 font-bold">Scolarité Annuelle ({currency})</label>
+                <input 
+                  type="number" 
+                  value={scolarite}
+                  onChange={(e) => setScolarite(Math.max(0, Number(e.target.value)))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5 font-bold">Uniforme Scolaire ({currency})</label>
+                <input 
+                  type="number" 
+                  value={uniforme}
+                  onChange={(e) => setUniforme(Math.max(0, Number(e.target.value)))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" 
+                />
+              </div>
+
+              <div className="col-span-1 sm:col-span-2 flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-gray-100">
+                <input 
+                  type="checkbox" 
+                  id="modalHasTransport" 
+                  className="w-4 h-4 rounded text-indigo-700 focus:ring-indigo-500 border-slate-300"
+                  checked={hasTransport} 
+                  onChange={(e) => setHasTransport(e.target.checked)} 
+                />
+                <label htmlFor="modalHasTransport" className="text-xs font-black text-slate-850 uppercase tracking-wider cursor-pointer">
+                  🚌 Activer le Transport Scolaire pour cet élève
+                </label>
+              </div>
+
+              {hasTransport && (
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5 font-bold">Transport Annuel ({currency})</label>
+                  <input 
+                    type="number" 
+                    value={transport}
+                    onChange={(e) => setTransport(Math.max(0, Number(e.target.value)))}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" 
+                  />
+                </div>
+              )}
+
+              <div className="col-span-1 sm:col-span-2 flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-gray-100">
+                <input 
+                  type="checkbox" 
+                  id="modalHasCanteen" 
+                  className="w-4 h-4 rounded text-indigo-700 focus:ring-indigo-500 border-slate-300"
+                  checked={hasCanteen} 
+                  onChange={(e) => setHasCanteen(e.target.checked)} 
+                />
+                <label htmlFor="modalHasCanteen" className="text-xs font-black text-slate-850 uppercase tracking-wider cursor-pointer">
+                  🍱 Activer la Cantine Cafétéria pour cet élève
+                </label>
+              </div>
+
+              {hasCanteen && (
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5 font-bold">Cantine Annuelle ({currency})</label>
+                  <input 
+                    type="number" 
+                    value={cantine}
+                    onChange={(e) => setCantine(Math.max(0, Number(e.target.value)))}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" 
+                  />
+                </div>
+              )}
+
+              <div className="col-span-1 sm:col-span-2 flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-gray-100">
+                <input 
+                  type="checkbox" 
+                  id="modalHasInternat" 
+                  className="w-4 h-4 rounded text-indigo-700 focus:ring-indigo-500 border-slate-300"
+                  checked={hasInternat} 
+                  onChange={(e) => setHasInternat(e.target.checked)} 
+                />
+                <label htmlFor="modalHasInternat" className="text-xs font-black text-slate-850 uppercase tracking-wider cursor-pointer">
+                  🏠 Activer l'Hébergement / Services d'Internat pour cet élève
+                </label>
+              </div>
+
+              {hasInternat && (
+                <div className="col-span-1 sm:col-span-2">
+                  <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5 font-bold">Frais d'Internat Annuel ({currency})</label>
+                  <input 
+                    type="number" 
+                    value={internat}
+                    onChange={(e) => setInternat(Math.max(0, Number(e.target.value)))}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" 
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right panel: Synthese de Calcul Dynamique */}
+          <div className="w-full md:w-[380px] p-8 shrink-0 bg-slate-50 flex flex-col justify-between max-h-[75vh] overflow-y-auto">
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-mono font-black text-slate-400 uppercase tracking-widest border-b pb-2 border-slate-200">
+                Aperçu & Calculs Mensuels
+              </h4>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono">
+                  <span className="text-slate-500 font-medium font-bold text-indigo-950">Durée de la formation :</span>
+                  <span className="font-extrabold text-indigo-950 font-black">{months} mois</span>
+                </div>
+
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono">
+                  <span className="text-slate-500 font-medium">🎟️ Frais d'Inscription :</span>
+                  <span className="font-black text-indigo-950">{inscription.toLocaleString()} {currency}</span>
+                </div>
+
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                  <div>
+                    <span className="text-slate-700 font-bold">🎓 Scolarité Annuelle :</span>
+                    <p className="text-[10px] text-indigo-650 font-bold mt-0.5">Scolarité Mensuelle (calculée) :</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-slate-600">{scolarite.toLocaleString()} {currency}</p>
+                    <p className="font-black text-indigo-700 text-sm">{(scolMens).toLocaleString()} {currency}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono">
+                  <span className="text-slate-500 font-medium">👕 Uniforme Scolaire :</span>
+                  <span className="font-black text-indigo-950">{uniforme.toLocaleString()} {currency}</span>
+                </div>
+
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                  <div>
+                    <span className="text-slate-700 font-bold">🚌 Transport Annuel :</span>
+                    <p className="text-[10px] text-emerald-650 font-bold mt-0.5 font-bold">Transport Mensuel (calculé) :</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-slate-600">{hasTransport ? `${transport.toLocaleString()} ${currency}` : "Désactivé"}</p>
+                    <p className="font-black text-emerald-750 text-emerald-800 text-sm">{(transMens).toLocaleString()} {currency}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                  <div>
+                    <span className="text-slate-700 font-bold">🍱 Cantine Annuelle :</span>
+                    <p className="text-[10px] text-amber-650 font-bold mt-0.5 font-bold">Cantine Mensuelle (calculée) :</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-slate-600">{hasCanteen ? `${cantine.toLocaleString()} ${currency}` : "Désactivé"}</p>
+                    <p className="font-black text-amber-700 text-sm">{(cantMens).toLocaleString()} {currency}</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                  <div>
+                    <span className="text-slate-700 font-bold">🏠 Internat Annuel :</span>
+                    <p className="text-[10px] text-violet-650 font-bold mt-0.5 font-bold">Internat Mensuel (calculé) :</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-slate-600">{hasInternat ? `${internat.toLocaleString()} ${currency}` : "Désactivé"}</p>
+                    <p className="font-black text-violet-700 text-sm">{(internatMens).toLocaleString()} {currency}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-indigo-950 p-4.5 rounded-2xl text-white font-mono mt-4">
+                <span className="text-[9px] text-indigo-200 uppercase tracking-wider font-extrabold">Objectif Annuel Global :</span>
+                <p className="text-lg font-black tracking-tight mt-0.5">{total.toLocaleString()} {currency}</p>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-6 border-t border-slate-200 mt-4 shrink-0 col-span-1 md:col-span-2">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="flex-1 py-3.5 border border-slate-200 text-xs font-black uppercase tracking-wider rounded-2xl text-gray-500 hover:bg-gray-100 transition-colors"
+              >
+                Annuler
+              </button>
+              <button 
+                type="submit" 
+                disabled={saving} 
+                className="flex-[2] py-3.5 bg-indigo-950 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-black transition-all"
+              >
+                {saving ? 'Sauvegarde...' : 'Enregistrer Tarifs'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </motion.div>
+    </div>
+  );
+};
+
 export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant, subTab?: string }) => {
-  const currency = merchant.currency || 'FCFA';
+  const liveMerchant = useLiveQuery(() => db.merchants.get(merchant.id), [merchant.id]) || merchant;
+  const currency = liveMerchant.currency || merchant.currency || 'FCFA';
+
+  const dbClasses = useLiveQuery(() => 
+    db.classes?.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
+
+  const getStudentFees = (st: any) => {
+    const pricing = (liveMerchant as any)?.schoolPricing || (merchant as any)?.schoolPricing;
+    const fallback = {
+      inscription: 25000,
+      scolarite: 300000,
+      uniforme: 40000,
+      transport: 60000,
+      cantine: 90000,
+      internat: 0,
+      monthsDuration: 9,
+      hasTransport: true,
+      hasCanteen: true,
+      hasInternat: false
+    };
+
+    const mapConfig = (cfg: any) => {
+      const hasTransport = cfg.hasTransport !== undefined ? !!cfg.hasTransport : true;
+      const hasCanteen = cfg.hasCanteen !== undefined ? !!cfg.hasCanteen : true;
+      const hasInternat = cfg.hasInternat !== undefined ? !!cfg.hasInternat : (Number((cfg.annualInternat || '').toString().replace(/\D/g, '')) > 0 || Number(cfg.internat || 0) > 0);
+      return {
+        inscription: Number((cfg.registrationFee || '').toString().replace(/\D/g, '') || fallback.inscription),
+        scolarite: Number((cfg.annualTuition || '').toString().replace(/\D/g, '') || fallback.scolarite),
+        uniforme: Number((cfg.uniformFee || '').toString().replace(/\D/g, '') || fallback.uniforme),
+        transport: hasTransport ? Number((cfg.annualTransport || '').toString().replace(/\D/g, '') || fallback.transport) : 0,
+        cantine: hasCanteen ? Number((cfg.annualCanteen || '').toString().replace(/\D/g, '') || fallback.cantine) : 0,
+        cantineInterne: Number((cfg.annualCanteenInterne || cfg.cantineInterne || cfg.annualCanteen || '').toString().replace(/\D/g, '') || fallback.cantine),
+        internat: hasInternat ? Number((cfg.annualInternat || '').toString().replace(/\D/g, '') || cfg.internat || fallback.internat) : 0,
+        hasTransport,
+        hasCanteen,
+        hasInternat,
+        monthsDuration: Number((cfg.monthsDuration || '').toString().replace(/\D/g, '') || fallback.monthsDuration)
+      };
+    };
+
+    // Normalize accents and lower-case
+    const normalizeStr = (str: string) => {
+      if (!str) return '';
+      return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/œ/g, 'oe')
+        .replace(/æ/g, 'ae');
+    };
+
+    // 1. Specific exceptions from admin setup
+    let baseFees: any = null;
+    if (pricing?.exceptions?.[st.id]) {
+      baseFees = mapConfig(pricing.exceptions[st.id]);
+    }
+
+    // 2. Class-specific pricing set by admin
+    if (!baseFees) {
+      const classKey = st.classId || st.class_id || st.class || st.grade;
+      
+      // First try a direct match
+      if (classKey && pricing?.classes?.[classKey]) {
+        baseFees = mapConfig(pricing.classes[classKey]);
+      } else {
+        // If we only have the name in classKey (e.g., student.grade = '5ème A'), try resolving the ID
+        const matchedClass = dbClasses.find(c => c.name === classKey || c.id === classKey);
+        if (matchedClass && pricing?.classes?.[matchedClass.id]) {
+          baseFees = mapConfig(pricing.classes[matchedClass.id]);
+        } else if (matchedClass && pricing?.classes?.[matchedClass.name]) {
+          baseFees = mapConfig(pricing.classes[matchedClass.name]);
+        }
+      }
+    }
+
+    // 3. Level-specific pricing set by admin
+    if (!baseFees) {
+      const gradeStr = normalizeStr(st.grade || st.class || '');
+      let levelKey = '';
+      if (gradeStr.includes('mat') || gradeStr.includes('crech') || gradeStr.includes('garde') || gradeStr.includes('maternelle')) {
+        levelKey = 'Maternelle';
+      } else if (gradeStr.includes('ci') || gradeStr.includes('cp') || gradeStr.includes('ce1') || gradeStr.includes('ce2') || gradeStr.includes('cm1') || gradeStr.includes('cm2') || gradeStr.includes('prim')) {
+        levelKey = 'Primaire';
+      } else if (gradeStr.includes('6e') || gradeStr.includes('5e') || gradeStr.includes('4e') || gradeStr.includes('3e') || gradeStr.includes('colleg')) {
+        levelKey = 'Collège';
+      } else if (gradeStr.includes('second') || gradeStr.includes('premier') || gradeStr.includes('terminal') || gradeStr.includes('lyce') || gradeStr.includes('2nd') || gradeStr.includes('1er') || gradeStr.includes('tle') || gradeStr.includes('l2')) {
+        levelKey = 'Lycée';
+      } else if (gradeStr.includes('pro') || gradeStr.includes('format')) {
+        levelKey = 'Formation Professionnelle';
+      }
+
+      if (levelKey && pricing?.levels?.[levelKey]) {
+        baseFees = mapConfig(pricing.levels[levelKey]);
+      }
+    }
+
+    // 4. Override with flat student parameters if present (Fiche d'Inscription options)
+    let hasTransport = baseFees ? baseFees.hasTransport : fallback.hasTransport;
+    if (st.hasTransport !== undefined) {
+      hasTransport = !!st.hasTransport;
+    } else if (st.serviceTransport !== undefined) {
+      hasTransport = !!st.serviceTransport;
+    }
+
+    let hasCanteen = baseFees ? baseFees.hasCanteen : fallback.hasCanteen;
+    if (st.hasCanteen !== undefined) {
+      hasCanteen = !!st.hasCanteen;
+    } else if (st.serviceCantine !== undefined) {
+      hasCanteen = !!st.serviceCantine;
+    }
+
+    let hasInternat = baseFees ? baseFees.hasInternat : fallback.hasInternat;
+    if (st.hasInternat !== undefined) {
+      hasInternat = !!st.hasInternat;
+    } else if (st.serviceInternat !== undefined) {
+      hasInternat = !!st.serviceInternat;
+    } else if (st.regime !== undefined) {
+      hasInternat = (st.regime === 'interne');
+    }
+
+    // Ensure transport, cantine & internat costs are correctly dynamic based on the active options
+    const rawTransport = st.annualTransport !== undefined ? Number(String(st.annualTransport).replace(/\D/g, '')) : (baseFees ? baseFees.transport : fallback.transport);
+    const rawCanteen = st.annualCanteen !== undefined ? Number(String(st.annualCanteen).replace(/\D/g, '')) : (baseFees ? (st.regime === 'interne' ? (baseFees.cantineInterne || baseFees.cantine) : baseFees.cantine) : fallback.cantine);
+    const rawInternat = st.annualInternat !== undefined ? Number(String(st.annualInternat).replace(/\D/g, '')) : (baseFees ? baseFees.internat : fallback.internat);
+
+    const transportValue = hasTransport ? rawTransport : 0;
+    const canteenValue = hasCanteen ? rawCanteen : 0;
+    const internatValue = hasInternat ? rawInternat : 0;
+
+    const currentResult = {
+      ...(baseFees || fallback),
+      transport: transportValue,
+      cantine: canteenValue,
+      internat: internatValue,
+      hasTransport,
+      hasCanteen,
+      hasInternat,
+    };
+
+    if (st.registrationFee !== undefined) {
+      currentResult.inscription = Number(String(st.registrationFee).replace(/\D/g, '')) || currentResult.inscription;
+    }
+    if (st.annualTuition !== undefined) {
+      currentResult.scolarite = Number(String(st.annualTuition).replace(/\D/g, '')) || currentResult.scolarite;
+    }
+    if (st.uniformFee !== undefined) {
+      currentResult.uniforme = Number(String(st.uniformFee).replace(/\D/g, '')) || currentResult.uniforme;
+    }
+    if (st.annualInternat !== undefined) {
+      currentResult.internat = hasInternat ? (Number(String(st.annualInternat).replace(/\D/g, '')) || currentResult.internat) : 0;
+    }
+    if (st.monthsDuration !== undefined) {
+      currentResult.monthsDuration = Number(String(st.monthsDuration).replace(/\D/g, '')) || currentResult.monthsDuration;
+    }
+
+    // 5. Specific inline-edited fees from student details (ONLY IF EXPLICITLY CUSTOM)
+    if (st.tuitionFeesBreakdown && st.tuitionFeesBreakdown.isCustom) {
+      const customHasTransport = st.tuitionFeesBreakdown.hasTransport !== undefined 
+        ? !!st.tuitionFeesBreakdown.hasTransport 
+        : (st.tuitionFeesBreakdown.transport !== undefined ? Number(st.tuitionFeesBreakdown.transport) > 0 : true);
+      const customHasCanteen = st.tuitionFeesBreakdown.hasCanteen !== undefined 
+        ? !!st.tuitionFeesBreakdown.hasCanteen 
+        : (st.tuitionFeesBreakdown.cantine !== undefined ? Number(st.tuitionFeesBreakdown.cantine) > 0 : true);
+      const customHasInternat = st.tuitionFeesBreakdown.hasInternat !== undefined 
+        ? !!st.tuitionFeesBreakdown.hasInternat 
+        : (st.tuitionFeesBreakdown.internat !== undefined ? Number(st.tuitionFeesBreakdown.internat) > 0 : false);
+      return {
+        ...currentResult,
+        ...st.tuitionFeesBreakdown,
+        transport: customHasTransport ? Number(st.tuitionFeesBreakdown.transport ?? currentResult.transport) : 0,
+        cantine: customHasCanteen ? Number(st.tuitionFeesBreakdown.cantine ?? currentResult.cantine) : 0,
+        internat: customHasInternat ? Number(st.tuitionFeesBreakdown.internat ?? currentResult.internat) : 0,
+        hasTransport: customHasTransport,
+        hasCanteen: customHasCanteen,
+        hasInternat: customHasInternat,
+        monthsDuration: Number(st.tuitionFeesBreakdown.monthsDuration || currentResult.monthsDuration)
+      };
+    }
+
+    return currentResult;
+  };
+
+  const autoGetFirstUnpaidMonthForStudent = (st: any, catLabel: string) => {
+    const currentFees = getStudentFees(st);
+    const SCHOOL_MONTHS = ['Octobre', 'Novembre', 'Décembre', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre'];
+    const activeMonths = SCHOOL_MONTHS.slice(0, Number(currentFees.monthsDuration || 9));
+    const payments = st.tuitionPayments || [];
+
+    for (const m of activeMonths) {
+      let target = 0;
+      let paid = 0;
+
+      if (catLabel === 'Mensualité Globale') {
+         const ts = Math.round(Number(currentFees.scolarite ?? 0) / Number(currentFees.monthsDuration || 9));
+         const tt = currentFees.hasTransport !== false ? Math.round(Number(currentFees.transport ?? 0) / Number(currentFees.monthsDuration || 9)) : 0;
+         const tc = currentFees.hasCanteen !== false ? Math.round(Number(currentFees.cantine ?? 0) / Number(currentFees.monthsDuration || 9)) : 0;
+         const ti = currentFees.hasInternat !== false ? Math.round(Number(currentFees.internat ?? 0) / Number(currentFees.monthsDuration || 9)) : 0;
+         target = ts + tt + tc + ti;
+
+         paid = payments
+          .filter((p: any) => 
+            p.category === `Scolarité - ${m}` || 
+            p.category === `Transport - ${m}` || 
+            p.category === `Cantine - ${m}` ||
+            p.category === `Internat - ${m}`
+          )
+          .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      } else if (catLabel === 'Scolarité Mensuelle') {
+        target = Math.round(Number(currentFees.scolarite ?? 0) / Number(currentFees.monthsDuration || 9));
+        paid = payments
+          .filter((p: any) => p.category === `Scolarité - ${m}`)
+          .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      } else if (catLabel === 'Transport Mensuel') {
+        target = Math.round(Number(currentFees.transport ?? 0) / Number(currentFees.monthsDuration || 9));
+        paid = payments
+          .filter((p: any) => p.category === `Transport - ${m}`)
+          .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      } else if (catLabel === 'Cantine Mensuelle') {
+        target = Math.round(Number(currentFees.cantine ?? 0) / Number(currentFees.monthsDuration || 9));
+        paid = payments
+          .filter((p: any) => p.category === `Cantine - ${m}`)
+          .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      } else if (catLabel === 'Internat Mensuel') {
+        target = Math.round(Number(currentFees.internat ?? 0) / Number(currentFees.monthsDuration || 9));
+        paid = payments
+          .filter((p: any) => p.category === `Internat - ${m}`)
+          .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      } else {
+        return activeMonths[0] || 'Octobre';
+      }
+
+      if (target > paid) {
+        return m;
+      }
+    }
+
+    return activeMonths[0] || 'Octobre';
+  };
 
   // State management
-  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'scolarite' | 'caisse' | 'depenses' | 'salaires' | 'stock' | 'transport' | 'cantine'>((subTab as any) || 'kpi');
+  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'scolarite' | 'caisse' | 'depenses' | 'salaires' | 'stock' | 'transport' | 'cantine' | 'pricing'>((subTab as any) || 'kpi');
 
   useEffect(() => {
     if (subTab && subTab !== activeSubTab) {
@@ -36,7 +586,8 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
   const [showFeeConfigModal, setShowFeeConfigModal] = useState<any>(null); // student object for configuring fees
   const [showPaymentModal, setShowPaymentModal] = useState<any>(null); // student object for quick payment cashier
   const [selectedStudentFinance, setSelectedStudentFinance] = useState<any>(null); // student selected for advanced financial sheet
-  const [financeFormCategory, setFinanceFormCategory] = useState<string>('Scolarité Mensuelle');
+  const [financeFormCategory, setFinanceFormCategory] = useState<string>('Mensualité Globale');
+  const [financeFormMonth, setFinanceFormMonth] = useState<string>('Octobre');
   const [financeFormAmount, setFinanceFormAmount] = useState<number>(30000);
   const [financeFormMode, setFinanceFormMode] = useState<string>('Wave');
   const [isEditingFeesInline, setIsEditingFeesInline] = useState<boolean>(false);
@@ -58,6 +609,26 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGrade, setSelectedGrade] = useState('Tous');
+
+  // Canteen / Cafeteria States
+  const [canteenSearchTerm, setCanteenSearchTerm] = useState('');
+  const [canteenRegimeFilter, setCanteenRegimeFilter] = useState<'all' | 'demi-pension' | 'interne' | 'externe'>('all');
+  const [canteenRosterMonth, setCanteenRosterMonth] = useState<string>('Juin');
+  const [isEditingMenu, setIsEditingMenu] = useState(false);
+  const [generatingMenu, setGeneratingMenu] = useState(false);
+  const [lunchMenu, setLunchMenu] = useState<any>(() => {
+    const saved = localStorage.getItem('school_lunch_menu');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      Lundi: 'Riz au poisson (Thiéboudienne)',
+      Mardi: 'Mafé au bœuf d\'excellence',
+      Mercredi: 'Poulet yassa traditionnel d\'ACOM',
+      Jeudi: 'Couscous sénégalais sauce gombo',
+      Vendredi: 'Riz au poulet grillé sauce oignon'
+    };
+  });
 
   // Load database items via useLiveQuery (Reactive)
   const students = useLiveQuery(() => 
@@ -92,13 +663,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
     let totalTargetFees = 0;
     let totalPaidFees = 0;
     students.forEach((s: any) => {
-      const fees = s.tuitionFeesBreakdown || {
-        inscription: 25000,
-        scolarite: 300000,
-        uniforme: 40000,
-        transport: 60000,
-        cantine: 90000
-      };
+      const fees = getStudentFees(s);
       
       const stTotal = Number(fees.inscription || 0) + 
                      Number(fees.scolarite || 0) + 
@@ -134,7 +699,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
       totalPaidFees,
       totalOverdue
     };
-  }, [sales, expenses, students]);
+  }, [sales, expenses, students, (merchant as any).schoolPricing]);
 
   // Unique grade levels
   const uniqueClassGrades = useMemo(() => {
@@ -165,7 +730,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
     try {
       await dbService.students.save({
         ...student,
-        tuitionFeesBreakdown: breakdown,
+        tuitionFeesBreakdown: { ...breakdown, isCustom: true },
         updatedAt: new Date()
       });
       syncService.syncAllMerchantData(merchant.id);
@@ -177,23 +742,133 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
     }
   };
 
-  // 2. SAVE PAYMENT (ENCAISSEMENT CAISSE)
-  const handleRecordPayment = async (studentId: string, paymentData: { amount: number, category: string, mode: string }) => {
+  // Update student's regime dynamically
+  const handleUpdateStudentRegime = async (studentId: string, newRegime: 'externe' | 'demi-pension' | 'interne') => {
     const student = students.find((s: any) => s.id === studentId);
+    if (!student) return;
+
+    setSaving(true);
+    try {
+      const pricing = (liveMerchant as any)?.schoolPricing || (merchant as any)?.schoolPricing;
+      
+      const getGradeStr = (st: any) => {
+        const gradeStr = st.grade || st.class || '';
+        if (gradeStr.includes('mat') || gradeStr.includes('crech') || gradeStr.includes('garde') || gradeStr.includes('maternelle')) return 'Maternelle';
+        if (gradeStr.includes('ci') || gradeStr.includes('cp') || gradeStr.includes('ce1') || gradeStr.includes('ce2') || gradeStr.includes('cm1') || gradeStr.includes('cm2') || gradeStr.includes('prim')) return 'Primaire';
+        if (gradeStr.includes('6e') || gradeStr.includes('5e') || gradeStr.includes('4e') || gradeStr.includes('3e') || gradeStr.includes('colleg')) return 'Collège';
+        return 'Lycée';
+      };
+      
+      const level = getGradeStr(student);
+      const baseFees = pricing?.levels?.[level];
+      
+      let annualCanteen = 0;
+      let annualInternat = 0;
+      let hasCanteen = false;
+      let hasInternat = false;
+
+      if (newRegime === 'demi-pension') {
+        hasCanteen = true;
+        annualCanteen = baseFees ? (Number((baseFees.annualCanteen || baseFees.cantine || '90000').toString().replace(/\D/g, ''))) : 90000;
+      } else if (newRegime === 'interne') {
+        hasCanteen = true;
+        hasInternat = true;
+        annualCanteen = baseFees ? (Number((baseFees.annualCanteenInterne || baseFees.annualCanteen || baseFees.cantine || '90000').toString().replace(/\D/g, ''))) : 90000;
+        annualInternat = baseFees ? (Number((baseFees.annualInternat || baseFees.internat || '180000').toString().replace(/\D/g, ''))) : 180000;
+      }
+
+      await dbService.students.save({
+        ...student,
+        regime: newRegime,
+        hasCanteen,
+        hasInternat,
+        annualCanteen,
+        annualInternat,
+        tuitionFeesBreakdown: student.tuitionFeesBreakdown ? {
+          ...student.tuitionFeesBreakdown,
+          hasCanteen,
+          hasInternat,
+          cantine: annualCanteen,
+          internat: annualInternat
+        } : undefined,
+        updatedAt: new Date()
+      });
+
+      syncService.syncAllMerchantData(merchant.id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleGenerateMenuWithAI = async () => {
+    setGeneratingMenu(true);
+    try {
+      const prompt = `Génère un menu hebdomadaire de cantine scolaire équilibré et nutritif avec des spécialités sénégalaises populaires pour les enfants (ex: Riz au poisson (Thiéboudienne), Poulet Yassa, Mafé au boeuf, Couscous gombo, Soupou Kandja, Kedjenou de poulet, etc.).
+      Retourne UNIQUEMENT un objet JSON valide contenant exactement les clés: Lundi, Mardi, Mercredi, Jeudi, Vendredi.
+      Le format de réponse doit être STRICTEMENT :
+      {
+        "Lundi": "nom complet du plat",
+        "Mardi": "nom complet du plat",
+        "Mercredi": "nom complet du plat",
+        "Jeudi": "nom complet du plat",
+        "Vendredi": "nom complet du plat"
+      }
+      Ne retourne rien d'autre que l'objet JSON brut. Pas de texte explicatif avant ou après.`;
+      
+      const responseText = await geminiService.generateText(prompt);
+      const cleanJson = responseText.replace(/```json|```/g, "").trim();
+      const parsedMenu = JSON.parse(cleanJson);
+      
+      if (parsedMenu.Lundi && parsedMenu.Mardi && parsedMenu.Mercredi && parsedMenu.Jeudi && parsedMenu.Vendredi) {
+        setLunchMenu(parsedMenu);
+        localStorage.setItem('school_lunch_menu', JSON.stringify(parsedMenu));
+      }
+    } catch (e) {
+      console.error("Failed to generate cafeteria menu via Gemini:", e);
+    } finally {
+      setGeneratingMenu(false);
+    }
+  };
+
+  // 2. SAVE PAYMENT (ENCAISSEMENT CAISSE)
+  const handleRecordPayment = async (studentId: string, paymentData: { amount: number, category: string, mode: string, details?: any }, skipReceiptUpdate = false) => {
+    const student = await db.students.get(studentId);
     if (!student) return;
 
     if (paymentData.amount <= 0) return;
     setSaving(true);
 
     try {
-      const receiptNumber = `REC-2026-${String(sales.length + 1).padStart(4, '0')}`;
+      // Certified Accounting Improvements:
+      // A. Collision-Proof Sequential Receipt Sequence (Safe multi-client identifier)
+      const baseIdx = sales.length + 1;
+      const uniqueSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+      const timeMarker = new Date().toISOString().slice(11,19).replace(/:/g, '');
+      const receiptNumber = `REC-2026-${String(baseIdx).padStart(4, '0')}-${timeMarker}-${uniqueSuffix}`;
+
+      // B. Double-Entry Accounting Class Metadata (SYSCOHADA Alignment)
+      const debitAccount = paymentData.mode === 'Espèces' ? '5711 (Caisse Établissement)' : '5211 (Banque / Mobile Money)';
+      const creditAccount = '4111 (Clients Élèves - Droits constatés)';
+      
       const newPayment = {
         id: crypto.randomUUID(),
         amount: Number(paymentData.amount),
         category: paymentData.category,
         mode: paymentData.mode,
         date: new Date().toISOString(),
-        receiptNumber
+        receiptNumber,
+        isImmutable: true, // Audit Trail Lock
+        debitAccount,
+        creditAccount,
+        details: paymentData.details || {
+          scolarite: paymentData.category.includes('Scolarité') ? Number(paymentData.amount) : 0,
+          transport: paymentData.category.includes('Transport') ? Number(paymentData.amount) : 0,
+          cantine: paymentData.category.includes('Cantine') ? Number(paymentData.amount) : 0,
+          inscription: paymentData.category.includes('Inscription') ? Number(paymentData.amount) : 0,
+          autres: (!paymentData.category.includes('Scolarité') && !paymentData.category.includes('Transport') && !paymentData.category.includes('Cantine') && !paymentData.category.includes('Inscription')) ? Number(paymentData.amount) : 0
+        }
       };
 
       // Append to student record
@@ -206,7 +881,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
         updatedAt: new Date()
       });
 
-      // Mirror onto general Sales ledger for accounting compliance
+      // Mirror onto general Sales ledger for accounting compliance (with Double-Entry Details)
       await dbService.merchantSales.save({
         merchantId: merchant.id,
         items: [{
@@ -221,6 +896,9 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
         receiptNumber,
         clientName: `${student.firstName} ${student.lastName}`,
         clientPhone: student.parentContact || '',
+        debitAccount,
+        creditAccount,
+        accountingPeriod: '2025-2026',
         createdAt: new Date()
       });
 
@@ -228,18 +906,21 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
       syncService.syncAllMerchantData(merchant.id);
       syncService.syncSales(merchant.id);
 
-      setSelectedReceipt({
-        ...newPayment,
-        studentName: `${student.firstName} ${student.lastName}`,
-        matricule: student.matricule || 'N/A',
-        grade: student.grade || 'Non spécifié'
-      });
-
-      setShowPaymentModal(null);
+      if (!skipReceiptUpdate) {
+        setSelectedReceipt({
+          ...newPayment,
+          studentName: `${student.firstName} ${student.lastName}`,
+          matricule: student.matricule || 'N/A',
+          grade: student.grade || 'Non spécifié'
+        });
+        setShowPaymentModal(null);
+      }
     } catch (err) {
       console.error(err);
     } finally {
-      setSaving(false);
+      if (!skipReceiptUpdate) {
+        setSaving(false);
+      }
     }
   };
 
@@ -451,7 +1132,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
         {/* ======================================= */}
         {activeSubTab === 'scolarite' && (
           <div className="space-y-6">
-            <div className="bg-slate-50 p-4 border border-slate-150 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="bg-slate-50 p-4 border border-gray-100 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -481,7 +1162,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-150">
+                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
                       <th className="px-8 py-5">Élève</th>
                       <th className="px-8 py-5">Classe / Matricule</th>
                       <th className="px-8 py-5">Fiche Facturation Annuelle</th>
@@ -498,13 +1179,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                       </tr>
                     ) : (
                       filteredStudents.map((st: any) => {
-                        const breakdown = st.tuitionFeesBreakdown || {
-                          inscription: 25000,
-                          scolarite: 300000,
-                          uniforme: 40000,
-                          transport: 60000,
-                          cantine: 90000
-                        };
+                        const breakdown = getStudentFees(st);
 
                         const totalTarget = Number(breakdown.inscription || 0) + 
                                             Number(breakdown.scolarite || 0) + 
@@ -527,13 +1202,27 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                               </span>
                               <p className="text-[9px] font-mono text-gray-400 mt-1">MAT: {st.matricule || 'GEN-2026'}</p>
                             </td>
-                            <td className="px-8 py-4.5">
-                              <p className="text-sm font-black text-indigo-950 font-mono">{totalTarget.toLocaleString()} {currency}</p>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                <span className="text-[8px] font-bold px-1 py-0.5 bg-gray-100 text-gray-500 rounded">Insc: {(breakdown.inscription || 0).toLocaleString()}</span>
-                                <span className="text-[8px] font-bold px-1 py-0.5 bg-gray-100 text-gray-500 rounded">Mens: {(breakdown.scolarite || 0).toLocaleString()}</span>
-                                <span className="text-[8px] font-bold px-1 py-0.5 bg-gray-100 text-gray-500 rounded">Unif: {(breakdown.uniforme || 0).toLocaleString()}</span>
-                              </div>
+                            <td className="px-8 py-4.5 bg-slate-50/20 max-w-[260px]">
+                              {(() => {
+                                const months = parseInt(breakdown.monthsDuration || '9') || 9;
+                                const insc = Number(breakdown.inscription || 0);
+                                const scolAnn = Number(breakdown.scolarite || 0);
+                                const scolMens = months > 0 ? Math.round(scolAnn / months) : 0;
+                                const unif = Number(breakdown.uniforme || 0);
+                                const transAnn = Number(breakdown.transport || 0);
+                                const transMens = months > 0 ? Math.round(transAnn / months) : 0;
+                                const cantAnn = Number(breakdown.cantine || 0);
+                                const cantMens = months > 0 ? Math.round(cantAnn / months) : 0;
+
+                                return (
+                                  <div className="flex flex-col gap-0.5 py-1">
+                                    <p className="text-sm font-black text-indigo-950 font-mono tracking-tight">
+                                      {totalTarget.toLocaleString()} {currency}
+                                    </p>
+                                    <p className="text-[10px] font-bold text-indigo-650 font-mono uppercase tracking-wider">Tarifs Contractuels</p>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="px-8 py-4.5">
                               <div className="flex items-center gap-2">
@@ -551,42 +1240,34 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                                 <button
                                   onClick={() => {
                                     setShowPaymentModal(st);
-                                    // Set default category to first unpaid/uncompleted fee
-                                    const bd = st.tuitionFeesBreakdown || {
-                                      inscription: 25000,
-                                      scolarite: 300000,
-                                      uniforme: 40000,
-                                      transport: 60000,
-                                      cantine: 90000
-                                    };
-                                    const cats = [
-                                      { key: 'inscription', label: "Inscription / Réinscription" },
-                                      { key: 'scolarite', label: "Scolarité Mensuelle" },
-                                      { key: 'uniforme', label: "Uniforme Scolaire" },
-                                      { key: 'transport', label: "Transport Scolaire" },
-                                      { key: 'cantine', label: "Cantine Cafétéria" }
-                                    ];
-                                    let chosenCat = "Scolarité Mensuelle";
-                                    let chosenAmount = 30000;
-                                    for(const cat of cats) {
-                                      const limitVal = Number(bd[cat.key] || 0);
-                                      const paidVal = (st.tuitionPayments || [])
-                                        .filter((p: any) => p.category === cat.label)
-                                        .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-                                      if (paidVal < limitVal) {
-                                        chosenCat = cat.label;
-                                        chosenAmount = limitVal - paidVal;
-                                        break;
-                                      }
-                                    }
-                                    setFinanceFormCategory(chosenCat);
-                                    setFinanceFormAmount(chosenAmount);
+                                    const bd = getStudentFees(st);
+                                    const startCategory = 'Mensualité Globale';
+                                    const firstUnpaidMonth = autoGetFirstUnpaidMonthForStudent(st, startCategory);
+                                    
+                                    setFinanceFormCategory(startCategory);
+                                    setFinanceFormMonth(firstUnpaidMonth);
+                                    
+                                    const ts = Math.round(Number(bd.scolarite ?? 0) / Number(bd.monthsDuration || 9));
+                                    const tt = bd.hasTransport !== false ? Math.round(Number(bd.transport ?? 0) / Number(bd.monthsDuration || 9)) : 0;
+                                    const tc = bd.hasCanteen !== false ? Math.round(Number(bd.cantine ?? 0) / Number(bd.monthsDuration || 9)) : 0;
+                                    const ti = bd.hasInternat !== false ? Math.round(Number(bd.internat ?? 0) / Number(bd.monthsDuration || 9)) : 0;
+                                    const target = ts + tt + tc + ti;
+
+                                    const payments = st.tuitionPayments || [];
+                                    const paid = payments.filter((p: any) => 
+                                      p.category === `Scolarité - ${firstUnpaidMonth}` || 
+                                      p.category === `Transport - ${firstUnpaidMonth}` || 
+                                      p.category === `Cantine - ${firstUnpaidMonth}` ||
+                                      p.category === `Internat - ${firstUnpaidMonth}`
+                                    ).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+                                    
+                                    setFinanceFormAmount(Math.max(0, target - paid));
                                     setFinanceFormMode('Wave');
                                   }}
-                                  className="px-3.5 py-2.5 bg-emerald-650 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-150 flex items-center gap-1.5 shadow-md shadow-emerald-600/10"
+                                  className="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-slate-900 border border-emerald-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-150 flex items-center gap-1.5 shadow-sm"
                                   title="Guichet rapide d'encaissement"
                                 >
-                                  <CreditCard className="w-4 h-4 text-emerald-300" />
+                                  <CreditCard className="w-4 h-4 text-emerald-600" />
                                   <span>Encaisser</span>
                                 </button>
 
@@ -645,7 +1326,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-150">
+                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
                       <th className="px-8 py-5">Référence / Date</th>
                       <th className="px-8 py-5">Émetteur / Contat</th>
                       <th className="px-8 py-5">Désignation frais scolaire</th>
@@ -727,7 +1408,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-150">
+                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
                       <th className="px-8 py-5">Libellé de charge</th>
                       <th className="px-8 py-5">Catégorie dépenses</th>
                       <th className="px-8 py-5">Date d'émission</th>
@@ -796,7 +1477,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-150">
+                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
                       <th className="px-8 py-5">Personnel</th>
                       <th className="px-8 py-5">Poste / Rôle</th>
                       <th className="px-8 py-5">Fiche Salaire Mensuel Brut</th>
@@ -977,7 +1658,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
         {/* ======================================= */}
         {activeSubTab === 'transport' && (
           <div className="space-y-6">
-            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-150 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="bg-slate-50 p-6 rounded-[2rem] border border-gray-100 relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 border border-indigo-100 text-[9px] font-black rounded-md tracking-widest uppercase">Flotte de transport</span>
                 <h3 className="text-xl font-black text-indigo-950 mt-1.5">Gestion des circuits de bus & ramassages</h3>
@@ -1029,63 +1710,486 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
         {/* ======================================= */}
         {/* TAB 8: CANTINE & REPAS */}
         {/* ======================================= */}
-        {activeSubTab === 'cantine' && (
-          <div className="space-y-6">
-            <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-150 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <span className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-100 text-[9px] font-black rounded-md tracking-widest uppercase">Service Cafétéria</span>
-                <h3 className="text-xl font-black text-indigo-950 mt-1.5">Menus cantine & abonnements scolaires</h3>
-              </div>
-              <div className="text-xs text-slate-600 font-mono space-y-1">
-                <p>🍲 Plan repas proposé : <span className="font-extrabold text-indigo-950">Menu du Jour</span></p>
-                <p>⭐ Norme sanitaire : <span className="font-extrabold text-emerald-600">Certifié ACOM</span></p>
-              </div>
-            </div>
+        {activeSubTab === 'cantine' && (() => {
+          // Dynamic Computations inside TAB 8
+          const demi = students.filter((s: any) => s.regime === 'demi-pension');
+          const int = students.filter((s: any) => s.regime === 'interne');
+          const ext = students.filter((s: any) => !s.regime || s.regime === 'externe');
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-              <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm space-y-4">
-                <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center">
-                  <Utensils className="w-5 h-5 text-indigo-600" />
-                </div>
-                <h4 className="text-md font-bold text-indigo-950">Abonnement Mensuel Cantine</h4>
-                <p className="text-xs text-slate-500 font-medium">Forfait complet midi (repas du jour + dessert + boisson).</p>
-                <p className="text-2xl font-black font-mono text-indigo-950">10 000 FCFA <span className="text-xs text-slate-400">/ mois</span></p>
-                <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-[10px] font-mono text-slate-500">
-                  <span>95 élèves abonnés</span>
-                  <span>Actif</span>
-                </div>
-              </div>
+          // Projected & Collected numbers for Canteen
+          let projectedMonthlyRev = 0;
+          students.forEach((st: any) => {
+            const fees = getStudentFees(st);
+            const months = fees.monthsDuration || 9;
+            if (st.regime === 'demi-pension') {
+              projectedMonthlyRev += months > 0 ? Math.round((fees.cantine || 0) / months) : 0;
+            } else if (st.regime === 'interne') {
+              projectedMonthlyRev += months > 0 ? Math.round((fees.cantine || 0) / months) : 0;
+            }
+          });
 
-              <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm space-y-4">
-                <div className="w-10 h-10 bg-rose-50 rounded-full flex items-center justify-center">
-                  <Utensils className="w-5 h-5 text-rose-500" />
-                </div>
-                <h4 className="text-md font-bold text-indigo-950">Abonnement Cantine XL (Spécial Maternelle)</h4>
-                <p className="text-xs text-slate-500 font-medium font-sans">Forfait déjeuner équilibré + goûter de 16h.</p>
-                <p className="text-2xl font-black font-mono text-indigo-950">15 000 FCFA <span className="text-xs text-slate-400">/ mois</span></p>
-                <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-[10px] font-mono text-slate-500">
-                  <span>45 élèves abonnés</span>
-                  <span>Actif</span>
-                </div>
-              </div>
+          let collectedThisMonth = 0;
+          students.forEach((st: any) => {
+            const payments = st.tuitionPayments || [];
+            const cPayments = payments.filter((p: any) => p.category === `Cantine - ${canteenRosterMonth}`);
+            collectedThisMonth += cPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+          });
 
-              <div className="bg-indigo-950 text-white p-6 rounded-[2rem] shadow-sm flex flex-col justify-between">
+          const totalSubscribers = demi.length + int.length;
+
+          // Filter Canteen Students
+          const filteredCanteenStudents = students.filter((st: any) => {
+            const q = canteenSearchTerm.toLowerCase().trim();
+            const matchesSearch = `${st.firstName || ''} ${st.lastName || ''}`.toLowerCase().includes(q) ||
+                                  (st.matricule || '').toLowerCase().includes(q);
+            
+            let matchesRegime = false;
+            if (canteenRegimeFilter === 'all') {
+              matchesRegime = st.regime === 'demi-pension' || st.regime === 'interne';
+            } else if (canteenRegimeFilter === 'demi-pension') {
+              matchesRegime = st.regime === 'demi-pension';
+            } else if (canteenRegimeFilter === 'interne') {
+              matchesRegime = st.regime === 'interne';
+            } else if (canteenRegimeFilter === 'externe') {
+              matchesRegime = !st.regime || st.regime === 'externe';
+            }
+
+            return matchesSearch && matchesRegime;
+          });
+
+          const SCHOOL_MONTHS = ['Octobre', 'Novembre', 'Décembre', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre'];
+
+          return (
+            <div className="space-y-6">
+              {/* Top Banner */}
+              <div className="bg-white p-6 rounded-[2rem] border border-black/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden shadow-sm">
+                <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-rose-500/5 to-transparent pointer-events-none" />
                 <div>
-                  <h4 className="font-bold text-md text-white">Menu Hebdomadaire Suggéré</h4>
-                  <ul className="mt-3 text-[11px] text-indigo-200 space-y-1.5 list-disc pl-3">
-                    <li><span className="text-white font-bold">Lundi :</span> Riz au poisson (Thiéboudienne)</li>
-                    <li><span className="text-white font-bold">Mardi :</span> Mafé au bœuf d'excellence</li>
-                    <li><span className="text-white font-bold">Mercredi :</span> Poulet yassa traditionnel d'ACOM</li>
-                    <li><span className="text-white font-bold">Jeudi :</span> Couscous sénégalais sauce gombo</li>
-                  </ul>
+                  <span className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-100 text-[9px] font-black rounded-md tracking-widest uppercase">Service Cafétéria</span>
+                  <h3 className="text-xl font-black text-indigo-950 mt-1.5 flex items-center gap-2">
+                    <Utensils className="w-5 h-5 text-rose-500 animate-pulse" />
+                    Menus cantine & abonnements scolaires (Régimes)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-1">
+                    Suivez, encaissez et gérez la restauration et l'internat de vos internes et demi-pensionnaires en temps réel.
+                  </p>
                 </div>
-                <div className="pt-4 border-t border-white/10 flex justify-between items-center text-[10px] font-mono text-indigo-300">
-                  <span>Cuisine certifiée</span>
-                  <span className="text-emerald-400 font-bold">Inspecté</span>
+                <div className="text-xs text-slate-600 font-mono space-y-1 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm shrink-0">
+                  <p className="flex justify-between gap-4">🍲 Plan repas : <span className="font-extrabold text-indigo-950">Menu du Jour</span></p>
+                  <p className="flex justify-between gap-4">⭐ Norme sanitaire : <span className="font-extrabold text-emerald-600">Certifié ACOM</span></p>
                 </div>
               </div>
+
+              {/* Stats Counters Bento Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-[1.8rem] border border-black/5 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Total Abonnés Cantine</span>
+                    <p className="text-2xl font-black text-indigo-950 mt-1">{totalSubscribers} <span className="text-xs text-slate-400 font-bold">élèves</span></p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-[10px] font-mono text-slate-500 border-t pt-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block" />
+                    <span>{demi.length} Demi-pensionnaires</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-[1.8rem] border border-black/5 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Élèves Internes</span>
+                    <p className="text-2xl font-black text-purple-950 mt-1">{int.length} <span className="text-xs text-slate-400 font-bold font-sans">élèves</span></p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-[10px] font-mono text-slate-500 border-t pt-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 block" />
+                    <span>Hébergés & Pension complète</span>
+                  </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-[1.8rem] border border-black/5 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">Objectif Facturation Mensuel</span>
+                    <p className="text-xl font-black text-indigo-950 font-mono mt-1.5">{projectedMonthlyRev.toLocaleString()} {currency}</p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-[10px] font-mono text-slate-500 border-t pt-2">
+                    <span className="text-indigo-650">🎯</span>
+                    <span>Projections abonnements</span>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50/20 border-emerald-100 border p-5 rounded-[1.8rem] shadow-sm flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-mono font-black text-emerald-600 uppercase tracking-widest block">Paiements Reçus ({canteenRosterMonth})</span>
+                    <p className="text-xl font-black text-emerald-900 font-mono mt-1.5">{collectedThisMonth.toLocaleString()} {currency}</p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-[10px] font-mono text-emerald-700 border-t border-emerald-100/50 pt-2 font-bold justify-between">
+                    <span>Taux de recouvrement :</span>
+                    <span>{projectedMonthlyRev > 0 ? `${Math.round((collectedThisMonth / projectedMonthlyRev) * 100)}%` : '0%'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Menu and Subscriptions Bento Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Weekly Menu Display & Interactive Tools */}
+                <div className="bg-indigo-950 text-white p-6 rounded-[2rem] shadow-md flex flex-col justify-between h-full relative overflow-hidden">
+                  <div className="absolute right-0 top-0 w-24 h-24 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+                  <div>
+                    <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
+                      <h4 className="font-black text-sm text-white flex items-center gap-2">
+                        🍱 Menu Hebdomadaire Suggéré
+                      </h4>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setIsEditingMenu(true)}
+                          className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg font-mono text-[9px] font-bold uppercase transition"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          onClick={handleGenerateMenuWithAI}
+                          disabled={generatingMenu}
+                          className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-mono text-[9px] font-bold uppercase transition flex items-center gap-1 cursor-pointer"
+                        >
+                          {generatingMenu ? 'AI...' : '⭐ IA'}
+                        </button>
+                      </div>
+                    </div>
+                    <ul className="text-[11px] text-indigo-100 space-y-2 font-mono">
+                      {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'].map((day) => (
+                        <li key={day} className="flex justify-between border-b border-white/5 pb-1">
+                          <span className="text-indigo-300 font-bold">{day} :</span>
+                          <span className="text-white font-medium max-w-[150px] truncate" title={lunchMenu[day]}>{lunchMenu[day] || 'Non défini'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="pt-4 border-t border-white/10 flex justify-between items-center text-[10px] font-mono text-indigo-300 mt-4">
+                    <span>Cuisine certifiée saine</span>
+                    <span className="text-emerald-400 font-bold">Inspecté & Valide</span>
+                  </div>
+                </div>
+
+                {/* Subscriptions detail cards (2 cols layout) */}
+                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Card 1: Demi-pension subscription */}
+                  <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm space-y-3 flex flex-col justify-between overflow-hidden">
+                    <div>
+                      <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center">
+                        <Utensils className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <h4 className="text-md font-bold text-indigo-950 mt-2">Plan : Demi-Pension</h4>
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                        L'élève mange le midi à l'école de Lundi à Vendredi (repas complet midi + boisson).
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <p className="text-2xl font-black font-mono text-indigo-950">10 000 FCFA <span className="text-xs text-slate-400">/ mois</span></p>
+                      <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-[10px] font-mono text-slate-500 mt-2">
+                        <span className="font-bold text-indigo-600">{demi.length} élèves actifs</span>
+                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-100 font-extrabold uppercase text-[8px]">Souscription active</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Interne subscription */}
+                  <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm space-y-3 flex flex-col justify-between overflow-hidden">
+                    <div>
+                      <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center">
+                        <Home className="w-5 h-5 text-purple-600" />
+                      </div>
+                      <h4 className="text-md font-bold text-indigo-950 mt-2">Plan : Régime Interne</h4>
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                        Hébergement complet à l'internat scolaire + Restauration intégrale matins, midis et soirs.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <p className="text-2xl font-black font-mono text-purple-950">15 000 FCFA <span className="text-xs text-slate-400">/ mois (cant.)</span></p>
+                      <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-[10px] font-mono text-slate-500 mt-2">
+                        <span className="font-bold text-purple-600">{int.length} élèves actifs</span>
+                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-100 font-extrabold uppercase text-[8px]">Souscription active</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Canteen Subscriber & Regime Manager board */}
+              <div className="bg-white rounded-[2rem] border border-black/5 p-6 shadow-sm space-y-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-4 border-gray-100">
+                  <div>
+                    <h3 className="text-base font-black text-indigo-950 uppercase tracking-tight">Registre de Restauration des Élèves</h3>
+                    <p className="text-xs text-slate-500 font-normal mt-0.5">Suivi des régimes de scolarité et collecte des frais de cantine.</p>
+                  </div>
+                  
+                  {/* Selectors filter */}
+                  <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                    {/* Month roster selector */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-black/5">
+                      <span className="text-[10px] font-mono text-slate-400 font-bold uppercase">Mois :</span>
+                      <select
+                        value={canteenRosterMonth}
+                        onChange={(e) => setCanteenRosterMonth(e.target.value)}
+                        className="bg-transparent text-xs font-black text-slate-800 outline-none cursor-pointer"
+                      >
+                        {SCHOOL_MONTHS.map((m) => (
+                          <option key={`roster-month-${m}`} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Regime Plan filter */}
+                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-black/5">
+                      <button
+                        onClick={() => setCanteenRegimeFilter('all')}
+                        className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition-all uppercase cursor-pointer ${
+                          canteenRegimeFilter === 'all' ? 'bg-indigo-950 text-white shadow-xs' : 'text-slate-500 hover:text-indigo-950'
+                        }`}
+                      >
+                        Abonnés
+                      </button>
+                      <button
+                        onClick={() => setCanteenRegimeFilter('demi-pension')}
+                        className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition-all uppercase cursor-pointer ${
+                          canteenRegimeFilter === 'demi-pension' ? 'bg-indigo-950 text-white shadow-xs' : 'text-slate-500 hover:text-indigo-950'
+                        }`}
+                      >
+                        Demi-Pension
+                      </button>
+                      <button
+                        onClick={() => setCanteenRegimeFilter('interne')}
+                        className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition-all uppercase cursor-pointer ${
+                          canteenRegimeFilter === 'interne' ? 'bg-indigo-950 text-white shadow-xs' : 'text-slate-500 hover:text-indigo-950'
+                        }`}
+                      >
+                        Internes
+                      </button>
+                      <button
+                        onClick={() => setCanteenRegimeFilter('externe')}
+                        className={`px-2.5 py-1 text-[10px] font-mono font-bold rounded-lg transition-all uppercase cursor-pointer ${
+                          canteenRegimeFilter === 'externe' ? 'bg-indigo-950 text-white shadow-xs' : 'text-slate-500 hover:text-indigo-950'
+                        }`}
+                      >
+                        Externes
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={canteenSearchTerm}
+                    onChange={(e) => setCanteenSearchTerm(e.target.value)}
+                    placeholder="Chercher un élève par nom, prénom ou matricule..."
+                    className="w-full pl-12 pr-4 py-3 bg-white border border-black/5 rounded-xl text-xs outline-none focus:ring-4 focus:ring-indigo-500/10 shadow-sm transition"
+                  />
+                </div>
+
+                {/* Table Roster */}
+                <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
+                        <th className="px-8 py-5">Élève</th>
+                        <th className="px-8 py-5">Classe</th>
+                        <th className="px-8 py-5">Régime (Abonnement)</th>
+                        <th className="px-8 py-5 font-mono">Tarif / Mois</th>
+                        <th className="px-8 py-5">Statut Paiement ({canteenRosterMonth})</th>
+                        <th className="px-8 py-5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white font-medium text-slate-700">
+                      {filteredCanteenStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-10 text-slate-400">
+                            Aucun élève trouvé correspondant à cette recherche ou à ce régime.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredCanteenStudents.map((st: any) => {
+                          const fees = getStudentFees(st);
+                          const months = fees.monthsDuration || 9;
+                          const monthlyCanteenFee = months > 0 ? Math.round((fees.cantine || 0) / months) : 0;
+                          
+                          // Calculate canteen payment specifically for the selected month
+                          const payments = st.tuitionPayments || [];
+                          const canteenPaidAmt = payments
+                            .filter((p: any) => p.category === `Cantine - ${canteenRosterMonth}`)
+                            .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+                          
+                          const owedCanteenAmt = Math.max(0, monthlyCanteenFee - canteenPaidAmt);
+
+                          let statusBadge = null;
+                          if (st.regime === 'externe' || !st.regime) {
+                            statusBadge = (
+                              <span className="px-2 py-0.5 bg-slate-100 text-slate-500 border border-slate-200 text-[10px] rounded-md font-mono">
+                                Sans Cafétéria
+                              </span>
+                            );
+                          } else if (owedCanteenAmt === 0) {
+                            statusBadge = (
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] rounded-md font-mono flex items-center gap-1 w-max">
+                                <Check className="w-3.5 h-3.5 text-emerald-700" /> Payé
+                              </span>
+                            );
+                          } else if (canteenPaidAmt > 0) {
+                            statusBadge = (
+                              <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-100 text-[10px] rounded-md font-mono">
+                                Réglé partiel : Reste {(owedCanteenAmt).toLocaleString()} FCFA
+                              </span>
+                            );
+                          } else {
+                            statusBadge = (
+                              <span className="px-2 py-0.5 bg-rose-50 text-rose-700 border border-rose-100 text-[10px] rounded-md font-mono">
+                                Non payé : {(owedCanteenAmt).toLocaleString()} FCFA
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <tr key={st.id} className="hover:bg-slate-50/50 transition duration-150">
+                              {/* Student name */}
+                              <td className="px-8 py-4.5 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-950 select-none uppercase shadow-xs shrink-0">
+                                  {st.firstName?.substring(0, 1)}{st.lastName?.substring(0, 1)}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-indigo-950 leading-tight truncate">{st.firstName} {st.lastName}</p>
+                                  <p className="text-[10px] text-slate-400 font-mono tracking-tight mt-0.5 truncate">{st.matricule || 'N/A'}</p>
+                                </div>
+                              </td>
+
+                              {/* Student grade */}
+                              <td className="px-8 py-4.5">
+                                <span className="font-bold text-indigo-900 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-md text-[10px]">
+                                  {st.grade || st.class || 'N/D'}
+                                </span>
+                              </td>
+
+                              {/* Student dynamic regime selection */}
+                              <td className="px-8 py-4.5">
+                                <select
+                                  value={st.regime || 'externe'}
+                                  onChange={(e) => handleUpdateStudentRegime(st.id, e.target.value as any)}
+                                  className={`px-2 py-1.5 text-[10px] font-bold uppercase rounded-lg outline-none cursor-pointer border transition-all ${
+                                    st.regime === 'demi-pension' 
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200 focus:ring-2 focus:ring-emerald-500/20' 
+                                      : st.regime === 'interne' 
+                                        ? 'bg-purple-50 text-purple-800 border-purple-200 focus:ring-2 focus:ring-purple-500/20' 
+                                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                                  }`}
+                                >
+                                  <option value="externe">📖 Externe</option>
+                                  <option value="demi-pension">🍱 Demi-Pension</option>
+                                  <option value="interne">🏠 Interne</option>
+                                </select>
+                              </td>
+
+                              {/* Monthly rate */}
+                              <td className="px-8 py-4.5 font-mono font-bold text-slate-900">
+                                {monthlyCanteenFee > 0 ? `${monthlyCanteenFee.toLocaleString()} FCFA` : '—'}
+                              </td>
+
+                              {/* Status payments */}
+                              <td className="px-8 py-4.5">
+                                {statusBadge}
+                              </td>
+
+                              {/* Actions payment & configuration */}
+                              <td className="px-8 py-4.5 text-right font-sans">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {owedCanteenAmt > 0 && (st.regime === 'demi-pension' || st.regime === 'interne') && (
+                                    <button
+                                      onClick={() => {
+                                        setFinanceFormCategory('Cantine Mensuelle');
+                                        setFinanceFormMonth(canteenRosterMonth);
+                                        setFinanceFormAmount(owedCanteenAmt);
+                                        setShowPaymentModal(st);
+                                      }}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-mono text-[9px] font-bold uppercase transition shadow-xs flex items-center gap-1 cursor-pointer"
+                                      title={`Encaisser les frais de cantine pour ${canteenRosterMonth}`}
+                                    >
+                                      🖩 Encaisser
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => setShowFeeConfigModal(st)}
+                                    className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-800 transition cursor-pointer"
+                                    title="Ajuster la fiche de tarifs de l'élève"
+                                  >
+                                    <Sliders className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Edit Menu Modal */}
+              {isEditingMenu && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
+                  <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 p-8 space-y-4">
+                    <div className="flex justify-between items-center pb-3 border-b">
+                      <div className="flex items-center gap-2">
+                        <Utensils className="w-5 h-5 text-indigo-700" />
+                        <h4 className="font-extrabold text-indigo-950">Modifier le Menu Cantine</h4>
+                      </div>
+                      <button onClick={() => setIsEditingMenu(false)} className="p-1 hover:bg-slate-100 rounded-lg">
+                        <X className="w-5 h-5 text-slate-500" />
+                      </button>
+                    </div>
+                    <div className="space-y-4 pt-2">
+                      {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'].map((day) => (
+                        <div key={day} className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest">{day}</label>
+                          <input 
+                            type="text" 
+                            value={lunchMenu[day] || ''} 
+                            onChange={(e) => {
+                              const updated = { ...lunchMenu, [day]: e.target.value };
+                              setLunchMenu(updated);
+                            }}
+                            className="w-full px-4 py-2 text-xs font-bold border border-slate-200 bg-slate-50 focus:bg-white rounded-xl text-slate-800 outline-none focus:ring-2 focus:ring-indigo-600/20"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-3 pt-4 border-t border-slate-100">
+                      <button 
+                        onClick={() => setIsEditingMenu(false)}
+                        className="flex-1 py-3 border border-slate-200 text-xs font-black rounded-xl uppercase text-slate-500 hover:bg-slate-50 transition cursor-pointer"
+                      >
+                        Annuler
+                      </button>
+                      <button 
+                        onClick={() => {
+                          localStorage.setItem('school_lunch_menu', JSON.stringify(lunchMenu));
+                          setIsEditingMenu(false);
+                        }}
+                        className="flex-1 py-3 bg-indigo-950 text-white text-xs font-black rounded-xl uppercase hover:bg-black transition cursor-pointer"
+                      >
+                        Enregistrer
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          );
+        })()}
+
+        {/* TAB 9: PARAMETRES TARIFS */}
+        {/* ======================================= */}
+        {activeSubTab === 'pricing' && (
+          <SchoolPricingSaaS merchant={merchant} />
         )}
       </div>
 
@@ -1094,129 +2198,105 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
       {/* ======================================= */}
       <AnimatePresence>
         {/* MODAL 1: CONFIGURATION RE-PENSÉ DE LA FICHE DES FRAIS ANNUELS */}
-        {showFeeConfigModal && (() => {
-          const activeS = students.find((s: any) => s.id === showFeeConfigModal.id) || showFeeConfigModal;
-          const currentFees = activeS.tuitionFeesBreakdown || {
-            inscription: 25000,
-            scolarite: 300000,
-            uniforme: 40000,
-            transport: 60000,
-            cantine: 90000
-          };
-
-          return (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-                animate={{ opacity: 1, scale: 1, y: 0 }} 
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col font-sans"
-              >
-                {/* Modal Header */}
-                <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-indigo-50/50">
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-5 h-5 text-indigo-700" />
-                    <div>
-                      <h3 className="text-lg font-black text-indigo-950 uppercase tracking-tight">Fiche de Facturation</h3>
-                      <p className="text-[10px] font-bold font-mono text-indigo-600 uppercase tracking-widest mt-0.5">
-                        Ajuster les tarifs pour {activeS.firstName} {activeS.lastName}
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setShowFeeConfigModal(null)} 
-                    className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors border shadow-sm text-slate-400 hover:text-slate-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <form 
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const target = e.target as any;
-                    const bd = {
-                      inscription: Number(target.inscription.value || 0),
-                      scolarite: Number(target.scolarite.value || 0),
-                      uniforme: Number(target.uniforme.value || 0),
-                      transport: Number(target.transport.value || 0),
-                      cantine: Number(target.cantine.value || 0)
-                    };
-                    handleSaveFeeConfig(activeS.id, bd);
-                    setShowFeeConfigModal(null);
-                  }} 
-                  className="p-8 space-y-4"
-                >
-                  <p className="text-xs text-slate-500 leading-normal mb-2 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">
-                    Modifiez les frais annuels contractuels de l'élève. Ces valeurs déterminent les objectifs de recouvrement et les impayés du pensionnaire.
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">1. Frais d'Inscription ({currency})</label>
-                      <input name="inscription" type="number" defaultValue={(currentFees.inscription ?? 25000)} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">2. Scolarité Annuelle ({currency})</label>
-                      <input name="scolarite" type="number" defaultValue={(currentFees.scolarite ?? 300000)} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">3. Uniforme Scolaire ({currency})</label>
-                      <input name="uniforme" type="number" defaultValue={(currentFees.uniforme ?? 40000)} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">4. Transport Scolaire ({currency})</label>
-                      <input name="transport" type="number" defaultValue={(currentFees.transport ?? 60000)} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">5. Cantine Scolaire ({currency})</label>
-                      <input name="cantine" type="number" defaultValue={(currentFees.cantine ?? 90000)} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none font-bold font-mono focus:border-indigo-500 text-slate-800" />
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-3 pt-5 border-t border-gray-150 mt-4">
-                    <button type="button" onClick={() => setShowFeeConfigModal(null)} className="flex-1 py-4 border border-slate-200 text-xs font-black uppercase tracking-wider rounded-2xl text-gray-500 hover:bg-gray-50">Annuler</button>
-                    <button type="submit" disabled={saving} className="flex-[2] py-4 bg-indigo-950 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-black transition-all">
-                      {saving ? 'Sauvegarde...' : 'Enregistrer Tarifs'}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </div>
-          );
-        })()}
+        {showFeeConfigModal && (
+          <StudentFeeConfigModal
+            student={students.find((s: any) => s.id === showFeeConfigModal.id) || showFeeConfigModal}
+            onClose={() => setShowFeeConfigModal(null)}
+            onSave={handleSaveFeeConfig}
+            currency={currency}
+            getStudentFees={getStudentFees}
+            saving={saving}
+          />
+        )}
 
         {/* MODAL 2: GUICHET DE CAISSE DÉDIÉ (LASER-FOCUSED ON PAYMENT COLLECTION) */}
         {showPaymentModal && (() => {
           const activeS = students.find((s: any) => s.id === showPaymentModal.id) || showPaymentModal;
-          const currentFees = activeS.tuitionFeesBreakdown || {
-            inscription: 25000,
-            scolarite: 300000,
-            uniforme: 40000,
-            transport: 60000,
-            cantine: 90000
-          };
+          const currentFees = getStudentFees(activeS);
 
           const catsInfo = [
             { label: "Inscription / Réinscription", key: "inscription" },
             { label: "Scolarité Mensuelle", key: "scolarite" },
             { label: "Uniforme Scolaire", key: "uniforme" },
             { label: "Transport Scolaire", key: "transport" },
-            { label: "Cantine Cafétéria", key: "cantine" }
+            { label: "Cantine Cafétéria", key: "cantine" },
+            { label: "Hébergement / Services d'internat", key: "internat" }
           ];
 
           // Compute remaining due for selected category to guide the accountant
-          const getCategoryStatus = (catLabel: string) => {
+          const getCategoryStatusForMonth = (catLabel: string, monthVal: string) => {
+            if (catLabel === 'Mensualité Globale') {
+               const targetScol = Math.round(Number(currentFees.scolarite ?? 0) / Number(currentFees.monthsDuration || 9));
+               const targetTrans = Math.round(Number(currentFees.transport ?? 0) / Number(currentFees.monthsDuration || 9));
+               const targetCant = Math.round(Number(currentFees.cantine ?? 0) / Number(currentFees.monthsDuration || 9));
+               const targetInt = Math.round(Number(currentFees.internat ?? 0) / Number(currentFees.monthsDuration || 9));
+               const target = targetScol + targetTrans + targetCant + targetInt;
+
+               const paid = (activeS.tuitionPayments || [])
+                .filter((p: any) => 
+                  p.category === `Scolarité - ${monthVal}` || 
+                  p.category === `Transport - ${monthVal}` || 
+                  p.category === `Cantine - ${monthVal}` ||
+                  p.category === `Internat - ${monthVal}`
+                )
+                .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+
+               return { target, paid, owed: Math.max(0, target - paid) };
+            }
+
+            if (catLabel === 'Scolarité Mensuelle') {
+              const target = Math.round(Number(currentFees.scolarite ?? 0) / Number(currentFees.monthsDuration || 9));
+              const paid = (activeS.tuitionPayments || [])
+                .filter((p: any) => p.category === `Scolarité - ${monthVal}`)
+                .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+              return { target, paid, owed: Math.max(0, target - paid) };
+            }
+            
+            if (catLabel === 'Transport Mensuel') {
+              const target = Math.round(Number(currentFees.transport ?? 0) / Number(currentFees.monthsDuration || 9));
+              const paid = (activeS.tuitionPayments || [])
+                .filter((p: any) => p.category === `Transport - ${monthVal}`)
+                .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+              return { target, paid, owed: Math.max(0, target - paid) };
+            }
+            
+            if (catLabel === 'Cantine Mensuelle') {
+              const target = Math.round(Number(currentFees.cantine ?? 0) / Number(currentFees.monthsDuration || 9));
+              const paid = (activeS.tuitionPayments || [])
+                .filter((p: any) => p.category === `Cantine - ${monthVal}`)
+                .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+              return { target, paid, owed: Math.max(0, target - paid) };
+            }
+
+            if (catLabel === 'Internat Mensuel') {
+              const target = Math.round(Number(currentFees.internat ?? 0) / Number(currentFees.monthsDuration || 9));
+              const paid = (activeS.tuitionPayments || [])
+                .filter((p: any) => p.category === `Internat - ${monthVal}`)
+                .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+              return { target, paid, owed: Math.max(0, target - paid) };
+            }
+
             const mapped = catsInfo.find(c => c.label === catLabel);
             if (!mapped) return { target: 0, paid: 0, owed: 0 };
             const target = Number(currentFees[mapped.key] ?? 0);
             const paid = (activeS.tuitionPayments || [])
-              .filter((p: any) => p.category === catLabel)
+              .filter((p: any) => p.category === catLabel || 
+                (catLabel === "Scolarité Mensuelle" && p.category.startsWith("Scolarité - ")) ||
+                (catLabel === "Transport Scolaire" && p.category.startsWith("Transport - ")) ||
+                (catLabel === "Cantine Cafétéria" && p.category.startsWith("Cantine - ")) ||
+                (catLabel === "Hébergement / Services d'internat" && p.category.startsWith("Internat - "))
+              )
               .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
             return { target, paid, owed: Math.max(0, target - paid) };
           };
 
+          const getCategoryStatus = (catLabel: string) => {
+            return getCategoryStatusForMonth(catLabel, financeFormMonth);
+          };
+
           const statusSelected = getCategoryStatus(financeFormCategory);
+          const SCHOOL_MONTHS = ['Octobre', 'Novembre', 'Décembre', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre'];
+          const activeMonths = SCHOOL_MONTHS.slice(0, Number(currentFees.monthsDuration || 9));
 
           return (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-md">
@@ -1224,10 +2304,10 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                 initial={{ opacity: 0, scale: 0.95, y: 20 }} 
                 animate={{ opacity: 1, scale: 1, y: 0 }} 
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col font-sans"
+                className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100 flex flex-col font-sans max-h-[92vh]"
               >
                 {/* Modal Header */}
-                <div className="px-8 py-5 border-b border-gray-150 flex justify-between items-center bg-emerald-50/50">
+                <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-emerald-50/50">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-extrabold text-xs">💰</div>
                     <div>
@@ -1245,31 +2325,103 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                   </button>
                 </div>
 
-                <div className="p-8 space-y-4">
+                <div className="flex-1 overflow-y-auto flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                  {/* Left panel: Form d'Encaissement */}
+                  <div className="flex-1 p-8 space-y-4 max-h-[75vh] min-h-[400px] overflow-y-auto bg-slate-50/10">
                   {/* Category Selection */}
-                  <div>
-                    <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">Rubrique de paiement</label>
-                    <select 
-                      value={financeFormCategory} 
-                      onChange={(e) => {
-                        const statusObj = getCategoryStatus(e.target.value);
-                        setFinanceFormCategory(e.target.value);
-                        setFinanceFormAmount(statusObj.owed);
-                      }}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-extrabold cursor-pointer focus:ring-2 focus:ring-emerald-500/20 text-slate-800"
-                    >
-                      <option value="Scolarité Mensuelle">Scolarité Mensuelle</option>
-                      <option value="Inscription / Réinscription">Inscription / Réinscription</option>
-                      <option value="Uniforme Scolaire">Uniforme Scolaire</option>
-                      <option value="Transport Scolaire">Transport Scolaire</option>
-                      <option value="Cantine Cafétéria">Cantine Cafétéria</option>
-                    </select>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">Rubrique de paiement</label>
+                      <select 
+                        value={financeFormCategory} 
+                        onChange={(e) => {
+                          const newCat = e.target.value;
+                          setFinanceFormCategory(newCat);
+                          
+                          if (['Mensualité Globale', 'Scolarité Mensuelle', 'Transport Mensuel', 'Cantine Mensuelle', 'Internat Mensuel'].includes(newCat)) {
+                            const newMonth = autoGetFirstUnpaidMonthForStudent(activeS, newCat);
+                            setFinanceFormMonth(newMonth);
+                            const statusObj = getCategoryStatusForMonth(newCat, newMonth);
+                            setFinanceFormAmount(statusObj.owed);
+                          } else {
+                            const statusObj = getCategoryStatus(newCat);
+                            setFinanceFormAmount(statusObj.owed);
+                          }
+                        }}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-extrabold cursor-pointer focus:ring-2 focus:ring-emerald-500/20 text-slate-800"
+                      >
+                        <option value="Mensualité Globale">
+                          {currentFees.hasInternat 
+                            ? "Mensualité Globale (Scol. + Transp. + Cant. + Internat)" 
+                            : "Mensualité Globale (Scol. + Transp. + Cant.)"}
+                        </option>
+                        <option value="Inscription / Réinscription">Frais d'Inscription / Réinscription</option>
+                        <option value="Scolarité Mensuelle">Scolarité Mensuelle (Isolée)</option>
+                        <option value="Uniforme Scolaire">Uniforme Scolaire</option>
+                        <option value="Transport Mensuel">Transport Mensuel (Isolé)</option>
+                        <option value="Cantine Mensuelle">Cantine Mensuelle (Isolée)</option>
+                        {!!currentFees.hasInternat && (
+                          <option value="Internat Mensuel">Internat Mensuel (Isolé)</option>
+                        )}
+                      </select>
+                    </div>
+
+                    {['Mensualité Globale', 'Scolarité Mensuelle', 'Transport Mensuel', 'Cantine Mensuelle', 'Internat Mensuel'].includes(financeFormCategory) && (
+                      <div className="w-[140px]">
+                        <label className="block text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest mb-1.5">Mois</label>
+                        <select 
+                          value={financeFormMonth} 
+                          onChange={async (e) => {
+                            const newMonth = e.target.value;
+                            setFinanceFormMonth(newMonth);
+
+                            // We need to calculate manually since state hasn't updated yet in this render
+                            let target = 0;
+                            let paid = 0;
+                            const payments = activeS.tuitionPayments || [];
+
+                            if (financeFormCategory === 'Mensualité Globale') {
+                               const ts = Math.round(Number(currentFees.scolarite ?? 0) / Number(currentFees.monthsDuration || 9));
+                               const tt = currentFees.hasTransport !== false ? Math.round(Number(currentFees.transport ?? 0) / Number(currentFees.monthsDuration || 9)) : 0;
+                               const tc = currentFees.hasCanteen !== false ? Math.round(Number(currentFees.cantine ?? 0) / Number(currentFees.monthsDuration || 9)) : 0;
+                               const ti = currentFees.hasInternat !== false ? Math.round(Number(currentFees.internat ?? 0) / Number(currentFees.monthsDuration || 9)) : 0;
+                               target = ts + tt + tc + ti;
+                               paid = payments.filter((p: any) => 
+                                 p.category === `Scolarité - ${newMonth}` || 
+                                 p.category === `Transport - ${newMonth}` || 
+                                 p.category === `Cantine - ${newMonth}` ||
+                                 p.category === `Internat - ${newMonth}`
+                               ).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                            } else if (financeFormCategory === 'Scolarité Mensuelle') {
+                               target = Math.round(Number(currentFees.scolarite ?? 0) / Number(currentFees.monthsDuration || 9));
+                               paid = payments.filter((p: any) => p.category === `Scolarité - ${newMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                            } else if (financeFormCategory === 'Transport Mensuel') {
+                               target = Math.round(Number(currentFees.transport ?? 0) / Number(currentFees.monthsDuration || 9));
+                               paid = payments.filter((p: any) => p.category === `Transport - ${newMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                            } else if (financeFormCategory === 'Cantine Mensuelle') {
+                               target = Math.round(Number(currentFees.cantine ?? 0) / Number(currentFees.monthsDuration || 9));
+                               paid = payments.filter((p: any) => p.category === `Cantine - ${newMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                            } else if (financeFormCategory === 'Internat Mensuel') {
+                               target = Math.round(Number(currentFees.internat ?? 0) / Number(currentFees.monthsDuration || 9));
+                               paid = payments.filter((p: any) => p.category === `Internat - ${newMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                            }
+
+                            setFinanceFormAmount(Math.max(0, target - paid));
+                          }}
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none font-extrabold cursor-pointer focus:ring-2 focus:ring-emerald-500/20 text-slate-800"
+                        >
+                          {activeMonths.map((m) => (
+                            <option key={`month-${m}`} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   {/* Context-aware information about selected category */}
-                  <div className="bg-slate-50 p-4.5 rounded-2xl border border-slate-150 flex items-center justify-between font-mono text-[11px]">
+                  <div className="bg-slate-50 p-4.5 rounded-2xl border border-gray-100 flex items-center justify-between font-mono text-[11px]">
                     <div>
-                      <span className="text-gray-400 uppercase text-[9px]">Dû Annuel:</span>
+                      <span className="text-gray-400 uppercase text-[9px]">Dû Total:</span>
                       <p className="font-extrabold text-slate-800">{statusSelected.target.toLocaleString()} {currency}</p>
                     </div>
                     <div>
@@ -1298,7 +2450,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                         <button
                           type="button"
                           onClick={() => setFinanceFormAmount(statusSelected.owed)}
-                          className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-mono text-[9px] rounded-lg font-bold border border-rose-150 transition-colors"
+                          className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-mono text-[9px] rounded-lg font-bold border border-rose-200 transition-colors"
                         >
                           Solder Reste ({statusSelected.owed.toLocaleString()} FCFA)
                         </button>
@@ -1331,24 +2483,209 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                     </select>
                   </div>
 
-                  <div className="flex space-x-3 pt-4 border-t border-gray-150 mt-4">
+                  <div className="flex space-x-3 pt-4 border-t border-gray-100 mt-4">
                     <button type="button" onClick={() => setShowPaymentModal(null)} className="flex-1 py-4 border border-slate-200 rounded-2xl font-black text-gray-500 hover:bg-gray-50 uppercase tracking-wider text-xs">Annuler</button>
                     <button 
                       type="button" 
                       disabled={saving || financeFormAmount <= 0}
                       onClick={async () => {
-                        await handleRecordPayment(activeS.id, {
-                          amount: financeFormAmount,
-                          category: financeFormCategory,
-                          mode: financeFormMode
-                        });
-                        setShowPaymentModal(null);
+                        if (financeFormCategory === "Mensualité Globale") {
+                          // Submit split payments roughly equal to target (until exhausted)
+                          // For simplicity, handleRecordPayment can be called multiple times or once with combined if we adapt it.
+                          // But handleRecordPayment takes a single category string. Let's adapt handleRecordPayment!
+                          // Or we just call it 3-4 times!
+                          let remaining = financeFormAmount;
+                          const {scolarite, transport, cantine, internat, monthsDuration, hasTransport, hasCanteen, hasInternat} = currentFees;
+                          
+                          const targetScol = Math.round(Number(scolarite ?? 0) / Number(monthsDuration || 9));
+                          const targetTrans = hasTransport !== false ? Math.round(Number(transport ?? 0) / Number(monthsDuration || 9)) : 0;
+                          const targetCant = hasCanteen !== false ? Math.round(Number(cantine ?? 0) / Number(monthsDuration || 9)) : 0;
+                          const targetInt = hasInternat !== false ? Math.round(Number(internat ?? 0) / Number(monthsDuration || 9)) : 0;
+                          
+                          const paidScol = (activeS.tuitionPayments || []).filter((p: any) => p.category === `Scolarité - ${financeFormMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                          const paidTrans = (activeS.tuitionPayments || []).filter((p: any) => p.category === `Transport - ${financeFormMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                          const paidCant = (activeS.tuitionPayments || []).filter((p: any) => p.category === `Cantine - ${financeFormMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+                          const paidInt = (activeS.tuitionPayments || []).filter((p: any) => p.category === `Internat - ${financeFormMonth}`).reduce((s: number, p: any) => s + Number(p.amount||0), 0);
+
+                          const owedScol = Math.max(0, targetScol - paidScol);
+                          const owedTrans = Math.max(0, targetTrans - paidTrans);
+                          const owedCant = Math.max(0, targetCant - paidCant);
+                          const owedInt = Math.max(0, targetInt - paidInt);
+
+                          // Distribute sequentially
+                          let pushScol = 0, pushTrans = 0, pushCant = 0, pushInt = 0;
+                          
+                          pushScol = Math.min(owedScol, remaining);
+                          remaining -= pushScol;
+                          
+                          pushTrans = Math.min(owedTrans, remaining);
+                          remaining -= pushTrans;
+                          
+                          pushCant = Math.min(owedCant, remaining);
+                          remaining -= pushCant;
+
+                          pushInt = Math.min(owedInt, remaining);
+                          remaining -= pushInt;
+
+                          if (remaining > 0) {
+                            if (pushScol > 0 || (targetTrans === 0 && targetCant === 0 && targetInt === 0)) pushScol += remaining;
+                            else if (pushTrans > 0) pushTrans += remaining;
+                            else if (pushCant > 0) pushCant += remaining;
+                            else if (pushInt > 0) pushInt += remaining;
+                            else pushScol = remaining;
+                          }
+
+                          setSaving(true);
+                          try {
+                            if (pushScol > 0) await handleRecordPayment(activeS.id, { amount: pushScol, category: `Scolarité - ${financeFormMonth}`, mode: financeFormMode }, true);
+                            if (pushTrans > 0) await handleRecordPayment(activeS.id, { amount: pushTrans, category: `Transport - ${financeFormMonth}`, mode: financeFormMode }, true);
+                            if (pushCant > 0) await handleRecordPayment(activeS.id, { amount: pushCant, category: `Cantine - ${financeFormMonth}`, mode: financeFormMode }, true);
+                            if (pushInt > 0) await handleRecordPayment(activeS.id, { amount: pushInt, category: `Internat - ${financeFormMonth}`, mode: financeFormMode }, true);
+
+                            // Set consolidated receipt for display so the printed sum is exactly the form total
+                            const uniqueSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+                            const timeMarker = new Date().toISOString().slice(11,19).replace(/:/g, '');
+                            const receiptNumber = `REC-2026-${String(sales.length + 1).padStart(4, '0')}-${timeMarker}-${uniqueSuffix}`;
+                            setSelectedReceipt({
+                              id: crypto.randomUUID(),
+                              amount: Number(financeFormAmount),
+                              category: `Mensualité Globale - ${financeFormMonth}`,
+                              mode: financeFormMode,
+                              date: new Date().toISOString(),
+                              receiptNumber,
+                              studentName: `${activeS.firstName} ${activeS.lastName}`,
+                              matricule: activeS.matricule || 'N/A',
+                              grade: activeS.grade || 'Non spécifié',
+                              details: {
+                                scolarite: pushScol,
+                                transport: pushTrans,
+                                cantine: pushCant,
+                                internat: pushInt
+                              }
+                            });
+                          } finally {
+                            setSaving(false);
+                            setShowPaymentModal(null);
+                          }
+                        } else {
+                          let finalCategory = financeFormCategory;
+                          if (financeFormCategory === 'Scolarité Mensuelle') finalCategory = `Scolarité - ${financeFormMonth}`;
+                          else if (financeFormCategory === 'Transport Mensuel') finalCategory = `Transport - ${financeFormMonth}`;
+                          else if (financeFormCategory === 'Cantine Mensuelle') finalCategory = `Cantine - ${financeFormMonth}`;
+                          else if (financeFormCategory === 'Internat Mensuel') finalCategory = `Internat - ${financeFormMonth}`;
+
+                          await handleRecordPayment(activeS.id, {
+                            amount: financeFormAmount,
+                            category: finalCategory,
+                            mode: financeFormMode
+                          });
+                          setShowPaymentModal(null);
+                        }
                       }}
                       className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-wider text-xs hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/10"
                     >
                       {saving ? 'Validation...' : 'Encaisser & Reçu'}
                     </button>
                   </div>
+                  {/* Close left panel */}
+                  </div>
+
+                  {/* Right panel: Active tuition configuration Active Details */}
+                  <div className="w-full md:w-[360px] p-8 shrink-0 bg-slate-50 flex flex-col justify-between max-h-[75vh] overflow-y-auto">
+                    <div className="space-y-4 font-sans">
+                      <h4 className="text-[10px] font-mono font-black text-slate-400 uppercase tracking-widest border-b pb-2 border-slate-200">
+                        Tarifs Contractuels Actifs
+                      </h4>
+
+                      {(() => {
+                        const monthsVal = Number(currentFees.monthsDuration ?? 9);
+                        const inscVal = Number(currentFees.inscription ?? 25000);
+                        const scolAnnVal = Number(currentFees.scolarite ?? 300000);
+                        const scolMensVal = monthsVal > 0 ? Math.round(scolAnnVal / monthsVal) : 0;
+                        const unifVal = Number(currentFees.uniforme ?? 40000);
+                        const transAnnVal = Number(currentFees.transport ?? 60000);
+                        const transMensVal = monthsVal > 0 ? Math.round(transAnnVal / monthsVal) : 0;
+                        const cantAnnVal = Number(currentFees.cantine ?? 90000);
+                        const cantMensVal = monthsVal > 0 ? Math.round(cantAnnVal / monthsVal) : 0;
+                        const hasInternat = currentFees.hasInternat !== undefined ? !!currentFees.hasInternat : Number(currentFees.internat ?? 0) > 0;
+                        const internatAnnVal = hasInternat ? Number(currentFees.internat ?? 0) : 0;
+                        const internatMensVal = monthsVal > 0 ? Math.round(internatAnnVal / monthsVal) : 0;
+
+                        return (
+                          <div className="space-y-2 text-xs font-sans">
+                            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono">
+                              <span className="text-slate-505 text-slate-550 text-slate-500 font-bold text-indigo-950">Durée de la formation :</span>
+                              <span className="font-extrabold text-indigo-950 font-black">{monthsVal} mois</span>
+                            </div>
+
+                            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono">
+                              <span className="text-slate-500 font-medium">🎟️ Frais d'Inscription :</span>
+                              <span className="font-black text-indigo-950">{inscVal.toLocaleString()} {currency}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                              <div>
+                                <span className="text-slate-700 font-bold">🎓 Scolarité Annuelle :</span>
+                                <p className="text-[10px] text-indigo-650 font-bold mt-0.5">Scolarité Mensuelle (calculée) :</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-gray-500 text-[10px]">{scolAnnVal.toLocaleString()} {currency}</p>
+                                <p className="font-black text-indigo-700">{(scolMensVal).toLocaleString()} {currency}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-between items-center pb-1.5 border-b border-slate-300 font-mono">
+                              <span className="text-slate-505 text-slate-500 font-medium font-bold text-slate-750">👕 Uniforme Scolaire :</span>
+                              <span className="font-extrabold text-indigo-950 font-black">{unifVal.toLocaleString()} {currency}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                              <div>
+                                <span className="text-slate-700 font-bold">🚌 Transport Annuel :</span>
+                                <p className="text-[10px] text-emerald-650 font-bold mt-0.5">Transport Mensuel (calculé) :</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-gray-500 text-[10px]">{transAnnVal.toLocaleString()} {currency}</p>
+                                <p className="font-black text-emerald-755 text-emerald-700 font-semibold">{(transMensVal).toLocaleString()} {currency}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                              <div>
+                                <span className="text-slate-700 font-bold">🍱 Cantine Annuelle :</span>
+                                <p className="text-[10px] text-amber-650 font-bold mt-0.5">Cantine Mensuelle (calculée) :</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-gray-500 text-[10px]">{cantAnnVal.toLocaleString()} {currency}</p>
+                                <p className="font-black text-amber-705 text-amber-700">{(cantMensVal).toLocaleString()} {currency}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex justify-between items-center pb-1.5 border-b border-slate-200/60 font-mono bg-white p-2.5 rounded-xl border border-slate-100 shadow-xs">
+                              <div>
+                                <span className="text-slate-700 font-bold">🏠 Internat Annuel :</span>
+                                <p className="text-[10px] text-violet-650 font-bold mt-0.5">Internat Mensuel (calculé) :</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-gray-500 text-[10px]">{hasInternat ? `${internatAnnVal.toLocaleString()} ${currency}` : "Désactivé"}</p>
+                                <p className="font-black text-violet-700">{(internatMensVal).toLocaleString()} {currency}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="mt-6 p-4 bg-indigo-50 border border-indigo-100 rounded-xl font-sans font-medium text-slate-700">
+                      <p className="text-[10px] text-indigo-950 uppercase tracking-wider font-mono font-black">
+                        💡 Information Caisse
+                      </p>
+                      <p className="text-[10px] text-indigo-900 mt-1 leading-normal font-sans">
+                        Pensez à délivrer un reçu officiel imprimé à la famille une fois le versement encaissé.
+                      </p>
+                    </div>
+                  </div>
+                  {/* Close horizontal split container */}
                 </div>
               </motion.div>
             </div>
@@ -1359,20 +2696,19 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
         {selectedStudentFinance && (() => {
           const activeStudentFinance = students.find((s: any) => s.id === selectedStudentFinance.id) || selectedStudentFinance;
           
-          const currentFeesBreakdown = activeStudentFinance.tuitionFeesBreakdown || {
-            inscription: 25000,
-            scolarite: 300000,
-            uniforme: 40000,
-            transport: 60000,
-            cantine: 90000
-          };
+          const currentFeesBreakdown = getStudentFees(activeStudentFinance);
+
+          const hasInternat = currentFeesBreakdown.hasInternat !== undefined ? !!currentFeesBreakdown.hasInternat : Number(currentFeesBreakdown.internat ?? 0) > 0;
 
           const detailedCategories = [
             { key: 'inscription', label: "Inscription / Réinscription", defaultVal: 25000, icon: BookOpen, color: 'text-indigo-600 bg-indigo-50 border-indigo-100', formValue: "Inscription / Réinscription" },
             { key: 'scolarite', label: "Scolarité Mensuelle", defaultVal: 300000, icon: DollarSign, color: 'text-sky-600 bg-sky-50 border-sky-100', formValue: "Scolarité Mensuelle" },
             { key: 'uniforme', label: "Uniforme Scolaire", defaultVal: 40000, icon: Package, color: 'text-amber-600 bg-amber-50 border-amber-100', formValue: "Uniforme Scolaire" },
             { key: 'transport', label: "Transport Scolaire", defaultVal: 60000, icon: Car, color: 'text-teal-600 bg-teal-50 border-teal-100', formValue: "Transport Scolaire" },
-            { key: 'cantine', label: "Cantine Cafétéria", defaultVal: 90000, icon: Utensils, color: 'text-rose-600 bg-rose-50 border-rose-100', formValue: "Cantine Cafétéria" }
+            { key: 'cantine', label: "Cantine Cafétéria", defaultVal: 90000, icon: Utensils, color: 'text-rose-600 bg-rose-50 border-rose-100', formValue: "Cantine Cafétéria" },
+            ...(hasInternat ? [
+              { key: 'internat', label: "Hébergement / Services d'internat", defaultVal: 0, icon: Home, color: 'text-violet-600 bg-violet-50 border-violet-100', formValue: "Internat Mensuel" }
+            ] : [])
           ];
 
           // Compute global totals for this student
@@ -1382,7 +2718,12 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
           detailedCategories.forEach(cat => {
             const target = Number(currentFeesBreakdown[cat.key] ?? cat.defaultVal);
             const paid = (activeStudentFinance.tuitionPayments || [])
-              .filter((p: any) => p.category === cat.formValue)
+              .filter((p: any) => p.category === cat.formValue || 
+                (cat.formValue === "Scolarité Mensuelle" && p.category.startsWith("Scolarité - ")) ||
+                (cat.formValue === "Transport Scolaire" && p.category.startsWith("Transport - ")) ||
+                (cat.formValue === "Cantine Cafétéria" && p.category.startsWith("Cantine - ")) ||
+                (cat.formValue === "Internat Mensuel" && p.category.startsWith("Internat - "))
+              )
               .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
             studentTotalTarget += target;
             studentTotalPaid += paid;
@@ -1452,12 +2793,99 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                       </div>
                     </div>
 
+                    {/* Fiche de Référence Financière à 9 points */}
+                    <div className="bg-white p-6 rounded-3xl border border-indigo-100 shadow-sm space-y-4">
+                      <div className="flex items-center gap-2 border-b border-indigo-50 pb-2.5">
+                        <span className="text-sm">📋</span>
+                        <h5 className="font-black text-[10px] font-mono uppercase tracking-wider text-indigo-950">Fiche des Tarifs Contractuels Actifs</h5>
+                      </div>
+
+                      {(() => {
+                        const mVal = Number(currentFeesBreakdown.monthsDuration ?? 9);
+                        const iVal = Number(currentFeesBreakdown.inscription ?? 25000);
+                        const sAnnVal = Number(currentFeesBreakdown.scolarite ?? 300000);
+                        const sMensVal = mVal > 0 ? Math.round(sAnnVal / mVal) : 0;
+                        const uVal = Number(currentFeesBreakdown.uniforme ?? 40000);
+                        const tAnnVal = Number(currentFeesBreakdown.transport ?? 60000);
+                        const tMensVal = mVal > 0 ? Math.round(tAnnVal / mVal) : 0;
+                        const cAnnVal = Number(currentFeesBreakdown.cantine ?? 90000);
+                        const cMensVal = mVal > 0 ? Math.round(cAnnVal / mVal) : 0;
+                        const hasInternat = currentFeesBreakdown.hasInternat !== undefined ? !!currentFeesBreakdown.hasInternat : Number(currentFeesBreakdown.internat ?? 0) > 0;
+                        const intAnnVal = hasInternat ? Number(currentFeesBreakdown.internat ?? 0) : 0;
+                        const intMensVal = mVal > 0 ? Math.round(intAnnVal / mVal) : 0;
+
+                        return (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                            <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 font-mono">
+                              <span className="text-[9px] text-slate-400 uppercase font-black">1. Durée de la formation</span>
+                              <p className="font-black text-indigo-950 mt-1">{mVal} mois</p>
+                            </div>
+
+                            <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 font-mono">
+                              <span className="text-[9px] text-slate-400 uppercase font-black">2. Frais d'inscription</span>
+                              <p className="font-black text-indigo-950 mt-1">{iVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-indigo-50/20 p-3 rounded-xl border border-indigo-100/30 font-mono">
+                              <span className="text-[9px] text-indigo-600 uppercase font-black">3. Scolarité annuelle</span>
+                              <p className="font-black text-indigo-950 mt-1">{sAnnVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/60 font-mono">
+                              <span className="text-[9px] text-indigo-700 uppercase font-black">4. Scolarité mensuelle (calculée)</span>
+                              <p className="font-black text-indigo-700 mt-1">{sMensVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 font-mono">
+                              <span className="text-[9px] text-slate-400 uppercase font-black">5. Uniforme scolaire</span>
+                              <p className="font-black text-indigo-950 mt-1">{uVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-emerald-50/20 p-3 rounded-xl border border-emerald-100/30 font-mono">
+                              <span className="text-[9px] text-emerald-600 uppercase font-black">6. Transport annuel</span>
+                              <p className="font-black text-indigo-950 mt-1">{tAnnVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/60 font-mono">
+                              <span className="text-[9px] text-emerald-700 uppercase font-black">7. Transport mensuel (calculé)</span>
+                              <p className="font-black text-emerald-800 mt-1">{tMensVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-amber-50/20 p-3 rounded-xl border border-amber-100/30 font-mono">
+                              <span className="text-[9px] text-amber-600 uppercase font-black">8. Cantine annuelle</span>
+                              <p className="font-black text-indigo-950 mt-1">{cAnnVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100/60 font-mono">
+                              <span className="text-[9px] text-amber-700 uppercase font-black">9. Cantine mensuelle (calculée)</span>
+                              <p className="font-black text-amber-800 mt-1">{cMensVal.toLocaleString()} {currency}</p>
+                            </div>
+
+                            <div className="bg-violet-50/20 p-3 rounded-xl border border-violet-100/30 font-mono">
+                              <span className="text-[9px] text-violet-600 uppercase font-black">10. Internat annuel</span>
+                              <p className="font-black text-indigo-950 mt-1">{hasInternat ? `${intAnnVal.toLocaleString()} ${currency}` : "Désactivé"}</p>
+                            </div>
+
+                            <div className="bg-violet-50/50 p-3 rounded-xl border border-violet-100/60 font-mono">
+                              <span className="text-[9px] text-violet-750 uppercase font-black font-bold">11. Internat mensuel (calculé)</span>
+                              <p className="font-black text-violet-800 mt-1">{hasInternat ? `${intMensVal.toLocaleString()} ${currency}` : "Désactivé"}</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
                     {/* Fee list items */}
                     <div className="space-y-3.5">
                       {detailedCategories.map((cat) => {
                         const target = Number(currentFeesBreakdown[cat.key] ?? cat.defaultVal);
                         const paid = (activeStudentFinance.tuitionPayments || [])
-                          .filter((p: any) => p.category === cat.formValue)
+                          .filter((p: any) => p.category === cat.formValue || 
+                            (cat.formValue === "Scolarité Mensuelle" && p.category.startsWith("Scolarité - ")) ||
+                            (cat.formValue === "Transport Scolaire" && p.category.startsWith("Transport - ")) ||
+                            (cat.formValue === "Cantine Cafétéria" && p.category.startsWith("Cantine - ")) ||
+                            (cat.formValue === "Internat Mensuel" && p.category.startsWith("Internat - "))
+                          )
                           .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
                         const owed = Math.max(0, target - paid);
                         const pct = target > 0 ? Math.min(100, Math.round((paid / target) * 100)) : 0;
@@ -1526,7 +2954,7 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                         </div>
                       ) : (
                         [...(activeStudentFinance.tuitionPayments || [])].reverse().map((pay: any) => (
-                          <div key={pay.id} className="bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-gray-150 transition-colors flex items-center justify-between gap-3 shadow-xs">
+                          <div key={pay.id} className="bg-slate-50 hover:bg-slate-100 p-4 rounded-xl border border-gray-100 transition-colors flex items-center justify-between gap-3 shadow-xs">
                             <div className="space-y-0.5">
                               <p className="text-xs font-black text-slate-800">{pay.category}</p>
                               <p className="text-[10px] font-mono text-indigo-950 font-bold">
@@ -1636,6 +3064,73 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                     <span className="font-extrabold text-right text-indigo-950">{selectedReceipt.category}</span>
                   </div>
                 </div>
+
+                {/* TABLEAU DES LIBELLÉS DÉTAILLÉS */}
+                {(() => {
+                  const details = selectedReceipt.details || (() => {
+                    const cat = selectedReceipt.category || '';
+                    if (cat.includes('Mensualité Globale')) {
+                      if (Number(selectedReceipt.amount) === 63333) {
+                        return { scolarite: 33333, transport: 10000, cantine: 20000 };
+                      }
+                      const amount = Number(selectedReceipt.amount || 0);
+                      const transport = Math.round(amount * 10000 / 63333);
+                      const cantine = Math.round(amount * 20000 / 63333);
+                      const scolarite = amount - transport - cantine;
+                      return { scolarite, transport, cantine };
+                    } else {
+                      return {
+                        scolarite: cat.includes('Scolarité') ? Number(selectedReceipt.amount) : 0,
+                        transport: cat.includes('Transport') ? Number(selectedReceipt.amount) : 0,
+                        cantine: cat.includes('Cantine') ? Number(selectedReceipt.amount) : 0,
+                        internat: cat.includes('Internat') ? Number(selectedReceipt.amount) : 0,
+                        inscription: cat.includes('Inscription') ? Number(selectedReceipt.amount) : 0,
+                        autres: (!cat.includes('Scolarité') && !cat.includes('Transport') && !cat.includes('Cantine') && !cat.includes('Internat') && !cat.includes('Inscription')) ? Number(selectedReceipt.amount) : 0
+                      };
+                    }
+                  })();
+
+                  return (
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden text-xs bg-white shadow-xs">
+                      <div className="bg-indigo-950/5 px-4 py-3 border-b border-slate-100 font-black text-indigo-950 text-[10px] uppercase tracking-wider flex justify-between">
+                        <span>ÉLÉMENT DE FACTURATIONS</span>
+                        <span>MONTANT ({currency})</span>
+                      </div>
+                      <div className="divide-y divide-slate-100 px-4">
+                        {Number(details.inscription || 0) > 0 && (
+                          <div className="flex justify-between py-2.5 text-slate-700 font-medium">
+                            <span className="font-bold">Inscription / Réinscription :</span>
+                            <span className="font-extrabold font-mono">{Number(details.inscription).toLocaleString()} {currency}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between py-2.5 text-slate-700 font-medium">
+                          <span className="font-bold">Scolarité :</span>
+                          <span className="font-extrabold font-mono">{Number(details.scolarite || 0).toLocaleString()} {currency}</span>
+                        </div>
+                        <div className="flex justify-between py-2.5 text-slate-700 font-medium">
+                          <span className="font-bold">Transport :</span>
+                          <span className="font-extrabold font-mono">{Number(details.transport || 0).toLocaleString()} {currency}</span>
+                        </div>
+                        <div className="flex justify-between py-2.5 text-slate-700 font-medium">
+                          <span className="font-bold">Cantine :</span>
+                          <span className="font-extrabold font-mono">{Number(details.cantine || 0).toLocaleString()} {currency}</span>
+                        </div>
+                        {Number(details.internat || 0) > 0 && (
+                          <div className="flex justify-between py-2.5 text-slate-700 font-medium">
+                            <span className="font-bold">Hébergement / Internat :</span>
+                            <span className="font-extrabold font-mono">{Number(details.internat).toLocaleString()} {currency}</span>
+                          </div>
+                        )}
+                        {Number(details.autres || 0) > 0 && (
+                          <div className="flex justify-between py-2.5 text-slate-700 font-medium">
+                            <span className="font-bold">Autres :</span>
+                            <span className="font-extrabold font-mono">{Number(details.autres).toLocaleString()} {currency}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="py-6 border-y border-dashed border-gray-200 flex justify-between items-center bg-slate-50 border-x rounded-xl px-6">
                   <span className="text-xs font-black uppercase text-indigo-950 tracking-wider">Montant total net perçu</span>

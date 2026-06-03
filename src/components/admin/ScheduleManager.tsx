@@ -128,16 +128,16 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
   // Colors automatically computed for subjects
   const getSubjectColorStyle = (subjectName: string) => {
     const s = (subjectName || '').toLowerCase().trim();
-    if (s.includes('math')) return { bg: 'bg-emerald-50 border-emerald-150', text: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-800', ring: 'ring-emerald-200', textAccent: 'text-emerald-600' };
-    if (s.includes('fran') || s.includes('lettre')) return { bg: 'bg-blue-50 border-blue-150', text: 'text-blue-800', badge: 'bg-blue-100 text-blue-800', ring: 'ring-blue-200', textAccent: 'text-blue-600' };
-    if (s.includes('phys') || s.includes('chim')) return { bg: 'bg-amber-50 border-amber-150', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-800', ring: 'ring-amber-200', textAccent: 'text-amber-600' };
-    if (s.includes('svt') || s.includes('sci') || s.includes('biol')) return { bg: 'bg-teal-50 border-teal-150', text: 'text-teal-800', badge: 'bg-teal-100 text-teal-800', ring: 'ring-teal-200', textAccent: 'text-teal-600' };
-    if (s.includes('hist') || s.includes('géo') || s.includes('geo')) return { bg: 'bg-orange-50 border-orange-150', text: 'text-orange-800', badge: 'bg-orange-100 text-orange-800', ring: 'ring-orange-200', textAccent: 'text-orange-600' };
-    if (s.includes('ang') || s.includes('all') || s.includes('esp') || s.includes('arabe')) return { bg: 'bg-violet-50 border-violet-150', text: 'text-violet-800', badge: 'bg-violet-100 text-violet-800', ring: 'ring-violet-200', textAccent: 'text-violet-600' };
-    if (s.includes('sport') || s.includes('eps')) return { bg: 'bg-rose-50 border-rose-150', text: 'text-rose-800', badge: 'bg-rose-100 text-rose-800', ring: 'ring-rose-200', textAccent: 'text-rose-600' };
-    if (s.includes('philo')) return { bg: 'bg-sky-50 border-sky-150', text: 'text-sky-800', badge: 'bg-sky-100 text-sky-800', ring: 'ring-sky-200', textAccent: 'text-sky-600' };
-    if (s.includes('info') || s.includes('tech')) return { bg: 'bg-indigo-50 border-indigo-150', text: 'text-indigo-800', badge: 'bg-indigo-100 text-indigo-800', ring: 'ring-indigo-200', textAccent: 'text-indigo-600' };
-    return { bg: 'bg-slate-50 border-slate-150', text: 'text-slate-800', badge: 'bg-slate-200 text-slate-700', ring: 'ring-slate-300', textAccent: 'text-slate-500' };
+    if (s.includes('math')) return { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-800', ring: 'ring-emerald-200', textAccent: 'text-emerald-600' };
+    if (s.includes('fran') || s.includes('lettre')) return { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-800', badge: 'bg-blue-100 text-blue-800', ring: 'ring-blue-200', textAccent: 'text-blue-600' };
+    if (s.includes('phys') || s.includes('chim')) return { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-800', ring: 'ring-amber-200', textAccent: 'text-amber-600' };
+    if (s.includes('svt') || s.includes('sci') || s.includes('biol')) return { bg: 'bg-teal-50 border-teal-200', text: 'text-teal-800', badge: 'bg-teal-100 text-teal-800', ring: 'ring-teal-200', textAccent: 'text-teal-600' };
+    if (s.includes('hist') || s.includes('géo') || s.includes('geo')) return { bg: 'bg-orange-50 border-orange-200', text: 'text-orange-800', badge: 'bg-orange-100 text-orange-800', ring: 'ring-orange-200', textAccent: 'text-orange-600' };
+    if (s.includes('ang') || s.includes('all') || s.includes('esp') || s.includes('arabe')) return { bg: 'bg-violet-50 border-violet-200', text: 'text-violet-800', badge: 'bg-violet-100 text-violet-800', ring: 'ring-violet-200', textAccent: 'text-violet-600' };
+    if (s.includes('sport') || s.includes('eps')) return { bg: 'bg-rose-50 border-rose-200', text: 'text-rose-800', badge: 'bg-rose-100 text-rose-800', ring: 'ring-rose-200', textAccent: 'text-rose-600' };
+    if (s.includes('philo')) return { bg: 'bg-sky-50 border-sky-200', text: 'text-sky-800', badge: 'bg-sky-100 text-sky-800', ring: 'ring-sky-200', textAccent: 'text-sky-600' };
+    if (s.includes('info') || s.includes('tech')) return { bg: 'bg-indigo-50 border-indigo-200', text: 'text-indigo-800', badge: 'bg-indigo-100 text-indigo-800', ring: 'ring-indigo-200', textAccent: 'text-indigo-600' };
+    return { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-800', badge: 'bg-slate-200 text-slate-700', ring: 'ring-slate-300', textAccent: 'text-slate-500' };
   };
 
   // Turn time to minutes for overlap checking
@@ -234,8 +234,9 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
     }
 
     const matchedTeacher = dbTeachers.find(t => t.id === newPeriod.teacherId);
-    await db.schedules.put({
-      id: uuidv4(),
+    const newScheduleId = uuidv4();
+    const newSchedule = {
+      id: newScheduleId,
       merchantId,
       classId,
       schoolYear: selectedYear,
@@ -250,7 +251,15 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
       groupType: newPeriod.groupType,
       status: 'normal',
       updatedAt: new Date().toISOString()
-    });
+    };
+    await db.schedules.put(newSchedule as any);
+
+    try {
+      const { firestoreService } = await import('../../services/firestoreService');
+      await firestoreService.save('schedules', newSchedule);
+    } catch (e) {
+      console.warn("Could not instantly push schedule to Firestore", e);
+    }
 
     toast.success("Horaire ajouté à l'emploi du temps !");
     setNewPeriod(prev => ({ ...prev, subject: '', teacherId: '', room: '' }));
@@ -258,6 +267,12 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
 
   const handleRemove = async (id: string) => {
     await db.schedules.delete(id);
+    try {
+      const { firestoreService } = await import('../../services/firestoreService');
+      await firestoreService.delete('schedules', id);
+    } catch (e) {
+      console.warn("Could not instantly delete schedule from Firestore", e);
+    }
     toast.success("Horaire retiré");
   };
 
@@ -288,6 +303,14 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
       };
 
       await db.schedules.put(updatedData);
+
+      try {
+        const { firestoreService } = await import('../../services/firestoreService');
+        await firestoreService.save('schedules', updatedData);
+      } catch (e) {
+        console.warn("Could not instantly push updated schedule to Firestore", e);
+      }
+
       toast.success("Modifications enregistrées !");
       setIsReplacementModalOpen(false);
 
@@ -461,13 +484,17 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
     try {
       // Clean up previous schedules for this class before copying
       const oldSchedules = allMerchantSchedules.filter(s => s.classId === classId);
+      const { firestoreService } = await import('../../services/firestoreService');
+
       for (const old of oldSchedules) {
         await db.schedules.delete(old.id);
+        await firestoreService.delete('schedules', old.id).catch(() => {});
       }
 
       // Add new ones
       for (const item of aiGeneratedSchedules) {
         await db.schedules.put(item);
+        await firestoreService.save('schedules', item).catch(() => {});
       }
 
       toast.success("🪄 L'emploi du temps généré par l'IA a été enregistré et déployé avec succès !");
@@ -532,7 +559,7 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
       {/* 1. Header with metadata context */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-gray-100 pb-6 gap-4 no-print">
         <div>
-          <span className="text-[10px] font-mono font-black uppercase text-indigo-700 bg-indigo-50 border border-indigo-150 px-3 py-1 rounded-full tracking-widest">
+          <span className="text-[10px] font-mono font-black uppercase text-indigo-700 bg-indigo-50 border border-indigo-100 px-3 py-1 rounded-full tracking-widest">
             Acom Technologies • Administration Académique
           </span>
           <h3 className="text-2xl font-black text-slate-800 mt-2 flex items-center gap-2">
@@ -619,7 +646,7 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
 
         <div>
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Type de Présentation Calendrier</label>
-          <div className="flex bg-white p-1 rounded-xl border border-gray-150">
+          <div className="flex bg-white p-1 rounded-xl border border-gray-100">
             <button 
               onClick={() => setViewType('grid')}
               className={`flex-1 text-center py-1 rounded-lg text-xs font-bold ${viewType === 'grid' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
@@ -758,7 +785,7 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
         </div>
 
         {schedules.length === 0 ? (
-          <div className="text-center py-20 bg-slate-50 rounded-[2rem] border border-gray-150 text-slate-400 no-print">
+          <div className="text-center py-20 bg-slate-50 rounded-[2rem] border border-gray-100 text-slate-400 no-print">
             <BookOpen className="w-16 h-16 mx-auto mb-4 opacity-30 text-indigo-500" />
             <h5 className="text-lg font-bold text-slate-700">Aucun cours planifié pour le moment</h5>
             <p className="text-sm text-slate-500 max-w-md mx-auto mt-2">
@@ -781,7 +808,7 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
                 if (slot.isBreak) {
                   return (
                     <div key={sIdx} className="grid grid-cols-7 bg-slate-50 text-slate-400 text-xs font-bold text-center py-3 select-none">
-                      <div className="font-mono text-[10px] flex items-center justify-center border-r border-slate-150 py-1">
+                      <div className="font-mono text-[10px] flex items-center justify-center border-r border-slate-100 py-1">
                         <Clock className="w-3.5 h-3.5 mr-1" />
                         {slot.start} - {slot.end}
                       </div>
@@ -905,10 +932,10 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
             {days.map(day => {
               const daySlots = schedules.filter(s => s.day === day).sort((a,b) => a.startTime.localeCompare(b.startTime));
               return (
-                <div key={day} className="bg-slate-50 p-5 rounded-3xl border border-gray-150 space-y-4">
+                <div key={day} className="bg-slate-50 p-5 rounded-3xl border border-gray-100 space-y-4">
                   <div className="flex justify-between items-center border-b border-gray-200 pb-2">
                     <h5 className="font-extrabold text-slate-800 text-sm uppercase tracking-widest">{day}</h5>
-                    <span className="text-[10px] font-bold bg-indigo-50 border border-indigo-150 text-indigo-700 px-2 py-0.5 rounded-xl">
+                    <span className="text-[10px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-xl">
                       {daySlots.length} Cours
                     </span>
                   </div>
@@ -973,7 +1000,7 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
         ) : (
           
           /* VIEW TYPE C: Timeline chronological list (Google Calendar list style) */
-          <div className="bg-white p-6 border border-gray-150 rounded-[2.5rem] shadow-sm space-y-4">
+          <div className="bg-white p-6 border border-gray-100 rounded-[2.5rem] shadow-sm space-y-4">
             <h4 className="text-xs font-black uppercase text-slate-400 tracking-widest">Chronologie des enseignements de la classe</h4>
             <div className="space-y-3">
               {days.map(day => {
@@ -1082,7 +1109,7 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
                     </div>
                   </div>
 
-                  <div className="border border-gray-150 rounded-2xl overflow-hidden max-h-[200px] overflow-y-auto divide-y divide-gray-100">
+                  <div className="border border-gray-100 rounded-2xl overflow-hidden max-h-[200px] overflow-y-auto divide-y divide-gray-100">
                     {aiGeneratedSchedules.map((item, idx) => (
                       <div key={idx} className="p-3 text-xs flex justify-between items-center hover:bg-slate-50 bg-white">
                         <div className="flex gap-2 items-center">
@@ -1147,7 +1174,7 @@ export const ScheduleManager = ({ merchantId, classId }: { merchantId: string, c
                 {/* Status Toggle */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Statut du Cours</label>
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1.5 rounded-xl border border-gray-150">
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-1.5 rounded-xl border border-gray-100">
                     <button
                       onClick={() => { setReplacementStatus('normal'); }}
                       className={`py-1.5 rounded-lg text-xs font-bold transition-all ${replacementStatus === 'normal' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-white/50'}`}

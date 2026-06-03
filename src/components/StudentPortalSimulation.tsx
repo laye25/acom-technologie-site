@@ -25,17 +25,24 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
       : (studentData?.merchantId || studentData?.merchant_id || localStorage.getItem('merchantId') || '');
   }, [merchant, studentData]);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Proactive Sync on Portal Session load
   React.useEffect(() => {
-    if (resolvedMerchantId) {
+    if (resolvedMerchantId && studentData?.id) {
       console.log("[StudentPortal] Triggering proactive SaaS collection synchronization with merchant:", resolvedMerchantId);
+      setIsSyncing(true);
       import('../services/syncService').then(({ syncService }) => {
-        syncService.syncSchoolPortalData(resolvedMerchantId, true);
+        syncService.syncStudentData(resolvedMerchantId, studentData.id).finally(() => {
+          setIsSyncing(false);
+          toast.success("Espace personnel synchronisé", { icon: "🔄", id: "sync" });
+        });
       }).catch(err => {
         console.error("[StudentPortal] Fail to trigger proactive sync:", err);
+        setIsSyncing(false);
       });
     }
-  }, [resolvedMerchantId]);
+  }, [resolvedMerchantId, studentData?.id]);
 
   const studentClasses = useLiveQuery(() => 
     resolvedMerchantId ? db.classes?.where('merchantId').equals(resolvedMerchantId).toArray() : []
@@ -200,8 +207,8 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                     }
 
                     return (
-                      <div key={g.id || idx} className="p-5 bg-slate-50 rounded-2xl border border-gray-150 flex flex-col justify-between">
-                        <div className="flex justify-between items-start mb-3 border-b border-gray-150 pb-2">
+                      <div key={g.id || idx} className="p-5 bg-slate-50 rounded-2xl border border-gray-200 flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-3 border-b border-gray-100 pb-2">
                           <div>
                             <span className="text-[10px] uppercase font-black tracking-widest text-indigo-600 font-extrabold">{subjectName}</span>
                             <p className="text-xs text-slate-500 mt-0.5 font-bold">{g.term || 'Trimestre 1'}</p>
@@ -209,7 +216,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                           {average !== null && (
                             <div className="text-right">
                               <span className="text-[8px] uppercase font-bold text-slate-400 block mb-0.5">Moyenne</span>
-                              <span className="text-xs font-black px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-150">
+                              <span className="text-xs font-black px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
                                 {average.toFixed(2)} / 20
                               </span>
                             </div>
@@ -290,7 +297,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
 
                 {/* Switcher pour le Type de Présentation Calendrier */}
                 {(studentClassObj?.schedulePublished !== false) && classSchedules.length > 0 && (
-                  <div className="flex bg-slate-100 p-1 rounded-2xl border border-gray-150 inline-flex self-start">
+                  <div className="flex bg-slate-100 p-1 rounded-2xl border border-gray-100 inline-flex self-start">
                     <button 
                       onClick={() => setScheduleViewType('grid')}
                       className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${scheduleViewType === 'grid' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
@@ -320,7 +327,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                   <p className="text-xs text-amber-700 mt-1 max-w-md mx-auto">L'emploi du temps officiel de votre classe n'a pas encore été publié officiellement par l'administration ou est en cours d'élaboration.</p>
                 </div>
               ) : classSchedules.length === 0 ? (
-                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-gray-150 text-slate-400">
+                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-gray-100 text-slate-400">
                   <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30 text-indigo-500" />
                   <p className="text-sm font-bold text-slate-700">Aucun emploi du temps officiel n'est disponible ou n'a encore été défini pour la classe {studentData?.grade || 'de l\'élève'}.</p>
                   <p className="text-xs text-slate-500 mt-1">Veuillez contacter l'administration de l'établissement pour la programmation horologique.</p>
@@ -347,7 +354,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                       const badgeColor = getSubjectSubColor(s.subject);
 
                       return (
-                        <div key={s.id || idx} className={`p-3 bg-white rounded-2xl border border-gray-150 shadow-sm transition-all hover:border-indigo-150 relative ${isCanceled ? 'opacity-50' : ''}`}>
+                        <div key={s.id || idx} className={`p-3 bg-white rounded-2xl border border-gray-100 shadow-sm transition-all hover:border-indigo-200 relative ${isCanceled ? 'opacity-50' : ''}`}>
                           <p className="text-[9px] font-bold text-indigo-600 flex items-center gap-1">
                             <Clock className="w-3 h-3 text-indigo-400" />
                             {s.startTime} - {s.endTime}
@@ -424,7 +431,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                                   className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
                                     isActive
                                       ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
-                                      : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-gray-150'
+                                      : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-gray-200'
                                   }`}
                                 >
                                   <span>{day}</span>
@@ -440,7 +447,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
 
                             if (daySlots.length === 0) {
                               return (
-                                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-gray-150 max-w-md mx-auto">
+                                <div className="text-center py-12 bg-slate-50 rounded-2xl border border-gray-100 max-w-md mx-auto">
                                   <span className="text-3xl">☕</span>
                                   <h4 className="font-extrabold text-slate-700 text-xs mt-3">Pas de cours programmé</h4>
                                   <p className="text-[11px] text-slate-500 mt-1">Profitez de ce moment de repos ou d'étude personnelle !</p>
@@ -504,7 +511,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
               
               {validHomeworks.length === 0 ? (
                 <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-150 text-center py-10">
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-gray-100 text-center py-10">
                     <BookOpen className="w-10 h-10 mx-auto text-slate-300 mb-3 animate-pulse" />
                     <p className="text-sm font-bold text-slate-700">Aucun devoir ou leçon n'a été publié pour l'instant.</p>
                     <p className="text-xs text-slate-500 mt-1">Consulte régulièrement cet espace pour suivre tes leçons.</p>
@@ -643,7 +650,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                 <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2"><Key className="w-5 h-5 text-indigo-500" /> Vos Clés de Connexion</h3>
                 <div className="space-y-4 text-xs">
                   <p className="text-slate-500">Conservez précieusement ces identifiants pour vos prochains accès scolaires depuis n'importe quel écran :</p>
-                  <div className="p-4 bg-slate-50 rounded-xl space-y-2 border border-gray-150">
+                  <div className="p-4 bg-slate-50 rounded-xl space-y-2 border border-gray-100">
                     <div className="flex justify-between items-center"><span className="font-bold text-slate-500">Type de Compte :</span> <strong className="text-slate-800 uppercase text-[10px] bg-slate-200 px-2 rounded">Élève</strong></div>
                     <div className="flex justify-between items-center"><span className="font-bold text-slate-500">Identifiant Unique :</span> <strong className="text-indigo-600 font-mono mt-0.5">{studentData?.studentUsername || studentData?.username || 'Inconnu'}</strong></div>
                     <div className="flex justify-between items-center"><span className="font-bold text-slate-500">Code PIN :</span> <strong className="text-slate-900 font-mono mt-0.5">{studentData?.studentPassword || studentData?.password || '---'}</strong></div>
@@ -685,7 +692,7 @@ export const StudentPortalSimulation = ({ student, merchant, onClose }: { studen
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">{studentData?.firstName} {studentData?.lastName}</p>
-                  <p className="text-xs text-indigo-200 truncate">Classe: {studentData?.grade || 'Non assigné'}</p>
+                  <p className="text-xs text-indigo-200 truncate">Classe: {studentData?.grade || studentData?.class || studentData?.class_id || studentData?.classId || 'Non assigné'}</p>
                 </div>
               </div>
             </div>

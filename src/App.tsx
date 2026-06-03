@@ -26,6 +26,9 @@ import Contact from './pages/Contact';
 import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import POS from './pages/POS';
+const TeacherPortal = React.lazy(() => import('./pages/TeacherPortal'));
+const StudentPortal = React.lazy(() => import('./pages/StudentPortal'));
+const ParentPortal = React.lazy(() => import('./pages/ParentPortal'));
 // Removed direct imports for lazy loading
 
 import Pricing from './pages/Pricing';
@@ -77,10 +80,11 @@ function AppContent() {
   // Détection du sous-domaine SaaS (ou simulation via ?mode=saas)
   const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || (typeof window !== 'undefined' && isDesktop);
 
-  // Pour le SaaS et la session Enseignant, on cache le header et le footer pour faire plus "Application" personnalisé
-  const isTeacherSession = typeof window !== 'undefined' && !!localStorage.getItem('activeTeacherId');
-  const hideNavbar = isEditor || isSaaSDomain || isTeacherSession;
-  const hideFooter = isEditor || isSaaSDomain || isTeacherSession;
+  // Pour le SaaS et la session Enseignant/Parent/Eleve, on cache le header et le footer pour faire plus "Application" personnalisé
+  const isPortalLayout = location.pathname.startsWith('/portal/') || location.pathname.startsWith('/merchant/');
+  
+  const hideNavbar = isEditor || isSaaSDomain || isPortalLayout;
+  const hideFooter = isEditor || isSaaSDomain || isPortalLayout;
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 selection:bg-primary-light selection:text-primary">
@@ -115,6 +119,9 @@ function AppContent() {
             <Route path="/admin/email-preview" element={<ProtectedRoute adminOnly><EmailPreview /></ProtectedRoute>} />
             <Route path="/manager/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
             <Route path="/merchant/saas" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
+            <Route path="/portal/student" element={<ProtectedRoute><StudentPortal /></ProtectedRoute>} />
+            <Route path="/portal/parent" element={<ProtectedRoute><ParentPortal /></ProtectedRoute>} />
+            <Route path="/portal/teacher" element={<ProtectedRoute><TeacherPortal /></ProtectedRoute>} />
             <Route path="/partner-portal" element={<ProtectedRoute><PartnerPortal /></ProtectedRoute>} />
             <Route path="/solutions-saas" element={<SaaSSolutions />} />
             <Route path="/pricing" element={<Pricing />} />

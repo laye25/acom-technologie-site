@@ -1,0 +1,19 @@
+3384:              { id: 'remind_payment', label: '💰 Écolage', defaultText: "Cher Parent, afin d'éviter toute suspension de cours, nous vous prions de régulariser tout reliquat de frais d'écolage pour l'élève [Élève] ([Classe])." },
+4393:                <StatCard title="Frais Scolarité" value={stats.revenue.total} currency={merchant.currency} icon={TrendingUp} color="text-blue-600" bgColor="bg-blue-50" description="Revenu total" />
+4523:                  {merchant.type === 'scolaire' ? 'Frais' : 
+4665:                          merchant.type === 'scolaire' ? 'Paiement Frais' :
+15655:      const matchItems = s.items?.some(i => i.name?.toLowerCase().includes("scolarité") || i.name?.toLowerCase().includes("frais") || i.name?.toLowerCase().includes("inscription") || i.name?.toLowerCase().includes("écolage"));
+15814:            <td style="padding: 12px; text-align: left;"><strong>${p.items?.[0]?.name || 'Frais de Scolarité'}</strong><br><span style="font-size: 10px; color: #94a3b8;">REF: ${p.id?.substring(0,8)}</span></td>
+15831:      { key: 'docReceipt', label: 'Quittance de paiement des frais d\'inscription' }
+16340:                    <th style="font-size: 10px; padding: 8px;">Description / Intitulé de Frais</th>
+17294:      content = `Chers Parents, le versement des frais de scolarité de ${student.firstName} est attendu. Reste dû: ${(schoolingTarget - totalPaid).toLocaleString()} FCFA. Merci pour votre règlement.`;
+17488:          }`}>Scolarité & Frais</button>
+18018:                            <p className="font-black text-slate-900">{p.items?.[0]?.name || 'Frais de Scolarité'}</p>
+18045:                      { key: 'docReceipt', label: 'Quittance frais d\'inscription' }
+18295:                            <p className="font-black text-gray-900">{p.items?.[0]?.name || 'Frais de Scolarité'}</p>
+18320:                          <label className="text-[10px] uppercase font-bold text-gray-400 tracking-widest block mb-1">Catégorie de Frais</label>
+19007:      - Frais de scolarité d'inscription prévus: ${editedStudent.registrationFee} FCFA (Méthode de règlement: ${editedStudent.paymentMethod}, Réduction: ${editedStudent.hasDiscount === 'oui' ? editedStudent.discountAmount + ' FCFA' : 'Aucune'})
+19064:            name: `Frais d'inscription - Élève ${editedStudent.firstName} ${editedStudent.lastName}`,
+19702:                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Frais d'inscription annuel (FCFA)</label>
+19746:                            <p className="text-[10px] font-mono text-emerald-600 font-bold mt-1">✓ Frais d'inscription réglés par Wave/CB | Ref: {editedStudent.paymentRef}</p>
+20344:              <span className="text-slate-400 font-bold uppercase tracking-wide">Frais d'Écolage dû :</span>
