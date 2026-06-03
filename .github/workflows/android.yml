@@ -23,7 +23,12 @@ jobs:
         npm install
 
     - name: Build Web App
-      run: npm run build
+      run: |
+        npm run build
+        if [ ! -d "dist" ]; then
+          echo "Error: dist directory not found after build!"
+          exit 1
+        fi
 
     - name: Setup Java
       uses: actions/setup-java@v4
