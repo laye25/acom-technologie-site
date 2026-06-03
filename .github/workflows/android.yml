@@ -38,7 +38,8 @@ jobs:
 
     - name: Sync Capacitor project
       run: |
-        npx cap add android || echo "Android project may already exist."
+        rm -rf android
+        npx cap add android
         npx cap sync android
 
     - name: Make gradlew executable
