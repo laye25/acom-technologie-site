@@ -38,8 +38,6 @@ jobs:
 
     - name: Sync Capacitor project
       run: |
-        rm -rf android
-        npx cap add android
         npx cap sync android
 
     - name: Make gradlew executable
