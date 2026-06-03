@@ -1,12 +1,66 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { db as dexieDb } from '../db/db';
+import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
+import { Capacitor } from '@capacitor/core';
 
 let db: any = null;
 let sqlite3Obj: any = null;
+let nativeDbConnection: SQLiteDBConnection | null = null;
+const sqlitePlugin = new SQLiteConnection(CapacitorSQLite);
+const isNative = Capacitor.isNativePlatform();
 
 export const initSQLite = async () => {
   if (db) return db;
 
+  if (isNative) {
+    try {
+      console.log('Initializing native Capacitor SQLite...');
+      nativeDbConnection = await sqlitePlugin.createConnection('acom_studio', false, 'no-encryption', 1, false);
+      await nativeDbConnection.open();
+      db = nativeDbConnection;
+      
+      // Setup tables for native
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS merchant_products (
+          id TEXT PRIMARY KEY,
+          merchantId TEXT,
+          name TEXT,
+          price REAL,
+          category TEXT,
+          stock INTEGER,
+          syncStatus TEXT,
+          updatedAt TEXT,
+          sizes TEXT,
+          colors TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS merchant_sales (
+          id TEXT PRIMARY KEY,
+          merchantId TEXT,
+          total REAL,
+          items TEXT,
+          syncStatus TEXT,
+          createdAt TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS merchant_expenses (
+          id TEXT PRIMARY KEY,
+          merchantId TEXT,
+          title TEXT,
+          amount REAL,
+          category TEXT,
+          syncStatus TEXT,
+          createdAt TEXT
+        );
+      `);
+      return db;
+    } catch (e) {
+      console.error('Failed to init native SQLite:', e);
+      return null;
+    }
+  }
+
+  // Fallback to WASM
   try {
     const sqlite3 = await (sqlite3InitModule as any)({
       print: console.log,

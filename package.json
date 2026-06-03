@@ -47,6 +47,7 @@
     }
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.0",
     "@capacitor/core": "^8.4.0",
     "@google/genai": "^1.29.0",
     "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
