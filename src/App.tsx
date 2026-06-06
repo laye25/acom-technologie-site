@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './ThemeProvider';
@@ -56,7 +57,8 @@ const isDesktop = typeof window !== 'undefined' && (
   (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
   (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
 );
-const Router = isDesktop ? HashRouter : BrowserRouter;
+const isNative = typeof window !== 'undefined' && Capacitor.isNativePlatform();
+const Router = (isDesktop || isNative) ? HashRouter : BrowserRouter;
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, profile, loading, isAdmin, isManager } = useAuth();
@@ -78,7 +80,7 @@ function AppContent() {
   const isEditor = location.pathname === '/design-editor';
   
   // Détection du sous-domaine SaaS (ou simulation via ?mode=saas)
-  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || (typeof window !== 'undefined' && isDesktop);
+  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || (typeof window !== 'undefined' && (isDesktop || isNative));
 
   // Pour le SaaS et la session Enseignant/Parent/Eleve, on cache le header et le footer pour faire plus "Application" personnalisé
   const isPortalLayout = location.pathname.startsWith('/portal/') || location.pathname.startsWith('/merchant/');
