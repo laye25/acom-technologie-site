@@ -55,13 +55,16 @@ import { LogOut } from 'lucide-react';
 import { ScheduleManager } from '../components/admin/ScheduleManager';
 import { SchoolScheduleManager } from '../components/admin/SchoolScheduleManager';
 import { StudentPortalsManager } from '../components/admin/StudentPortalsManager';
+import { Capacitor } from '@capacitor/core';
 
+const isCapacitor = typeof window !== 'undefined' && Capacitor.isNativePlatform();
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
   (window.process && (window.process as any).type) || 
   (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
   (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
 );
+const isNativeApp = isDesktop || isCapacitor;
 
 const printPDF = (doc: jsPDF, filename = 'document_imprimer.pdf') => {
   try {
@@ -4116,7 +4119,7 @@ const MerchantDashboard = ({
       )}
 
       {/* Download Center & Build Dashboard for LOCAL Plan */}
-      {merchant.plan === 'LOCAL' && !isDesktop && (
+      {merchant.plan === 'LOCAL' && !isNativeApp && (
         <div className="bg-gradient-to-br from-gray-900 to-black rounded-[2rem] border border-gray-800 shadow-2xl overflow-hidden relative mt-8">
           <div className="p-8 relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Architecture / OS Features Col */}

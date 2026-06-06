@@ -6,6 +6,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, ArrowRight, LogIn, UserPlus } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -15,24 +16,26 @@ const Login = () => {
 
   const from = location.state?.from?.pathname + (location.state?.from?.search || '') || '/dashboard';
 
+  const isCapacitor = typeof window !== 'undefined' && Capacitor.isNativePlatform();
   const isDesktop = typeof window !== 'undefined' && (
     ('__TAURI__' in window) || 
     (window.process && (window.process as any).type) || 
     (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
     (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
   );
+  const isNativeApp = isDesktop || isCapacitor;
   
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isNativeApp;
       if (isSaaSDomain && from === '/dashboard') {
         navigate('/');
       } else {
         navigate(from);
       }
     }
-  }, [user, navigate, from, isDesktop]);
+  }, [user, navigate, from, isNativeApp]);
 
   const [isResetting, setIsResetting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,7 +85,7 @@ const Login = () => {
       localStorage.removeItem('activeParentId');
       localStorage.removeItem('activeStudentId');
       await signInWithGoogle();
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isNativeApp;
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       navigate(targetUrl);
     } catch (error: any) {
@@ -132,7 +135,7 @@ const Login = () => {
     setSuccess(null);
 
     try {
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isNativeApp;
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       
       if (isLogin) {
