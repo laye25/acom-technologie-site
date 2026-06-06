@@ -153,6 +153,74 @@ export const initSQLite = async () => {
 
 export const getSQLiteDB = () => db;
 
+// Helper to execute non-query SQL (inserts, updates, schema creation, transactions)
+export const executeSQL = async (sql: string, bind: any[] = []): Promise<void> => {
+  if (!db) await initSQLite();
+  if (!db) {
+    console.warn("Database connection is not available for executeSQL");
+    return;
+  }
+
+  if (isNative) {
+    try {
+      if (bind && bind.length > 0) {
+        await db.run(sql, bind);
+      } else {
+        await db.execute(sql);
+      }
+    } catch (err) {
+      console.error("Native SQLite execution failed for SQL:", sql, err);
+      throw err;
+    }
+  } else {
+    try {
+      if (bind && bind.length > 0) {
+        db.exec({ sql, bind });
+      } else {
+        db.exec(sql);
+      }
+    } catch (err) {
+      console.error("WASM SQLite execution failed for SQL:", sql, err);
+      throw err;
+    }
+  }
+};
+
+// Helper to query/select data from SQLite
+export const querySQL = async (sql: string, bind: any[] = []): Promise<any[]> => {
+  if (!db) await initSQLite();
+  if (!db) {
+    console.warn("Database connection is not available for querySQL");
+    return [];
+  }
+
+  if (isNative) {
+    try {
+      const res = await db.query(sql, bind);
+      return res.values || [];
+    } catch (err) {
+      console.error("Native SQLite query failed for SQL:", sql, err);
+      throw err;
+    }
+  } else {
+    try {
+      const results: any[] = [];
+      db.exec({
+        sql,
+        bind,
+        rowMode: 'object',
+        callback: (row: any) => {
+          results.push(row);
+        }
+      });
+      return results;
+    } catch (err) {
+      console.error("WASM SQLite query failed for SQL:", sql, err);
+      throw err;
+    }
+  }
+};
+
 export const populateSQLiteFromDexie = async (merchantId: string) => {
   if (!db) await initSQLite();
   if (!db) {
@@ -167,7 +235,7 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
     const expenses = await dexieDb.expenses.where('merchantId').equals(merchantId).toArray() || [];
 
     // Ensure the db contains the tables
-    db.exec(`
+    await executeSQL(`
       CREATE TABLE IF NOT EXISTS merchant_products (
         id TEXT PRIMARY KEY,
         merchantId TEXT,
@@ -203,20 +271,20 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
 
     // Run safe migrations for existing desktop databases
     try {
-      db.exec("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
+      await executeSQL("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
     } catch (_) {}
     try {
-      db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
+      await executeSQL("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
     } catch (_) {}
 
     // Insert all into SQLite in a single transaction
-    db.exec('BEGIN TRANSACTION;');
+    await executeSQL('BEGIN TRANSACTION;');
 
     for (const p of products) {
       const pAny = p as any;
-      db.exec({
-        sql: 'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        bind: [
+      await executeSQL(
+        'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
           pAny.id,
           pAny.merchantId,
           pAny.name,
@@ -228,14 +296,14 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
           pAny.sizes || '',
           pAny.colors || ''
         ]
-      });
+      );
     }
 
     for (const s of sales) {
       const sAny = s as any;
-      db.exec({
-        sql: 'INSERT OR REPLACE INTO merchant_sales (id, merchantId, total, items, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-        bind: [
+      await executeSQL(
+        'INSERT OR REPLACE INTO merchant_sales (id, merchantId, total, items, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+        [
           sAny.id,
           sAny.merchantId,
           sAny.totalAmount || sAny.total || 0,
@@ -243,14 +311,14 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
           sAny.syncStatus || 'local-only',
           sAny.createdAt?.toString() || new Date().toISOString()
         ]
-      });
+      );
     }
 
     for (const e of expenses) {
       const eAny = e as any;
-      db.exec({
-        sql: 'INSERT OR REPLACE INTO merchant_expenses (id, merchantId, title, amount, category, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        bind: [
+      await executeSQL(
+        'INSERT OR REPLACE INTO merchant_expenses (id, merchantId, title, amount, category, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
           eAny.id,
           eAny.merchantId,
           eAny.title || eAny.description || '',
@@ -259,16 +327,16 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
           eAny.syncStatus || 'local-only',
           eAny.createdAt?.toString() || new Date().toISOString()
         ]
-      });
+      );
     }
 
-    db.exec('COMMIT;');
+    await executeSQL('COMMIT;');
     await syncPhysicalFile();
     return true;
   } catch (err) {
     console.error('Error populating SQLite from Dexie:', err);
     try {
-      db.exec('ROLLBACK;');
+      await executeSQL('ROLLBACK;');
     } catch (_) {}
     return false;
   }
@@ -337,13 +405,7 @@ export const populateDexieFromSQLite = async () => {
     // 1. Read merchant's products
     let sqliteProducts: any[] = [];
     try {
-      db.exec({
-        sql: 'SELECT * FROM merchant_products',
-        rowMode: 'object',
-        callback: (row: any) => {
-          sqliteProducts.push(row);
-        }
-      });
+      sqliteProducts = await querySQL('SELECT * FROM merchant_products');
     } catch (e) {
       console.warn("No products found or table does not exist in SQLite:", e);
     }
@@ -351,13 +413,7 @@ export const populateDexieFromSQLite = async () => {
     // 2. Read merchant's sales
     let sqliteSales: any[] = [];
     try {
-      db.exec({
-        sql: 'SELECT * FROM merchant_sales',
-        rowMode: 'object',
-        callback: (row: any) => {
-          sqliteSales.push(row);
-        }
-      });
+      sqliteSales = await querySQL('SELECT * FROM merchant_sales');
     } catch (e) {
       console.warn("No sales found or table does not exist in SQLite:", e);
     }
@@ -365,13 +421,7 @@ export const populateDexieFromSQLite = async () => {
     // 3. Read merchant's expenses
     let sqliteExpenses: any[] = [];
     try {
-      db.exec({
-        sql: 'SELECT * FROM merchant_expenses',
-        rowMode: 'object',
-        callback: (row: any) => {
-          sqliteExpenses.push(row);
-        }
-      });
+      sqliteExpenses = await querySQL('SELECT * FROM merchant_expenses');
     } catch (e) {
       console.warn("No expenses found or table does not exist in SQLite:", e);
     }
@@ -409,11 +459,11 @@ export const populateDexieFromSQLite = async () => {
         return {
           id: s.id,
           merchantId: s.merchantId,
-          totalAmount: Number(s.total || 0),
+          totalAmount: Number(s.total || s.totalAmount || 0),
           items: items,
           syncStatus: s.syncStatus || 'local-only',
           createdAt: s.createdAt || new Date().toISOString(),
-          paidAmount: Number(s.total || 0),
+          paidAmount: Number(s.total || s.totalAmount || 0),
           balance: 0,
           payments: [],
           paymentMethod: 'cash' as const,
@@ -534,12 +584,9 @@ export const syncPhysicalFile = async () => {
 
 export const sqliteHelper = {
   async insertProduct(product: any) {
-    if (!db) await initSQLite();
-    if (!db) return;
-    
-    db.exec({
-      sql: 'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      bind: [
+    await executeSQL(
+      'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
         product.id,
         product.merchantId || product.merchant_id,
         product.name,
@@ -549,17 +596,14 @@ export const sqliteHelper = {
         product.syncStatus,
         product.updatedAt?.toString() || new Date().toISOString()
       ]
-    });
+    );
     await syncPhysicalFile();
   },
 
   async insertSale(sale: any) {
-    if (!db) await initSQLite();
-    if (!db) return;
-    
-    db.exec({
-      sql: 'INSERT OR REPLACE INTO merchant_sales (id, merchantId, total, items, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-      bind: [
+    await executeSQL(
+      'INSERT OR REPLACE INTO merchant_sales (id, merchantId, total, items, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+      [
         sale.id,
         sale.merchantId || sale.merchant_id,
         sale.total,
@@ -567,17 +611,14 @@ export const sqliteHelper = {
         sale.syncStatus,
         sale.createdAt?.toString() || new Date().toISOString()
       ]
-    });
+    );
     await syncPhysicalFile();
   },
 
   async insertExpense(expense: any) {
-    if (!db) await initSQLite();
-    if (!db) return;
-    
-    db.exec({
-      sql: 'INSERT OR REPLACE INTO merchant_expenses (id, merchantId, title, amount, category, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      bind: [
+    await executeSQL(
+      'INSERT OR REPLACE INTO merchant_expenses (id, merchantId, title, amount, category, syncStatus, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
         expense.id,
         expense.merchantId || expense.merchant_id,
         expense.title,
@@ -586,7 +627,7 @@ export const sqliteHelper = {
         expense.syncStatus,
         expense.createdAt?.toString() || new Date().toISOString()
       ]
-    });
+    );
     await syncPhysicalFile();
   }
 };

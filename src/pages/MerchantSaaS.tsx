@@ -3616,6 +3616,7 @@ const MerchantDashboard = ({
 }) => {
   const [desktopOS, setDesktopOS] = useState<'windows' | 'mac' | 'linux'>('windows');
   const [fileToRestore, setFileToRestore] = useState<File | null>(null);
+  const [dashboardSelectedMonth, setDashboardSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
 
   // States for Smart School Multi-Send communication hub on dashboard
   const [dashboardSchoolTab, setDashboardSchoolTab] = useState<'inscriptions' | 'broadcast'>('inscriptions');
@@ -3722,7 +3723,7 @@ const MerchantDashboard = ({
   const stats = useMemo(() => {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
-    const thisMonth = now.toISOString().slice(0, 7);
+    const thisMonth = dashboardSelectedMonth || now.toISOString().slice(0, 7);
     const thisYear = now.getFullYear().toString();
 
     const getIsoDate = (date: any) => {
@@ -3815,7 +3816,7 @@ const MerchantDashboard = ({
         appointmentsToday
       }
     };
-  }, [sales, expenses, products, interventions, projects, vehicles, employees, students, patients, appointments, merchantStats]);
+  }, [sales, expenses, products, interventions, projects, vehicles, employees, students, patients, appointments, merchantStats, dashboardSelectedMonth]);
 
   const chartData = useMemo(() => {
     const now = new Date();
@@ -4352,19 +4353,35 @@ const MerchantDashboard = ({
       )}
       <>
         {(merchant.type === 'boutique' || !merchant.type) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-            <StatCard title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
-            <StatCard title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+              <StatCard title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
+              <StatCard title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
+            </div>
+            
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 text-primary font-bold">
+                <Calendar className="w-5 h-5 text-indigo-600" />
+                <span>Période des statistiques de vente</span>
+              </div>
+              <input
+                type="month"
+                value={dashboardSelectedMonth}
+                onChange={(e) => setDashboardSelectedMonth(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-colors"
+                max={new Date().toISOString().slice(0, 7)}
+              />
+            </div>
+          </>
         )}
         <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${(merchant.type === 'boutique' || !merchant.type) ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
 
         {merchant.type === 'boutique' || !merchant.type ? (
           <>
-            <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description="Ce mois-ci" />
-            <StatCard title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-indigo-600" bgColor="bg-indigo-50" description="Ce mois-ci - Hors dépenses" />
-            <StatCard title="Dépenses" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description="Ce mois-ci" />
-            <StatCard title="Bénéfice Net" value={stats.netProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description="Ce mois-ci" />
+            <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
+            <StatCard title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-indigo-600" bgColor="bg-indigo-50" description={`${dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} - Hors dépenses`} />
+            <StatCard title="Dépenses" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
+            <StatCard title="Bénéfice Net" value={stats.netProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
             <StatCard title="Stock Faible" value={stats.lowStockCount} icon={AlertCircle} color={stats.lowStockCount > 0 ? "text-amber-600" : "text-emerald-600"} bgColor={stats.lowStockCount > 0 ? "bg-amber-50" : "bg-emerald-50"} description={`${stats.totalProducts} produits au total`} />
           </>
         ) : (
@@ -7476,46 +7493,48 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-8 border-b border-black/5">
         <div className="space-y-1">
-          <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-2">Technologie PWA</p>
+          <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-2">Technologie PWA & Native</p>
           <h2 className="text-3xl font-black text-ink tracking-tight">Installation Bureau & Mobile</h2>
           <p className="text-gray-400 font-medium max-w-xl">
-            Générez un exécutable autonome (.exe ou .dmg) pour votre PC ou Mac. Cette version fonctionnera 100% hors-ligne avec SQLite.
+            Générez un exécutable autonome Bureau (.exe, .dmg) ou Mobile Android fonctionnant 100% hors-ligne avec SQLite.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white rounded-[2.5rem] border border-black/5 p-10 shadow-sm relative overflow-hidden group">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+        <div className="bg-white rounded-[2.5rem] border border-black/5 p-10 shadow-sm relative overflow-hidden group flex flex-col justify-between">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
             <Cpu className="w-40 h-40" />
           </div>
 
-          <div className="relative z-10 space-y-8">
-            <div className="p-4 bg-emerald-50 rounded-2xl w-fit">
-              <Download className="w-8 h-8 text-emerald-500" />
-            </div>
+          <div className="relative z-10 space-y-8 flex-1 flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="p-4 bg-emerald-50 rounded-2xl w-fit">
+                <Download className="w-8 h-8 text-emerald-500" />
+              </div>
 
-            <div className="space-y-4">
-              <h3 className="text-2xl font-black text-ink tracking-tight">Application Native</h3>
-              <p className="text-gray-500 text-sm leading-relaxed">
-                Utilisez la technologie PWA (Progressive Web App) pour une installation instantanée sans fichier exécutable (.exe/.dmg), garantie sans virus et toujours à jour.
-              </p>
-            </div>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-black text-ink tracking-tight">Application PWA</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  Utilisez la technologie PWA (Progressive Web App) pour une installation instantanée sans fichier exécutable (.exe/.dmg), garantie sans virus et toujours à jour.
+                </p>
+              </div>
 
-            <ul className="space-y-3">
-              {[
-                "Expérience plein écran instantanée",
-                "Moteur de base de données SQLite embarqué (OPFS)",
-                "Support complet du mode Hors-ligne",
-                "Mise à jour automatique en arrière-plan",
-                "Icône sur le bureau et le menu Démarrer"
-              ].map((step, idx) => (
-                <li key={idx} className="flex items-center gap-3 text-xs font-black text-gray-400 uppercase tracking-widest">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  {step}
-                </li>
-              ))}
-            </ul>
+              <ul className="space-y-3">
+                {[
+                  "Expérience plein écran instantanée",
+                  "Moteur de base de données SQLite embarqué (OPFS)",
+                  "Support complet du mode Hors-ligne",
+                  "Mise à jour automatique en arrière-plan",
+                  "Icône sur le bureau et le menu Démarrer"
+                ].map((step, idx) => (
+                  <li key={idx} className="flex items-center gap-3 text-xs font-black text-gray-400 uppercase tracking-widest">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    {step}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
             <div className="space-y-4 relative pt-4">
               {isInstalled ? (
@@ -7538,52 +7557,129 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
           </div>
         </div>
 
-        <div className="bg-gray-950 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5 flex flex-col justify-center items-center text-center">
-            
-            <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center mb-8 shadow-inner border border-white/10">
-                <Monitor className="w-12 h-12 text-white opacity-80" />
+        <div className="bg-gray-900 text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5 flex flex-col justify-between group">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Monitor className="w-40 h-40 text-white" />
             </div>
 
-            <h3 className="text-xl font-bold text-white mb-4">Acom Gestion Desktop</h3>
-            
-            <p className="text-sm text-gray-400 max-w-sm mx-auto mb-8 leading-relaxed">
-              Téléchargez la version officielle de l'application bureau pour Windows et MacOS. Profitez d'une expérience optimisée avec un support matériel complet (imprimantes de tickets, lecteurs de codes-barres).
-            </p>
+            <div className="relative z-10 space-y-8 flex-1 flex flex-col justify-between">
+              <div className="space-y-6">
+                <div className="p-4 bg-white/10 rounded-2xl w-fit border border-white/10">
+                    <Monitor className="w-8 h-8 text-white opacity-80" />
+                </div>
 
-            <div className="w-full max-w-sm space-y-4">
-              <a
-                href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20"
-              >
-                <Download className="w-5 h-5" />
-                Télécharger pour Windows (.exe)
-              </a>
+                <div className="space-y-4 text-left">
+                  <h3 className="text-2xl font-black text-white tracking-tight">Version Bureau PC/Mac</h3>
+                  <p className="text-sm text-gray-400 leading-relaxed">
+                    Téléchargez la version officielle de l'application bureau pour Windows et MacOS. Profitez d'une expérience optimisée avec un support matériel complet (imprimantes de tickets, lecteurs de codes-barres).
+                  </p>
+                </div>
 
-              <a
-                href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 shadow-xl shadow-primary/20"
-              >
-                <Download className="w-5 h-5" />
-                Télécharger pour MacOS (.dmg)
-              </a>
+                <ul className="space-y-3 text-left">
+                  {[
+                    "Exécutable autonome auto-porté",
+                    "Installation directe en local chez vous",
+                    "Support imprimante ticket (CJS / ESC-POS)",
+                    "Lecteur code-barres USB instantané"
+                  ].map((step, idx) => (
+                    <li key={idx} className="flex items-center gap-3 text-xs font-black text-gray-500 uppercase tracking-widest">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                      {step}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-              <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-left">
-                <p className="text-[10px] text-gray-500 font-mono break-all leading-tight mb-2">
-                  <span className="font-bold text-gray-400 mr-2 uppercase tracking-wider">WIN SHA-256:</span>
-                  8c68a169f2f1c7def734ad91d4ebf0cbb3d45bb32ced315d11e722cac17c4fcd
-                </p>
-                <p className="text-[10px] text-gray-500 font-mono break-all leading-tight">
-                  <span className="font-bold text-gray-400 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
-                  1656ba775088e613882e8b794b03d528b7e8f9a0b1c2d3e4f5a6b7c8d9e0
-                </p>
+              <div className="w-full space-y-4 pt-6 text-left">
+                <a
+                  href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-indigo-600/20 text-xs uppercase tracking-wider"
+                >
+                  <Download className="w-4 h-4" />
+                  Télécharger pour Windows (.exe)
+                </a>
+
+                <a
+                  href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-indigo-600/20 text-xs uppercase tracking-wider"
+                >
+                  <Download className="w-4 h-4" />
+                  Télécharger pour MacOS (.dmg)
+                </a>
+
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-left space-y-1">
+                  <p className="text-[9px] text-gray-500 font-mono break-all leading-tight">
+                    <span className="font-bold text-gray-400 mr-2">WIN:</span>8c68a169f2f1c...fcd
+                  </p>
+                  <p className="text-[9px] text-gray-500 font-mono break-all leading-tight">
+                    <span className="font-bold text-gray-400 mr-2">MAC:</span>1656ba775088e...e0
+                  </p>
+                </div>
               </div>
             </div>
-
         </div>
+
+        <div className="bg-gradient-to-br from-indigo-950 to-slate-900 text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-indigo-500/20 flex flex-col justify-between group">
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Smartphone className="w-40 h-40" />
+          </div>
+
+          <div className="relative z-10 space-y-8 flex-1 flex flex-col justify-between">
+            <div className="space-y-6">
+              <div className="p-4 bg-indigo-500/10 rounded-2xl w-fit border border-indigo-500/20">
+                <Smartphone className="w-8 h-8 text-indigo-400" />
+              </div>
+
+              <div className="space-y-4 text-left">
+                <h3 className="text-2xl font-black text-white tracking-tight">Version Mobile Android</h3>
+                <p className="text-slate-300 text-sm leading-relaxed">
+                  L'intégration mobile SQLite via Capacitor est entièrement configurée. L'application s'exécute localement à 100% hors-ligne sur votre smartphone ou tablette Android.
+                </p>
+              </div>
+
+              <ul className="space-y-3 text-left">
+                {[
+                  "Moteur SQLite Natif pour de hautes performances",
+                  "Support lecteur code-barres caméra & bluetooth",
+                  "Impression de reçus via imprimante thermique",
+                  "Synchronisation delta cloud ultra-économique"
+                ].map((step, idx) => (
+                  <li key={idx} className="flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                    {step}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="space-y-4 pt-6 text-left">
+              <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                <h4 className="text-xs font-black uppercase tracking-wider text-indigo-400 mb-2">Instructions de compilation APK</h4>
+                <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                  Le dossier de compilation <code className="font-mono bg-black/30 px-1 py-0.5 rounded text-white text-[10px]">/android</code> est prêt à l'emploi. Pour générer votre fichier d'installation APK :
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5 text-[10px] text-slate-400 font-medium">
+                  <li>Lancez la commande <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npm run build</code></li>
+                  <li>Synchronisez le projet : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap sync android</code></li>
+                  <li>Ouvrez dans Android Studio : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap open android</code></li>
+                  <li>Sélectionnez <code className="text-white">Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</code></li>
+                </ol>
+              </div>
+
+              <button
+                disabled
+                className="w-full py-4 rounded-xl font-bold text-xs uppercase tracking-wider bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                Intégration SQLite & Capacitor Activée ✅
+              </button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
