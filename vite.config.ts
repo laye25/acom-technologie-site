@@ -13,20 +13,6 @@ export default defineConfig(({mode}) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
-      sourcemap: false,
-      minify: false,
-      cssMinify: false,
-      rollupOptions: {
-        maxParallelFileOps: 1,
-        cache: false,
-        treeshake: false,
-        output: {
-          manualChunks: () => 'main',
-        }
-      }
-    },
-    css: {
-      transformer: 'lightningcss',
     },
     base: './',
     define: {

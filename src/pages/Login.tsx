@@ -6,7 +6,6 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, ArrowRight, LogIn, UserPlus } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -16,26 +15,24 @@ const Login = () => {
 
   const from = location.state?.from?.pathname + (location.state?.from?.search || '') || '/dashboard';
 
-  const isCapacitor = typeof window !== 'undefined' && Capacitor.isNativePlatform();
   const isDesktop = typeof window !== 'undefined' && (
     ('__TAURI__' in window) || 
     (window.process && (window.process as any).type) || 
     (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
     (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
   );
-  const isNativeApp = isDesktop || isCapacitor;
   
   // Redirect if already logged in
   React.useEffect(() => {
     if (user) {
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isNativeApp;
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
       if (isSaaSDomain && from === '/dashboard') {
         navigate('/');
       } else {
         navigate(from);
       }
     }
-  }, [user, navigate, from, isNativeApp]);
+  }, [user, navigate, from, isDesktop]);
 
   const [isResetting, setIsResetting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -85,7 +82,7 @@ const Login = () => {
       localStorage.removeItem('activeParentId');
       localStorage.removeItem('activeStudentId');
       await signInWithGoogle();
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isNativeApp;
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       navigate(targetUrl);
     } catch (error: any) {
@@ -135,7 +132,7 @@ const Login = () => {
     setSuccess(null);
 
     try {
-      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isNativeApp;
+      const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || isDesktop;
       const targetUrl = isSaaSDomain && from === '/dashboard' ? '/' : from;
       
       if (isLogin) {
@@ -333,26 +330,13 @@ const Login = () => {
         className="max-w-md w-full bg-white rounded-3xl border border-black/5 shadow-xl p-8 md:p-10"
       >
         <div className="text-center mb-10">
-          <div className="w-20 h-20 mx-auto mb-6 relative flex items-center justify-center">
-            <img 
-              src={logoUrl || "/logo.svg"} 
-              alt="Logo" 
-              className="w-full h-full object-contain rounded-2xl overflow-hidden"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                if (target.src.endsWith('/logo.svg')) {
-                  target.src = '/icon.png';
-                } else if (target.src.endsWith('/icon.png')) {
-                  target.style.display = 'none';
-                  const fb = document.getElementById('login-logo-fallback');
-                  if (fb) fb.classList.remove('hidden');
-                }
-              }}
-            />
-            <div id="login-logo-fallback" className="hidden absolute inset-0 bg-primary-light rounded-2xl flex items-center justify-center">
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="w-20 h-20 object-contain mx-auto mb-6 rounded-2xl overflow-hidden shadow-sm" />
+          ) : (
+            <div className="w-16 h-16 bg-primary-light rounded-2xl flex items-center justify-center mx-auto mb-6">
               <span className="text-3xl font-bold text-primary">{brandName[0].toUpperCase()}</span>
             </div>
-          </div>
+          )}
           <h1 className="text-3xl font-bold text-gray-900">
             {isResetting 
               ? 'Réinitialiser' 

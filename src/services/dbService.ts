@@ -141,53 +141,14 @@ export const dbService = {
       const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
         protected collectionName = 'settings';
       })();
-      const result = await repo.update(id, { data: settingsData });
-      try {
-        await db.settings.put({ id, data: settingsData, updatedAt: Date.now() });
-      } catch (e) {
-        console.error('Failed to save settings to local Dexie:', e);
-      }
-      return result;
+      return repo.update(id, { data: settingsData });
     },
     async get(id: string) {
-      // 1. Try to fetch from local Dexie first as fallback
-      try {
-        const localSettings = await db.settings.get(id);
-        if (localSettings && localSettings.data) {
-          return localSettings.data;
-        }
-      } catch (e) {
-        console.warn('Failed to read settings from Dexie:', e);
-      }
-
-      // 2. Try online Firestore
-      try {
-        const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
-          protected collectionName = 'settings';
-        })();
-        const settings = await repo.getById(id);
-        const data = settings?.data || settings;
-        if (data) {
-          try {
-            await db.settings.put({ id, data, updatedAt: Date.now() });
-          } catch (e) {
-            console.error('Failed to cache settings in Dexie:', e);
-          }
-          return data;
-        }
-      } catch (error) {
-        console.error('Error fetching settings from firestore:', error);
-      }
-
-      // 3. Fallback mock settings for global brand when both offline and no cache is present
-      if (id === 'global') {
-        return {
-          brandName: 'Acom Technologie',
-          logoUrl: '/logo.svg',
-          desktopLogo: '/logo.svg'
-        };
-      }
-      return null;
+      const repo = new (class extends (await import('../data/repositories/base.repository')).BaseRepository<any> {
+        protected collectionName = 'settings';
+      })();
+      const settings = await repo.getById(id);
+      return settings?.data || settings;
     }
   },
   messages: {

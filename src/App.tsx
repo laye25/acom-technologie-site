@@ -46,20 +46,17 @@ import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import AIAssistant from './components/AIAssistant';
 import { CommandPalette } from './components/CommandPalette';
-import { Capacitor } from '@capacitor/core';
 
 import { Toaster } from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 
-const isCapacitor = typeof window !== 'undefined' && Capacitor.isNativePlatform();
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
   (window.process && (window.process as any).type) || 
   (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
   (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
 );
-const isNativeApp = isDesktop || isCapacitor;
-const Router = isNativeApp ? HashRouter : BrowserRouter;
+const Router = isDesktop ? HashRouter : BrowserRouter;
 
 const ProtectedRoute = ({ children, adminOnly = false }: { children: React.ReactNode, adminOnly?: boolean }) => {
   const { user, profile, loading, isAdmin, isManager } = useAuth();
@@ -81,7 +78,7 @@ function AppContent() {
   const isEditor = location.pathname === '/design-editor';
   
   // Détection du sous-domaine SaaS (ou simulation via ?mode=saas)
-  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || (typeof window !== 'undefined' && isNativeApp);
+  const isSaaSDomain = window.location.hostname.startsWith('saas.') || window.location.search.includes('mode=saas') || (typeof window !== 'undefined' && isDesktop);
 
   // Pour le SaaS et la session Enseignant/Parent/Eleve, on cache le header et le footer pour faire plus "Application" personnalisé
   const isPortalLayout = location.pathname.startsWith('/portal/') || location.pathname.startsWith('/merchant/');
