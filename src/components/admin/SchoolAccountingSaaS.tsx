@@ -669,7 +669,8 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                      Number(fees.scolarite || 0) + 
                      Number(fees.uniforme || 0) + 
                      Number(fees.transport || 0) + 
-                     Number(fees.cantine || 0);
+                     Number(fees.cantine || 0) +
+                     Number(fees.internat || 0);
       
       totalTargetFees += stTotal;
 
@@ -1185,7 +1186,8 @@ export const SchoolAccountingSaaS = ({ merchant, subTab }: { merchant: Merchant,
                                             Number(breakdown.scolarite || 0) + 
                                             Number(breakdown.uniforme || 0) + 
                                             Number(breakdown.transport || 0) + 
-                                            Number(breakdown.cantine || 0);
+                                            Number(breakdown.cantine || 0) +
+                                            Number(breakdown.internat || 0);
 
                         const totalPaid = (st.tuitionPayments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
                         const owed = Math.max(0, totalTarget - totalPaid);

@@ -24,12 +24,27 @@ const ParentPortal = () => {
 
   const children = useLiveQuery(async () => {
     if (!activeParentId) return [];
+    
+    // Get the parent record to retrieve its accurate phone and ID details
+    let p = await db.parents?.where('phone').equals(activeParentId).first();
+    if (!p) p = await db.parents?.where('username').equals(activeParentId).first();
+    if (!p) p = await db.parents?.where('id').equals(activeParentId).first();
+
     const allStudents = await db.students?.toArray() || [];
     const cleanActiveParent = activeParentId.replace(/[^0-9]/g, '');
+    const cleanParentPhone = p?.phone ? p.phone.replace(/[^0-9]/g, '') : '';
+    const parentId = p?.id || '';
+
     return allStudents.filter(s => {
       const phones = [s.fatherPhone, s.motherPhone, s.guardianPhone, s.parentContact, s.parentAccountPhone]
-        .map(p => p?.replace(/[^0-9]/g, '')).filter(Boolean);
-      return phones.includes(cleanActiveParent) || s.parentId === activeParentId;
+        .map(ph => ph?.replace(/[^0-9]/g, '')).filter(Boolean);
+      
+      const phoneMatchesActiveId = cleanActiveParent && cleanActiveParent.length >= 8 && phones.some(ph => ph.includes(cleanActiveParent) || cleanActiveParent.includes(ph));
+      const phoneMatchesParentPhone = cleanParentPhone && cleanParentPhone.length >= 8 && phones.some(ph => ph.includes(cleanParentPhone) || cleanParentPhone.includes(ph));
+      const idMatchesParentId = parentId && (s.parentId === parentId || s.parent_id === parentId);
+      const parentIdMatchesActiveId = s.parentId === activeParentId || s.parent_id === activeParentId;
+
+      return phoneMatchesActiveId || phoneMatchesParentPhone || idMatchesParentId || parentIdMatchesActiveId;
     });
   }, [activeParentId]) || [];
 

@@ -11175,6 +11175,25 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
   // 2. Class options: Always provide all system classes for full offline capability
   const availableClasses = classes;
 
+  // Filtered list of teachers for the selected class (including primary and extra classes)
+  const filteredTeachersForClass = useMemo(() => {
+    if (!selectedClass) return teachers;
+    const currentClassObj = classes.find(c => c.id === selectedClass);
+    return teachers.filter(t => {
+      const isPrimaryClass = t.classId === selectedClass || 
+        (currentClassObj?.name && t.className?.trim().toLowerCase() === currentClassObj.name.trim().toLowerCase());
+        
+      const isExtraClass = Array.isArray(t.extraClasses) && t.extraClasses.some((cl: any) => {
+        if (!cl) return false;
+        const clStr = cl.toString().trim().toLowerCase();
+        return clStr === selectedClass.trim().toLowerCase() || 
+          (currentClassObj?.name && clStr === currentClassObj.name.trim().toLowerCase());
+      });
+
+      return isPrimaryClass || isExtraClass;
+    });
+  }, [teachers, selectedClass, classes]);
+
   // 3. Subjects list filtered: based on class subjects and selected teacher's focus subject
   const availableSubjects = useMemo(() => {
     if (!selectedClass) return [];
@@ -11230,14 +11249,31 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
   const handleSubjectChange = (subject: string) => {
     setSelectedSubject(subject);
     if (subject) {
-      // Find teacher teaching this subject
-      const matchingTeacher = teachers.find(t => 
-        t.subject === subject && 
-        (selectedClass && (t.classId === selectedClass || t.className === classes.find(c => c.id === selectedClass)?.name))
-      ) || teachers.find(t => t.subject === subject);
+      const classObj = classes.find(c => c.id === selectedClass);
+      // Filter teachers by class first
+      const classTeachers = teachers.filter(t => {
+        const isPrimaryClass = t.classId === selectedClass || 
+          (classObj?.name && t.className?.trim().toLowerCase() === classObj.name.trim().toLowerCase());
+          
+        const isExtraClass = Array.isArray(t.extraClasses) && t.extraClasses.some((cl: any) => {
+          if (!cl) return false;
+          const clStr = cl.toString().trim().toLowerCase();
+          return clStr === selectedClass.trim().toLowerCase() || 
+            (classObj?.name && clStr === classObj.name.trim().toLowerCase());
+        });
+
+        return isPrimaryClass || isExtraClass;
+      });
+
+      // Find teacher teaching this subject in the class
+      const matchingTeacher = classTeachers.find(t => 
+        (t.subject || '').trim().toLowerCase() === subject.trim().toLowerCase()
+      );
 
       if (matchingTeacher) {
         setSelectedTeacherId(matchingTeacher.id);
+      } else {
+        setSelectedTeacherId(''); // Non attribué
       }
     }
   };
@@ -11246,17 +11282,34 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
     setSelectedClass(classId);
     if (classId) {
       const classObj = classes.find(c => c.id === classId);
+      
+      // Filter teachers by this class first
+      const classTeachers = teachers.filter(t => {
+        const isPrimaryClass = t.classId === classId || 
+          (classObj?.name && t.className?.trim().toLowerCase() === classObj.name.trim().toLowerCase());
+          
+        const isExtraClass = Array.isArray(t.extraClasses) && t.extraClasses.some((cl: any) => {
+          if (!cl) return false;
+          const clStr = cl.toString().trim().toLowerCase();
+          return clStr === classId.trim().toLowerCase() || 
+            (classObj?.name && clStr === classObj.name.trim().toLowerCase());
+        });
+
+        return isPrimaryClass || isExtraClass;
+      });
+
       // Find a teacher assigned to this class and preferably teaching the current subject, or any subject
-      const matchingTeacher = teachers.find(t => 
-        (t.classId === classId || t.className === classObj?.name) && 
-        (selectedSubject && t.subject === selectedSubject)
-      ) || teachers.find(t => t.classId === classId || t.className === classObj?.name);
+      const matchingTeacher = classTeachers.find(t => 
+        selectedSubject && (t.subject || '').trim().toLowerCase() === selectedSubject.trim().toLowerCase()
+      ) || classTeachers[0];
 
       if (matchingTeacher) {
         setSelectedTeacherId(matchingTeacher.id);
         if (matchingTeacher.subject) {
           setSelectedSubject(matchingTeacher.subject);
         }
+      } else {
+        setSelectedTeacherId(''); // Non attribué
       }
     }
   };
@@ -11496,7 +11549,9 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
             >
               <option value="">Sélectionner Matière</option>
               {availableSubjects.map((sub: string) => (
-                <option key={sub} value={sub}>{sub}</option>
+                <option key={sub} value={sub}>
+                  {sub}
+                </option>
               ))}
             </select>
 
@@ -11506,8 +11561,12 @@ const TeacherGradePortal = ({ merchant }: { merchant: Merchant }) => {
               onChange={e => handleTeacherChange(e.target.value)}
               className="bg-white text-indigo-950 font-black rounded-xl px-4 py-2.5 text-xs cursor-pointer outline-none shadow-sm w-full transition-all hover:bg-slate-50 border border-slate-100"
             >
-              <option value="">Saisie Directe Admin</option>
-              {teachers.map(t => (
+              <option value="">
+                {selectedSubject && !filteredTeachersForClass.some(t => (t.subject || '').trim().toLowerCase() === selectedSubject.trim().toLowerCase())
+                  ? "Enseignant non attribué"
+                  : "Saisie Directe Admin"}
+              </option>
+              {filteredTeachersForClass.map(t => (
                 <option key={t.id} value={t.id}>
                   Enseignant : {t.firstName} {t.lastName || ''}
                 </option>
@@ -13649,6 +13708,10 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
     db.classes?.where('merchantId').equals(merchant.id).reverse().sortBy('updatedAt')
   , [merchant.id]) || [];
 
+  const teachers = useLiveQuery(() => 
+    db.teachers?.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
+
   // Compute unique levels directly from classes
   const uniqueLevels = useMemo(() => {
     const levels = new Set<string>();
@@ -13841,12 +13904,42 @@ const AcademicManager = ({ merchant }: { merchant: Merchant }) => {
                    <span>Matières ({c.subjects?.length || 0})</span>
                  </div>
                  {c.subjects && c.subjects.length > 0 ? (
-                   <div className="flex flex-wrap gap-1.5 max-h-[84px] overflow-y-auto pr-1">
-                     {c.subjects.map((sub: string, index: number) => (
-                       <span key={index} className="inline-flex items-center bg-indigo-50/70 text-indigo-700 text-[10px] font-bold px-2 py-1 rounded-lg border border-indigo-100/50">
-                         {sub}
-                       </span>
-                     ))}
+                   <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                     {c.subjects.map((sub: string, index: number) => {
+                       // Filter teachers for this class and this subject
+                       const classTeachers = (teachers || []).filter((t: any) => {
+                         const isPrimaryClass = t.classId === c.id || 
+                           (c.name && t.className?.trim().toLowerCase() === c.name.trim().toLowerCase());
+                           
+                         const isExtraClass = Array.isArray(t.extraClasses) && t.extraClasses.some((cl: any) => {
+                           if (!cl) return false;
+                           const clStr = cl.toString().trim().toLowerCase();
+                           return clStr === c.id.trim().toLowerCase() || 
+                             (c.name && clStr === c.name.trim().toLowerCase());
+                         });
+
+                         const isAssigned = isPrimaryClass || isExtraClass;
+                         const isTeachingSubject = (t.subject || '').trim().toLowerCase() === sub.trim().toLowerCase();
+                         return isAssigned && isTeachingSubject;
+                       });
+
+                       const hasTeacher = classTeachers.length > 0;
+
+                       return (
+                         <div key={index} className="flex justify-between items-center text-[11px] py-1 border-b border-gray-50 last:border-0">
+                           <span className="font-bold text-gray-800">{sub}</span>
+                           {hasTeacher ? (
+                             <span className="text-gray-500 font-medium">
+                               Prof: <span className="text-indigo-600 font-bold">{classTeachers.map((t: any) => `${t.firstName || ''} ${t.lastName || ''}`.trim()).join(', ')}</span>
+                             </span>
+                           ) : (
+                             <span className="text-amber-650 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                               (Enseignants Non attribué)
+                             </span>
+                           )}
+                         </div>
+                       );
+                     })}
                    </div>
                  ) : (
                    <p className="text-[11px] text-gray-400 italic">Aucune matière affectée. Veuillez en ajouter.</p>
@@ -14973,6 +15066,10 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
       { title: "Réunion de Coordination Pédagogique", content: "Chers collègues, une concertation pédagogique générale est programmée ce mercredi à 14h30 en salle de réunion. Ordre du jour : harmonisation des évaluations et examens." },
       { title: "Saisie des Appréciations", content: "Chers enseignants, merci de bien vouloir compléter les bulletins scolaires et les commentaires sur l'Espace Professeur d'ici le week-end venu. Merci pour votre réactivité." }
     ],
+    students: [
+      { title: "Rappel de Discipline", content: "Chers élèves, nous vous rappelons l'importance de respecter le règlement intérieur de l'établissement." },
+      { title: "Activités Péri-scolaires", content: "Les inscriptions pour les activités sportives et culturelles débutent ce mercredi à la récréation." }
+    ],
     all: [
       { title: "Célébration de la Fête de l'Établissement", content: "Chers membres de la communauté scolaire de notre établissement, nous vous attendons samedi prochain à 15h00 pour la grande kermesse de fin d'année. Venez nombreux !" }
     ]
@@ -15076,7 +15173,7 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
     }
   };
 
-  const activeTemplates = templates[currentMessage.targetAudience as 'parents' | 'teachers' | 'all'] || [];
+  const activeTemplates = (templates as any)[currentMessage.targetAudience] || [];
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -15103,10 +15200,11 @@ const CommunicationManager = ({ merchant }: { merchant: Merchant }) => {
                 <label className="text-[10px] font-mono font-black text-slate-500 uppercase tracking-widest">
                   1. Cible de l'annonce
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {[
-                    { id: 'parents', label: 'Parents', icon: Users, activeBg: 'border-indigo-600 bg-indigo-50 text-indigo-700' },
-                    { id: 'teachers', label: 'Profs', icon: GraduationCap, activeBg: 'border-amber-600 bg-amber-50 text-amber-800' },
+                    { id: 'parents', label: "Parents d'élèves", icon: Users, activeBg: 'border-indigo-600 bg-indigo-50 text-indigo-700' },
+                    { id: 'teachers', label: 'Enseignants', icon: GraduationCap, activeBg: 'border-amber-600 bg-amber-50 text-amber-800' },
+                    { id: 'students', label: 'Élèves', icon: BookOpen, activeBg: 'border-emerald-600 bg-emerald-50 text-emerald-800' },
                     { id: 'all', label: 'Global', icon: Store, activeBg: 'border-slate-800 bg-slate-950 text-white' }
                   ].map((item) => {
                     const Icon = item.icon;

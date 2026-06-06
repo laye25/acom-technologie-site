@@ -32,46 +32,82 @@ export const StudentPortalsManager = ({ merchant }: StudentPortalsManagerProps) 
     db.classes?.where('merchantId').equals(merchant.id || '').toArray()
   , [merchant.id]) || [];
 
-  // Process and automatically guarantee credentials exist for students
+  // Process and automatically guarantee credentials exist for students in memory for immediate UI display
   const processedStudents = React.useMemo(() => {
+    // We keep a record of stable randomly generated credentials so they don't shift on every useMemo re-run
+    const genCache = (window as any).__student_gen_cache || {};
+    (window as any).__student_gen_cache = genCache;
+
     return students.map((s: any) => {
-      let updated = false;
       const copy = { ...s };
+      let cached = genCache[s.id];
+      if (!cached) {
+        cached = {};
+        if (!copy.studentUsername && !copy.username) {
+          const cleanStudentName = ((copy.firstName || '') + (copy.lastName || ''))
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]/g, "");
+          const randSuffix = Math.floor(100 + Math.random() * 900);
+          cached.studentUsername = `e_${cleanStudentName || 'eleve'}${randSuffix}`;
+          cached.username = cached.studentUsername;
+        }
+        if (!copy.studentPassword && !copy.password) {
+          cached.studentPassword = Math.floor(100000 + Math.random() * 900000).toString();
+          cached.password = cached.studentPassword;
+        }
+        genCache[s.id] = cached;
+      }
 
       if (!copy.studentUsername && !copy.username) {
-        const cleanStudentName = ((copy.firstName || '') + (copy.lastName || ''))
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]/g, "");
-        const randSuffix = Math.floor(100 + Math.random() * 900);
-        const generatedStudentUsername = `e_${cleanStudentName || 'eleve'}${randSuffix}`;
-        copy.studentUsername = generatedStudentUsername;
-        copy.username = generatedStudentUsername;
-        updated = true;
+        copy.studentUsername = cached.studentUsername;
+        copy.username = cached.username;
       }
-
       if (!copy.studentPassword && !copy.password) {
-        const generatedStudentPassword = Math.floor(100000 + Math.random() * 900000).toString();
-        copy.studentPassword = generatedStudentPassword;
-        copy.password = generatedStudentPassword;
-        updated = true;
+        copy.studentPassword = cached.studentPassword;
+        copy.password = cached.password;
       }
-
-      if (updated) {
-        dbService.students.save({
-          ...s,
-          studentUsername: copy.studentUsername || copy.username,
-          username: copy.studentUsername || copy.username,
-          studentPassword: copy.studentPassword || copy.password,
-          password: copy.studentPassword || copy.password,
-          updatedAt: new Date()
-        }).catch(err => console.error("Error auto-generating student credentials FL:", err));
-      }
-
       return copy;
     });
   }, [students]);
+
+  // Persist auto-generated credentials safely inside a useEffect with a dependency check to avoid loops
+  React.useEffect(() => {
+    const studentsToUpdate = processedStudents.filter((ps: any) => {
+      const original = students.find((s: any) => s.id === ps.id);
+      if (!original) return false;
+      const needsUsername = !original.studentUsername && !original.username;
+      const needsPassword = !original.studentPassword && !original.password;
+      return needsUsername || needsPassword;
+    });
+
+    if (studentsToUpdate.length === 0) return;
+
+    // To prevent infinite loops, we persist sequentially and flag already-written IDs
+    const persistedIds = (window as any).__student_persisted_ids || new Set();
+    (window as any).__student_persisted_ids = persistedIds;
+
+    const unpersisted = studentsToUpdate.filter(s => !persistedIds.has(s.id));
+    if (unpersisted.length === 0) return;
+
+    console.log(`[StudentPortalsManager] Persisting generated credentials for ${unpersisted.length} students safely...`);
+
+    const updateAll = async () => {
+      for (const s of unpersisted) {
+        persistedIds.add(s.id);
+        try {
+          await dbService.students.save({
+            ...s,
+            updatedAt: new Date()
+          });
+        } catch (err) {
+          console.error("Error auto-saving student credentials:", err);
+        }
+      }
+    };
+    updateAll();
+  }, [processedStudents, students]);
 
   // Filter students based on search and selected class
   const filteredStudents = React.useMemo(() => {
