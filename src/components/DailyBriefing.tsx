@@ -43,10 +43,10 @@ export const DailyBriefing: React.FC<DailyBriefingProps> = ({ merchantId, data }
 
   if (loading) {
     return (
-      <div className="bg-white/50 backdrop-blur-sm border border-primary/10 rounded-[2rem] p-8 mb-8">
+      <div className="bg-white/50 backdrop-blur-sm border border-primary/10 rounded-2xl md:rounded-[2rem] p-5 md:p-8 mb-6 md:mb-8">
         <div className="flex items-center gap-4 animate-pulse">
-          <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-            <Sparkles className="w-6 h-6 text-primary animate-spin" />
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-primary/10 rounded-xl md:rounded-2xl flex items-center justify-center">
+            <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-primary animate-spin" />
           </div>
           <div className="space-y-2 flex-1">
             <div className="h-4 bg-gray-100 rounded w-1/4" />
@@ -63,19 +63,19 @@ export const DailyBriefing: React.FC<DailyBriefingProps> = ({ merchantId, data }
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden bg-white border border-black/5 rounded-[2.5rem] p-8 mb-12 shadow-sm group hover:shadow-md transition-all"
+      className="relative overflow-hidden bg-white border border-black/5 rounded-2xl md:rounded-[2.5rem] p-5 md:p-8 mb-8 md:mb-12 shadow-sm group hover:shadow-md transition-all"
     >
-      <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-        <Sparkles className="w-32 h-32 text-primary" />
+      <div className="absolute top-0 right-0 p-4 md:p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+        <Sparkles className="w-20 h-20 md:w-32 md:h-32 text-primary" />
       </div>
 
       <div className="relative z-10">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-primary" />
+        <div className="flex items-center gap-3 mb-4 md:mb-6">
+          <div className="w-8 h-8 md:w-10 md:h-10 bg-primary/10 rounded-lg md:rounded-xl flex items-center justify-center">
+            <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Briefing Matinal • {format(new Date(), 'EEEE d MMMM', { locale: fr })}</h3>
+            <h3 className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Briefing Matinal • {format(new Date(), 'EEEE d MMMM', { locale: fr })}</h3>
           </div>
         </div>
 
@@ -86,7 +86,7 @@ export const DailyBriefing: React.FC<DailyBriefingProps> = ({ merchantId, data }
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-xl font-display font-bold text-gray-900 leading-relaxed">
+            <p className="text-sm md:text-xl font-display font-medium md:font-bold text-gray-900 leading-relaxed">
               {briefing}
             </p>
             <div className="flex items-center gap-4 pt-4 border-t border-gray-50">

@@ -2010,10 +2010,10 @@ const MerchantSaaS = () => {
   const tabs = getTabs(merchant.type || 'boutique', merchant.plan || '');
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-24 pb-12">
+    <div className="min-h-screen bg-gray-50 pt-6 md:pt-12 lg:pt-24 pb-12">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="flex flex-col mb-12 gap-6">
+        <div className="flex flex-col mb-6 md:mb-12 gap-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center space-x-6">
               <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner overflow-hidden shrink-0">
@@ -2093,15 +2093,16 @@ const MerchantSaaS = () => {
                 {groupName !== 'Général' && tabs[0].group && (
                   <h4 className="text-[10px] font-black font-mono uppercase tracking-[0.2em] text-gray-400 mb-2 px-2">{groupName}</h4>
                 )}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex overflow-x-auto whitespace-nowrap snap-x snap-mandatory gap-2 pb-1 -mx-1 px-1">
                   {(groupTabs as any[]).map((tab: any) => (
-                    <TabButton 
-                      key={tab.id}
-                      active={activeTab === tab.id} 
-                      onClick={() => setActiveTab(tab.id)} 
-                      icon={tab.icon} 
-                      label={tab.label} 
-                    />
+                    <div key={tab.id} className="snap-start shrink-0">
+                      <TabButton 
+                        active={activeTab === tab.id} 
+                        onClick={() => setActiveTab(tab.id)} 
+                        icon={tab.icon} 
+                        label={tab.label} 
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -4016,21 +4017,21 @@ const MerchantDashboard = ({
 
       {/* Sync Control Bar - Phase 2 */}
       {merchant.id && (
-        <div className="flex items-center justify-between p-6 bg-white rounded-[2rem] border border-black/5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl ${navigator.onLine && (merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between p-5 md:p-6 bg-white rounded-[2rem] border border-black/5 shadow-sm gap-4">
+          <div className="flex items-center gap-3 md:gap-4 w-full">
+            <div className={`p-3 shrink-0 rounded-2xl ${navigator.onLine && (merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
               {navigator.onLine && (merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? <Database className="w-5 h-5" /> : <HardDrive className="w-5 h-5" />}
             </div>
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">État du Moteur de Synchronisation</p>
-              <h4 className="text-sm font-black text-ink uppercase tracking-tight">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 truncate">État du Moteur de Synchronisation</p>
+              <h4 className="text-sm font-black text-ink uppercase tracking-tight truncate">
                 {(merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') 
-                  ? (navigator.onLine ? 'Mode Hybride (Local + Cloud)' : 'Mode Local Uniquement (Hors ligne)') 
-                  : `Mode Local Uniquement (Plan: ${merchant.plan || 'TESTE'})`}
+                  ? (navigator.onLine ? 'Mode Hybride (Local + Cloud)' : 'Mode Local (Hors ligne)') 
+                  : `Mode Local (Plan: ${merchant.plan || 'TESTE'})`}
               </h4>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 w-full lg:w-auto">
             <button 
               onClick={async () => {
                 const toastId = toast.loading('Génération du fichier de base de données SQLite...');
@@ -4117,7 +4118,7 @@ const MerchantDashboard = ({
 
       {/* Download Center & Build Dashboard for LOCAL Plan */}
       {merchant.plan === 'LOCAL' && !isDesktop && (
-        <div className="bg-gradient-to-br from-gray-900 to-black rounded-[2rem] border border-gray-800 shadow-2xl overflow-hidden relative mt-8">
+        <div className="hidden md:block bg-gradient-to-br from-gray-900 to-black rounded-[2rem] border border-gray-800 shadow-2xl overflow-hidden relative mt-8">
           <div className="p-8 relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Architecture / OS Features Col */}
             <div className="lg:col-span-1 space-y-6">
@@ -4669,15 +4670,15 @@ const MerchantDashboard = ({
               </div>
             ) : (
               recentTransactions.map((tx: any) => (
-                <div key={tx.id} className="flex items-center justify-between p-5 hover:bg-gray-50/50 rounded-[1.5rem] transition-all border border-transparent hover:border-gray-100 group">
-                  <div className="flex items-center space-x-5">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 ${
+                <div key={tx.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-5 hover:bg-gray-50/50 rounded-[1.5rem] transition-all border border-transparent hover:border-gray-100 group gap-4">
+                  <div className="flex items-center space-x-4 md:space-x-5 flex-1 min-w-0 w-full sm:w-auto">
+                    <div className={`w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 ${
                       tx.type === 'sale' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
                     }`}>
-                      {tx.type === 'sale' ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
+                      {tx.type === 'sale' ? <ArrowUpRight className="w-5 h-5 md:w-6 md:h-6" /> : <ArrowDownRight className="w-5 h-5 md:w-6 md:h-6" />}
                     </div>
-                    <div>
-                      <p className="font-black text-ink text-base leading-tight">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-ink text-sm md:text-base leading-tight truncate">
                         {tx.type === 'sale' ? (tx.customerName || (
                           merchant.type === 'scolaire' ? 'Paiement Frais' :
                           merchant.type === 'medical' ? 'Consultation' :
@@ -4688,17 +4689,17 @@ const MerchantDashboard = ({
                           'Vente POS'
                         )) : tx.title}
                       </p>
-                      <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest mt-1">
+                      <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest mt-1 truncate">
                         {format(new Date(tx.date), 'dd MMMM yyyy', { locale: fr })}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-mono font-black text-base ${tx.type === 'sale' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <div className="text-left sm:text-right w-full sm:w-auto shrink-0 pl-16 sm:pl-0 mt-2 sm:mt-0 min-w-0">
+                    <p className={`font-mono font-black text-base truncate ${tx.type === 'sale' ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {tx.type === 'sale' ? '+' : '-'}{tx.type === 'sale' ? tx.totalAmount.toLocaleString() : tx.amount.toLocaleString()} 
                       <span className="text-[10px] ml-1 opacity-60">{merchant.currency}</span>
                     </p>
-                    <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">
+                    <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1 truncate">
                       {tx.paymentMethod || tx.category || 'Général'}
                     </p>
                   </div>
@@ -5532,10 +5533,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                      <th className="px-8 py-5">Article</th>
-                      <th className="px-8 py-5">Prix & Valeur</th>
-                      <th className="px-8 py-5">État Stock</th>
-                      <th className="px-8 py-5 text-right">Actions</th>
+                      <th className="px-4 sm:px-8 py-3 md:py-5">Article</th>
+                      <th className="px-4 sm:px-8 py-3 md:py-5">Prix & Valeur</th>
+                      <th className="px-4 sm:px-8 py-3 md:py-5">État Stock</th>
+                      <th className="px-4 sm:px-8 py-3 md:py-5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -5555,18 +5556,18 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                         
                         return (
                           <tr key={product.id} className="hover:bg-gray-50/20 transition-colors group">
-                            <td className="px-8 py-6">
-                              <div className="flex items-center space-x-5">
-                                <div className="w-16 h-16 bg-gray-50 rounded-[1.25rem] flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-105 transition-transform shadow-inner shrink-0">
+                            <td className="px-4 sm:px-8 py-4 md:py-6">
+                              <div className="flex items-center space-x-3 md:space-x-5">
+                                <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-50 rounded-[1.25rem] flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-105 transition-transform shadow-inner shrink-0">
                                   {product.image ? (
                                     <OptimizedImage src={product.image} alt={product.name} width={150} className="w-full h-full object-cover" />
                                   ) : (
-                                    <Package className="w-8 h-8 text-gray-200" />
+                                    <Package className="w-6 h-6 md:w-8 md:h-8 text-gray-200" />
                                   )}
                                 </div>
                                 <div className="flex flex-col min-w-0">
                                   <span className="font-black text-ink text-sm leading-tight tracking-tight truncate">{product.name}</span>
-                                  <div className="flex items-center gap-2 mt-1.5">
+                                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                     <span className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.15em]">
                                       {product.sku || 'SANS SKU'}
                                     </span>
@@ -5607,7 +5608,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                 </div>
                               </div>
                             </td>
-                            <td className="px-8 py-6">
+                            <td className="px-4 sm:px-8 py-4 md:py-6">
                               <div className="flex flex-col">
                                 <span className="font-mono font-black text-ink text-sm">
                                   {product.price.toLocaleString()} <span className="text-[9px] opacity-40">{merchant.currency}</span>
@@ -5617,7 +5618,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                 </span>
                               </div>
                             </td>
-                            <td className="px-8 py-6">
+                            <td className="px-4 sm:px-8 py-4 md:py-6">
                               <div className="flex items-center space-x-4">
                                 <div className={`px-4 py-2 rounded-xl text-[10px] font-mono font-black border tracking-widest ${
                                   isOut ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' :
@@ -5645,7 +5646,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                 </button>
                               </div>
                             </td>
-                            <td className="px-8 py-6 text-right">
+                            <td className="px-4 sm:px-8 py-4 md:py-6 text-right">
                               <div className="flex items-center justify-end space-x-2">
                                 <button onClick={() => { setCurrentProduct(product); setIsEditing(true); }} className="p-3 bg-gray-50 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-black/5 hover:border-primary/20 shadow-sm"><Edit2 className="w-4 h-4" /></button>
                                 <button onClick={() => setDeleteConfirm(product.id || null)} className="p-3 bg-gray-50 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all border border-black/5 hover:border-rose-200 shadow-sm"><Trash2 className="w-4 h-4" /></button>
@@ -5709,22 +5710,22 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
               {movements.slice(0, 8).map((m: any) => {
                 const product = products.find(p => p.id === m.productId);
                 return (
-                  <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 group hover:shadow-md transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                  <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 group hover:shadow-md transition-all gap-4">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center border ${
                         m.type === 'in' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                         m.type === 'sale' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-100 text-gray-400 border-gray-200'
                       }`}>
                         {m.type === 'in' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-gray-900 truncate">{product?.name || 'Produit...'}</p>
                         <p className="text-[9px] font-mono text-gray-400 font-bold uppercase tracking-widest mt-0.5">
                           {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd MMM, HH:mm') : '-'}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <p className={`text-xs font-black font-mono ${m.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {m.type === 'in' ? '+' : '-'}{m.quantity}
                       </p>
@@ -6279,6 +6280,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
 const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, setShowUpgradeModal?: (s: boolean) => void }) => {
   const { user } = useAuth();
   const [cart, setCart] = useState<{ productId: string, name: string, quantity: number, price: number, costPrice: number, sizes?: string, colors?: string }[]>([]);
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile_money' | 'split'>('cash');
@@ -6615,6 +6617,166 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     }
   };
 
+  const renderCartContent = (isMobile = false) => {
+    return (
+      <>
+        <div className="flex items-center justify-between mb-8">
+          <h3 className="text-xl font-bold text-ink flex items-center">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mr-3">
+              <ShoppingCart className="w-5 h-5 text-primary" />
+            </div>
+            {isMobile ? `Panier Mobile (${cart.reduce((sum, item) => sum + item.quantity, 0)})` : "Panier"}
+          </h3>
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
+            merchant.licenseType === 'local' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+          }`}>
+            {merchant.licenseType === 'local' ? <HardDrive className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}
+            {merchant.licenseType === 'local' ? 'Mode Local' : 'Sync Cloud'}
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {cartError && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -10 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="mb-6 p-4 bg-rose-50 border border-rose-100/80 rounded-2xl flex items-start gap-3 shadow-md relative overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
+              <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-4 h-4 text-rose-600 animate-pulse" />
+              </div>
+              <div className="flex-1 min-w-0 pr-6">
+                <p className="text-[11px] font-black text-rose-900 uppercase tracking-wide leading-snug">
+                  {cartError}
+                </p>
+                <p className="text-[8px] text-rose-500 font-black uppercase tracking-widest mt-1">
+                  Sélection annulée par précaution
+                </p>
+              </div>
+              <button
+                onClick={() => setCartError(null)}
+                className="absolute top-2 right-2 p-1 text-rose-400 hover:text-rose-600 rounded-lg hover:bg-rose-100 transition-all cursor-pointer animate-fadeIn"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className={`space-y-4 mb-8 pr-2 custom-scrollbar ${isMobile ? 'max-h-[220px]' : 'max-h-[350px]'} overflow-y-auto`}>
+          {cart.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center opacity-40">
+              <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                <ShoppingCart className="w-8 h-8" />
+              </div>
+              <p className="text-sm font-bold uppercase tracking-widest">Panier vide</p>
+            </div>
+          ) : (
+            cart.map((item) => (
+              <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl border border-gray-100 group">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    <p className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
+                      {item.quantity} x {item.price.toLocaleString()} {merchant.currency}
+                    </p>
+                    {item.sizes && (
+                      <span className="text-[9px] font-mono font-semibold bg-blue-50 text-blue-600 px-1 py-0.5 rounded">T: {item.sizes}</span>
+                    )}
+                    {item.colors && (
+                      <span className="text-[9px] font-mono font-semibold bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded">C: {item.colors}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-black text-ink">{(item.price * item.quantity).toLocaleString()}</p>
+                  <button onClick={() => removeFromCart(item.productId)} className="p-2 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="space-y-6 border-t border-gray-100 pt-8">
+          <div className="space-y-3">
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+              <input type="text" placeholder="Nom du client (optionnel)" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
+            </div>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+              <input type="tel" placeholder="Téléphone client" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+            <PaymentMethodBtn active={paymentMethod === 'cash'} onClick={() => setPaymentMethod('cash')} label="ESPÈCES" />
+            <PaymentMethodBtn active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} label="CARTE" />
+            <PaymentMethodBtn active={paymentMethod === 'mobile_money'} onClick={() => setPaymentMethod('mobile_money')} label="MOBILE" />
+          </div>
+
+          <div className="pt-4 border-t border-black/5">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div 
+                onClick={() => setIsPartial(!isPartial)}
+                className={`w-10 h-6 rounded-full transition-all relative ${isPartial ? 'bg-primary' : 'bg-gray-200'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isPartial ? 'left-5' : 'left-1'}`} />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Paiement partiel (Acompte)</span>
+            </label>
+
+            {isPartial && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="mt-4 space-y-2 overflow-hidden"
+              >
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Montant de l'acompte</label>
+                <input 
+                  type="number" 
+                  value={initialPaidAmount}
+                  onChange={e => setInitialPaidAmount(e.target.value)}
+                  placeholder="Entrez le montant reçu..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-black/5 rounded-xl text-sm font-black outline-none focus:border-primary/30"
+                />
+                {initialPaidAmount && Number(initialPaidAmount) < total && (
+                  <p className="text-[9px] font-bold text-amber-500 italic">Reste à payer: {(total - Number(initialPaidAmount)).toLocaleString()} {merchant.currency}</p>
+                )}
+              </motion.div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-dashed border-gray-100">
+            <span className="text-gray-400 text-[10px] font-mono font-black uppercase tracking-widest">Total à payer</span>
+            <div className="text-right">
+              <span className="text-3xl font-black text-ink">{total.toLocaleString()}</span>
+              <span className="text-xs font-mono font-bold text-gray-400 ml-1 uppercase">{merchant.currency}</span>
+            </div>
+          </div>
+
+          <button 
+            onClick={async () => {
+              await handleCheckout();
+              if (isMobile) {
+                setIsMobileCartOpen(false);
+              }
+            }} 
+            disabled={cart.length === 0 || isSubmitting} 
+            className="w-full py-5 bg-primary text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] hover:bg-primary-hover transition-all disabled:opacity-50 shadow-xl shadow-primary/20 active:scale-[0.98]"
+          >
+            {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Valider la vente'}
+          </button>
+        </div>
+      </>
+    );
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
@@ -6707,10 +6869,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               )}
             </div>
             
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+            <div className="flex gap-2 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setSelectedCategory('all')}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
                   selectedCategory === 'all'
                     ? 'bg-primary text-white border-primary shadow-sm'
                     : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200 shadow-sm'
@@ -6730,7 +6892,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
+                    className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
                       selectedCategory === cat
                         ? 'bg-primary text-white border-primary shadow-sm'
                         : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200 shadow-sm'
@@ -6758,10 +6920,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 </span>
               </div>
               
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+              <div className="flex gap-2 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
                 <button
                   onClick={() => setSelectedSubCategory('all')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all border ${
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all border ${
                     selectedSubCategory === 'all'
                       ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
                       : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
@@ -6781,7 +6943,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                     <button
                       key={subCat}
                       onClick={() => setSelectedSubCategory(subCat)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all border ${
+                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all border ${
                         selectedSubCategory === subCat
                           ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
                           : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
@@ -6819,10 +6981,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                       </button>
                     )}
                   </div>
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+                  <div className="flex gap-1.5 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
                     <button
                       onClick={() => setSelectedSize('all')}
-                      className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                      className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
                         selectedSize === 'all'
                           ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
                           : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
@@ -6836,7 +6998,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                         <button
                           key={size}
                           onClick={() => setSelectedSize(size)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
                             selectedSize === size
                               ? 'bg-primary text-white border-primary shadow-sm'
                               : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200'
@@ -6871,10 +7033,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                       </button>
                     )}
                   </div>
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-200/50 scrollbar-track-transparent">
+                  <div className="flex gap-1.5 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
                     <button
                       onClick={() => setSelectedColor('all')}
-                      className={`px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                      className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
                         selectedColor === 'all'
                           ? 'bg-primary/10 text-primary border-primary/20 shadow-sm'
                           : 'bg-white text-gray-500 hover:text-gray-800 border-black/5 hover:border-gray-200'
@@ -6888,7 +7050,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                         <button
                           key={color}
                           onClick={() => setSelectedColor(color)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
+                          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
                             selectedColor === color
                               ? 'bg-primary text-white border-primary shadow-sm'
                               : 'bg-white text-gray-600 hover:text-gray-900 border-black/5 hover:border-gray-200'
@@ -6912,12 +7074,12 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           {/* Ligne 2: Disponibilité & Tri */}
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between border-t border-black/5 pt-3">
             {/* Disponibilité Segmented Control */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Filtrer Stock :</span>
-              <div className="bg-white border border-black/5 rounded-2xl p-1 flex gap-1 shadow-sm">
+            <div className="flex items-center gap-2 w-full overflow-x-auto pb-2 -mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+              <span className="text-[10px] shrink-0 font-black text-gray-400 uppercase tracking-widest mr-1">Filtrer Stock :</span>
+              <div className="bg-white border border-black/5 rounded-2xl p-1 flex gap-1 shadow-sm shrink-0">
                 <button
                   onClick={() => setStockFilter('all')}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                  className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
                     stockFilter === 'all'
                       ? 'bg-gray-900 text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
@@ -6927,7 +7089,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 </button>
                 <button
                   onClick={() => setStockFilter('instock')}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                  className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
                     stockFilter === 'instock'
                       ? 'bg-emerald-500 text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
@@ -6937,7 +7099,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 </button>
                 <button
                   onClick={() => setStockFilter('lowstock')}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                  className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
                     stockFilter === 'lowstock'
                       ? 'bg-amber-500 text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
@@ -6954,7 +7116,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 </button>
                 <button
                   onClick={() => setStockFilter('outofstock')}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
+                  className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 ${
                     stockFilter === 'outofstock'
                       ? 'bg-rose-500 text-white shadow-sm'
                       : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
@@ -7072,158 +7234,79 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         )}
       </div>
 
-      <div className="w-full lg:w-[400px]">
+      <div className="hidden lg:block w-full lg:w-[400px]">
         <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-xl sticky top-32">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold text-ink flex items-center">
-              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center mr-3">
-                <ShoppingCart className="w-5 h-5 text-primary" />
-              </div>
-              Panier
-            </h3>
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
-              merchant.licenseType === 'local' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
-            }`}>
-              {merchant.licenseType === 'local' ? <HardDrive className="w-2.5 h-2.5" /> : <Database className="w-2.5 h-2.5" />}
-              {merchant.licenseType === 'local' ? 'Mode Local' : 'Sync Cloud'}
-            </div>
-          </div>
-
-          <AnimatePresence>
-            {cartError && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, y: -10 }}
-                animate={{ opacity: 1, height: "auto", y: 0 }}
-                exit={{ opacity: 0, height: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-                className="mb-6 p-4 bg-rose-50 border border-rose-100/80 rounded-2xl flex items-start gap-3 shadow-md relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 w-1 h-full bg-rose-500"></div>
-                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center shrink-0">
-                  <AlertCircle className="w-4 h-4 text-rose-600 animate-pulse" />
-                </div>
-                <div className="flex-1 min-w-0 pr-6">
-                  <p className="text-[11px] font-black text-rose-900 uppercase tracking-wide leading-snug">
-                    {cartError}
-                  </p>
-                  <p className="text-[8px] text-rose-500 font-black uppercase tracking-widest mt-1">
-                    Sélection annulée par précaution
-                  </p>
-                </div>
-                <button
-                  onClick={() => setCartError(null)}
-                  className="absolute top-2 right-2 p-1 text-rose-400 hover:text-rose-600 rounded-lg hover:bg-rose-100 transition-all cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="space-y-4 mb-8 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-            {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center opacity-40">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                  <ShoppingCart className="w-8 h-8" />
-                </div>
-                <p className="text-sm font-bold uppercase tracking-widest">Panier vide</p>
-              </div>
-            ) : (
-              cart.map((item) => (
-                <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl border border-gray-100 group">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      <p className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
-                        {item.quantity} x {item.price.toLocaleString()} {merchant.currency}
-                      </p>
-                      {item.sizes && (
-                        <span className="text-[9px] font-mono font-semibold bg-blue-50 text-blue-600 px-1 py-0.5 rounded">T: {item.sizes}</span>
-                      )}
-                      {item.colors && (
-                        <span className="text-[9px] font-mono font-semibold bg-emerald-50 text-emerald-600 px-1 py-0.5 rounded">C: {item.colors}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-black text-ink">{(item.price * item.quantity).toLocaleString()}</p>
-                    <button onClick={() => removeFromCart(item.productId)} className="p-2 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="space-y-6 border-t border-gray-100 pt-8">
-            <div className="space-y-3">
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                <input type="text" placeholder="Nom du client (optionnel)" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
-              </div>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                <input type="tel" placeholder="Téléphone client" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-              <PaymentMethodBtn active={paymentMethod === 'cash'} onClick={() => setPaymentMethod('cash')} label="ESPÈCES" />
-              <PaymentMethodBtn active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} label="CARTE" />
-              <PaymentMethodBtn active={paymentMethod === 'mobile_money'} onClick={() => setPaymentMethod('mobile_money')} label="MOBILE" />
-            </div>
-
-            <div className="pt-4 border-t border-black/5">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div 
-                  onClick={() => setIsPartial(!isPartial)}
-                  className={`w-10 h-6 rounded-full transition-all relative ${isPartial ? 'bg-primary' : 'bg-gray-200'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isPartial ? 'left-5' : 'left-1'}`} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Paiement partiel (Acompte)</span>
-              </label>
-
-              {isPartial && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-4 space-y-2 overflow-hidden"
-                >
-                  <label className="text-[9px] font-black uppercase tracking-widest text-gray-400">Montant de l'acompte</label>
-                  <input 
-                    type="number" 
-                    value={initialPaidAmount}
-                    onChange={e => setInitialPaidAmount(e.target.value)}
-                    placeholder="Entrez le montant reçu..."
-                    className="w-full px-4 py-3 bg-gray-50 border border-black/5 rounded-xl text-sm font-black outline-none focus:border-primary/30"
-                  />
-                  {initialPaidAmount && Number(initialPaidAmount) < total && (
-                    <p className="text-[9px] font-bold text-amber-500 italic">Reste à payer: {(total - Number(initialPaidAmount)).toLocaleString()} {merchant.currency}</p>
-                  )}
-                </motion.div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-dashed border-gray-100">
-              <span className="text-gray-400 text-[10px] font-mono font-black uppercase tracking-widest">Total à payer</span>
-              <div className="text-right">
-                <span className="text-3xl font-black text-ink">{total.toLocaleString()}</span>
-                <span className="text-xs font-mono font-bold text-gray-400 ml-1 uppercase">{merchant.currency}</span>
-              </div>
-            </div>
-
-            <button 
-              onClick={handleCheckout} 
-              disabled={cart.length === 0 || isSubmitting} 
-              className="w-full py-5 bg-primary text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] hover:bg-primary-hover transition-all disabled:opacity-50 shadow-xl shadow-primary/20 active:scale-[0.98]"
-            >
-              {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : 'Valider la vente'}
-            </button>
-          </div>
+          {renderCartContent(false)}
         </div>
       </div>
+
+      {/* Mobile Floating Cart Button */}
+      <AnimatePresence>
+        {cart.length > 0 && (
+          <motion.button
+            key="mobile-cart-button"
+            initial={{ scale: 0, opacity: 0, y: 50 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0, opacity: 0, y: 50 }}
+            onClick={() => setIsMobileCartOpen(true)}
+            className="lg:hidden fixed bottom-6 left-6 max-md:bottom-4 max-md:left-4 z-[9998] bg-gray-900 text-white p-4 rounded-full shadow-2xl flex items-center justify-center border border-white/10"
+            whileTap={{ scale: 0.9 }}
+          >
+            <ShoppingCart className="w-6 h-6" />
+            
+            {/* Pulsing notification badge */}
+            <span className="absolute -top-1 -right-1 flex h-5 w-5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 text-white text-[10px] font-bold items-center justify-center">
+                {cart.reduce((sum, item) => sum + item.quantity, 0)}
+              </span>
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Drawer (Paiement) */}
+      <AnimatePresence>
+        {isMobileCartOpen && (
+          <div className="lg:hidden fixed inset-0 z-[9999] overflow-hidden">
+            {/* Backdrop overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileCartOpen(false)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
+
+            {/* Drawer container */}
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh]"
+            >
+              {/* Drawer Handle (visual cue) */}
+              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto my-3 shrink-0" />
+
+              {/* Close Button at top right of header */}
+              <div className="absolute top-3 right-5 z-[10001]">
+                <button 
+                  onClick={() => setIsMobileCartOpen(false)}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Scrollable Content inside drawer */}
+              <div className="flex-1 overflow-y-auto px-6 pb-8 pt-2">
+                {renderCartContent(true)}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {showBarcodeScanner && (
         <BarcodeScanner 
@@ -7371,12 +7454,12 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                  <th className="px-8 py-5">Horodatage</th>
-                  <th className="px-8 py-5">Produit</th>
-                  <th className="px-8 py-5">Type de Flux</th>
-                  <th className="px-8 py-5">Quantité</th>
-                  <th className="px-8 py-5">Delta Stock</th>
-                  <th className="px-8 py-5">Motif / Raison</th>
+                  <th className="px-4 sm:px-8 py-3 md:py-5">Horodatage</th>
+                  <th className="px-4 sm:px-8 py-3 md:py-5">Produit</th>
+                  <th className="px-4 sm:px-8 py-3 md:py-5">Type de Flux</th>
+                  <th className="px-4 sm:px-8 py-3 md:py-5">Quantité</th>
+                  <th className="px-4 sm:px-8 py-3 md:py-5">Delta Stock</th>
+                  <th className="px-4 sm:px-8 py-3 md:py-5">Motif / Raison</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -7384,7 +7467,7 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
                   const product = products.find(p => p.id === m.productId);
                   return (
                     <tr key={m.id} className="hover:bg-gray-50/50 transition-colors group">
-                      <td className="px-8 py-5">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5">
                         <p className="text-[11px] font-mono font-bold text-gray-400">
                           {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd.MM.yyyy') : '--'}
                         </p>
@@ -7392,11 +7475,11 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
                           {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'HH:mm:ss') : '--'}
                         </p>
                       </td>
-                      <td className="px-8 py-5">
-                        <p className="font-bold text-gray-900 text-sm leading-tight">{product?.name || 'Produit supprimé'}</p>
-                        <p className="text-[10px] font-mono text-gray-400 uppercase tracking-tighter mt-0.5">ID: {m.productId.slice(0, 8)}</p>
+                      <td className="px-4 sm:px-8 py-4 sm:py-5 max-w-[150px] sm:max-w-[200px]">
+                        <p className="font-bold text-gray-900 text-sm leading-tight truncate">{product?.name || 'Produit supprimé'}</p>
+                        <p className="text-[10px] font-mono text-gray-400 uppercase tracking-tighter mt-0.5 truncate">ID: {m.productId.slice(0, 8)}</p>
                       </td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5">
                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                           m.type === 'in' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                           m.type === 'sale' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-600 border-gray-100'
@@ -7404,21 +7487,21 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
                           {m.type === 'in' ? 'ENTRÉE' : m.type === 'sale' ? 'VENTE' : m.type}
                         </span>
                       </td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5">
                         <div className={`flex items-center font-mono font-black text-sm ${m.type === 'in' ? 'text-emerald-500' : 'text-rose-500'}`}>
                           {m.type === 'in' ? <Plus className="w-3 h-3 mr-1" /> : <Minus className="w-3 h-3 mr-1" />}
                           {m.quantity}
                         </div>
                       </td>
-                      <td className="px-8 py-5">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5">
                         <div className="flex items-center space-x-2">
                           <span className="text-[11px] font-mono text-gray-400">{m.previousQuantity}</span>
                           <ArrowRight className="w-3 h-3 text-gray-300" />
                           <span className="text-[11px] font-mono font-black text-ink">{m.newQuantity}</span>
                         </div>
                       </td>
-                      <td className="px-8 py-5">
-                        <p className="text-xs text-gray-500 italic leading-relaxed max-w-xs">{m.reason || 'Aucune raison spécifiée'}</p>
+                      <td className="px-4 sm:px-8 py-4 sm:py-5">
+                        <p className="text-xs text-gray-500 italic leading-relaxed max-w-[150px] sm:max-w-xs line-clamp-2">{m.reason || 'Aucune raison spécifiée'}</p>
                       </td>
                     </tr>
                   );
@@ -7557,7 +7640,7 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
           </div>
         </div>
 
-        <div className="bg-gray-900 text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5 flex flex-col justify-between group">
+        <div className="hidden md:flex bg-gray-900 text-white rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden border border-white/5 flex-col justify-between group">
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
                 <Monitor className="w-40 h-40 text-white" />
             </div>
@@ -9617,7 +9700,7 @@ const MerchantSettings = ({
       exit={{ opacity: 0, x: -20 }}
       className="max-w-4xl mx-auto"
     >
-      <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-2xl font-black text-ink">Gestion des Données Locales</h3>
@@ -9630,28 +9713,28 @@ const MerchantSettings = ({
 
         <div className="space-y-6">
           <div className="bg-emerald-50/30 rounded-[2rem] p-8 border border-emerald-100/50">
-            <div className="flex items-start gap-6">
-              <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-emerald-100">
+            <div className="flex flex-col sm:flex-row items-start gap-6">
+              <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-emerald-100 shrink-0">
                 <HardDrive className="w-6 h-6 text-emerald-600" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-black text-ink uppercase tracking-wider">Mode Local-First (Optimisé)</h4>
-                <p className="text-xs text-emerald-800/70 mt-2 leading-relaxed">
+                <p className="text-xs text-emerald-800/70 mt-2 leading-relaxed break-words">
                   Studio Acom enregistre automatiquement chaque transaction dans la mémoire locale (IndexedDB) de votre ordinateur. 
                   Cela garantit une rapidité maximale et vous permet de travailler <b>sans limites de quota Cloud</b> même avec une connexion lente.
                 </p>
                 
                 {merchant.licenseType === 'local' ? (
-                  <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-3">
-                    <AlertCircle className="w-4 h-4 text-amber-600" />
-                    <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wide">
+                  <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex items-start sm:items-center gap-3">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+                    <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wide min-w-0 flex-1 break-words">
                       Mode "Local Uniquement" activé. La synchronisation Cloud est désactivée.
                     </p>
                   </div>
                 ) : (
-                  <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-center gap-3">
-                    <Database className="w-4 h-4 text-blue-600" />
-                    <p className="text-[10px] text-blue-800 font-bold uppercase tracking-wide">
+                  <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-start sm:items-center gap-3">
+                    <Database className="w-4 h-4 text-blue-600 shrink-0 mt-0.5 sm:mt-0" />
+                    <p className="text-[10px] text-blue-800 font-bold uppercase tracking-wide min-w-0 flex-1 break-words">
                       Synchronisation Cloud activée. Vos données sont sauvegardées en temps réel.
                     </p>
                   </div>
@@ -9696,7 +9779,7 @@ const MerchantSettings = ({
         </div>
       </div>
 
-      <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-2xl font-black text-ink">Version Bureau & Desktop</h3>
@@ -9735,7 +9818,7 @@ const MerchantSettings = ({
         </div>
       </div>
 
-      <div className="bg-white p-10 rounded-[3rem] border border-black/5 shadow-xl">
+      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl">
         <div className="flex items-center justify-between mb-10">
           <div>
             <h3 className="text-2xl font-black text-ink">Réglages Business</h3>
@@ -9747,50 +9830,50 @@ const MerchantSettings = ({
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+            <div className="flex items-center space-x-4 w-full min-w-0">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
                 <Store className="w-6 h-6 text-primary" />
               </div>
-              <div>
-                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Type de SaaS</p>
-                <p className="font-black text-ink capitalize text-lg">{merchant.type}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest truncate">Type de SaaS</p>
+                <p className="font-black text-ink capitalize text-lg truncate">{merchant.type}</p>
               </div>
             </div>
-            <div className="flex items-center text-[9px] font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 uppercase tracking-widest">
-              <AlertCircle className="w-3 h-3 mr-1.5" />
+            <div className="flex items-center text-[9px] font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-100 uppercase tracking-widest shrink-0 self-start sm:self-auto">
+              <AlertCircle className="w-3 h-3 mr-1.5 shrink-0" />
               Fixe
             </div>
           </div>
 
-          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+            <div className="flex items-center space-x-4 w-full min-w-0">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
                 <Zap className="w-6 h-6 text-primary" />
               </div>
-              <div>
-                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Forfait Actuel</p>
-                <p className="font-black text-ink text-lg">{merchant.plan || 'FREE'}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest truncate">Forfait Actuel</p>
+                <p className="font-black text-ink text-lg truncate">{merchant.plan || 'FREE'}</p>
               </div>
             </div>
             <button 
               onClick={() => setActiveTab('dashboard')}
-              className="text-[9px] font-black text-primary hover:bg-primary hover:text-white transition-all bg-primary/10 px-4 py-2 rounded-full uppercase tracking-widest"
+              className="text-[9px] font-black text-primary hover:bg-primary hover:text-white transition-all bg-primary/10 px-4 py-2 rounded-full uppercase tracking-widest shrink-0 self-start sm:self-auto"
             >
               Améliorer
             </button>
           </div>
-          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+            <div className="flex items-center space-x-4 w-full min-w-0">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
                 {formData.licenseType === 'cloud' ? <Database className="w-6 h-6 text-blue-500" /> : <HardDrive className="w-6 h-6 text-emerald-500" />}
               </div>
-              <div>
-                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Type de Licence</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest truncate">Type de Licence</p>
                 <select 
                   value={formData.licenseType || 'cloud'}
                   onChange={(e) => setFormData({ ...formData, licenseType: e.target.value as any })}
-                  className="font-black text-ink bg-transparent border-none p-0 focus:ring-0 text-lg cursor-pointer"
+                  className="font-black text-ink bg-transparent border-none p-0 focus:ring-0 text-lg cursor-pointer truncate block w-full"
                 >
                   <option value="cloud">FORFAIT CLOUD (SYNC)</option>
                   <option value="local">FORFAIT LOCAL (DESKTOP)</option>
@@ -9899,9 +9982,9 @@ const MerchantSettings = ({
             <button 
               type="submit" 
               disabled={saving} 
-              className="w-full py-5 bg-ink text-white rounded-[1.5rem] font-black text-sm uppercase tracking-[0.2em] hover:bg-black transition-all flex items-center justify-center shadow-2xl shadow-black/20 active:scale-[0.98]"
+              className="w-full py-5 bg-ink text-white rounded-[1.5rem] font-black text-xs md:text-sm uppercase tracking-widest md:tracking-[0.2em] hover:bg-black transition-all flex items-center justify-center shadow-2xl shadow-black/20 active:scale-[0.98]"
             >
-              {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-5 h-5 mr-3" /> Enregistrer les modifications</>}
+              {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-5 h-5 mr-3 shrink-0" /> <span>Enregistrer les modifications</span></>}
             </button>
           </div>
         </form>

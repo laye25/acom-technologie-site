@@ -140,8 +140,8 @@ function AppContent() {
       </main>
       
       {!hideFooter && <Footer />}
-      {!isEditor && <AIAssistant />}
-      {!isSaaSDomain && <NetworkStatusIndicator position="bottom-right" />}
+      {!isEditor && location.pathname !== '/manager/pos' && <AIAssistant />}
+      {!isSaaSDomain && location.pathname !== '/manager/pos' && <NetworkStatusIndicator position="bottom-right" />}
     </div>
   );
 }
