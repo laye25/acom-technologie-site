@@ -63,6 +63,47 @@ const isDesktop = typeof window !== 'undefined' && (
   (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
 );
 
+const saveOrSharePDF = (doc: jsPDF, filename: string) => {
+  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+  
+  if (isMobile) {
+    try {
+      const blob = doc.output('blob');
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: filename,
+          text: 'Document PDF - Acom Technologie'
+        })
+        .then(() => {
+          toast.success('Document sauvegardé / partagé !', { position: 'top-center' });
+        })
+        .catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.error('Error sharing PDF on save:', err);
+            doc.save(filename);
+            toast.success(`Le document PDF "${filename}" a été téléchargé.`, { position: 'top-center' });
+          }
+        });
+        return;
+      }
+    } catch (e) {
+      console.error('Failed mobile sharing in saveOrSharePDF, falling back to direct save:', e);
+    }
+  }
+
+  // Desktop or Mobile fallback
+  try {
+    doc.save(filename);
+    toast.success('Le document PDF a été téléchargé.', { position: 'top-center' });
+  } catch (err) {
+    console.error('doc.save error:', err);
+    toast.error('Une erreur est survenue lors du téléchargement.', { position: 'top-center' });
+  }
+};
+
 const printPDF = (doc: jsPDF, filename = 'document_imprimer.pdf') => {
   try {
     // 1. Tell jsPDF to add the auto-print script to the PDF
@@ -71,6 +112,33 @@ const printPDF = (doc: jsPDF, filename = 'document_imprimer.pdf') => {
     // 2. Generate a standard, universally supported W3C Blob
     const blob = doc.output('blob');
     const blobUrl = URL.createObjectURL(blob);
+
+    const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+    if (isMobile) {
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: filename,
+          text: 'Document PDF - Acom Technologie'
+        })
+        .then(() => {
+          toast.success('Impression mobile : Document envoyé au partage pour impression.', { position: 'top-center' });
+        })
+        .catch((err) => {
+          if (err.name !== 'AbortError') {
+            console.error('Error sharing PDF:', err);
+            doc.save(filename);
+            toast.success(`Le PDF "${filename}" a été téléchargé pour impression.`, { position: 'top-center' });
+          }
+        });
+        return;
+      } else {
+        doc.save(filename);
+        toast.success(`Le PDF "${filename}" a été téléchargé sur votre mobile pour impression.`, { duration: 6000, position: 'top-center' });
+        return;
+      }
+    }
 
     // If we are in Acom Gestion Desktop (Tauri/Electron context or local file), 
     // webview printing (IFrames) can be blocked by sandboxing or lack of native Webview2 print hooks.
@@ -133,6 +201,20 @@ const printPDF = (doc: jsPDF, filename = 'document_imprimer.pdf') => {
 
 
 const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpaid' | 'quote', data: any) => {
+  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+  
+  if (isMobile) {
+    toast.success("Impression mobile : Préparation du document PDF...", { position: 'top-center' });
+    if (type === 'receipt') {
+      generateReceiptPDF(merchant, data, 'print');
+    } else if (type === 'invoice' || type === 'unpaid') {
+      generateA4InvoicePDF(merchant, data, 'print', type);
+    } else if (type === 'quote') {
+      generateA4QuotePDF(merchant, data, 'print');
+    }
+    return;
+  }
+
   const fmt = (num: number) => {
     if (num === undefined || num === null || isNaN(num)) return '0';
     const parts = Math.round(num).toString().split('.');
@@ -851,7 +933,7 @@ const generateReceiptPDF = (merchant: Merchant, sale: any, action: 'print' | 'do
   if (action === 'print') {
     printPDF(doc, `recu_ticket_${sale.id || Date.now()}.pdf`);
   } else {
-    doc.save(`recu_${sale.id || Date.now()}.pdf`);
+    saveOrSharePDF(doc, `recu_${sale.id || Date.now()}.pdf`);
   }
 };
 
@@ -1118,7 +1200,7 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   if (action === 'print') {
     printPDF(doc, `facture_A4_${sale.id.slice(0, 8)}.pdf`);
   } else {
-    doc.save(`facture_${sale.id.slice(0, 8)}.pdf`);
+    saveOrSharePDF(doc, `facture_${sale.id.slice(0, 8)}.pdf`);
   }
 };
 
@@ -1319,7 +1401,7 @@ const generateA4QuotePDF = (merchant: Merchant, quote: any, action: 'print' | 'd
   if (action === 'print') {
     printPDF(doc, `devis_A4_${quote.id.slice(0, 8)}.pdf`);
   } else {
-    doc.save(`devis_${quote.id.slice(0, 8)}.pdf`);
+    saveOrSharePDF(doc, `devis_${quote.id.slice(0, 8)}.pdf`);
   }
 };
 
@@ -6292,6 +6374,8 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
   const cartErrorTimeoutRef = useRef<any>(null);
+  const [sendToWhatsApp, setSendToWhatsApp] = useState(true);
+  const [managerPhone, setManagerPhone] = useState(merchant.phone || '');
 
   const triggerCartError = (message: string) => {
     setCartError(message);
@@ -6603,6 +6687,60 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       // Save the sale (service handles stock update)
       const saleId = await dbService.merchantSales.save(saleData);
 
+      // Real-time WhatsApp Notification to Manager
+      if (sendToWhatsApp && managerPhone) {
+        let cleanManagerPhone = managerPhone.replace(/[^0-9+]/g, '');
+        if (cleanManagerPhone.startsWith('7') && cleanManagerPhone.length === 9) {
+          cleanManagerPhone = '221' + cleanManagerPhone; // Default to Senegal code
+        }
+        const cleanNumber = cleanManagerPhone.replace(/[^0-9]/g, '');
+        if (cleanNumber) {
+          const paymentMethodLabels: Record<string, string> = {
+            cash: 'Espèces 💵',
+            card: 'Carte Bancaire 💳',
+            mobile_money: 'Mobile Money 📱',
+            split: 'Paiement partiel (Acompte) 💸'
+          };
+          
+          const methodLabel = paymentMethodLabels[paymentMethod] || paymentMethod;
+          const isPartialLabel = isPartial ? `\n*Montant reçu :* ${actualPaid.toLocaleString()} ${merchant.currency}\n*Reste dû :* ${(total - actualPaid).toLocaleString()} ${merchant.currency}` : '';
+
+          const itemsText = cart.map(item => {
+            let itemStr = `• *${item.name}* : ${item.quantity} x ${item.price.toLocaleString()} ${merchant.currency}`;
+            if (item.sizes || item.colors) {
+              const details = [];
+              if (item.sizes) details.push(`T: ${item.sizes}`);
+              if (item.colors) details.push(`C: ${item.colors}`);
+              itemStr += ` (${details.join(', ')})`;
+            }
+            return itemStr;
+          }).join('\n');
+
+          const receiptText = `🧾 *NOUVELLE VENTE - CAISSE POS* 🧾\n` +
+            `----------------------------------------\n` +
+            `🌐 *Boutique :* ${merchant.name}\n` +
+            `👤 *Opérateur :* ${user.displayName || user.email || 'N/A'}\n` +
+            `📅 *Date :* ${new Date().toLocaleString('fr-FR')}\n` +
+            `----------------------------------------\n` +
+            `📦 *DÉTAILS DES ARTICLES :*\n${itemsText}\n` +
+            `----------------------------------------\n` +
+            `💰 *TOTAL :* *${total.toLocaleString()} ${merchant.currency}*\n` +
+            `💳 *Mode de Règlement :* ${isPartial ? 'Acompte' : methodLabel}${isPartialLabel}\n` +
+            `----------------------------------------\n` +
+            `👥 *CLIENT :*\n` +
+            `• *Nom :* ${customerName || 'Client de passage'}\n` +
+            `• *Téléphone :* ${customerPhone || 'Non renseigné'}\n` +
+            `----------------------------------------\n` +
+            `_Envoyé instantanément depuis l'application de Caisse_`;
+
+          const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(receiptText)}`;
+          
+          setTimeout(() => {
+            window.open(whatsappUrl, '_blank');
+          }, 150);
+        }
+      }
+
       setShowReceiptModal({ show: true, saleData: { ...saleData, id: saleId } });
 
       setCart([]);
@@ -6749,6 +6887,34 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                   <p className="text-[9px] font-bold text-amber-500 italic">Reste à payer: {(total - Number(initialPaidAmount)).toLocaleString()} {merchant.currency}</p>
                 )}
               </motion.div>
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-black/5 space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input 
+                type="checkbox"
+                checked={sendToWhatsApp}
+                onChange={e => setSendToWhatsApp(e.target.checked)}
+                className="rounded border-gray-300 text-primary focus:ring-primary/20 w-4 h-4 cursor-pointer"
+              />
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-1.5/10">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 inline-block mr-1"></span>
+                Suivi WhatsApp Manager Temps Réel
+              </span>
+            </label>
+
+            {sendToWhatsApp && (
+              <div className="relative">
+                <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                <input 
+                  type="tel" 
+                  placeholder="Téléphone du Manager (ex: +22177...)" 
+                  value={managerPhone} 
+                  onChange={e => setManagerPhone(e.target.value)} 
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-emerald-100 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500/10 font-mono font-bold"
+                />
+              </div>
             )}
           </div>
 
@@ -9127,8 +9293,7 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       doc.setTextColor(148, 163, 184); // Slate-400
       doc.text(`Rapport financier généré électroniquement par ACOM Technologie. Établissement : ${merchant.name}`, 105, y, { align: 'center' });
 
-      doc.save(`rapport_financier_${merchant.name.toLowerCase().replace(/\s+/g, '_')}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
-      toast.success('Rapport exporté sous format PDF !');
+      saveOrSharePDF(doc, `rapport_financier_${merchant.name.toLowerCase().replace(/\s+/g, '_')}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
     } catch (error) {
       console.error(error);
       toast.error('Échec de la génération du PDF.');
