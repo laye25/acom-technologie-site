@@ -7884,9 +7884,9 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
               </div>
 
               <div className="space-y-4 text-left">
-                <h3 className="text-2xl font-black text-white tracking-tight">Version Mobile Android</h3>
+                <h3 className="text-2xl font-black text-white tracking-tight">Versions Mobiles (iOS & Android)</h3>
                 <p className="text-slate-300 text-sm leading-relaxed">
-                  L'intégration mobile SQLite via Capacitor est entièrement configurée. L'application s'exécute localement à 100% hors-ligne sur votre smartphone ou tablette Android.
+                  L'intégration mobile SQLite via Capacitor est entièrement configurée. L'application s'exécute localement à 100% hors-ligne sur votre smartphone ou tablette iOS et Android.
                 </p>
               </div>
 
@@ -7907,16 +7907,30 @@ const MerchantBuild = ({ merchant }: { merchant: Merchant & { id: string } }) =>
 
             <div className="space-y-4 pt-6 text-left">
               <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-                <h4 className="text-xs font-black uppercase tracking-wider text-indigo-400 mb-2">Instructions de compilation APK</h4>
+                <h4 className="text-xs font-black uppercase tracking-wider text-indigo-400 mb-2">Instructions de compilation (APK/IPA)</h4>
                 <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
-                  Le dossier de compilation <code className="font-mono bg-black/30 px-1 py-0.5 rounded text-white text-[10px]">/android</code> est prêt à l'emploi. Pour générer votre fichier d'installation APK :
+                  Les dossiers de compilation <code className="font-mono bg-black/30 px-1 py-0.5 rounded text-white text-[10px]">/android</code> et <code className="font-mono bg-black/30 px-1 py-0.5 rounded text-white text-[10px]">/ios</code> sont prêts à l'emploi. L'écosystème Apple permet la compilation spécifique depuis GitHub avec Xcode.
                 </p>
-                <ol className="list-decimal list-inside space-y-1.5 text-[10px] text-slate-400 font-medium">
-                  <li>Lancez la commande <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npm run build</code></li>
-                  <li>Synchronisez le projet : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap sync android</code></li>
-                  <li>Ouvrez dans Android Studio : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap open android</code></li>
-                  <li>Sélectionnez <code className="text-white">Build &gt; Build Bundle(s) / APK(s) &gt; Build APK(s)</code></li>
-                </ol>
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block mb-1">Android (APK)</span>
+                    <ol className="list-decimal list-inside space-y-1 text-[10px] text-slate-400 font-medium">
+                      <li>Lancez : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npm run build</code></li>
+                      <li>Synchronisez : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap sync android</code></li>
+                      <li>Ouvrez dans Android Studio : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap open android</code></li>
+                      <li>Générez via : <code className="text-white">Build &gt; Build APK(s)</code></li>
+                    </ol>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-sky-500 uppercase tracking-widest block mb-1">iOS (IPA via Xcode)</span>
+                    <ol className="list-decimal list-inside space-y-1 text-[10px] text-slate-400 font-medium">
+                      <li>Lancez : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npm run build</code></li>
+                      <li>Synchronisez : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap sync ios</code></li>
+                      <li>Ouvrez Xcode : <code className="font-mono bg-black/30 px-1 text-white text-[9px]">npx cap open ios</code></li>
+                      <li>Générez via : <code className="text-white">Product &gt; Archive</code> (pour App Store / TestFlight)</li>
+                    </ol>
+                  </div>
+                </div>
               </div>
 
               <button
