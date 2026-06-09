@@ -158,8 +158,9 @@ async function startServer() {
       }
 
       const resend = new Resend(process.env.RESEND_API_KEY);
+      const fromEmail = process.env.RESEND_FROM || "Acom Technologie <service-technique@acomtechnologie.com>";
       const { data, error } = await resend.emails.send({
-        from: "Acom Technologie <service-technique@acomtechnologie.com>",
+        from: fromEmail,
         to: [to],
         subject: subject,
         html: html,

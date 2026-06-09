@@ -6378,6 +6378,8 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [managerPhone, setManagerPhone] = useState(merchant.phone || '');
   const [sendToEmail, setSendToEmail] = useState(true);
   const [managerEmail, setManagerEmail] = useState(merchant.email || '');
+  const [emailSendStatus, setEmailSendStatus] = useState<'idle' | 'sending' | 'success' | 'error' | 'simulated'>('idle');
+  const [emailSendError, setEmailSendError] = useState<string | null>(null);
 
   const triggerCartError = (message: string) => {
     setCartError(message);
@@ -6824,6 +6826,8 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             </div>
           `;
 
+          setEmailSendStatus('sending');
+          setEmailSendError(null);
           fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -6832,9 +6836,33 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               subject: `[PRO POS - ${merchant.name}] Vente Réussie : ${total.toLocaleString()} ${merchant.currency}`,
               html: emailHtml
             })
-          }).catch(err => console.error("Error sending automatic email tracking:", err));
+          })
+          .then(async (res) => {
+            if (res.ok) {
+              const data = await res.json();
+              if (data.message && data.message.includes("missing")) {
+                setEmailSendStatus('simulated');
+              } else if (data.success) {
+                setEmailSendStatus('success');
+              } else {
+                setEmailSendStatus('error');
+                setEmailSendError(data.error || "Erreur de transmission");
+              }
+            } else {
+              const data = await res.json().catch(() => ({}));
+              setEmailSendStatus('error');
+              setEmailSendError(data.error || `Erreur serveur (${res.status})`);
+            }
+          })
+          .catch(err => {
+            console.error("Error sending automatic email tracking:", err);
+            setEmailSendStatus('error');
+            setEmailSendError(err.message || "Erreur réseau");
+          });
         } catch (emailErr) {
           console.error("Error sending background email:", emailErr);
+          setEmailSendStatus('error');
+          setEmailSendError(String(emailErr));
         }
       }
 
@@ -7746,10 +7774,40 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                               value={managerEmail}
                               className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-bold text-gray-600 outline-none"
                             />
-                            <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-indigo-600 font-semibold bg-indigo-50/50 p-2 rounded-lg">
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                              Email envoyé en arrière-plan avec succès !
-                            </div>
+                            {emailSendStatus === 'sending' && (
+                              <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-blue-600 font-semibold bg-blue-50/50 p-2 rounded-lg">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                Envoi de l'email de suivi en arrière-plan...
+                              </div>
+                            )}
+                            {emailSendStatus === 'success' && (
+                              <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-emerald-600 font-semibold bg-emerald-50/50 p-2 rounded-lg">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Email envoyé en arrière-plan avec succès !
+                              </div>
+                            )}
+                            {emailSendStatus === 'simulated' && (
+                              <div className="mt-1.5 flex flex-col gap-1 text-[9px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                                <div className="flex items-center gap-1.5 font-bold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                  Simulation d'envoi (Aucun e-mail émis)
+                                </div>
+                                <span className="text-[8px] text-amber-600 font-normal leading-relaxed">
+                                  Raison : <code className="bg-amber-100/80 px-1 py-0.5 rounded font-mono font-bold">RESEND_API_KEY</code> manquante dans l'environnement.
+                                </span>
+                              </div>
+                            )}
+                            {emailSendStatus === 'error' && (
+                              <div className="mt-1.5 flex flex-col gap-1 text-[9px] text-red-700 bg-red-50 p-2 rounded-lg border border-red-200">
+                                <div className="flex items-center gap-1.5 font-bold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
+                                  Échec de l'envoi de l'email
+                                </div>
+                                <span className="text-[8px] text-red-600 font-mono font-bold leading-normal truncate">
+                                  {emailSendError || "Erreur de configuration ou domaine non vérifié"}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
