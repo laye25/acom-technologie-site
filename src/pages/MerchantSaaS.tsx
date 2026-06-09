@@ -1991,9 +1991,9 @@ const MerchantSaaS = () => {
       default: // boutique
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
+          { id: 'pos', label: 'Caisse POS', icon: ShoppingCart },
           { id: 'inventory', label: 'Stock', icon: Package },
           { id: 'suppliers', label: 'Fournisseurs', icon: Truck },
-          { id: 'pos', label: 'Caisse POS', icon: ShoppingCart },
           { id: 'billing', label: 'Facture/Devis', icon: Receipt },
           { id: 'audit', label: 'Audit', icon: Clock },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
@@ -6370,7 +6370,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [initialPaidAmount, setInitialPaidAmount] = useState<number | string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showReceiptModal, setShowReceiptModal] = useState<{ show: boolean, saleData: any } | null>(null);
+  const [showReceiptModal, setShowReceiptModal] = useState<{ show: boolean, saleData: any, whatsappUrl?: string } | null>(null);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
   const cartErrorTimeoutRef = useRef<any>(null);
@@ -6734,10 +6734,13 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             `_Envoyé instantanément depuis l'application de Caisse_`;
 
           const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(receiptText)}`;
+          setShowReceiptModal({ show: true, saleData: { ...saleData, id: saleId }, whatsappUrl: whatsappUrl });
           
-          setTimeout(() => {
-            window.open(whatsappUrl, '_blank');
-          }, 150);
+          setCart([]);
+          setCustomerName('');
+          setCustomerPhone('');
+          toast.success('Vente enregistrée !');
+          return;
         }
       }
 
@@ -7550,6 +7553,22 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                     </button>
                   </div>
                 </div>
+
+                {/* Section WhatsApp Manager */}
+                {showReceiptModal.whatsappUrl && (
+                  <div>
+                    <div className="text-[9px] font-mono font-black uppercase text-indigo-500 tracking-[0.2em] mb-2">Notification Manager</div>
+                    <button 
+                      onClick={() => {
+                        window.open(showReceiptModal.whatsappUrl, '_blank');
+                      }}
+                      className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-indigo-100 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Smartphone className="w-3.5 h-3.5" />
+                      <span>Envoyer au Manager via WhatsApp</span>
+                    </button>
+                  </div>
+                )}
 
                 <div className="pt-2">
                   <button 
