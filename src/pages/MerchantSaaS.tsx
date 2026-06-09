@@ -6376,6 +6376,8 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const cartErrorTimeoutRef = useRef<any>(null);
   const [sendToWhatsApp, setSendToWhatsApp] = useState(true);
   const [managerPhone, setManagerPhone] = useState(merchant.phone || '');
+  const [sendToEmail, setSendToEmail] = useState(true);
+  const [managerEmail, setManagerEmail] = useState(merchant.email || '');
 
   const triggerCartError = (message: string) => {
     setCartError(message);
@@ -6687,7 +6689,18 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       // Save the sale (service handles stock update)
       const saleId = await dbService.merchantSales.save(saleData);
 
-      // Real-time WhatsApp Notification to Manager
+      // 1. Prepare WhatsApp URL if tracking is enabled
+      let whatsappUrl: string | undefined = undefined;
+      let methodLabel = isPartial ? 'Paiement partiel (Acompte) 💸' : 'Espèces 💵';
+      if (!isPartial) {
+        const paymentMethodLabels: Record<string, string> = {
+          cash: 'Espèces 💵',
+          card: 'Carte Bancaire 💳',
+          mobile_money: 'Mobile Money 📱'
+        };
+        methodLabel = paymentMethodLabels[paymentMethod] || paymentMethod;
+      }
+
       if (sendToWhatsApp && managerPhone) {
         let cleanManagerPhone = managerPhone.replace(/[^0-9+]/g, '');
         if (cleanManagerPhone.startsWith('7') && cleanManagerPhone.length === 9) {
@@ -6695,14 +6708,6 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         }
         const cleanNumber = cleanManagerPhone.replace(/[^0-9]/g, '');
         if (cleanNumber) {
-          const paymentMethodLabels: Record<string, string> = {
-            cash: 'Espèces 💵',
-            card: 'Carte Bancaire 💳',
-            mobile_money: 'Mobile Money 📱',
-            split: 'Paiement partiel (Acompte) 💸'
-          };
-          
-          const methodLabel = paymentMethodLabels[paymentMethod] || paymentMethod;
           const isPartialLabel = isPartial ? `\n*Montant reçu :* ${actualPaid.toLocaleString()} ${merchant.currency}\n*Reste dû :* ${(total - actualPaid).toLocaleString()} ${merchant.currency}` : '';
 
           const itemsText = cart.map(item => {
@@ -6733,18 +6738,108 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             `----------------------------------------\n` +
             `_Envoyé instantanément depuis l'application de Caisse_`;
 
-          const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(receiptText)}`;
-          setShowReceiptModal({ show: true, saleData: { ...saleData, id: saleId }, whatsappUrl: whatsappUrl });
-          
-          setCart([]);
-          setCustomerName('');
-          setCustomerPhone('');
-          toast.success('Vente enregistrée !');
-          return;
+          whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(receiptText)}`;
         }
       }
 
-      setShowReceiptModal({ show: true, saleData: { ...saleData, id: saleId } });
+      // 2. Prepare and send background Email tracking if enabled
+      if (sendToEmail && managerEmail) {
+        try {
+          const isPartialLabelEmail = isPartial ? `
+          <tr style="border-top: 1px solid #e2e8f0;">
+            <td style="color: #64748b; padding-top: 8px;">Montant Reçu :</td>
+            <td style="color: #16a34a; font-weight: 800; text-align: right; padding-top: 8px;">${actualPaid.toLocaleString()} ${merchant.currency}</td>
+          </tr>
+          <tr>
+            <td style="color: #64748b; padding-bottom: 8px;">Reste Dû :</td>
+            <td style="color: #dc2626; font-weight: 800; text-align: right; padding-bottom: 8px;">${(total - actualPaid).toLocaleString()} ${merchant.currency}</td>
+          </tr>` : '';
+
+          const emailHtml = `
+            <div style="background-color: #f8f9fa; padding: 40px 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+              <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #eee;">
+                <div style="background-color: #4f46e5; padding: 30px; text-align: center; color: white;">
+                  <h2 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">NOUVELLE VENTE POS</h2>
+                  <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Boutique : ${merchant.name}</p>
+                </div>
+                
+                <div style="padding: 30px; color: #1e293b;">
+                  <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="font-size: 36px; font-weight: 900; color: #4f46e5;">${total.toLocaleString()} ${merchant.currency}</div>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; font-weight: bold;">Règlement : ${isPartial ? 'Acompte' : methodLabel}</p>
+                  </div>
+                  
+                  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 25px;">
+                    <thead>
+                      <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+                        <th style="padding: 10px 0; font-size: 12px; text-transform: uppercase; color: #64748b;">Article</th>
+                        <th width="80" style="padding: 10px 0; font-size: 12px; text-transform: uppercase; color: #64748b; text-align: center;">Qté</th>
+                        <th width="120" style="padding: 10px 0; font-size: 12px; text-transform: uppercase; color: #64748b; text-align: right;">Prix</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${cart.map(item => `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                          <td style="padding: 12px 0; font-size: 14px; font-weight: 600; color: #1e293b;">
+                            ${item.name}
+                            ${item.sizes || item.colors ? `<div style="font-size: 11px; color: #64748b; font-weight: normal; margin-top: 2px;">${[item.sizes ? `Taille: ${item.sizes}` : '', item.colors ? `Couleur: ${item.colors}` : ''].filter(Boolean).join(' | ')}</div>` : ''}
+                          </td>
+                          <td style="padding: 12px 0; font-size: 14px; color: #475569; text-align: center;">${item.quantity}</td>
+                          <td style="padding: 12px 0; font-size: 14px; color: #1e293b; text-align: right; font-weight: 600;">${(item.price * item.quantity).toLocaleString()} ${merchant.currency}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                  
+                  <div style="background-color: #f8f9fa; border-radius: 12px; padding: 20px; font-size: 14px; margin-bottom: 25px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="color: #64748b; padding-bottom: 8px;">Date de transaction &nbsp;:</td>
+                        <td style="color: #1e293b; font-weight: 600; text-align: right; padding-bottom: 8px;">${new Date().toLocaleString('fr-FR')}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; padding-bottom: 8px;">Opérateur :</td>
+                        <td style="color: #1e293b; font-weight: 600; text-align: right; padding-bottom: 8px;">${user?.displayName || user?.email || 'N/A'}</td>
+                      </tr>
+                      <tr>
+                        <td style="color: #64748b; padding-bottom: 8px;">Client :</td>
+                        <td style="color: #1e293b; font-weight: 600; text-align: right; padding-bottom: 8px;">${customerName || 'Client de passage'}</td>
+                      </tr>
+                      ${customerPhone ? `
+                      <tr>
+                        <td style="color: #64748b; padding-bottom: 8px;">Téléphone :</td>
+                        <td style="color: #1e293b; font-weight: 600; text-align: right; padding-bottom: 8px;">${customerPhone}</td>
+                      </tr>
+                      ` : ''}
+                      ${isPartialLabelEmail}
+                    </table>
+                  </div>
+                </div>
+                
+                <div style="background-color: #1e293b; padding: 20px; text-align: center; color: #94a3b8; font-size: 11px;">
+                  <p style="margin: 0; color: white; font-weight: bold; font-size: 13px;">${merchant.name}</p>
+                  <p style="margin: 4px 0 0 0;">Notification de Suivi de Caisse en Temps Réel</p>
+                </div>
+              </div>
+            </div>
+          `;
+
+          fetch('/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: managerEmail,
+              subject: `[PRO POS - ${merchant.name}] Vente Réussie : ${total.toLocaleString()} ${merchant.currency}`,
+              html: emailHtml
+            })
+          }).catch(err => console.error("Error sending automatic email tracking:", err));
+        } catch (emailErr) {
+          console.error("Error sending background email:", emailErr);
+        }
+      }
+
+      // 3. Set Receipt modal data and whatsappUrl
+      setShowReceiptModal({ show: true, saleData: { ...saleData, id: saleId }, whatsappUrl: whatsappUrl });
 
       setCart([]);
       setCustomerName('');
@@ -6894,31 +6989,65 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           </div>
 
           <div className="pt-4 border-t border-black/5 space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <input 
-                type="checkbox"
-                checked={sendToWhatsApp}
-                onChange={e => setSendToWhatsApp(e.target.checked)}
-                className="rounded border-gray-300 text-primary focus:ring-primary/20 w-4 h-4 cursor-pointer"
-              />
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-1.5/10">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0 inline-block mr-1"></span>
-                Suivi WhatsApp Manager Temps Réel
-              </span>
-            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* WhatsApp follow-up */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={sendToWhatsApp}
+                    onChange={e => setSendToWhatsApp(e.target.checked)}
+                    className="rounded border-gray-300 text-primary focus:ring-primary/20 w-4.5 h-4.5 cursor-pointer"
+                  />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0 inline-block mr-1"></span>
+                    Suivi WhatsApp Manager
+                  </span>
+                </label>
 
-            {sendToWhatsApp && (
-              <div className="relative">
-                <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
-                <input 
-                  type="tel" 
-                  placeholder="Téléphone du Manager (ex: +22177...)" 
-                  value={managerPhone} 
-                  onChange={e => setManagerPhone(e.target.value)} 
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-emerald-100 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500/10 font-mono font-bold"
-                />
+                {sendToWhatsApp && (
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                    <input 
+                      type="tel" 
+                      placeholder="Téléphone du Manager (ex: +22177...)" 
+                      value={managerPhone} 
+                      onChange={e => setManagerPhone(e.target.value)} 
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-emerald-100/80 rounded-xl text-[11px] outline-none focus:ring-2 focus:ring-emerald-500/10 font-mono font-bold text-gray-700"
+                    />
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Email follow-up */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={sendToEmail}
+                    onChange={e => setSendToEmail(e.target.checked)}
+                    className="rounded border-gray-300 text-primary focus:ring-primary/20 w-4.5 h-4.5 cursor-pointer"
+                  />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-indigo-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse shrink-0 inline-block mr-1"></span>
+                    Suivi Email Manager
+                  </span>
+                </label>
+
+                {sendToEmail && (
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500" />
+                    <input 
+                      type="email" 
+                      placeholder="Email du Manager" 
+                      value={managerEmail} 
+                      onChange={e => setManagerEmail(e.target.value)} 
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-indigo-100/80 rounded-xl text-[11px] outline-none focus:ring-2 focus:ring-indigo-500/10 font-mono font-bold text-gray-700"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-dashed border-gray-100">
@@ -7495,90 +7624,216 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-8 text-center"
+              className={`bg-white w-full rounded-2xl shadow-2xl p-6 md:p-8 transition-all ${
+                showReceiptModal.whatsappUrl ? 'max-w-2xl' : 'max-w-sm text-center'
+              }`}
             >
-              <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle className="w-10 h-10 text-emerald-500" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Vente Réussie !</h3>
-              <p className="text-gray-500 mb-8">La transaction a été enregistrée avec succès.</p>
-              
-              <div className="space-y-4 text-left">
-                {/* Section Ticket */}
-                <div>
-                  <div className="text-[9px] font-mono font-black uppercase text-amber-500 tracking-[0.2em] mb-2">Format Ticket POS</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button 
-                      onClick={() => {
-                        printDirectHTML(merchant, 'receipt', showReceiptModal.saleData);
-                      }}
-                      className="py-3 bg-amber-500 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-amber-600 transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Imprimer</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        generateReceiptPDF(merchant, showReceiptModal.saleData, 'download');
-                      }}
-                      className="py-3 bg-amber-50 text-amber-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-amber-100 transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Télécharger</span>
-                    </button>
+              {showReceiptModal.whatsappUrl ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                  {/* Left Column: Vente Réussie & Printers */}
+                  <div className="space-y-4 md:space-y-6 flex flex-col justify-between">
+                    <div>
+                      <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 mx-auto md:mx-0">
+                        <CheckCircle className="w-8 h-8 text-emerald-500" />
+                      </div>
+                      <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-1 text-center md:text-left">Vente Réussie !</h3>
+                      <p className="text-gray-500 text-xs md:text-sm mb-4 text-center md:text-left">La transaction a été enregistrée.</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Section Ticket */}
+                      <div>
+                        <div className="text-[9px] font-mono font-black uppercase text-amber-500 tracking-[0.2em] mb-1.5">Format Ticket POS</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button 
+                            onClick={() => {
+                              printDirectHTML(merchant, 'receipt', showReceiptModal.saleData);
+                            }}
+                            className="py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-amber-600 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Imprimer</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              generateReceiptPDF(merchant, showReceiptModal.saleData, 'download');
+                            }}
+                            className="py-2.5 bg-amber-50 text-amber-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-amber-100 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Télécharger</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Section Facture A4 */}
+                      <div>
+                        <div className="text-[9px] font-mono font-black uppercase text-emerald-500 tracking-[0.2em] mb-1.5">Format Facture A4</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button 
+                            onClick={() => {
+                              printDirectHTML(merchant, 'invoice', showReceiptModal.saleData);
+                            }}
+                            className="py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Imprimer</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              generateA4InvoicePDF(merchant, showReceiptModal.saleData, 'download');
+                            }}
+                            className="py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Télécharger</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button 
+                        onClick={() => setShowReceiptModal(null)}
+                        className="w-full py-3 bg-gray-50 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-black/5 text-center"
+                      >
+                        Nouveau Client
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Column: WhatsApp & Live Tracking Panel */}
+                  <div className="border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-6 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div>
+                        <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mb-3">
+                          <Smartphone className="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <h4 className="text-base font-black text-gray-900 mb-1">Détails de Suivi</h4>
+                        <p className="text-gray-400 text-[11px] leading-relaxed mb-4">Envoyez les détails de la vente ou vérifiez l'email automatique.</p>
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* WhatsApp section */}
+                        <div>
+                          <label className="block text-[8px] font-mono font-black uppercase text-emerald-600 tracking-[0.1em] mb-1">Destinataire WhatsApp</label>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              readOnly
+                              value={managerPhone}
+                              className="flex-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-bold text-gray-600 outline-none"
+                            />
+                            <button 
+                              onClick={() => {
+                                window.open(showReceiptModal.whatsappUrl, '_blank');
+                              }}
+                              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
+                            >
+                              <Smartphone className="w-3.5 h-3.5" />
+                              <span>Ouvrir</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Email section details */}
+                        {sendToEmail && managerEmail && (
+                          <div className="pt-2 border-t border-dashed border-gray-100">
+                            <label className="block text-[8px] font-mono font-black uppercase text-indigo-500 tracking-[0.1em] mb-1">Rapport de Vente Email</label>
+                            <input 
+                              type="text" 
+                              readOnly
+                              value={managerEmail}
+                              className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-bold text-gray-600 outline-none"
+                            />
+                            <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-indigo-600 font-semibold bg-indigo-50/50 p-2 rounded-lg">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                              Email envoyé en arrière-plan avec succès !
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 mt-4">
+                      <div className="text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Aperçu du texte :</div>
+                      <div className="text-[9px] text-gray-500 font-mono leading-relaxed line-clamp-3 select-all">
+                        🧾 *NOUVELLE VENTE - CAISSE POS* 🧾<br/>
+                        🌐 *Boutique :* {merchant.name}<br/>
+                        💰 *TOTAL :* {showReceiptModal.saleData?.totalAmount?.toLocaleString()} {merchant.currency}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                {/* Section Facture A4 */}
-                <div>
-                  <div className="text-[9px] font-mono font-black uppercase text-emerald-500 tracking-[0.2em] mb-2">Format Facture A4</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button 
-                      onClick={() => {
-                        printDirectHTML(merchant, 'invoice', showReceiptModal.saleData);
-                      }}
-                      className="py-3 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Imprimer</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        generateA4InvoicePDF(merchant, showReceiptModal.saleData, 'download');
-                      }}
-                      className="py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Télécharger</span>
-                    </button>
+              ) : (
+                /* Fallback centered template without WhatsApp tracking */
+                <>
+                  <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle className="w-10 h-10 text-emerald-500" />
                   </div>
-                </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Vente Réussie !</h3>
+                  <p className="text-gray-500 mb-8">La transaction a été enregistrée avec succès.</p>
+                  
+                  <div className="space-y-4 text-left">
+                    <div>
+                      <div className="text-[9px] font-mono font-black uppercase text-amber-500 tracking-[0.2em] mb-2">Format Ticket POS</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={() => {
+                            printDirectHTML(merchant, 'receipt', showReceiptModal.saleData);
+                          }}
+                          className="py-3 bg-amber-500 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-amber-600 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Imprimer</span>
+                        </button>
+                        <button 
+                          onClick={() => {
+                            generateReceiptPDF(merchant, showReceiptModal.saleData, 'download');
+                          }}
+                          className="py-3 bg-amber-50 text-amber-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-amber-100 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Télécharger</span>
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Section WhatsApp Manager */}
-                {showReceiptModal.whatsappUrl && (
-                  <div>
-                    <div className="text-[9px] font-mono font-black uppercase text-indigo-500 tracking-[0.2em] mb-2">Notification Manager</div>
-                    <button 
-                      onClick={() => {
-                        window.open(showReceiptModal.whatsappUrl, '_blank');
-                      }}
-                      className="w-full py-3 bg-indigo-50 text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-indigo-100 transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Smartphone className="w-3.5 h-3.5" />
-                      <span>Envoyer au Manager via WhatsApp</span>
-                    </button>
+                    <div>
+                      <div className="text-[9px] font-mono font-black uppercase text-emerald-500 tracking-[0.2em] mb-2">Format Facture A4</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={() => {
+                            printDirectHTML(merchant, 'invoice', showReceiptModal.saleData);
+                          }}
+                          className="py-3 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>Imprimer</span>
+                        </button>
+                        <button 
+                          onClick={() => {
+                            generateA4InvoicePDF(merchant, showReceiptModal.saleData, 'download');
+                          }}
+                          className="py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[11px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Télécharger</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <button 
+                        onClick={() => setShowReceiptModal(null)}
+                        className="w-full py-3 bg-gray-50 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-black/5 text-center"
+                      >
+                        Fermer
+                      </button>
+                    </div>
                   </div>
-                )}
-
-                <div className="pt-2">
-                  <button 
-                    onClick={() => setShowReceiptModal(null)}
-                    className="w-full py-3 bg-gray-50 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-black/5 text-center"
-                  >
-                    Fermer
-                  </button>
-                </div>
-              </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}
