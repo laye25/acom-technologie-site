@@ -41,7 +41,7 @@ async function fetchIcon() {
         
         // Provide a white background if original has transparency but user uploaded something weird,
         // though jimp handles PNG transparency well. We just resize and format as PNG.
-        image.resize({ w: 256, h: 256 }); // resize to square 256x256
+        image.resize({ w: 512, h: 512 }); // resize to square 512x512
         
         const outPath = path.resolve('public', 'icon.png');
         await image.write(outPath);
