@@ -18,6 +18,7 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
       CSC_SKIP_SIGNING: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repository
@@ -26,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
