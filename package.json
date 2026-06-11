@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "node copy-sqlite.js && tsx server.ts",
     "start": "node copy-sqlite.js && node server.ts",
-    "build": "node copy-sqlite.js && vite build",
+    "build": "node copy-sqlite.js && NODE_OPTIONS=--max-old-space-size=4096 vite build",
     "build:desktop": "npm run build && electron-builder",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
@@ -55,6 +55,7 @@
     "@stripe/stripe-js": "^8.11.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/jest": "^30.0.0",
+    "@vis.gl/react-google-maps": "^1.8.3",
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

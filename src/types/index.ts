@@ -519,6 +519,8 @@ export interface Merchant {
   description?: string;
   logo?: string;
   address?: string;
+  lat?: number;
+  lng?: number;
   phone?: string;
   email?: string;
   currency: string;
@@ -530,6 +532,12 @@ export interface Merchant {
     levels: Record<string, any>;
     classes: Record<string, any>;
     exceptions: Record<string, any>;
+  };
+  managerNotifications?: {
+    whatsappPhone?: string;
+    email?: string;
+    notifyOnCashClosure?: boolean;
+    notifyOnPOSSale?: boolean;
   };
 }
 

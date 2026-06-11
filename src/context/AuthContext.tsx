@@ -135,7 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // After sync attempt, checking one last time
                 localDb.users.get(currentUser.uid).then(profile => {
                   if (!profile) {
-                    createProfileIfMissing(currentUser);
+                    createProfileIfMissing(currentUser).finally(() => setLoading(false));
+                  } else {
+                    setLoading(false);
                   }
                 });
               }).catch(err => {

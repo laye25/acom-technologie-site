@@ -17,6 +17,8 @@ import Dashboard from './pages/Dashboard';
 const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
 const MerchantSaaS = React.lazy(() => import('./pages/MerchantSaaS'));
 const DesignEditor = React.lazy(() => import('./pages/DesignEditor'));
+const AcomZone = React.lazy(() => import('./pages/AcomZone'));
+const AcomZoneMerchant = React.lazy(() => import('./pages/AcomZoneMerchant'));
 import Chat from './pages/Chat';
 import OrderDetails from './pages/OrderDetails';
 import OrderQuote from './pages/OrderQuote';
@@ -126,6 +128,8 @@ function AppContent() {
             <Route path="/portal/teacher" element={<ProtectedRoute><TeacherPortal /></ProtectedRoute>} />
             <Route path="/partner-portal" element={<ProtectedRoute><PartnerPortal /></ProtectedRoute>} />
             <Route path="/solutions-saas" element={<SaaSSolutions />} />
+            <Route path="/acomzone" element={<AcomZone />} />
+            <Route path="/acomzone/:merchantId" element={<AcomZoneMerchant />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/prix" element={<Pricing />} />
             <Route path="/design-editor" element={<ProtectedRoute><DesignEditor /></ProtectedRoute>} />

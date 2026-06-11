@@ -265,7 +265,8 @@ const Home = () => {
                     'Gestion de transport & flotte',
                     'Ressources Humaines (RH)',
                     'Gestion scolaire',
-                    'Gestion médicale'
+                    'Gestion médicale',
+                    'Gestion de pressing'
                   ]).map((item, i) => (
                     <li key={i} className="flex items-center text-xs font-medium text-white/80">
                       <CheckCircle2 className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />

@@ -96,6 +96,7 @@ const Navbar = () => {
 
   const navLinks = [
     { name: 'Services', path: '/' },
+    { name: 'AcomZone', path: '/acomzone' },
     { name: 'Design', path: '/design-editor' },
     { name: 'Portfolio', path: '/portfolio' },
     { name: 'Tarifs', path: '/prix' },

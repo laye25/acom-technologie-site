@@ -14,7 +14,7 @@ import { Merchant, MerchantProduct, MerchantSale, MerchantQuote, MerchantQuoteIt
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, Package, ShoppingCart, PieChart, Plus, Trash2, Trash2 as Trash,
-  Edit2, Search, Loader2, Save, X, TrendingUp, Download,
+  Edit2, Search, Loader2, Save, X, TrendingUp, Download, Eye,
   DollarSign, ArrowUpRight, ArrowDownRight, AlertCircle,
   BarChart3, Settings, User, Phone, Mail, MapPin,
   Calculator, Receipt, CreditCard, Smartphone, Banknote,
@@ -24,7 +24,7 @@ import {
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
   Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket,
   Filter, SlidersHorizontal, ArrowUpDown, Tag, Scissors, Palette, ScanLine, PenTool, BookOpen,
-  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key, Bus, Utensils
+  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key, Bus, Utensils, WashingMachine
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -55,6 +55,7 @@ import { LogOut } from 'lucide-react';
 import { ScheduleManager } from '../components/admin/ScheduleManager';
 import { SchoolScheduleManager } from '../components/admin/SchoolScheduleManager';
 import { StudentPortalsManager } from '../components/admin/StudentPortalsManager';
+import { CashClosureManager } from '../components/admin/CashClosureManager';
 
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
@@ -1988,6 +1989,18 @@ const MerchantSaaS = () => {
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
         break;
+      case 'pressing':
+        tabs = [
+          { id: 'dashboard', label: 'Aperçu', icon: PieChart },
+          { id: 'pressing_receipt', label: '🧺 Fiche Réception', icon: ClipboardList },
+          { id: 'pressing_stock', label: 'Vente & Stock', icon: Package },
+          { id: 'pressing_tarifs', label: '⚙️ Paramètres Tarifs', icon: DollarSign },
+          { id: 'pressing_closure', label: '🔒 Clôture de Caisse', icon: LockIcon },
+          { id: 'accounting', label: 'Compta', icon: BarChart3 },
+          { id: 'reports', label: 'Rapports', icon: FileText },
+          { id: 'settings', label: 'Réglages', icon: Settings },
+        ];
+        break;
       default: // boutique
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
@@ -1997,6 +2010,7 @@ const MerchantSaaS = () => {
           { id: 'billing', label: 'Facture/Devis', icon: Receipt },
           { id: 'audit', label: 'Audit', icon: Clock },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
+          { id: 'cash_closure', label: 'Clôture de Caisse', icon: LockIcon },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
@@ -2200,7 +2214,9 @@ const MerchantSaaS = () => {
           {activeTab === 'pos' && <MerchantPOS key="pos" merchant={merchant} setShowUpgradeModal={setShowUpgradeModal} />}
           {activeTab === 'audit' && <MerchantAuditLog key="audit" merchant={merchant} />}
           {activeTab === 'billing' && <MerchantBilling key="billing" merchant={merchant} />}
-          {activeTab.startsWith('fin_') && <MerchantAccounting key="accounting" merchant={merchant} subTab={activeTab.replace('fin_', '')} />}
+          {(activeTab === 'accounting' || activeTab.startsWith('fin_')) && <MerchantAccounting key="accounting" merchant={merchant} subTab={activeTab.startsWith('fin_') ? activeTab.replace('fin_', '') : undefined} />}
+          {activeTab === 'cash_closure' && <CashClosureManager key="cash_closure" merchant={merchant} />}
+          {activeTab === 'pressing_closure' && <PressingClosureManager key="pressing_closure" merchant={merchant} />}
           {activeTab === 'reports' && <MerchantReports key="reports" merchant={merchant} />}
           {activeTab === 'settings' && <MerchantSettings key="settings" merchant={merchant} onUpdate={(m) => setMerchant(m)} setActiveTab={setActiveTab} />}
           {activeTab === 'build' && <MerchantBuild key="build" merchant={merchant as any} />}
@@ -2223,6 +2239,9 @@ const MerchantSaaS = () => {
           {activeTab === 'ai' && <AIEducationManager key="ai" merchant={merchant} />}
           {activeTab === 'patients' && <MedicalManager key="patients" merchant={merchant} />}
           {activeTab === 'appointments' && <AppointmentManager key="appointments" merchant={merchant} />}
+          {activeTab === 'pressing_receipt' && <PressingReceiptManager key="pressing_receipt" merchant={merchant} />}
+          {activeTab === 'pressing_stock' && <PressingStockManager key="pressing_stock" merchant={merchant} />}
+          {activeTab === 'pressing_tarifs' && <PressingTarifsManager key="pressing_tarifs" merchant={merchant} />}
         </AnimatePresence>
 
         {/* SaaS Footer */}
@@ -2420,6 +2439,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     { id: 'rh', label: 'Ressources Humaines', icon: Users, color: 'text-rose-500', bgColor: 'bg-rose-50' },
     { id: 'scolaire', label: 'Établissement Scolaire', icon: GraduationCap, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
     { id: 'medical', label: 'Établissement Médical', icon: Stethoscope, color: 'text-red-500', bgColor: 'bg-red-50' },
+    { id: 'pressing', label: 'Gestion de Pressing', icon: WashingMachine, color: 'text-cyan-500', bgColor: 'bg-cyan-50' },
   ];
 
   const plans = PAYMENT_PLANS;
@@ -2438,6 +2458,8 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         return { label: "l'établissement scolaire", placeholder: "ex: École Excellence" };
       case 'medical':
         return { label: "l'établissement médical", placeholder: "ex: Clinique du Parc" };
+      case 'pressing':
+        return { label: "le pressing / laverie", placeholder: "ex: Pressing Prestige" };
       default:
         return { label: "votre organisation", placeholder: "ex: Mon Entreprise / Établissement" };
     }
@@ -3879,6 +3901,10 @@ const MerchantDashboard = ({
     const totalStockValue = products.reduce((acc, p) => acc + (Number(p.price || 0) * Number(p.stockQuantity || 0)), 0);
     const totalStockProfit = products.reduce((acc, p) => acc + ((Number(p.price || 0) - Number(p.costPrice || 0)) * Number(p.stockQuantity || 0)), 0);
 
+    const cashFlowMonth = revenue.month - expensesStats.month;
+    const totalSalesCountMonth = salesMonth.length;
+    const averageOrderValueMonth = salesMonth.length > 0 ? revenue.month / salesMonth.length : 0;
+
     return {
       revenue,
       expenses: expensesStats,
@@ -3887,6 +3913,9 @@ const MerchantDashboard = ({
       grossProfitMonth: revenue.month - cogsMonth,
       totalStockValue,
       totalStockProfit,
+      cashFlowMonth,
+      totalSalesCountMonth,
+      averageOrderValueMonth,
       lowStockCount: products.filter(p => Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length,
       totalProducts: products.length,
       specialized: {
@@ -4457,15 +4486,18 @@ const MerchantDashboard = ({
             </div>
           </>
         )}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${(merchant.type === 'boutique' || !merchant.type) ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${(merchant.type === 'boutique' || !merchant.type) ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-4'}`}>
 
         {merchant.type === 'boutique' || !merchant.type ? (
           <>
             <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
-            <StatCard title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-indigo-600" bgColor="bg-indigo-50" description={`${dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} - Hors dépenses`} />
-            <StatCard title="Dépenses" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
+            <StatCard title="Flux de Trésorerie" value={stats.cashFlowMonth} currency={merchant.currency} icon={Banknote} color={stats.cashFlowMonth >= 0 ? "text-indigo-600" : "text-rose-600"} bgColor={stats.cashFlowMonth >= 0 ? "bg-indigo-50" : "bg-rose-50"} description="Entrées - Sorties" />
+            <StatCard title="Dépenses Opérationnelles" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
             <StatCard title="Bénéfice Net" value={stats.netProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
-            <StatCard title="Stock Faible" value={stats.lowStockCount} icon={AlertCircle} color={stats.lowStockCount > 0 ? "text-amber-600" : "text-emerald-600"} bgColor={stats.lowStockCount > 0 ? "bg-amber-50" : "bg-emerald-50"} description={`${stats.totalProducts} produits au total`} />
+            <StatCard title="Volume des Ventes" value={stats.totalSalesCountMonth} icon={CreditCard} color="text-blue-600" bgColor="bg-blue-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Transactions réalisées ce mois" : "Transactions sur la période"} />
+            <StatCard title="Panier Moyen" value={stats.averageOrderValueMonth} currency={merchant.currency} icon={ShoppingCart} color="text-teal-600" bgColor="bg-teal-50" description="Valeur moyenne par achat" />
+            <StatCard title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={BarChart3} color="text-cyan-600" bgColor="bg-cyan-50" description="Marge brute globale sur la période" />
+            <StatCard title="Alertes Stock" value={stats.lowStockCount} icon={AlertCircle} color={stats.lowStockCount > 0 ? "text-amber-600" : "text-emerald-600"} bgColor={stats.lowStockCount > 0 ? "bg-amber-50" : "bg-emerald-50"} description={`${stats.totalProducts} produits au total`} />
           </>
         ) : (
           <>
@@ -6374,10 +6406,18 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [cartError, setCartError] = useState<string | null>(null);
   const cartErrorTimeoutRef = useRef<any>(null);
-  const [sendToWhatsApp, setSendToWhatsApp] = useState(true);
-  const [managerPhone, setManagerPhone] = useState(merchant.phone || '');
-  const [sendToEmail, setSendToEmail] = useState(true);
-  const [managerEmail, setManagerEmail] = useState(merchant.email || '');
+  const [sendToWhatsApp, setSendToWhatsApp] = useState(() => merchant.managerNotifications?.notifyOnPOSSale !== false);
+  const [managerPhone, setManagerPhone] = useState(() => merchant.managerNotifications?.whatsappPhone || merchant.phone || '');
+  const [sendToEmail, setSendToEmail] = useState(() => merchant.managerNotifications?.notifyOnPOSSale !== false);
+  const [managerEmail, setManagerEmail] = useState(() => merchant.managerNotifications?.email || merchant.email || '');
+
+  // Keep POS manager notification states in sync with unified settings
+  useEffect(() => {
+    setSendToWhatsApp(merchant.managerNotifications?.notifyOnPOSSale !== false);
+    setSendToEmail(merchant.managerNotifications?.notifyOnPOSSale !== false);
+    setManagerPhone(merchant.managerNotifications?.whatsappPhone || merchant.phone || '');
+    setManagerEmail(merchant.managerNotifications?.email || merchant.email || '');
+  }, [merchant.managerNotifications, merchant.phone, merchant.email]);
   const [emailSendStatus, setEmailSendStatus] = useState<'idle' | 'sending' | 'success' | 'error' | 'simulated'>('idle');
   const [emailSendError, setEmailSendError] = useState<string | null>(null);
 
@@ -8286,18 +8326,10 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
   }
 
   const [isAddingExpense, setIsAddingExpense] = useState(false);
+  const [expenseDate, setExpenseDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [newExpense, setNewExpense] = useState({ title: '', amount: 0, category: 'Général', description: '' });
   const [saving, setSaving] = useState(false);
   const [expenseLimit, setExpenseLimit] = useState(10);
-
-  // const expenseOptions = useMemo(() => ({
-  //   where: [['merchantId', '==', merchant.id]],
-  //   order: { column: 'createdAt' as const, direction: 'desc' as const },
-  //   limit: 100,
-  //   realtime: false
-  // }), [merchant.id]);
-
-  // const { data: expenses, loading } = useFirestoreData<MerchantExpense>(expenseOptions);
 
   useEffect(() => {
     syncService.syncExpenses(merchant.id);
@@ -8316,12 +8348,13 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       await dbService.merchantExpenses.save({
         ...newExpense,
         merchantId: merchant.id,
-        date: new Date().toISOString()
+        date: expenseDate ? new Date(expenseDate).toISOString() : new Date().toISOString()
       });
       syncService.syncExpenses(merchant.id);
-      // toast.success('Dépense enregistrée');
       setIsAddingExpense(false);
       setNewExpense({ title: '', amount: 0, category: 'Général', description: '' });
+      setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
+      toast.success('Dépense enregistrée avec succès !');
     } catch (error) {
       toast.error('Erreur lors de l\'enregistrement');
     } finally {
@@ -8342,7 +8375,11 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
           <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des flux financiers & dépenses</p>
         </div>
         <button 
-          onClick={() => setIsAddingExpense(true)} 
+          onClick={() => {
+            setNewExpense({ title: '', amount: 0, category: 'Général', description: '' });
+            setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
+            setIsAddingExpense(true);
+          }} 
           className="w-full sm:w-auto flex items-center justify-center space-x-2 px-6 py-3 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 hover:scale-105"
         >
           <Plus className="w-4 h-4" />
@@ -8378,6 +8415,9 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                   <tr key={expense.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-8 py-5">
                       <p className="font-black text-ink text-sm leading-tight">{expense.title}</p>
+                      {expense.description && (
+                        <p className="text-xs text-gray-500 mt-1 italic font-medium">✏️ {expense.description}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-1.5">
                         <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">REF: {expense.id.slice(0, 8)}</p>
                         {(expense as any).syncStatus && (
@@ -8402,7 +8442,16 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                     </td>
                     <td className="px-8 py-5">
                       <p className="text-[11px] font-mono font-black text-ink uppercase">
-                        {expense.createdAt?.seconds ? format(new Date(expense.createdAt.seconds * 1000), 'dd/MM/yyyy') : '-'}
+                        {(() => {
+                          const rawDate = expense.date || expense.createdAt;
+                          if (!rawDate) return '-';
+                          try {
+                            const d = (rawDate as any).seconds ? new Date((rawDate as any).seconds * 1000) : new Date(rawDate as any);
+                            return format(d, 'dd/MM/yyyy');
+                          } catch {
+                            return '-';
+                          }
+                        })()}
                       </p>
                     </td>
                     <td className="px-8 py-5 text-right">
@@ -8434,7 +8483,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
-              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
             >
               <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <div>
@@ -8457,10 +8506,55 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                     <input type="number" required value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-mono font-bold" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
-                    <input type="text" value={newExpense.category} onChange={e => setNewExpense({...newExpense, category: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-bold" />
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Date de Dépense</label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={expenseDate} 
+                      onChange={e => setExpenseDate(e.target.value)} 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-mono font-bold text-sm" 
+                    />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie (Sélectionnez ou saisissez)</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Approvisionnement', 'Salaires', 'Loyer & Factures', 'Électricité / Eau', 'Machines', 'Divers'].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setNewExpense({ ...newExpense, category: cat })}
+                        className={`py-2.5 px-3 text-[10px] font-bold rounded-xl border transition-all ${
+                          newExpense.category === cat 
+                            ? 'bg-rose-50 border-rose-200 text-rose-600 ring-2 ring-rose-500/10 font-bold' 
+                            : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50 font-medium'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="Saisir autre catégorie..." 
+                    value={newExpense.category} 
+                    onChange={e => setNewExpense({...newExpense, category: e.target.value})} 
+                    className="w-full mt-3 px-4 py-2.5 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 text-xs font-bold" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Description / Justification (Optionnel)</label>
+                  <textarea 
+                    rows={2}
+                    placeholder="Saisissez des détails supplémentaires sur cette dépense..." 
+                    value={newExpense.description} 
+                    onChange={e => setNewExpense({...newExpense, description: e.target.value})} 
+                    className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 text-xs font-medium" 
+                  />
+                </div>
+
                 <div className="flex space-x-3 pt-4">
                   <button type="button" onClick={() => setIsAddingExpense(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
                   <button type="submit" disabled={saving} className="flex-[2] py-4 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">
@@ -10287,6 +10381,92 @@ const MerchantSettings = ({
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h3 className="text-2xl font-black text-ink">Suivi Gérant (Temps Réel)</h3>
+            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Configuration WhatsApp & E-mail (Clôture / POS)</p>
+          </div>
+          <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center border border-indigo-100">
+            <MessageSquare className="w-7 h-7 text-indigo-600" />
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-[2rem] p-8 border border-black/5 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">WhatsApp Gérant (avec indicatif)</label>
+              <input
+                type="text"
+                value={formData.managerNotifications?.whatsappPhone || ''}
+                onChange={e => setFormData({
+                  ...formData,
+                  managerNotifications: { ...(formData.managerNotifications || {}), whatsappPhone: e.target.value }
+                })}
+                placeholder="ex: +221771234567"
+                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">E-mail Gérant</label>
+              <input
+                type="email"
+                value={formData.managerNotifications?.email || ''}
+                onChange={e => setFormData({
+                  ...formData,
+                  managerNotifications: { ...(formData.managerNotifications || {}), email: e.target.value }
+                })}
+                placeholder="gerant@boutique.com"
+                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <label className="flex items-center p-4 bg-white border border-gray-200 rounded-2xl cursor-pointer hover:border-indigo-300 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.managerNotifications?.notifyOnCashClosure !== false}
+                onChange={e => setFormData({
+                  ...formData,
+                  managerNotifications: { ...(formData.managerNotifications || {}), notifyOnCashClosure: e.target.checked }
+                })}
+                className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+              />
+              <div className="ml-4">
+                <p className="font-bold text-ink text-sm">Clôture de Caisse</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-mono">Notifier automatiquement</p>
+              </div>
+            </label>
+
+            <label className="flex items-center p-4 bg-white border border-gray-200 rounded-2xl cursor-pointer hover:border-indigo-300 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.managerNotifications?.notifyOnPOSSale !== false}
+                onChange={e => setFormData({
+                  ...formData,
+                  managerNotifications: { ...(formData.managerNotifications || {}), notifyOnPOSSale: e.target.checked }
+                })}
+                className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500 cursor-pointer"
+              />
+              <div className="ml-4">
+                <p className="font-bold text-ink text-sm">Vente Caisse POS</p>
+                <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-mono">Notifier automatiquement</p>
+              </div>
+            </label>
+          </div>
+          
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full mt-4 flex items-center justify-center space-x-2 bg-indigo-600 text-white rounded-2xl py-4 font-bold shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            <span>Sauvegarder les alertes</span>
+          </button>
         </div>
       </div>
 
@@ -22484,7 +22664,7 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
                 <h3 className="text-xl font-bold text-ink">Détails du Rendez-vous</h3>
                 <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Planification & Ressources</p>
               </div>
-              <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+              <button type="button" onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
@@ -22530,12 +22710,4351 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
             </form>
 
             <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
-              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
-              <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+              <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors border-none">Annuler</button>
+              <button type="button" onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le rendez-vous'}
               </button>
             </div>
           </motion.div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+// ==========================================
+// 8. Pressing Manager (Gestion de pressing)
+// ==========================================
+
+interface PressingTarifs {
+  articles: {
+    chemise: number;
+    pantalon: number;
+    costume: number;
+    robe: number;
+    drap: number;
+    couverture: number;
+    rideau: number;
+    autre: number;
+  };
+  poids: {
+    standard: number;
+    premium: number;
+    express: number;
+  };
+}
+
+const DEFAULT_TARIFS: PressingTarifs = {
+  articles: {
+    chemise: 500,
+    pantalon: 700,
+    costume: 1500,
+    robe: 1000,
+    drap: 800,
+    couverture: 2000,
+    rideau: 1500,
+    autre: 500
+  },
+  poids: {
+    standard: 1000,
+    premium: 1500,
+    express: 2000
+  }
+};
+
+interface PressingTicket {
+  id: string;
+  ticketNumber: string;
+  clientName: string;
+  clientPhone: string;
+  clientEmail?: string;
+  depositDate: string;
+  expectedDeliveryDate?: string;
+  billingType: 'article' | 'poids';
+  articles: { [key: string]: number };
+  weightService: 'standard' | 'premium' | 'express';
+  weightKg: number;
+  supplements: {
+    repassage: boolean;
+    express: boolean;
+    detachage: boolean;
+    livraison: boolean;
+    premiumPack: boolean;
+  };
+  supplementTarifs: {
+    repassage: number;
+    express: number;
+    detachage: number;
+    livraison: number;
+    premiumPack: number;
+  };
+  discount: number;
+  subtotal: number;
+  supplementTotal: number;
+  total: number;
+  status: 'deposed' | 'in_progress' | 'ready' | 'delivered';
+  paymentStatus?: 'unpaid' | 'partial' | 'paid';
+  paymentMethod?: 'cash' | 'mobile_money' | 'card' | 'other';
+  amountPaid?: number;
+  notes?: string;
+  sentNotifications?: { id: string; type: 'whatsapp' | 'email'; templateName: string; msg: string; timestamp: string }[];
+}
+
+const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
+  const [tarifs, setTarifs] = useState<PressingTarifs>(() => {
+    const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
+    return saved ? JSON.parse(saved) : DEFAULT_TARIFS;
+  });
+
+  const handleSave = () => {
+    localStorage.setItem(`pressing_tarifs_${merchant.id}`, JSON.stringify(tarifs));
+    toast.success('Tarifs de pressing sauvegardés avec succès !');
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div>
+          <h2 className="text-2xl font-black text-ink tracking-tight flex items-center gap-2">
+            <WashingMachine className="w-7 h-7 text-cyan-500 animate-pulse" /> Paramétrage des Tarifs
+          </h2>
+          <p className="text-gray-500 text-xs mt-1">Définissez vos grilles tarifaires par article ou par kilo (Kg).</p>
+        </div>
+        <button
+          onClick={handleSave}
+          className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
+        >
+          <Save className="w-4 h-4" /> Enregistrer les Tarifs
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Article Billing */}
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
+          <div className="border-b border-gray-100 pb-4">
+            <h3 className="text-lg font-black text-ink flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-indigo-500" /> Tarifs par Article (Vêtements)
+            </h3>
+            <p className="text-gray-400 text-xs mt-0.5">Tarifs unitaires appliqués lors du dépôt de vêtements individuels.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {Object.keys(tarifs.articles).map((key) => {
+              const typedKey = key as keyof typeof tarifs.articles;
+              return (
+                <div key={key} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col gap-2">
+                  <span className="font-bold text-xs text-ink uppercase tracking-wider capitalize">{key}</span>
+                  <div className="relative flex items-center">
+                    <input
+                      type="number"
+                      value={tarifs.articles[typedKey]}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                        setTarifs({
+                          ...tarifs,
+                          articles: { ...tarifs.articles, [key]: val }
+                        });
+                      }}
+                      className="w-full pl-4 pr-16 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Weight Billing (Kg) */}
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
+          <div className="border-b border-gray-100 pb-4">
+            <h3 className="text-lg font-black text-ink flex items-center gap-2">
+              <WashingMachine className="w-5 h-5 text-cyan-500" /> Tarifs au Kilogramme (Kg)
+            </h3>
+            <p className="text-gray-400 text-xs mt-0.5">Recommandé pour les sacs de linge en vrac, laverie standard et blanchisseries.</p>
+          </div>
+
+          <div className="space-y-4">
+            {Object.keys(tarifs.poids).map((key) => {
+              const typedKey = key as keyof typeof tarifs.poids;
+              const labels: { [key: string]: string } = {
+                standard: 'Lavage Standard',
+                premium: 'Lavage Premium / Délicat',
+                express: 'Lavage Express 24h'
+              };
+              return (
+                <div key={key} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-gray-50 rounded-2xl border border-gray-100 gap-4">
+                  <div>
+                    <span className="font-bold text-sm text-ink block">{labels[key]}</span>
+                    <span className="text-[10px] text-gray-400">Prise en charge professionnelle</span>
+                  </div>
+                  <div className="relative flex items-center w-full sm:w-48">
+                    <input
+                      type="number"
+                      value={tarifs.poids[typedKey]}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                        setTarifs({
+                          ...tarifs,
+                          poids: { ...tarifs.poids, [key]: val }
+                        });
+                      }}
+                      className="w-full pl-4 pr-20 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA/Kg</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+interface PressingClosure {
+  id: string;
+  date: string;
+  timestamp: string;
+  cashierName: string;
+  totalPressingRevenue: number;
+  totalDetergentRevenue: number;
+  totalExpenses?: number; // added to support expenses
+  totalTheoreticalRevenue: number;
+  actualCashCounted: number;
+  discrepancy: number; // actual - theoretical
+  notes: string;
+  status: 'closed';
+  sentToManager?: boolean;
+}
+
+const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
+  const [closures, setClosures] = useState<PressingClosure[]>(() => {
+    const saved = localStorage.getItem(`pressing_closures_${merchant.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [closureDate, setClosureDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [cashierName, setCashierName] = useState('');
+  const [actualCash, setActualCash] = useState<number>(0);
+  const [closureNotes, setClosureNotes] = useState('');
+
+  const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+  const managerEmail = merchant.managerNotifications?.email || '';
+  const autoEmailManager = merchant.managerNotifications?.notifyOnCashClosure !== false;
+
+  useEffect(() => {
+    localStorage.setItem(`pressing_closures_${merchant.id}`, JSON.stringify(closures));
+  }, [closures, merchant.id]);
+
+  // Read direct database inputs
+  const tickets = useMemo<PressingTicket[]>(() => {
+    try {
+      const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, closures]);
+
+  const detergentSales = useMemo<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(`pressing_stock_sales_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, closures]);
+
+  // Fetch local expenses using safe useLiveQuery
+  const expenses = useLiveQuery(() => 
+    db.expenses.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
+  , []) || [];
+
+  // Memos for daily stats
+  const dailyPressingTickets = useMemo(() => {
+    return tickets.filter(t => t.depositDate === closureDate);
+  }, [tickets, closureDate]);
+
+  const dailyPressingRevenue = useMemo(() => {
+    return dailyPressingTickets.reduce((sum, t) => sum + (t.amountPaid || 0), 0);
+  }, [dailyPressingTickets]);
+
+  const dailyDetergentSales = useMemo(() => {
+    return detergentSales.filter(s => s.date && s.date.startsWith(closureDate));
+  }, [detergentSales, closureDate]);
+
+  const dailyDetergentRevenue = useMemo(() => {
+    return dailyDetergentSales.reduce((sum, s) => sum + (s.total || 0), 0);
+  }, [dailyDetergentSales]);
+
+  // Expenses filter
+  const dailyExpenses = useMemo(() => {
+    return expenses.filter(e => {
+      if (e.date && e.date.startsWith(closureDate)) return true;
+      if (e.createdAt) {
+        try {
+          const d = e.createdAt.seconds ? new Date(e.createdAt.seconds * 1000) : new Date(e.createdAt);
+          return d.toISOString().startsWith(closureDate);
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    });
+  }, [expenses, closureDate]);
+
+  const dailyExpensesTotal = useMemo(() => {
+    return dailyExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  }, [dailyExpenses]);
+
+  // Expected cash in hand including expenditures
+  const totalTheoreticalRevenue = useMemo(() => {
+    return Math.max(0, dailyPressingRevenue + dailyDetergentRevenue - dailyExpensesTotal);
+  }, [dailyPressingRevenue, dailyDetergentRevenue, dailyExpensesTotal]);
+
+  const getManagerClosureNotificationMessage = useCallback((c: PressingClosure) => {
+    const diffSign = c.discrepancy >= 0 ? '+' : '';
+    const diffText = c.discrepancy === 0 ? 'Parfait (0 FCFA)' : `${diffSign}${c.discrepancy} FCFA`;
+    
+    return `👑 [CLÔTURE DE CAISSE DE PRESSING] 📊\n` +
+           `--------------------------------\n` +
+           `• Date d'Activité : ${c.date}\n` +
+           `• Date Clôture : ${new Date(c.timestamp).toLocaleString('fr-FR')}\n` +
+           `• Caissier / Opérateur : ${c.cashierName || 'Non renseigné'}\n` +
+           `--------------------------------\n` +
+           `RÉSUMÉ DES FLUX :\n` +
+           `• Recettes Services Pressing : +${c.totalPressingRevenue.toLocaleString()} FCFA\n` +
+           `• Ventes Produits Détergents : +${c.totalDetergentRevenue.toLocaleString()} FCFA\n` +
+           `• Dépenses Enregistrées : -${(c.totalExpenses || 0).toLocaleString()} FCFA\n` +
+           `--------------------------------\n` +
+           `• SOLDE ATTENDU (Théorique) : ${c.totalTheoreticalRevenue.toLocaleString()} FCFA\n` +
+           `• ESPÈCES RÉELLES COMPTÉES : ${c.actualCashCounted.toLocaleString()} FCFA\n` +
+           `• ÉCART DE CAISSE : ${diffText} (${c.discrepancy < 0 ? '⚠️ MANQUANT' : c.discrepancy > 0 ? '🟢 SURPLUS' : '✅ EQUILIBRE'})\n` +
+           `--------------------------------\n` +
+           `OBSERVATIONS :\n` +
+           `"${c.notes || 'Aucun commentaire.'}"\n` +
+           `--------------------------------\n` +
+           `Rapport de clôture journalier transmis en Temps Réel via l'application SaaS ${merchant.name || 'ACOM'}.`;
+  }, [merchant]);
+
+  const sendSilentBackgroundClosureEmailToManager = useCallback(async (c: PressingClosure) => {
+    if (!managerEmail || !managerEmail.trim()) return false;
+
+    const title = `📊 CLÔTURE DE CAISSE JOURNALIÈRE — ${c.date}`;
+    const themeColor = '#1e1b4b'; // Deep Navy indigo
+    const diffColor = c.discrepancy < 0 ? '#ef4444' : c.discrepancy > 0 ? '#10b981' : '#64748b';
+    const diffLabel = c.discrepancy < 0 ? 'MANQUANT (Perte) ⚠️' : c.discrepancy > 0 ? 'SURPLUS (Excédent) 🟢' : 'ÉQUILIBRÉ 👍';
+
+    const mailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+        <div style="background-color: ${themeColor}; color: white; padding: 20px; border-radius: 8px; text-align: center;">
+          <h2 style="margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Pressing'}</h2>
+          <p style="margin: 5px 0 0; font-size: 13px; opacity: 0.9;">Rapport de Clôture de Caisse Journalier</p>
+        </div>
+
+        <div style="margin-top: 25px;">
+          <h3 style="color: ${themeColor}; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">📊 État de la Caisse (Intègre les dépenses)</h3>
+          
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 200px;"><strong>Date d'Activité :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${c.date}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Heure de Clôture :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9;">${new Date(c.timestamp).toLocaleTimeString('fr-FR')}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Caissier / Gestionnaire :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${c.cashierName || 'Non renseigné'}</td>
+            </tr>
+            
+            <tr>
+              <td colspan="2" style="padding: 15px 0 5px 0; font-weight: bold; color: ${themeColor}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">DÉTAIL DES FLUX :</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">• Recettes Services Pressing :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #10b981;">+${c.totalPressingRevenue.toLocaleString()} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">• Ventes Détergents & Produits :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #10b981;">+${c.totalDetergentRevenue.toLocaleString()} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">• Total Dépenses du Jour :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #ef4444;">-${(c.totalExpenses || 0).toLocaleString()} FCFA</td>
+            </tr>
+            
+            <tr>
+              <td colspan="2" style="padding: 15px 0 5px 0; font-weight: bold; color: ${themeColor}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">RAPPROCHEMENT DE CAISSE :</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Total Théorique Attendu :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; font-size: 14px;">${c.totalTheoreticalRevenue.toLocaleString()} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Espèces Réelles Comptées :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; font-size: 14px; color: #1e1b4b;">${c.actualCashCounted.toLocaleString()} FCFA</td>
+            </tr>
+            <tr style="background-color: #f8fafc;">
+              <td style="padding: 12px 10px; color: #0f172a; font-weight: bold;"><strong>ÉCART DE CAISSE :</strong></td>
+              <td style="padding: 12px 10px; font-weight: bold; font-size: 15px; color: ${diffColor};">
+                ${c.discrepancy >= 0 ? '+' : ''}${c.discrepancy.toLocaleString()} FCFA
+                <div style="font-size: 11px; font-weight: normal; margin-top: 2px;">${diffLabel}</div>
+              </td>
+            </tr>
+            ${c.notes ? `
+            <tr>
+              <td style="padding: 12px 0 0 0; color: #64748b;" valign="top"><strong>Notes & Observations :</strong></td>
+              <td style="padding: 12px 0 0 0; font-style: italic; color: #475569;">"${c.notes}"</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+
+        <div style="margin-top: 35px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+          Ce rapport de clôture intégrant les dépenses a été expédié automatiquement en temps réel au gérant.<br/>
+          <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
+        </div>
+      </div>
+    `;
+
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: managerEmail,
+          subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
+          html: mailHtml
+        })
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error dispatching silent manager background mail:', error);
+      return false;
+    }
+  }, [managerEmail, merchant]);
+
+  const dispatchManagerClosureNotif = (c: PressingClosure, method: 'whatsapp' | 'email') => {
+    const textNotif = getManagerClosureNotificationMessage(c);
+    
+    if (method === 'whatsapp') {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const url = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${managerPhone.replace(/\s+/g, '')}&text=${encodeURIComponent(textNotif)}`;
+      window.open(url, '_blank');
+      toast.success('Rapport prêt pour envoi via WhatsApp !');
+    } else {
+      const url = `mailto:${managerEmail}?subject=${encodeURIComponent(`📊 CLÔTURE DE CAISSE JOURNALIÈRE — ${c.date}`)}&body=${encodeURIComponent(textNotif)}`;
+      window.open(url, '_blank');
+      toast.success("Rapport prêt dans votre logiciel d'e-mail !");
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="space-y-6"
+    >
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-ink">🔒 Clôture de Caisse & Rapport Journalier</h2>
+          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Supervision journalière & rapprochement financier</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Closure Form & Reconciliation Card */}
+        <div className="lg:col-span-6 space-y-6">
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
+            <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-black text-ink">🔑 Clôturer la caisse d'aujourd'hui</h3>
+                <p className="text-gray-400 text-xs mt-0.5">Vérifiez les calculs puis saisissez l'encours en espèces.</p>
+              </div>
+              <input
+                type="date"
+                value={closureDate}
+                onChange={e => setClosureDate(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50"
+              />
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100/40 text-center">
+                  <span className="block text-[8px] font-mono text-indigo-400 uppercase tracking-wider">Recettes Pressing (+)</span>
+                  <strong className="block text-base font-black text-indigo-900 mt-1">{dailyPressingRevenue.toLocaleString()} F</strong>
+                  <span className="text-[8px] text-indigo-500 font-mono mt-0.5 block">{dailyPressingTickets.length} dépôts du jour</span>
+                </div>
+                <div className="p-4 bg-cyan-50/60 rounded-2xl border border-cyan-100/40 text-center">
+                  <span className="block text-[8px] font-mono text-cyan-400 uppercase tracking-wider">Ventes Produits (+)</span>
+                  <strong className="block text-base font-black text-cyan-900 mt-1">{dailyDetergentRevenue.toLocaleString()} F</strong>
+                  <span className="text-[8px] text-cyan-500 font-mono mt-0.5 block">{dailyDetergentSales.length} ventes de boutique</span>
+                </div>
+                <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100/45 text-center">
+                  <span className="block text-[8px] font-mono text-rose-400 uppercase tracking-wider">Dépenses du Jour (-)</span>
+                  <strong className="block text-base font-black text-rose-900 mt-1">{dailyExpensesTotal.toLocaleString()} F</strong>
+                  <span className="text-[8px] text-rose-500 font-mono mt-0.5 block">{dailyExpenses.length} justificatifs saisis</span>
+                </div>
+              </div>
+
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+                <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest block">📊 Chiffre d'Affaires Théorique Attendu</span>
+                <strong className="text-2xl font-black text-ink mt-1 block">
+                  {totalTheoreticalRevenue.toLocaleString()} <span className="text-sm font-medium">{merchant.currency || 'FCFA'}</span>
+                </strong>
+                <p className="text-[9px] text-gray-400 mt-1">Calcul : Recettes Pressing + Produits boutique - Dépenses du jour</p>
+              </div>
+
+              {/* Input section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nom du Caissier / Opérateur *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Kouamé Marc"
+                    value={cashierName}
+                    onChange={e => setCashierName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold bg-gray-50/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Espèces Réelles Comptées * ({merchant.currency || 'F'})</label>
+                  <input
+                    type="number"
+                    required
+                    value={actualCash || ''}
+                    onChange={e => setActualCash(Math.max(0, parseFloat(e.target.value) || 0))}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 text-xs font-mono font-black bg-gray-50/50"
+                  />
+                </div>
+              </div>
+
+              {actualCash > 0 && (
+                <div className={`p-4 rounded-2xl border transition-all ${
+                  actualCash === totalTheoreticalRevenue 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                    : actualCash > totalTheoreticalRevenue 
+                      ? 'bg-blue-50 border-blue-200 text-blue-800' 
+                      : 'bg-rose-50 border-rose-200 text-rose-800'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider block">Rapprochement de caisse ({closureDate})</span>
+                      <strong className={`text-sm font-black ${
+                        actualCash === totalTheoreticalRevenue 
+                          ? 'text-emerald-700' 
+                          : actualCash > totalTheoreticalRevenue 
+                            ? 'text-blue-700' 
+                            : 'text-rose-700'
+                      }`}>
+                        {actualCash === totalTheoreticalRevenue 
+                          ? '✅ Caisse parfaitement équilibrée' 
+                          : actualCash > totalTheoreticalRevenue 
+                            ? `🟢 Surplus de caisse (+${(actualCash - totalTheoreticalRevenue).toLocaleString()} FCFA)` 
+                            : `⚠️ Manquant détecté (${(actualCash - totalTheoreticalRevenue).toLocaleString()} FCFA)`}
+                      </strong>
+                    </div>
+                    <span className="font-mono font-bold text-xs">
+                      {actualCash === totalTheoreticalRevenue ? 'OK' : `${actualCash - totalTheoreticalRevenue > 0 ? '+' : ''}${(actualCash - totalTheoreticalRevenue).toLocaleString()} F`}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Observations / Justifications</label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Écart de caisse justifié par les dépenses de détergents ou petite monnaie manquante..."
+                  value={closureNotes}
+                  onChange={e => setClosureNotes(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 text-xs text-ink font-sans"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!cashierName.trim()) {
+                    toast.error('Veuillez spécifier votre nom de Caissier.');
+                    return;
+                  }
+                  
+                  // Check if closure already exists for this date to prevent duplicate
+                  if (closures.some(c => c.date === closureDate)) {
+                    if (!confirm(`Une clôture de caisse existe déjà pour le ${closureDate}. Voulez-vous la remplacer ?`)) {
+                      return;
+                    }
+                  }
+
+                  const newClosure: PressingClosure = {
+                    id: `closure_${Date.now()}`,
+                    date: closureDate,
+                    timestamp: new Date().toISOString(),
+                    cashierName: cashierName.trim(),
+                    totalPressingRevenue: dailyPressingRevenue,
+                    totalDetergentRevenue: dailyDetergentRevenue,
+                    totalExpenses: dailyExpensesTotal, // Capture expenses perfectly
+                    totalTheoreticalRevenue,
+                    actualCashCounted: actualCash,
+                    discrepancy: actualCash - totalTheoreticalRevenue,
+                    notes: closureNotes.trim(),
+                    status: 'closed',
+                    sentToManager: false
+                  };
+
+                  let sentEmail = false;
+                  if (autoEmailManager && managerEmail && managerEmail.trim()) {
+                    toast.loading('Envoi automatique du rapport de clôture au Gérant...');
+                    const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
+                    sentEmail = success;
+                    newClosure.sentToManager = success;
+                  }
+
+                  // Update State & localstorage
+                  setClosures(prev => {
+                    const filtered = prev.filter(c => c.date !== closureDate);
+                    return [newClosure, ...filtered];
+                  });
+
+                  // Reset inputs
+                  setActualCash(0);
+                  setClosureNotes('');
+                  toast.dismiss();
+                  toast.success(`Clôture du ${closureDate} enregistrée à l'instant avec succès !`);
+                }}
+                className="w-full bg-primary hover:bg-[#c93b3b] text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-2xl transition duration-200 flex items-center justify-center gap-2 shadow"
+              >
+                🔒 Valider & Verrouiller la Caisse
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Historical Closures List */}
+        <div className="lg:col-span-6 space-y-4">
+          <h3 className="text-base font-black text-ink flex items-center gap-2">
+            📜 Historique des Clôtures Journalières
+          </h3>
+
+          {closures.length === 0 ? (
+            <div className="bg-white p-8 rounded-3xl border border-gray-100 text-center text-gray-400 space-y-2 shadow-sm">
+              <p className="text-xs font-bold font-mono">Aucun rapport de clôture archivé pour le moment.</p>
+              <p className="text-[10px]">Utilisez le formulaire de gauche pour effectuer votre premier rapprochement.</p>
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+              {closures.map(c => {
+                const errorVal = c.discrepancy;
+                const isPerfect = errorVal === 0;
+                const isLoss = errorVal < 0;
+
+                return (
+                  <div key={c.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition space-y-3 font-sans">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[9px] font-bold font-mono rounded-md uppercase">
+                          Date: {c.date}
+                        </span>
+                        <h4 className="text-xs font-black text-ink mt-1">Clôture par {c.cashierName}</h4>
+                        <span className="text-[9px] text-gray-400 font-mono">Clos le {new Date(c.timestamp).toLocaleString('fr-FR')}</span>
+                      </div>
+                      
+                      <div className="text-right">
+                        <span className="text-[9px] text-gray-400 font-mono block">Écart caisse:</span>
+                        <span className={`text-xs font-mono font-black ${
+                          isPerfect ? 'text-emerald-600' : isLoss ? 'text-rose-600' : 'text-blue-600'
+                        }`}>
+                          {isPerfect ? '0 FCFA' : `${errorVal > 0 ? '+' : ''}${errorVal.toLocaleString()} FCFA`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1.5 bg-gray-50 p-2.5 rounded-xl text-[10px] text-gray-500 font-mono text-center font-bold">
+                      <div>
+                        <span className="block text-[7px] text-gray-400">Recettes Pressing</span>
+                        <strong className="text-ink text-[11px] block mt-1">{c.totalPressingRevenue.toLocaleString()} F</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[7px] text-gray-400">Détergents</span>
+                        <strong className="text-ink text-[11px] block mt-1">{c.totalDetergentRevenue.toLocaleString()} F</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[7px] text-rose-500">Dépenses</span>
+                        <strong className="text-rose-600 text-[11px] block mt-1">{(c.totalExpenses || 0).toLocaleString()} F</strong>
+                      </div>
+                      <div>
+                        <span className="block text-[7px] text-gray-400 font-bold">Total Réel</span>
+                        <strong className="text-primary text-[11px] block mt-1 font-black">{c.actualCashCounted.toLocaleString()} F</strong>
+                      </div>
+                    </div>
+
+                    {c.notes && (
+                      <p className="text-[10px] text-gray-500 italic bg-amber-50/50 rounded-lg p-2 border border-amber-100/30">
+                        <strong>Note :</strong> "{c.notes}"
+                      </p>
+                    )}
+
+                    {/* Communication / manual Send buttons */}
+                    <div className="border-t border-gray-100/80 pt-3 space-y-2">
+                      <p className="text-[9px] font-mono font-bold text-gray-400 uppercase tracking-widest text-center">
+                        Transférer au Manager
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => dispatchManagerClosureNotif(c, 'whatsapp')}
+                          className="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-extrabold rounded-lg flex items-center justify-center gap-1 transition"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Gérant
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            toast.loading('Envoi du rapport par mail...');
+                            const ok = await sendSilentBackgroundClosureEmailToManager(c);
+                            toast.dismiss();
+                            if (ok) {
+                              toast.success('Rapport envoyé avec succès !');
+                            } else {
+                              dispatchManagerClosureNotif(c, 'email');
+                            }
+                          }}
+                          className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-extrabold rounded-lg flex items-center justify-center gap-1 transition"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> E-mail Direct
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'create' | 'active' | 'history' | 'closures'>('create');
+  
+  const [tarifs] = useState<PressingTarifs>(() => {
+    const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
+    return saved ? JSON.parse(saved) : DEFAULT_TARIFS;
+  });
+
+  const [tickets, setTickets] = useState<PressingTicket[]>(() => {
+    const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Form states
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [depositDate, setDepositDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    return format(d, 'yyyy-MM-dd');
+  });
+  const [billingType, setBillingType] = useState<'article' | 'poids'>('article');
+  
+  const [articlesQty, setArticlesQty] = useState<{ [key: string]: number }>({
+    chemise: 0,
+    pantalon: 0,
+    costume: 0,
+    robe: 0,
+    drap: 0,
+    couverture: 0,
+    rideau: 0,
+    autre: 0,
+  });
+
+  const [weightService, setWeightService] = useState<'standard' | 'premium' | 'express'>('standard');
+  const [weightKg, setWeightKg] = useState<number>(0);
+
+  const [supplements, setSupplements] = useState({
+    repassage: false,
+    express: false,
+    detachage: false,
+    livraison: false,
+    premiumPack: false,
+  });
+
+  const supplementTarifs = {
+    repassage: 500,
+    express: 1000,
+    detachage: 800,
+    livraison: 1500,
+    premiumPack: 500,
+  };
+
+  const [discount, setDiscount] = useState<number>(0);
+  const [selectedTicket, setSelectedTicket] = useState<PressingTicket | null>(null);
+
+  // Enhanced additional state fields
+  const [notes, setNotes] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<'unpaid' | 'partial' | 'paid'>('paid');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mobile_money' | 'card' | 'other'>('cash');
+  const [amountPaid, setAmountPaid] = useState<number>(0);
+  const [viewingTicket, setViewingTicket] = useState<PressingTicket | null>(null);
+  const [washStatusFilter, setWashStatusFilter] = useState<'all' | 'deposed' | 'in_progress' | 'ready'>('all');
+
+  // Relance & Notification Temps Réel Client
+  const [selectedNotifTemplate, setSelectedNotifTemplate] = useState<string>('deposit');
+  const [notifMessage, setNotifMessage] = useState('');
+  const [editedPhone, setEditedPhone] = useState('');
+  const [editedEmail, setEditedEmail] = useState('');
+
+  // Suivi Gérant Temps Réel à Distance
+  const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+  const managerEmail = merchant.managerNotifications?.email || '';
+  const autoEmailManager = merchant.managerNotifications?.notifyOnCashClosure !== false;
+  
+  const [managerNotifsHistory, setManagerNotifsHistory] = useState<{ id: string; ticketNumber: string; type: 'entrée' | 'sortie'; method: 'whatsapp' | 'email'; timestamp: string }[]>(() => {
+    const saved = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify(managerNotifsHistory));
+  }, [managerNotifsHistory, merchant.id]);
+
+  // Clôture de caisse states
+  const [closures, setClosures] = useState<PressingClosure[]>(() => {
+    const saved = localStorage.getItem(`pressing_closures_${merchant.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [closureDate, setClosureDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
+  const [cashierName, setCashierName] = useState('');
+  const [actualCash, setActualCash] = useState<number>(0);
+  const [closureNotes, setClosureNotes] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem(`pressing_closures_${merchant.id}`, JSON.stringify(closures));
+  }, [closures, merchant.id]);
+
+  // Totals computations
+  const subtotal = useMemo(() => {
+    if (billingType === 'article') {
+      return Object.keys(articlesQty).reduce((acc, key) => {
+        const qty = articlesQty[key];
+        const price = tarifs.articles[key as keyof typeof tarifs.articles] || 0;
+        return acc + (qty * price);
+      }, 0);
+    } else {
+      const pricePerKg = tarifs.poids[weightService] || 0;
+      return weightKg * pricePerKg;
+    }
+  }, [billingType, articlesQty, weightService, weightKg, tarifs]);
+
+  const supplementTotal = useMemo(() => {
+    return Object.keys(supplements).reduce((acc, key) => {
+      const active = supplements[key as keyof typeof supplements];
+      const cost = supplementTarifs[key as keyof typeof supplementTarifs] || 0;
+      return acc + (active ? cost : 0);
+    }, 0);
+  }, [supplements]);
+
+  const total = useMemo(() => {
+    const val = (subtotal + supplementTotal) - discount;
+    return Math.max(0, val);
+  }, [subtotal, supplementTotal, discount]);
+
+  // Synchronize amountPaid automatically with dynamic changes
+  useEffect(() => {
+    if (paymentStatus === 'paid') {
+      setAmountPaid(total);
+    } else if (paymentStatus === 'unpaid') {
+      setAmountPaid(0);
+    }
+  }, [total, paymentStatus]);
+
+  // Calculate high-fidelity stats for subheader
+  const pressingStats = useMemo(() => {
+    const activeOnes = tickets.filter(t => t.status !== 'delivered');
+    const totalDue = activeOnes.reduce((acc, t) => {
+      const paid = t.amountPaid || 0;
+      return acc + Math.max(0, t.total - paid);
+    }, 0);
+    const inProgressCount = activeOnes.filter(t => t.status === 'in_progress').length;
+    const readyCount = activeOnes.filter(t => t.status === 'ready').length;
+    const deposedCount = activeOnes.filter(t => t.status === 'deposed').length;
+    const totalActiveValue = activeOnes.reduce((acc, t) => acc + t.total, 0);
+
+    const activePaid = activeOnes.filter(t => t.paymentStatus === 'paid').length;
+    const activeUnpaid = activeOnes.filter(t => t.paymentStatus === 'unpaid').length;
+    const activePartial = activeOnes.filter(t => t.paymentStatus === 'partial').length;
+
+    return {
+      activeCount: activeOnes.length,
+      totalDue,
+      inProgressCount,
+      readyCount,
+      deposedCount,
+      totalActiveValue,
+      activePaid,
+      activeUnpaid,
+      activePartial
+    };
+  }, [tickets]);
+
+  // Templates Map for client notifications
+  const NOTIFICATION_TEMPLATES = useMemo<{ [key: string]: { label: string; subject: string; body: (ticket: PressingTicket) => string } }>(() => ({
+    deposit: {
+      label: '📥 Réception / Dépôt enregistré',
+      subject: `Confirmation de dépôt - ${merchant.name || 'Pressing'}`,
+      body: (t: PressingTicket) => `Bonjour ${t.clientName}, votre dépôt du ${t.depositDate} au pressing ${merchant.name || 'ACOM'} a bien été enregistré. Ticket N°: ${t.ticketNumber}. Prix : ${t.total} FCFA. Versé: ${t.amountPaid || 0} FCFA. Retrait prévu: ${t.expectedDeliveryDate || 'N/A'}. Merci de votre fidélité !`
+    },
+    in_progress: {
+      label: '🧼 Lavage en cours',
+      subject: `Traitement de votre linge - ${merchant.name || 'Pressing'}`,
+      body: (t: PressingTicket) => `Bonjour ${t.clientName}, votre linge du ticket N°: ${t.ticketNumber} est actuellement en cours de traitement et de lavage par notre équipe.`
+    },
+    ready: {
+      label: '👔 Linge Prêt pour Retrait',
+      subject: `Votre commande est prête ! - ${merchant.name || 'Pressing'}`,
+      body: (t: PressingTicket) => `Bonjour ${t.clientName}, bonne nouvelle ! Votre linge est lavé, repassé et disponible (Ticket N°: ${t.ticketNumber}). Montant total: ${t.total} FCFA, reste à payer: ${Math.max(0, t.total - (t.amountPaid || 0))} FCFA. À très bientôt !`
+    },
+    delivered: {
+      label: '✅ Commande Livrée',
+      subject: `Merci pour votre visite ! - ${merchant.name || 'Pressing'}`,
+      body: (t: PressingTicket) => `Bonjour ${t.clientName}, votre commande ticket N°: ${t.ticketNumber} vous a été délivrée. Merci pour votre confiance !`
+    },
+    payment_reminder: {
+      label: '💰 Solde dû (Rappel de paiement)',
+      subject: `Rappel de règlement - ${merchant.name || 'Pressing'}`,
+      body: (t: PressingTicket) => `Bonjour ${t.clientName}, nous vous rappelons qu'un solde de ${Math.max(0, t.total - (t.amountPaid || 0))} FCFA reste à régler pour votre commande N°: ${t.ticketNumber}. Merci de régulariser lors du retrait.`
+    }
+  }), [merchant]);
+
+  // Synchronise edited recipient coordinates and message draught upon viewing modifications
+  useEffect(() => {
+    if (viewingTicket) {
+      setEditedPhone(viewingTicket.clientPhone || '');
+      setEditedEmail(viewingTicket.clientEmail || '');
+      const tmpl = NOTIFICATION_TEMPLATES[selectedNotifTemplate];
+      if (tmpl) {
+        setNotifMessage(tmpl.body(viewingTicket));
+      }
+    }
+  }, [viewingTicket, selectedNotifTemplate, NOTIFICATION_TEMPLATES]);
+
+  const logNotificationSent = (type: 'whatsapp' | 'email', templateKey: string, matchedMsg: string) => {
+    if (!viewingTicket) return;
+    
+    const newLog = {
+      id: `notif_${Date.now()}`,
+      type,
+      templateName: NOTIFICATION_TEMPLATES[templateKey]?.label || templateKey,
+      msg: matchedMsg,
+      timestamp: new Date().toISOString()
+    };
+    
+    const updatedNotifications = [...(viewingTicket.sentNotifications || []), newLog];
+    
+    const updatedTicket: PressingTicket = {
+      ...viewingTicket,
+      clientPhone: editedPhone,
+      clientEmail: editedEmail,
+      sentNotifications: updatedNotifications
+    };
+    
+    const updatedTickets = tickets.map(t => t.id === viewingTicket.id ? updatedTicket : t);
+    setTickets(updatedTickets);
+    localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updatedTickets));
+    setViewingTicket(updatedTicket);
+    if (selectedTicket && selectedTicket.id === viewingTicket.id) {
+      setSelectedTicket(updatedTicket);
+    }
+  };
+
+  const getManagerNotificationMessage = useCallback((t: PressingTicket, type: 'entrée' | 'sortie') => {
+    const isEntry = type === 'entrée';
+    const statusLabel = t.status === 'delivered' ? 'LIVRÉ ✅' : t.status === 'ready' ? 'PRÊT 👔' : t.status === 'in_progress' ? 'EN LAVAGE 🧼' : 'REÇU COMPTÉ 🧺';
+    
+    const articlesDesc = t.billingType === 'article' 
+      ? Object.entries(t.articles || {})
+          .filter(([_, qty]) => (qty as number) > 0)
+          .map(([name, qty]) => `${qty}x ${name}`)
+          .join(', ')
+      : `${t.weightKg} Kg (${t.weightService})`;
+
+    const paidText = t.paymentStatus === 'paid' ? 'ENTIÈREMENT PAYÉ 👍' : t.paymentStatus === 'partial' ? `ACOMPTE PAYÉ DE ${t.amountPaid} FCFA 🟡` : 'NON REGLE (À payer au retrait) 🔴';
+
+    if (isEntry) {
+      return `📢 [SUIVI GÉRANT - ENTRÉE REÇUE] 📥\n` +
+             `--------------------------------\n` +
+             `• Ticket N° : ${t.ticketNumber}\n` +
+             `• Client : ${t.clientName} (${t.clientPhone || 'Aucun contact'})\n` +
+             `• Linge / Lots : ${articlesDesc || '0 article'}\n` +
+             `• Valeur Totale : ${t.total} FCFA\n` +
+             `• Versé initial : ${t.amountPaid || 0} FCFA\n` +
+             `• Reste à encaisser : ${Math.max(0, t.total - (t.amountPaid || 0))} FCFA\n` +
+             `• Statut de paiement : ${paidText}\n` +
+             `• Date dépôt : ${t.depositDate}\n` +
+             `• Retrait prévu : ${t.expectedDeliveryDate || 'N/A'}\n` +
+             `--------------------------------\n` +
+             `Rapport d'activité temps réel généré sur l'application SaaS ${merchant.name || 'ACOM'}.`;
+    } else {
+      return `📢 [SUIVI GÉRANT - SORTIE / STATUT CHANGÉ] 👔\n` +
+             `--------------------------------\n` +
+             `• Ticket N° : ${t.ticketNumber}\n` +
+             `• Client : ${t.clientName}\n` +
+             `• Nouveau Statut : ${statusLabel}\n` +
+             `• Valeur de la fiche : ${t.total} FCFA\n` +
+             `• Total Perçu : ${t.amountPaid || 0} FCFA\n` +
+             `• Solde Résiduel : ${Math.max(0, t.total - (t.amountPaid || 0))} FCFA\n` +
+             `• Statut de règlement : ${paidText}\n` +
+             `--------------------------------\n` +
+             `Rapport d'activité temps réel généré sur l'application SaaS ${merchant.name || 'ACOM'}.`;
+    }
+  }, [merchant]);
+
+  const dispatchManagerNotif = (t: PressingTicket, flowType: 'entrée' | 'sortie', method: 'whatsapp' | 'email') => {
+    const message = getManagerNotificationMessage(t, flowType);
+    if (method === 'whatsapp') {
+      if (!managerPhone.trim()) {
+        toast.error('Veuillez configurer le numéro WhatsApp du Gérant dans l\'onglet Réglages.');
+        return;
+      }
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '221' + cleaned;
+      }
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+      toast.success('Rapport de suivi WhatsApp configuré !');
+    } else {
+      if (!managerEmail.trim()) {
+        toast.error('Veuillez configurer l\'adresse email du Gérant dans l\'onglet Réglages.');
+        return;
+      }
+      const subject = `[TEMPS RÉEL] ${flowType.toUpperCase()} - Ticket ${t.ticketNumber} - ${merchant.name || 'Pressing'}`;
+      const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+      window.open(mailtoUrl, '_blank');
+      toast.success('Email de rapport de suivi prêt !');
+    }
+
+    // Add to local history
+    const newLog = {
+      id: `mnotif_${Date.now()}`,
+      ticketNumber: t.ticketNumber,
+      type: flowType,
+      method,
+      timestamp: new Date().toISOString()
+    };
+    setManagerNotifsHistory(prev => [newLog, ...prev]);
+  };
+
+  const sendSilentBackgroundEmailToManager = async (ticket: PressingTicket, flowType: 'entrée' | 'sortie') => {
+    if (!managerEmail || !managerEmail.trim()) {
+      return;
+    }
+
+    const isEntry = flowType === 'entrée';
+    const title = isEntry ? `📥 Notification d'Entrée (Nouveau Dépôt)` : `👔 Notification de Sortie / Changement de Statut`;
+    const themeColor = isEntry ? '#0d9488' : '#4f46e5'; // Teal for entries, Indigo for exits
+    
+    // Format articles list
+    const articlesDesc = ticket.billingType === 'article'
+      ? Object.entries(ticket.articles || {})
+          .filter(([_, qty]) => (qty as number) > 0)
+          .map(([name, qty]) => `<li style="margin: 4px 0;"><strong>${qty}x</strong> ${name}</li>`)
+          .join('')
+      : `<li style="margin: 4px 0;"><strong>${ticket.weightKg} Kg</strong> (${ticket.weightService})</li>`;
+
+    // Supplements HTML
+    const activeSupps = Object.entries(ticket.supplements || {})
+      .filter(([_, active]) => active)
+      .map(([name]) => `<span style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 4px; display: inline-block;">${name}</span>`)
+      .join(' ');
+
+    const statusLabel = ticket.status === 'delivered' ? 'LIVRÉ ✅' : ticket.status === 'ready' ? 'PRÊT 👔' : ticket.status === 'in_progress' ? 'EN LAVAGE 🧼' : 'REÇU COMPTÉ 🧺';
+    const paymentLabel = ticket.paymentStatus === 'paid' ? 'ENTIÈREMENT PAYÉ 👍' : ticket.paymentStatus === 'partial' ? `ACOMPTE DE ${ticket.amountPaid} FCFA 🟡` : 'NON RÉGLÉ 🔴';
+
+    const mailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+        <div style="background-color: ${themeColor}; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+          <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Pressing'}</h2>
+          <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Suivi d'Activité en Temps Réel — Gérant</p>
+        </div>
+
+        <div style="margin-top: 20px;">
+          <h3 style="color: ${themeColor}; border-bottom: 2px solid ${themeColor}; padding-bottom: 5px; margin-bottom: 15px;">${title}</h3>
+          
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 150px;"><strong>N° Ticket :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${ticket.ticketNumber}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Client :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${ticket.clientName} (${ticket.clientPhone || 'Aucun contact'})</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Type Facturation :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; text-transform: capitalize;">Par ${ticket.billingType}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;" valign="top"><strong>Articles / Poids :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                <ul style="margin: 0; padding-left: 20px;">${articlesDesc || 'Aucun article renseigné'}</ul>
+              </td>
+            </tr>
+            ${activeSupps ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Suppléments :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${activeSupps}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Montant Total :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #1e293b; font-size: 14px;">${ticket.total} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Acompte Payé :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #0d9488; font-weight: bold;">${ticket.amountPaid || 0} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Reste à Payer :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #ef4444; font-weight: bold; font-size: 14px;">${Math.max(0, ticket.total - (ticket.amountPaid || 0))} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Règlement :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${paymentLabel}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Statut Linge :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: ${themeColor};">${statusLabel}</td>
+            </tr>
+            ${ticket.notes ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Notes :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-style: italic; color: #475569;">"${ticket.notes}"</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Date Dépôt :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${ticket.depositDate}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;"><strong>Date Retrait Prévue :</strong></td>
+              <td style="padding: 8px 0; font-weight: bold;">${ticket.expectedDeliveryDate || 'N/A'}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+          Ce rapport automatique en direct a été envoyé en arrière-plan sans action requise de l'opérateur.<br/>
+          <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
+        </div>
+      </div>
+    `;
+
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: managerEmail,
+          subject: `⚡ [${flowType.toUpperCase()}] Ticket n°${ticket.ticketNumber} - ${merchant.name || 'Pressing'}`,
+          html: mailHtml
+        })
+      });
+
+      if (response.ok) {
+        toast.success(`Rapport Gérant envoyé par email ! (Arrière-plan)`);
+        
+        // Add to local history
+        const newLog = {
+          id: `mnotif_${Date.now()}`,
+          ticketNumber: ticket.ticketNumber,
+          type: flowType,
+          method: 'email' as const,
+          timestamp: new Date().toISOString()
+        };
+        setManagerNotifsHistory(prev => [newLog, ...prev]);
+      } else {
+        console.error('Failed to send background email to manager');
+      }
+    } catch (error) {
+      console.error('Error dispatching silent manager background mail:', error);
+    }
+  };
+
+  const dailyPressingTickets = useMemo(() => {
+    return tickets.filter(t => t.depositDate === closureDate);
+  }, [tickets, closureDate]);
+
+  const dailyPressingRevenue = useMemo(() => {
+    return dailyPressingTickets.reduce((sum, t) => sum + (t.amountPaid || 0), 0);
+  }, [dailyPressingTickets]);
+
+  const dailyDetergentSales = useMemo(() => {
+    try {
+      const savedSales = localStorage.getItem(`pressing_stock_sales_${merchant.id}`);
+      const parsedSales: DetergentSale[] = savedSales ? JSON.parse(savedSales) : [];
+      return parsedSales.filter(s => s.date.startsWith(closureDate));
+    } catch {
+      return [];
+    }
+  }, [closureDate, merchant.id]);
+
+  const dailyDetergentRevenue = useMemo(() => {
+    return dailyDetergentSales.reduce((sum, s) => sum + (s.total || 0), 0);
+  }, [dailyDetergentSales]);
+
+  const totalTheoreticalRevenue = dailyPressingRevenue + dailyDetergentRevenue;
+
+  const getManagerClosureNotificationMessage = useCallback((c: PressingClosure) => {
+    const diffSign = c.discrepancy >= 0 ? '+' : '';
+    const diffText = c.discrepancy === 0 ? 'Parfait (0 FCFA)' : `${diffSign}${c.discrepancy} FCFA`;
+    
+    return `👑 [CLÔTURE DE CAISSE DE PRESSING] 📊\n` +
+           `--------------------------------\n` +
+           `• Date d'Activité : ${c.date}\n` +
+           `• Date Clôture : ${new Date(c.timestamp).toLocaleString('fr-FR')}\n` +
+           `• Caissier / Opérateur : ${c.cashierName || 'Non renseigné'}\n` +
+           `--------------------------------\n` +
+           `RÉSUMÉ DES RECETTES :\n` +
+           `• Recettes Services Pressing : ${c.totalPressingRevenue} FCFA\n` +
+           `• Ventes Produits Détergents : ${c.totalDetergentRevenue} FCFA\n` +
+           `--------------------------------\n` +
+           `• TOTAL ATTENDU : ${c.totalTheoreticalRevenue} FCFA\n` +
+           `• ESPÈCES RÉELLES : ${c.actualCashCounted} FCFA\n` +
+           `• ÉCART DE CAISSE : ${diffText} (${c.discrepancy < 0 ? '⚠️ MANQUANT' : c.discrepancy > 0 ? '🟢 SURPLUS' : '✅ EQUILIBRE'})\n` +
+           `--------------------------------\n` +
+           `OBSERVATIONS :\n` +
+           `"${c.notes || 'Aucun commentaire.'}"\n` +
+           `--------------------------------\n` +
+           `Rapport de clôture journalier transmis en Temps Réel via l'application SaaS ${merchant.name || 'ACOM'}.`;
+  }, [merchant]);
+
+  const sendSilentBackgroundClosureEmailToManager = useCallback(async (c: PressingClosure) => {
+    if (!managerEmail || !managerEmail.trim()) return false;
+
+    const title = `📊 CLÔTURE DE CAISSE JOURNALIÈRE — ${c.date}`;
+    const themeColor = '#1e1b4b'; // Deep Navy indigo
+    const diffColor = c.discrepancy < 0 ? '#ef4444' : c.discrepancy > 0 ? '#10b981' : '#64748b';
+    const diffLabel = c.discrepancy < 0 ? 'MANQUANT (Perte) ⚠️' : c.discrepancy > 0 ? 'SURPLUS (Excédent) 🟢' : 'ÉQUILIBRÉ 👍';
+
+    const mailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+        <div style="background-color: ${themeColor}; color: white; padding: 20px; border-radius: 8px; text-align: center;">
+          <h2 style="margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Pressing'}</h2>
+          <p style="margin: 5px 0 0; font-size: 13px; opacity: 0.9;">Rapport de Clôture de Caisse Journalier</p>
+        </div>
+
+        <div style="margin-top: 25px;">
+          <h3 style="color: ${themeColor}; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">📊 État de la Caisse</h3>
+          
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 200px;"><strong>Date d'Activité :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${c.date}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Heure de Clôture :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9;">${new Date(c.timestamp).toLocaleTimeString('fr-FR')}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Caissier / Gestionnaire :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${c.cashierName || 'Non renseigné'}</td>
+            </tr>
+            
+            <tr>
+              <td colspan="2" style="padding: 15px 0 5px 0; font-weight: bold; color: ${themeColor}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">DÉTAIL DES ENCAISSEMENTS :</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">• Recettes Services Pressing :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${c.totalPressingRevenue.toLocaleString()} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">• Ventes Détergents & Produits :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${c.totalDetergentRevenue.toLocaleString()} FCFA</td>
+            </tr>
+            
+            <tr>
+              <td colspan="2" style="padding: 15px 0 5px 0; font-weight: bold; color: ${themeColor}; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">RAPPROCHEMENT DE CAISSE :</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Total Théorique Attendu :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; font-size: 14px;">${c.totalTheoreticalRevenue.toLocaleString()} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Espèces Réelles Comptées :</strong></td>
+              <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; font-size: 14px; color: #1e1b4b;">${c.actualCashCounted.toLocaleString()} FCFA</td>
+            </tr>
+            <tr style="background-color: #f8fafc;">
+              <td style="padding: 12px 10px; color: #0f172a; font-weight: bold;"><strong>ÉCART DE CAISSE :</strong></td>
+              <td style="padding: 12px 10px; font-weight: bold; font-size: 15px; color: ${diffColor};">
+                ${c.discrepancy >= 0 ? '+' : ''}${c.discrepancy.toLocaleString()} FCFA
+                <div style="font-size: 11px; font-weight: normal; margin-top: 2px;">${diffLabel}</div>
+              </td>
+            </tr>
+            ${c.notes ? `
+            <tr>
+              <td style="padding: 12px 0 0 0; color: #64748b;" valign="top"><strong>Notes & Observations :</strong></td>
+              <td style="padding: 12px 0 0 0; font-style: italic; color: #475569;">"${c.notes}"</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+
+        <div style="margin-top: 35px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+          Ce rapport de clôture a été expédié automatiquement en temps réel au gérant.<br/>
+          <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
+        </div>
+      </div>
+    `;
+
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: managerEmail,
+          subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
+          html: mailHtml
+        })
+      });
+
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, [managerEmail, merchant]);
+
+  const dispatchManagerClosureNotif = useCallback((c: PressingClosure, method: 'whatsapp' | 'email') => {
+    const message = getManagerClosureNotificationMessage(c);
+    if (method === 'whatsapp') {
+      if (!managerPhone.trim()) {
+        toast.error('Veuillez configurer le numéro de téléphone WhatsApp du Gérant.');
+        return;
+      }
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '221' + cleaned;
+      }
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+      toast.success('Rapport de clôture WhatsApp ouvert !');
+    } else {
+      if (!managerEmail.trim()) {
+        toast.error('Veuillez configurer l\'adresse email du Gérant.');
+        return;
+      }
+      const subject = `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`;
+      const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+      window.open(mailtoUrl, '_blank');
+      toast.success('Rapport Email prêt !');
+    }
+  }, [managerPhone, managerEmail, merchant, getManagerClosureNotificationMessage]);
+
+  const handleCreateTicket = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientName.trim()) {
+      toast.error('Veuillez renseigner le nom du client.');
+      return;
+    }
+
+    const nextNumber = tickets.length + 1;
+    const ticketNumber = `PR-2026-${String(nextNumber).padStart(4, '0')}`;
+
+    const newTicket: PressingTicket = {
+      id: `t_${Date.now()}`,
+      ticketNumber,
+      clientName,
+      clientPhone,
+      clientEmail,
+      depositDate,
+      expectedDeliveryDate,
+      billingType,
+      articles: billingType === 'article' ? { ...articlesQty } : {},
+      weightService,
+      weightKg: billingType === 'poids' ? weightKg : 0,
+      supplements: { ...supplements },
+      supplementTarifs: { ...supplementTarifs },
+      discount,
+      subtotal,
+      supplementTotal,
+      total,
+      status: 'deposed',
+      paymentStatus,
+      paymentMethod,
+      amountPaid: paymentStatus === 'unpaid' ? 0 : amountPaid,
+      notes,
+      sentNotifications: []
+    };
+
+    const updated = [newTicket, ...tickets];
+    setTickets(updated);
+    localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
+    toast.success(`Fiche de réception enregistrée ! Ticket : ${ticketNumber}`);
+
+    // Track as Sales inside system DB
+    try {
+      db.sales.add({
+        id: newTicket.id,
+        merchantId: merchant.id,
+        items: [],
+        totalAmount: total,
+        paidAmount: paymentStatus === 'unpaid' ? 0 : amountPaid,
+        balance: Math.max(0, total - amountPaid),
+        payments: [{
+          id: `p_${Date.now()}`,
+          amount: paymentStatus === 'unpaid' ? 0 : amountPaid,
+          method: paymentMethod === 'other' ? 'transfer' : paymentMethod,
+          date: new Date().toISOString()
+        }],
+        paymentMethod: paymentMethod === 'other' ? 'mobile_money' : paymentMethod,
+        customerName: clientName,
+        customerPhone: clientPhone,
+        processedBy: 'system',
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Reset Form
+    setClientName('');
+    setClientPhone('');
+    setClientEmail('');
+    setArticlesQty({
+      chemise: 0,
+      pantalon: 0,
+      costume: 0,
+      robe: 0,
+      drap: 0,
+      couverture: 0,
+      rideau: 0,
+      autre: 0,
+    });
+    setWeightKg(0);
+    setSupplements({
+      repassage: false,
+      express: false,
+      detachage: false,
+      livraison: false,
+      premiumPack: false,
+    });
+    setDiscount(0);
+    setNotes('');
+    setPaymentStatus('paid');
+    setPaymentMethod('cash');
+    setAmountPaid(0);
+
+    // Open detail simulator immediately
+    setSelectedTicket(newTicket);
+
+    // Auto-email to manager in background on entry
+    if (autoEmailManager && managerEmail && managerEmail.trim()) {
+      sendSilentBackgroundEmailToManager(newTicket, 'entrée');
+    }
+  };
+
+  const updateStatus = (ticketId: string, nextStatus: PressingTicket['status']) => {
+    const updated = tickets.map(t => t.id === ticketId ? { ...t, status: nextStatus } : t);
+    setTickets(updated);
+    localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
+    
+    const targetTicket = updated.find(t => t.id === ticketId);
+    if (selectedTicket && selectedTicket.id === ticketId) {
+      setSelectedTicket({ ...selectedTicket, status: nextStatus });
+    }
+    toast.success('Statut de réception mis à jour !');
+
+    // Auto-email to manager in background on status change (exit/outing alerts)
+    if (targetTicket && autoEmailManager && managerEmail && managerEmail.trim()) {
+      sendSilentBackgroundEmailToManager(targetTicket, 'sortie');
+    }
+  };
+
+  const deleteTicket = (ticketId: string) => {
+    if (window.confirm('Voulez-vous supprimer définitivement ce ticket ?')) {
+      const updated = tickets.filter(t => t.id !== ticketId);
+      setTickets(updated);
+      localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
+      setSelectedTicket(null);
+      if (viewingTicket && viewingTicket.id === ticketId) {
+        setViewingTicket(null);
+      }
+      toast.success('Ticket supprimé de la base locale !');
+    }
+  };
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(t => {
+      const matchSearch = t.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          t.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          t.clientPhone.includes(searchQuery);
+      
+      if (activeSubTab === 'active') {
+        const isNotDelivered = t.status !== 'delivered';
+        const isWashMatched = washStatusFilter === 'all' || t.status === washStatusFilter;
+        return matchSearch && isNotDelivered && isWashMatched;
+      } else if (activeSubTab === 'history') {
+        return matchSearch && t.status === 'delivered';
+      }
+      return matchSearch;
+    });
+  }, [tickets, searchQuery, activeSubTab, washStatusFilter]);
+
+  const handleDownloadPDF = (ticket: PressingTicket) => {
+    const pdf = new jsPDF('p', 'mm', [80, 185]);
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(10);
+    
+    let y = 10;
+    pdf.text(merchant.name || 'ACOM Pressing', 40, y, { align: 'center' });
+    y += 5;
+    pdf.setFontSize(8);
+    pdf.text(merchant.address || 'Service de Pressing', 40, y, { align: 'center' });
+    y += 7;
+    pdf.line(5, y, 75, y);
+    y += 6;
+    
+    pdf.setFont('courier', 'bold');
+    pdf.text(`TICKET : ${ticket.ticketNumber}`, 5, y);
+    y += 5;
+    pdf.setFont('courier', 'normal');
+    pdf.text(`Client  : ${ticket.clientName}`, 5, y);
+    y += 4;
+    pdf.text(`Contact : ${ticket.clientPhone || 'N/A'}`, 5, y);
+    y += 4;
+    if (ticket.clientEmail) {
+      const emailTrunc = ticket.clientEmail.length > 25 ? ticket.clientEmail.slice(0, 23) + '..' : ticket.clientEmail;
+      pdf.text(`E-mail  : ${emailTrunc}`, 5, y);
+      y += 4;
+    }
+    pdf.text(`Dépôt   : ${ticket.depositDate}`, 5, y);
+    y += 4;
+    if (ticket.expectedDeliveryDate) {
+      pdf.text(`Retrait : ${ticket.expectedDeliveryDate} (Prévu)`, 5, y);
+      y += 4;
+    }
+    if (ticket.notes) {
+      const trimmedNotes = ticket.notes.length > 28 ? ticket.notes.slice(0, 26) + '..' : ticket.notes;
+      pdf.text(`Note    : ${trimmedNotes}`, 5, y);
+      y += 4;
+    }
+    y += 1;
+    pdf.line(5, y, 75, y);
+    y += 5;
+
+    pdf.setFont('courier', 'bold');
+    pdf.text('Détails Prestation', 5, y);
+    y += 5;
+    pdf.setFont('courier', 'normal');
+
+    if (ticket.billingType === 'article') {
+      Object.keys(ticket.articles).forEach(key => {
+        const qty = ticket.articles[key];
+        if (qty > 0) {
+          const price = tarifs.articles[key as keyof typeof tarifs.articles] || 0;
+          const totalItem = qty * price;
+          pdf.text(`- ${key.slice(0, 10).padEnd(10, ' ')} x${qty} : ${totalItem} FCFA`, 5, y);
+          y += 4;
+        }
+      });
+    } else {
+      const serviceName = ticket.weightService === 'standard' ? 'Stnd.' : ticket.weightService === 'premium' ? 'Prem.' : 'Exp.';
+      const pricePerKg = tarifs.poids[ticket.weightService] || 0;
+      pdf.text(`- Poids : ${ticket.weightKg} Kg (${serviceName})`, 5, y);
+      y += 4;
+      pdf.text(`  Tarif : ${pricePerKg} FCFA/Kg`, 5, y);
+      y += 4;
+    }
+
+    const activeSupps = Object.keys(ticket.supplements).filter(k => ticket.supplements[k as keyof typeof ticket.supplements]);
+    if (activeSupps.length > 0) {
+      pdf.text('Suppléments :', 5, y);
+      y += 4;
+      activeSupps.forEach(k => {
+        const cost = ticket.supplementTarifs[k as keyof typeof ticket.supplementTarifs] || 0;
+        const labels: { [key: string]: string } = {
+          repassage: 'Repassage',
+          express: 'Lavage Express (unit.)',
+          detachage: 'Détachage spécial',
+          livraison: 'Livraison à domicile',
+          premiumPack: 'Emballage Premium',
+        };
+        pdf.text(`  + ${labels[k].slice(0, 13).padEnd(13, ' ')} : ${cost} FCFA`, 5, y);
+        y += 4;
+      });
+    }
+
+    y += 2;
+    pdf.line(5, y, 75, y);
+    y += 5;
+
+    pdf.text(`Sous-total: ${ticket.subtotal + ticket.supplementTotal} FCFA`, 5, y);
+    y += 4;
+    if (ticket.discount > 0) {
+      pdf.text(`Remise: -${ticket.discount} FCFA`, 5, y);
+      y += 4;
+    }
+    
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(10);
+    pdf.text(`TOTAL NET : ${ticket.total} FCFA`, 5, y);
+    y += 5;
+
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(8);
+    const pStatusLabel = ticket.paymentStatus === 'paid' ? 'PAYE D\'AVANCE' : ticket.paymentStatus === 'partial' ? 'ACOMPTE PAYE' : 'IMPAYE AT RETRAIT';
+    pdf.text(`Règlement : ${pStatusLabel}`, 5, y);
+    y += 4;
+
+    const paidVal = ticket.amountPaid || 0;
+    const remainingVal = Math.max(0, ticket.total - paidVal);
+    pdf.text(`Versé     : ${paidVal} FCFA`, 5, y);
+    y += 4;
+    pdf.setFont('courier', 'bold');
+    pdf.text(`Reste dû  : ${remainingVal} FCFA`, 5, y);
+    y += 5;
+
+    pdf.line(5, y, 75, y);
+    y += 5;
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(8);
+    pdf.text('Merci de votre confiance !', 40, y, { align: 'center' });
+    y += 4;
+    pdf.text('Veuillez présenter ce ticket', 40, y, { align: 'center' });
+    y += 4;
+    pdf.text('lors du retrait du linge.', 40, y, { align: 'center' });
+
+    pdf.save(`Ticket_Pressing_${ticket.ticketNumber}.pdf`);
+    toast.success('Reçu PDF généré et téléchargé !');
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+      {/* Header bar */}
+      <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-ink tracking-tight">🧾 Fiche de Réception Client</h2>
+          <p className="text-gray-500 text-xs mt-1">Enregistrement et suivi des dépôts, factures unitaires et par kg.</p>
+        </div>
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl w-fit border border-black/5 shrink-0">
+          <button
+            onClick={() => { setActiveSubTab('create'); setSelectedTicket(null); }}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'create' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            🧾 Nouveau Ticket
+          </button>
+          <button
+            onClick={() => setActiveSubTab('active')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'active' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            ⏳ En Cours ({tickets.filter(t => t.status !== 'delivered').length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('history')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'history' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            ✅ Historique ({tickets.filter(t => t.status === 'delivered').length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('closures')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'closures' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            👑 Clôtures ({closures.length})
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Stats Bar Widget */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">⏳ Dépôts Actifs</span>
+          <span className="text-base font-black text-ink mt-1">{pressingStats.activeCount}</span>
+        </div>
+        <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-rose-500 uppercase tracking-widest font-bold">💰 À Récupérer</span>
+          <span className="text-base font-black text-rose-600 mt-1">{pressingStats.totalDue.toLocaleString()} F</span>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">🟢 Payés</span>
+          <span className="text-base font-black text-emerald-600 mt-1">{pressingStats.activePaid}</span>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">🟡 Acomptes</span>
+          <span className="text-base font-black text-amber-500 mt-1">{pressingStats.activePartial}</span>
+        </div>
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">🔴 Impayés</span>
+          <span className="text-base font-black text-rose-600 mt-1">{pressingStats.activeUnpaid}</span>
+        </div>
+      </div>
+
+      {activeSubTab === 'create' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Form Panel */}
+          <form onSubmit={handleCreateTicket} className="lg:col-span-7 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
+            <h3 className="text-lg font-black text-ink border-b border-gray-50 pb-3">Informations de la Commande</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nom du Client</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Nom complet"
+                  value={clientName}
+                  onChange={e => setClientName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Téléphone / WhatsApp Contacts</label>
+                <input
+                  type="text"
+                  placeholder="ex: +221771234567"
+                  value={clientPhone}
+                  onChange={e => setClientPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Adresse Email <span className="text-gray-400 font-normal">(Optionnel)</span></label>
+                <input
+                  type="email"
+                  placeholder="client@mail.com"
+                  value={clientEmail}
+                  onChange={e => setClientEmail(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Date de dépôt</label>
+                <input
+                  type="date"
+                  required
+                  value={depositDate}
+                  onChange={e => {
+                    setDepositDate(e.target.value);
+                    const parts = e.target.value.split('-');
+                    if (parts.length === 3) {
+                      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                      d.setDate(d.getDate() + 3);
+                      setExpectedDeliveryDate(format(d, 'yyyy-MM-dd'));
+                    }
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Date de retrait prévue 📅</label>
+                <input
+                  type="date"
+                  required
+                  value={expectedDeliveryDate}
+                  onChange={e => setExpectedDeliveryDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Observations / État du linge</label>
+                <input
+                  type="text"
+                  placeholder="ex: Col sale, bouton manquant, linge délicat..."
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Type de facturation</label>
+                <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setBillingType('article')}
+                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                      billingType === 'article' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    ◉ Par Article
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingType('poids')}
+                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                      billingType === 'poids' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    ◉ Par Poids (Kg)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode: Article */}
+            {billingType === 'article' && (
+              <div className="space-y-4 pt-4 border-t border-dashed border-gray-100">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider">Quantité d'articles à laver</h4>
+                  <span className="text-[10px] font-bold px-2 py-1 rounded bg-indigo-50 text-indigo-600">Tarification unitaire</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Object.keys(articlesQty).map((key) => {
+                    const price = tarifs.articles[key as keyof typeof tarifs.articles] || 0;
+                    return (
+                      <div key={key} className="p-3 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-xs text-ink uppercase tracking-wider block capitalize">{key}</span>
+                          <span className="text-[10px] text-gray-400 font-mono">{price} FCFA/u</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = Math.max(0, articlesQty[key] - 1);
+                              setArticlesQty({ ...articlesQty, [key]: val });
+                            }}
+                            className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 flex items-center justify-center transition-all"
+                          >
+                            -
+                          </button>
+                          <span className="font-mono font-black text-sm text-ink w-6 text-center">{articlesQty[key]}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setArticlesQty({ ...articlesQty, [key]: articlesQty[key] + 1 });
+                            }}
+                            className="w-8 h-8 rounded-lg bg-primary/10 hover:bg-primary/20 font-bold text-primary flex items-center justify-center transition-all"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Mode: Kg / Poids */}
+            {billingType === 'poids' && (
+              <div className="space-y-4 pt-4 border-t border-dashed border-gray-100">
+                <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider">Poids total du linge</h4>
+                
+                <div className="p-6 bg-cyan-50/30 rounded-3xl border border-cyan-100/50 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Forfait de Lavage</label>
+                      <select
+                        value={weightService}
+                        onChange={(e) => setWeightService(e.target.value as any)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-bold text-xs text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="standard">Lavage Standard ({tarifs.poids.standard} FCFA/Kg)</option>
+                        <option value="premium">Lavage Premium ({tarifs.poids.premium} FCFA/Kg)</option>
+                        <option value="express">Lavage Express ({tarifs.poids.express} FCFA/Kg)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Poids Estimé (Kg)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        placeholder="ex: 6.5"
+                        value={weightKg || ''}
+                        onChange={(e) => setWeightKg(Math.max(0, parseFloat(e.target.value) || 0))}
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-700 pt-2 border-t border-cyan-100">
+                    <span>Base de facturation :</span>
+                    <span className="font-mono text-cyan-600">{subtotal.toLocaleString()} FCFA</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Supplementary Options */}
+            <div className="space-y-3 pt-4 border-t border-dashed border-gray-100">
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Prestations optionnelles</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {Object.keys(supplements).map((key) => {
+                  const active = supplements[key as keyof typeof supplements];
+                  const price = supplementTarifs[key as keyof typeof supplementTarifs];
+                  const labels: { [key: string]: string } = {
+                    repassage: '👔 Repassage',
+                    express: '⚡ Lavage Express (unit.)',
+                    detachage: '🔬 Détachage spécial',
+                    livraison: '🚚 Livraison à domicile',
+                    premiumPack: '💎 Emballage Premium',
+                  };
+                  return (
+                    <button
+                      type="button"
+                      key={key}
+                      onClick={() => setSupplements({ ...supplements, [key]: !active })}
+                      className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between h-20 text-[10px] ${
+                        active 
+                          ? 'bg-primary/5 border-primary text-primary font-bold' 
+                          : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="uppercase font-black leading-tight">{labels[key]}</span>
+                      <span className="font-mono font-bold opacity-80">+{price} FCFA</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Discount Section */}
+            <div className="pt-4 border-t border-dashed border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-3">
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5 font-bold">Remise immédiate (FCFA)</label>
+                <input
+                  type="number"
+                  placeholder="ex: 500"
+                  value={discount || ''}
+                  onChange={e => setDiscount(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono font-bold text-xs text-ink"
+                />
+              </div>
+            </div>
+
+            {/* Payment Section */}
+            <div className="pt-4 border-t border-dashed border-gray-100 space-y-4">
+              <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider">🔒 Règlement de la Commande</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Statut de paiement</label>
+                  <select
+                    value={paymentStatus}
+                    onChange={e => {
+                      const status = e.target.value as 'unpaid' | 'partial' | 'paid';
+                      setPaymentStatus(status);
+                      if (status === 'paid') {
+                        setAmountPaid(total);
+                      } else if (status === 'unpaid') {
+                        setAmountPaid(0);
+                      } else {
+                        setAmountPaid(Math.floor(total / 2));
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 font-bold text-xs text-ink outline-none"
+                  >
+                    <option value="paid">Payé d'avance 🟢</option>
+                    <option value="unpaid">Impayé / Au retrait 🔴</option>
+                    <option value="partial">Acompte versé 🟡</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Montant Perçu (FCFA)</label>
+                  <input
+                    type="number"
+                    disabled={paymentStatus === 'unpaid'}
+                    value={paymentStatus === 'unpaid' ? 0 : amountPaid || ''}
+                    onChange={e => {
+                      const val = Math.max(0, parseInt(e.target.value) || 0);
+                      setAmountPaid(Math.min(total, val));
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono font-bold text-xs text-ink"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Règlement via :</label>
+                  <select
+                    disabled={paymentStatus === 'unpaid'}
+                    value={paymentMethod}
+                    onChange={e => setPaymentMethod(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 font-bold text-xs text-ink outline-none"
+                  >
+                    <option value="cash">Espèces 💵</option>
+                    <option value="mobile_money">Wave / Orange Money 📱</option>
+                    <option value="card">Carte Bancaire 💳</option>
+                    <option value="other">Autre 📁</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs font-mono">
+                <span className="text-gray-500 font-bold">Reste à encaisser :</span>
+                <span className={`font-black ${total - amountPaid > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  {(total - amountPaid).toLocaleString()} FCFA
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-dashed border-gray-100 flex items-end">
+              <button
+                type="submit"
+                className="w-full bg-primary hover:bg-primary-hover text-white py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Enregistrer le Ticket de Réception
+              </button>
+            </div>
+          </form>
+
+          {/* Simulator Ticket Preview */}
+          <div className="lg:col-span-5 space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-wider text-gray-400">Aperçu Réel du Ticket de Caisse</h4>
+            
+            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 relative overflow-hidden">
+              <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-primary to-cyan-500" />
+              
+              <div className="space-y-4 font-mono text-[11px] text-gray-700 leading-relaxed bg-[#fbfbf9] p-5 rounded-2xl border border-dashed border-gray-200 shadow-inner">
+                <div className="text-center pb-3 border-b border-dashed border-gray-200">
+                  <p className="font-black text-xs uppercase tracking-wider text-ink block">{merchant.name || 'ACOM Pressing'}</p>
+                  <p className="text-[9px] text-gray-400 mt-0.5">{merchant.address || 'Service de Lavage Professionnel'}</p>
+                </div>
+
+                <div className="space-y-1 text-gray-500">
+                  <p className="text-gray-900 font-bold">N° : PR-2026-#### (Généré à la création)</p>
+                  <p>Client : <span className="text-ink font-bold">{clientName || '________________'}</span></p>
+                  <p>Contact : <span className="text-ink font-bold">{clientPhone || '________________'}</span></p>
+                  <p>Dépôt : <span className="font-bold">{depositDate}</span></p>
+                  <p className="text-indigo-600 font-bold">Retrait prévu : <span>{expectedDeliveryDate}</span></p>
+                  {notes.trim() && (
+                    <p className="text-amber-600 italic text-[10px]">Notes : {notes}</p>
+                  )}
+                </div>
+
+                <div className="border-t border-dashed border-gray-200 pt-3">
+                  <p className="font-bold uppercase text-ink mb-1.5 text-xs">Prestations :</p>
+                  {billingType === 'article' ? (
+                    <div className="space-y-1">
+                      {Object.keys(articlesQty).filter(k => articlesQty[k] > 0).map(k => (
+                        <div key={k} className="flex justify-between">
+                          <span>- {k} x{articlesQty[k]}</span>
+                          <span className="font-bold">{(articlesQty[k] * tarifs.articles[k as keyof typeof tarifs.articles]).toLocaleString()} FCFA</span>
+                        </div>
+                      ))}
+                      {Object.keys(articlesQty).filter(k => articlesQty[k] > 0).length === 0 && (
+                        <p className="text-gray-400 italic">Aucun article sélectionné</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {weightKg > 0 ? (
+                        <div className="flex justify-between">
+                          <span>- Poids ({weightKg} Kg × {tarifs.poids[weightService]} FCFA)</span>
+                          <span className="font-bold">{(weightKg * tarifs.poids[weightService]).toLocaleString()} FCFA</span>
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 italic font-bold text-[10px]">Indiquez le poids total pour calculer</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Supplement active items list */}
+                {Object.keys(supplements).some(k => supplements[k as keyof typeof supplements]) && (
+                  <div className="border-t border-dashed border-gray-200 pt-3">
+                    <p className="font-bold uppercase text-ink mb-1">Suppléments actifs :</p>
+                    <div className="space-y-1">
+                      {Object.keys(supplements).filter(k => supplements[k as keyof typeof supplements]).map(k => (
+                        <div key={k} className="flex justify-between text-indigo-500">
+                          <span>+ {k === 'premiumPack' ? 'emb. premium' : k}</span>
+                          <span>+{supplementTarifs[k as keyof typeof supplementTarifs]} FCFA</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-dashed border-gray-200 pt-3 space-y-1 text-xs">
+                  <div className="flex justify-between text-gray-500 text-[10px]">
+                    <span>Sous-total prestations :</span>
+                    <span className="font-bold">{(subtotal).toLocaleString()} FCFA</span>
+                  </div>
+                  <div className="flex justify-between text-gray-500 text-[10px]">
+                    <span>Total suppléments :</span>
+                    <span className="font-bold">{(supplementTotal).toLocaleString()} FCFA</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-red-500 text-[10px]">
+                      <span>Remise adhérent :</span>
+                      <span>-{discount.toLocaleString()} FCFA</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-ink font-black pt-1 border-t border-gray-200 text-sm">
+                    <span>Net à Payer :</span>
+                    <span className="text-primary">{total.toLocaleString()} FCFA</span>
+                  </div>
+                  
+                  {/* Enhanced settlement rows on ticket preview */}
+                  <div className="border-t border-dotted border-gray-200 pt-1.5 space-y-0.5 mt-1">
+                    <div className="flex justify-between text-gray-500 text-[9px] font-bold">
+                      <span>Règlement :</span>
+                      <span>
+                        {paymentStatus === 'paid' ? 'PAYÉ D\'AVANCE' : paymentStatus === 'partial' ? 'ACOMPTE VERSÉ' : 'À LA LIVRAISON'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 text-[9px] font-bold">
+                      <span>Montant Versé :</span>
+                      <span>{(paymentStatus === 'unpaid' ? 0 : amountPaid).toLocaleString()} FCFA</span>
+                    </div>
+                    {total - (paymentStatus === 'unpaid' ? 0 : amountPaid) > 0 && (
+                      <div className="flex justify-between text-rose-500 text-[9px] font-extrabold animate-pulse">
+                        <span>Reste dû :</span>
+                        <span>{(total - (paymentStatus === 'unpaid' ? 0 : amountPaid)).toLocaleString()} FCFA</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-center pt-3 border-t border-dashed border-gray-200 text-[9px] text-gray-400 space-y-1">
+                  <p className="font-bold text-ink">Merci de votre confiance !</p>
+                  <p>Ticket requis pour retirer votre linge.</p>
+                </div>
+              </div>
+
+              {selectedTicket && (
+                <div className="flex flex-col gap-2 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/60">
+                  <p className="text-xs font-bold text-indigo-700 text-center">🎉 Nouveau ticket enregistré avec succès !</p>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadPDF(selectedTicket)}
+                    className="w-full bg-[#1e293b] hover:bg-black text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition"
+                  >
+                    <Download className="w-4 h-4 animate-bounce" /> Imprimer le Ticket de Caisse (PDF)
+                  </button>
+
+                  <div className="border-t border-indigo-200/50 mt-2.5 pt-2.5 space-y-2">
+                    <p className="text-[9px] font-mono font-bold text-indigo-700 uppercase tracking-widest text-center flex items-center justify-center gap-1.5">
+                      <span>👑</span> Suivi Temps Réel du Gérant (Dépôt / Entrée)
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => dispatchManagerNotif(selectedTicket, 'entrée', 'whatsapp')}
+                        className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Gérant
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dispatchManagerNotif(selectedTicket, 'entrée', 'email')}
+                        className="py-2 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                      >
+                        <Mail className="w-3.5 h-3.5" /> E-mail Gérant
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : activeSubTab === 'closures' ? (
+        /* Clôture de caisse interactive view */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* New Closure Form */}
+          <div className="lg:col-span-6 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-ink flex items-center gap-2">
+                🔒 Nouvelle Clôture de Caisse
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Calculez les recettes théoriques de la journée et déclarez les espèces physiques en caisse.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Date d'Activité</label>
+                <input
+                  type="date"
+                  value={closureDate}
+                  onChange={e => setClosureDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Caissier / Opérateur</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Abdoulaye"
+                  value={cashierName}
+                  onChange={e => setCashierName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink"
+                />
+              </div>
+            </div>
+
+            {/* Recalculated Theoretical State */}
+            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
+              <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest block">📊 Chiffre d'Affaires Théorique ({closureDate})</span>
+              
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600 flex items-center gap-1.5 font-medium">🧺 Recettes Pressing ({dailyPressingTickets.length} dépôts) :</span>
+                  <span className="font-mono font-bold text-ink">{dailyPressingRevenue.toLocaleString()} FCFA</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600 flex items-center gap-1.5 font-medium">🛒 Ventes Détergents ({dailyDetergentSales.length} ventes) :</span>
+                  <span className="font-mono font-bold text-ink">{dailyDetergentRevenue.toLocaleString()} FCFA</span>
+                </div>
+                <div className="border-t border-slate-200/60 pt-2.5 flex justify-between items-center">
+                  <span className="font-black text-xs text-ink uppercase tracking-wider">💰 Total Théorique :</span>
+                  <span className="font-mono font-black text-sm text-primary">{totalTheoreticalRevenue.toLocaleString()} FCFA</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Inputs */}
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Espèces Réelles Comptées</label>
+                  <span className="text-[10px] font-mono font-semibold text-gray-400">Pour rapprochement</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Entrez le montant cash réel"
+                    value={actualCash || ''}
+                    onChange={e => setActualCash(Number(e.target.value))}
+                    className="w-full pl-4 pr-16 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-black text-sm text-ink font-mono"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">FCFA</span>
+                </div>
+              </div>
+
+              {/* Rapprochement Renders */}
+              {actualCash > 0 && (
+                <div className={`p-4 rounded-xl border transition ${
+                  actualCash === totalTheoreticalRevenue 
+                    ? 'bg-emerald-50 border-emerald-100' 
+                    : actualCash > totalTheoreticalRevenue 
+                      ? 'bg-blue-50 border-blue-100' 
+                      : 'bg-rose-50 border-rose-100'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider block">Rapprochement de caisse ({closureDate})</span>
+                      <strong className={`text-sm font-black ${
+                        actualCash === totalTheoreticalRevenue 
+                          ? 'text-emerald-700' 
+                          : actualCash > totalTheoreticalRevenue 
+                            ? 'text-blue-700' 
+                            : 'text-rose-700'
+                      }`}>
+                        {actualCash === totalTheoreticalRevenue 
+                          ? '✅ Caisse parfaitement équilibrée' 
+                          : actualCash > totalTheoreticalRevenue 
+                            ? `🟢 Surplus de caisse (+${(actualCash - totalTheoreticalRevenue).toLocaleString()} FCFA)` 
+                            : `⚠️ Manquant détecté (${(actualCash - totalTheoreticalRevenue).toLocaleString()} FCFA)`}
+                      </strong>
+                    </div>
+                    <span className="font-mono font-bold text-xs">
+                      {actualCash === totalTheoreticalRevenue ? 'OK' : `${actualCash - totalTheoreticalRevenue > 0 ? '+' : ''}${(actualCash - totalTheoreticalRevenue).toLocaleString()} F`}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Observations / Justifications</label>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Écart de caisse justifié par un acompte différé, commentaires..."
+                  value={closureNotes}
+                  onChange={e => setClosureNotes(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 text-xs text-ink font-sans"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!cashierName.trim()) {
+                    toast.error('Veuillez spécifier votre nom de Caissier.');
+                    return;
+                  }
+                  
+                  // Check if closure already exists for this date to prevent duplicate
+                  if (closures.some(c => c.date === closureDate)) {
+                    if (!confirm(`Une clôture de caisse existe déjà pour le ${closureDate}. Voulez-vous la remplacer ?`)) {
+                      return;
+                    }
+                  }
+
+                  const newClosure: PressingClosure = {
+                    id: `closure_${Date.now()}`,
+                    date: closureDate,
+                    timestamp: new Date().toISOString(),
+                    cashierName: cashierName.trim(),
+                    totalPressingRevenue: dailyPressingRevenue,
+                    totalDetergentRevenue: dailyDetergentRevenue,
+                    totalTheoreticalRevenue,
+                    actualCashCounted: actualCash,
+                    discrepancy: actualCash - totalTheoreticalRevenue,
+                    notes: closureNotes.trim(),
+                    status: 'closed',
+                    sentToManager: false
+                  };
+
+                  let sentEmail = false;
+                  if (autoEmailManager && managerEmail && managerEmail.trim()) {
+                    toast.loading('Envoi automatique du rapport de clôture au Gérant...');
+                    const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
+                    sentEmail = success;
+                    newClosure.sentToManager = success;
+                  }
+
+                  // Update State & localstorage
+                  setClosures(prev => {
+                    const filtered = prev.filter(c => c.date !== closureDate);
+                    return [newClosure, ...filtered];
+                  });
+
+                  // Reset inputs
+                  setActualCash(0);
+                  setClosureNotes('');
+                  toast.dismiss();
+                  toast.success(`Clôture du ${closureDate} enregistrée à l'instant avec succès !`);
+                }}
+                className="w-full bg-primary hover:bg-[#c93b3b] text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-2xl transition duration-200 flex items-center justify-center gap-2 shadow"
+              >
+                🔒 Valider & Verrouiller la Caisse
+              </button>
+            </div>
+          </div>
+
+          {/* Historical Closures List */}
+          <div className="lg:col-span-6 space-y-4">
+            <h3 className="text-base font-black text-ink flex items-center gap-2">
+              📜 Historique des Clôtures Journalières
+            </h3>
+
+            {closures.length === 0 ? (
+              <div className="bg-gray-50 p-8 rounded-3xl border border-gray-100 text-center text-gray-400 space-y-2">
+                <p className="text-xs font-bold font-mono">Aucun rapport de clôture archivé pour le moment.</p>
+                <p className="text-[10px]">Utilisez le formulaire de gauche pour effectuer votre premier rapprochement.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                {closures.map(c => {
+                  const errorVal = c.discrepancy;
+                  const isPerfect = errorVal === 0;
+                  const isLoss = errorVal < 0;
+
+                  return (
+                    <div key={c.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition space-y-3 font-sans">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[9px] font-bold font-mono rounded-md uppercase">
+                            Date: {c.date}
+                          </span>
+                          <h4 className="text-xs font-black text-ink mt-1">Clôture par {c.cashierName}</h4>
+                          <span className="text-[9px] text-gray-400 font-mono">Clos le {new Date(c.timestamp).toLocaleString('fr-FR')}</span>
+                        </div>
+                        
+                        <div className="text-right">
+                          <span className="text-[9px] text-gray-400 font-mono block">Écart caisse:</span>
+                          <span className={`text-xs font-mono font-black ${
+                            isPerfect ? 'text-emerald-600' : isLoss ? 'text-rose-600' : 'text-blue-600'
+                          }`}>
+                            {isPerfect ? '0 FCFA' : `${errorVal > 0 ? '+' : ''}${errorVal.toLocaleString()} FCFA`}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 bg-gray-50 p-2.5 rounded-xl text-[10px] text-gray-500 font-mono text-center font-bold">
+                        <div>
+                          <span className="block text-[8px] text-gray-400">Pressing</span>
+                          <strong className="text-ink text-xs block mt-1">{c.totalPressingRevenue.toLocaleString()} F</strong>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] text-gray-400">Détergents</span>
+                          <strong className="text-ink text-xs block mt-1">{c.totalDetergentRevenue.toLocaleString()} F</strong>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] text-gray-400 font-bold">Total Réel</span>
+                          <strong className="text-primary text-xs block mt-1 font-black">{c.actualCashCounted.toLocaleString()} F</strong>
+                        </div>
+                      </div>
+
+                      {c.notes && (
+                        <p className="text-[10px] text-gray-500 italic bg-amber-50/50 rounded-lg p-2 border border-amber-100/30">
+                          <strong>Note :</strong> "{c.notes}"
+                        </p>
+                      )}
+
+                      {/* Communication / manual Send buttons */}
+                      <div className="border-t border-gray-100/80 pt-3 space-y-2">
+                        <p className="text-[9px] font-mono font-bold text-gray-400 uppercase tracking-widest text-center">
+                          Transférer au Manager
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => dispatchManagerClosureNotif(c, 'whatsapp')}
+                            className="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-extrabold rounded-lg flex items-center justify-center gap-1 transition"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Gérant
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              toast.loading('Envoi du rapport par mail...');
+                              const ok = await sendSilentBackgroundClosureEmailToManager(c);
+                              toast.dismiss();
+                              if (ok) {
+                                toast.success('Rapport envoyé avec succès !');
+                              } else {
+                                dispatchManagerClosureNotif(c, 'email');
+                              }
+                            }}
+                            className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-extrabold rounded-lg flex items-center justify-center gap-1 transition"
+                          >
+                            <Mail className="w-3.5 h-3.5" /> E-mail Direct
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Tickets listings (Active vs History) */
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h3 className="text-lg font-black text-ink uppercase tracking-wider">
+              {activeSubTab === 'active' ? '⏳ Dépôts En Cours / Prêt à Livrer' : '✅ Historique des Livraisons Pressing'}
+            </h3>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Chercher N° Ticket, Client..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+          </div>
+
+          {/* Status Sub-Filters for Active Tickets */}
+          {activeSubTab === 'active' && (
+            <div className="flex flex-wrap gap-2 pb-2.5 border-b border-gray-100">
+              <button
+                type="button"
+                onClick={() => setWashStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  washStatusFilter === 'all'
+                    ? 'bg-ink text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900'
+                }`}
+              >
+                Tous ({tickets.filter(t => t.status !== 'delivered').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setWashStatusFilter('deposed')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  washStatusFilter === 'deposed'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'bg-amber-50 text-amber-600 hover:bg-amber-100/60'
+                }`}
+              >
+                🧺 Déposés ({tickets.filter(t => t.status === 'deposed').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setWashStatusFilter('in_progress')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  washStatusFilter === 'in_progress'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100/60'
+                }`}
+              >
+                🧼 En Lavage ({tickets.filter(t => t.status === 'in_progress').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setWashStatusFilter('ready')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  washStatusFilter === 'ready'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100/60'
+                }`}
+              >
+                👔 Prêts ({tickets.filter(t => t.status === 'ready').length})
+              </button>
+            </div>
+          )}
+
+          {filteredTickets.length === 0 ? (
+            <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              <p className="text-gray-400 font-bold text-sm">Aucun ticket correspondant.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest bg-gray-50/40">
+                    <th className="px-6 py-4">N° Ticket</th>
+                    <th className="px-6 py-4">Client</th>
+                    <th className="px-6 py-4">Dépôt</th>
+                    <th className="px-6 py-4">Facturation</th>
+                    <th className="px-6 py-4">Total</th>
+                    <th className="px-6 py-4">Action Statut</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-xs">
+                  {filteredTickets.map(ticket => (
+                    <tr key={ticket.id} className="hover:bg-gray-50/80 transition group">
+                      <td className="px-6 py-4 font-mono font-black text-ink">{ticket.ticketNumber}</td>
+                      <td className="px-6 py-4 font-bold">
+                        <div>{ticket.clientName}</div>
+                        <div className="text-[10px] text-gray-400 font-mono">{ticket.clientPhone || 'Aucun contact'}</div>
+                        {ticket.notes && (
+                          <div className="text-[9px] text-amber-600 bg-amber-50 rounded px-1.5 py-0.5 w-fit mt-1 max-w-[140px] truncate" title={ticket.notes}>
+                            📝 {ticket.notes}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-gray-500 font-mono">
+                        <div>{ticket.depositDate}</div>
+                        {ticket.expectedDeliveryDate && (
+                          <div className="text-[10px] text-indigo-500 font-bold mt-1">📅 Retrait: {ticket.expectedDeliveryDate}</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {ticket.billingType === 'article' ? (
+                          <span className="px-2 py-1 bg-indigo-50 border border-indigo-100/40 text-indigo-600 font-bold text-[9px] rounded-lg">Articles ({Object.values(ticket.articles).reduce((a, b) => a + b, 0)})</span>
+                        ) : (
+                          <span className="px-2 py-1 bg-cyan-50 border border-cyan-100/40 text-cyan-600 font-bold text-[9px] rounded-lg">{ticket.weightKg} Kg ({ticket.weightService})</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-mono">
+                        <div className="font-bold text-ink">{ticket.total.toLocaleString()} FCFA</div>
+                        <div className="mt-1">
+                          {ticket.paymentStatus === 'paid' ? (
+                            <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-1.5 py-0.5 rounded border border-emerald-100/40">Payé 👍</span>
+                          ) : ticket.paymentStatus === 'partial' ? (
+                            <span className="text-[9px] bg-amber-50 text-amber-600 font-extrabold px-1.5 py-0.5 rounded border border-amber-100/40">Acompte: {ticket.amountPaid?.toLocaleString()} F</span>
+                          ) : (
+                            <span className="text-[9px] bg-rose-50 text-rose-600 font-extrabold px-1.5 py-0.5 rounded border border-rose-100/40">Reste: {ticket.total.toLocaleString()} F</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={ticket.status}
+                          onChange={e => updateStatus(ticket.id, e.target.value as any)}
+                          className={`font-black uppercase text-[10px] rounded-lg px-2 py-1 border outline-none ${
+                            ticket.status === 'deposed' ? 'bg-amber-50 border-amber-100 text-amber-700' :
+                            ticket.status === 'in_progress' ? 'bg-blue-50 border-blue-100 text-blue-700' :
+                            ticket.status === 'ready' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
+                            'bg-gray-100 border-gray-200 text-gray-500'
+                          }`}
+                        >
+                          <option value="deposed">Déposé 🧺</option>
+                          <option value="in_progress">En Lavage 🧼</option>
+                          <option value="ready">Prêt 👔</option>
+                          <option value="delivered">Livré ✅</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 text-right space-x-1 shrink-0">
+                        <button
+                          onClick={() => setViewingTicket(ticket)}
+                          className="p-1 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg font-bold text-[9px] transition inline-flex items-center gap-1"
+                          title="Détails"
+                        >
+                          <Eye className="w-3 h-3" /> Détails
+                        </button>
+                        <button
+                          onClick={() => handleDownloadPDF(ticket)}
+                          className="p-1 px-2.5 bg-gray-900 text-white rounded-lg hover:bg-primary font-bold text-[9px] transition inline-flex items-center"
+                          title="Télécharger PDF"
+                        >
+                          PDF
+                        </button>
+                        <button
+                          onClick={() => deleteTicket(ticket.id)}
+                          className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg group-hover:opacity-100 transition inline-flex items-center"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Detail View Modal */}
+      <AnimatePresence>
+        {viewingTicket && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-[#1e293b] to-[#0f172a] text-white p-6 relative">
+                <button
+                  type="button"
+                  onClick={() => setViewingTicket(null)}
+                  className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-full flex items-center justify-center transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <div className="text-[10px] font-mono tracking-widest text-cyan-400 font-bold uppercase mb-1">Ticket de Réception</div>
+                <h3 className="text-xl font-black">{viewingTicket.ticketNumber}</h3>
+                <p className="text-xs text-slate-300 mt-1">Géré par le pressing professionnel ACOM</p>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+                {/* Client info */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <div>
+                    <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Client</span>
+                    <span className="font-bold text-sm text-ink">{viewingTicket.clientName}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Téléphone / Contact</span>
+                    <span className="font-bold text-sm text-ink font-mono">{viewingTicket.clientPhone || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Email</span>
+                    <span className="font-bold text-xs text-ink break-all font-mono">{viewingTicket.clientEmail || 'Non spécifié'}</span>
+                  </div>
+                </div>
+
+                {/* Dates & Notes */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Date de dépôt</span>
+                    <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">{viewingTicket.depositDate}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Retrait prévu ⚠️</span>
+                    <span className="font-mono text-xs text-indigo-700 bg-indigo-50 font-bold px-2 py-1 rounded">
+                      {viewingTicket.expectedDeliveryDate || 'Non spécifié'}
+                    </span>
+                  </div>
+                </div>
+
+                {viewingTicket.notes && (
+                  <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-xl">
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-amber-500 mb-1">Observations / Remarques :</span>
+                    <p className="text-xs text-amber-900 font-medium">{viewingTicket.notes}</p>
+                  </div>
+                )}
+
+                {/* Prestations */}
+                <div className="space-y-2">
+                  <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider">Détail des Prestations</span>
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-white">
+                    {viewingTicket.billingType === 'article' ? (
+                      Object.keys(viewingTicket.articles).filter(k => viewingTicket.articles[k] > 0).map(k => {
+                        const q = viewingTicket.articles[k];
+                        const singlePrice = tarifs.articles[k as keyof typeof tarifs.articles] || 0;
+                        return (
+                          <div key={k} className="flex justify-between p-3 text-xs">
+                            <span className="capitalize font-medium text-ink">- {k} <span className="text-gray-400 font-mono">x{q}</span></span>
+                            <span className="font-mono font-bold text-ink">{(q * singlePrice).toLocaleString()} FCFA</span>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="flex justify-between p-3 text-xs">
+                        <span className="font-medium text-ink">- Lavage au poids <span className="text-gray-400 font-mono">({viewingTicket.weightKg} Kg, {viewingTicket.weightService})</span></span>
+                        <span className="font-mono font-bold text-ink">{(viewingTicket.weightKg * (tarifs.poids[viewingTicket.weightService] || 0)).toLocaleString()} FCFA</span>
+                      </div>
+                    )}
+
+                    {/* Supplements */}
+                    {Object.keys(viewingTicket.supplements).filter(k => viewingTicket.supplements[k as keyof typeof viewingTicket.supplements]).map(k => {
+                      const cost = viewingTicket.supplementTarifs[k as keyof typeof viewingTicket.supplementTarifs] || 0;
+                      const labels: { [key: string]: string } = {
+                        repassage: '👔 Repassage',
+                        express: '⚡ Lavage Express',
+                        detachage: '🔬 Détachage spécial',
+                        livraison: '🚚 Livraison à domicile',
+                        premiumPack: '💎 Emballage Premium',
+                      };
+                      return (
+                        <div key={k} className="flex justify-between p-3 text-xs bg-indigo-50/10 text-indigo-700">
+                          <span>+ {labels[k]}</span>
+                          <span className="font-mono font-bold">+{cost.toLocaleString()} FCFA</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Financial Summary */}
+                <div className="pt-3 border-t border-dashed border-gray-200 space-y-1.5 font-mono text-xs">
+                  <div className="flex justify-between text-gray-500 font-bold">
+                    <span>Sous-total prest. :</span>
+                    <span>{(viewingTicket.subtotal + viewingTicket.supplementTotal).toLocaleString()} FCFA</span>
+                  </div>
+                  {viewingTicket.discount > 0 && (
+                    <div className="flex justify-between text-rose-500">
+                      <span>Remise accordée :</span>
+                      <span>-{viewingTicket.discount.toLocaleString()} FCFA</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-slate-900 font-black text-sm pt-1 border-t border-slate-100">
+                    <span>Prix global net :</span>
+                    <span>{viewingTicket.total.toLocaleString()} FCFA</span>
+                  </div>
+
+                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1 mt-3">
+                    <div className="flex justify-between text-[10px] text-gray-500 font-sans">
+                      <span>Statut de paiement :</span>
+                      <span className="font-bold uppercase tracking-wider">
+                        {viewingTicket.paymentStatus === 'paid' ? "Payé d'avance 🟢" : viewingTicket.paymentStatus === 'partial' ? 'Acompte versé 🟡' : 'Impayé au retrait 🔴'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-indigo-600 font-sans font-bold">
+                      <span>Montant Versé :</span>
+                      <span>{(viewingTicket.amountPaid || 0).toLocaleString()} FCFA</span>
+                    </div>
+                    {viewingTicket.total - (viewingTicket.amountPaid || 0) > 0 && (
+                      <div className="flex justify-between text-rose-600 font-sans font-black">
+                        <span>Solde dû :</span>
+                        <span>{(viewingTicket.total - (viewingTicket.amountPaid || 0)).toLocaleString()} FCFA</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 🔔 Module de Suivi & Notifications en Temps Réel */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                    <h4 className="text-[11px] font-mono font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
+                      <span>🔔</span> Suivi & Relance Client (Temps Réel)
+                    </h4>
+                    <span className="text-[9px] font-mono font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full uppercase">
+                      WhatsApp & Mail
+                    </span>
+                  </div>
+
+                  {/* Destinataires variables */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Téléphone/WhatsApp</label>
+                      <input
+                        type="text"
+                        placeholder="N° de téléphone"
+                        value={editedPhone}
+                        onChange={e => setEditedPhone(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs font-mono font-semibold rounded-lg border border-gray-200 focus:ring-1 focus:ring-indigo-500 bg-white text-ink"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Adresse E-mail</label>
+                      <input
+                        type="email"
+                        placeholder="Adresse email client"
+                        value={editedEmail}
+                        onChange={e => setEditedEmail(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs font-mono font-semibold rounded-lg border border-gray-200 focus:ring-1 focus:ring-indigo-500 bg-white text-ink"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Template quick selects */}
+                  <div>
+                    <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">Sélectionner un modèle :</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {Object.keys(NOTIFICATION_TEMPLATES).map(key => {
+                        const template = NOTIFICATION_TEMPLATES[key as keyof typeof NOTIFICATION_TEMPLATES];
+                        const isSelected = selectedNotifTemplate === key;
+                        return (
+                          <button
+                            type="button"
+                            key={key}
+                            onClick={() => setSelectedNotifTemplate(key as any)}
+                            className={`p-2 text-left rounded-xl border text-[10px] font-bold transition-all relative ${
+                              isSelected 
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white hover:bg-gray-100 text-slate-700 border-gray-200'
+                            }`}
+                          >
+                            <span className="block truncate">{template.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Preview Editor */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider">Aperçu du message à envoyer :</label>
+                      <span className="text-[8px] font-mono text-gray-400 font-semibold">({notifMessage.length} caract.)</span>
+                    </div>
+                    <textarea
+                      value={notifMessage}
+                      onChange={e => setNotifMessage(e.target.value)}
+                      rows={3}
+                      className="w-full p-2.5 text-xs rounded-xl border border-gray-200 bg-white focus:ring-1 focus:ring-indigo-500 font-semibold text-slate-700 outline-none leading-relaxed text-ink"
+                    />
+                  </div>
+
+                  {/* Action Dispatchers */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Send WhatsApp Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!editedPhone.trim()) {
+                          toast.error('Veuillez renseigner un numéro de téléphone.');
+                          return;
+                        }
+                        let cleaned = editedPhone.replace(/[^0-9]/g, '');
+                        if (cleaned.length === 9 && cleaned.startsWith('7')) {
+                          cleaned = '221' + cleaned;
+                        }
+                        
+                        const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(notifMessage)}`;
+                        window.open(waUrl, '_blank');
+                        
+                        logNotificationSent('whatsapp', selectedNotifTemplate, notifMessage);
+                        toast.success('Lien WhatsApp généré !');
+                      }}
+                      className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition shadow-sm border border-emerald-500"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Suivi par WhatsApp
+                    </button>
+
+                    {/* Send Email Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!editedEmail.trim()) {
+                          toast.error('Veuillez renseigner une adresse e-mail.');
+                          return;
+                        }
+                        const subject = NOTIFICATION_TEMPLATES[selectedNotifTemplate]?.subject || 'Suivi Pressing';
+                        const mailtoUrl = `mailto:${editedEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(notifMessage)}`;
+                        window.open(mailtoUrl, '_blank');
+                        
+                        logNotificationSent('email', selectedNotifTemplate, notifMessage);
+                        toast.success('Relance par email ouverte !');
+                      }}
+                      className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition shadow-sm border border-indigo-500"
+                    >
+                      <Mail className="w-3.5 h-3.5" /> Suivi par Email
+                    </button>
+                  </div>
+
+                  {/* Timeline Logs in the modal */}
+                  {viewingTicket.sentNotifications && viewingTicket.sentNotifications.length > 0 && (
+                    <div className="pt-2 border-t border-slate-200">
+                      <span className="block text-[8px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">Historique des envois :</span>
+                      <div className="space-y-1 max-h-[100px] overflow-y-auto pr-1">
+                        {viewingTicket.sentNotifications.map((l, idx) => (
+                          <div key={l.id || idx} className="flex items-start justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-100 text-[10px] font-medium text-slate-600">
+                            <span className="flex items-center gap-1 shrink-0 truncate max-w-[210px]">
+                              {l.type === 'whatsapp' ? '🟢 WhatsApp :' : '🔵 Email :'} <strong className="font-bold text-slate-800">{l.templateName}</strong>
+                            </span>
+                            <span className="text-[8px] font-mono text-gray-400 shrink-0">
+                              {new Date(l.timestamp).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 👑 Relais en Temps Réel au Gérant */}
+                <div className="p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100/60 space-y-3">
+                  <div className="flex items-center justify-between border-b border-indigo-200/40 pb-2">
+                    <h4 className="text-[11px] font-mono font-bold text-indigo-800 uppercase tracking-widest flex items-center gap-1.5">
+                      <span>👑</span> Relais Temps Réel Gérant
+                    </h4>
+                    <span className="text-[8px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white font-mono uppercase">
+                      Manager Alert
+                    </span>
+                  </div>
+
+                  <p className="text-[10px] text-gray-500 leading-relaxed font-semibold">
+                    Notification formatée envoyée au Gérant pour le suivi des <strong className="text-indigo-600 font-bold">entrées et les sorties (depuis la distance)</strong>.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 pb-1 bg-white p-2.5 rounded-xl border border-indigo-100/50">
+                    <div className="col-span-2 text-[9px] font-mono font-black text-indigo-700 uppercase tracking-wider mb-0.5 text-center">
+                      📥 ENTRÉE (Dépôt Enregistré)
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => dispatchManagerNotif(viewingTicket, 'entrée', 'whatsapp')}
+                      className="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm"
+                    >
+                      <MessageSquare className="w-3 h-3" /> WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dispatchManagerNotif(viewingTicket, 'entrée', 'email')}
+                      className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm"
+                    >
+                      <Mail className="w-3 h-3" /> E-mail
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-xl border border-indigo-100/50">
+                    <div className="col-span-2 text-[9px] font-mono font-black text-indigo-700 uppercase tracking-wider mb-0.5 text-center">
+                      👔 SORTIE (Prêt / Livré)
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => dispatchManagerNotif(viewingTicket, 'sortie', 'whatsapp')}
+                      className="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm"
+                    >
+                      <MessageSquare className="w-3 h-3" /> WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dispatchManagerNotif(viewingTicket, 'sortie', 'email')}
+                      className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm"
+                    >
+                      <Mail className="w-3 h-3" /> E-mail
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions footer */}
+              <div className="bg-gray-50 p-4 border-t border-gray-100 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDownloadPDF(viewingTicket)}
+                  className="flex-1 bg-gray-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition"
+                >
+                  <Printer className="w-4 h-4" /> Ré-Imprimer Ticket PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewingTicket(null)}
+                  className="px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs py-3 rounded-xl transition"
+                >
+                  Fermer
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+// ==========================================
+// 8.1 Pressing Stock & Detergent Sales Manager
+// ==========================================
+
+interface DetergentProduct {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  minStock: number;
+  category: string;
+  description: string;
+}
+
+interface DetergentSale {
+  id: string;
+  saleNumber: string;
+  customerName: string;
+  customerPhone: string;
+  date: string;
+  items: {
+    productId: string;
+    productName: string;
+    price: number;
+    quantity: number;
+    total: number;
+  }[];
+  discount: number;
+  subtotal: number;
+  total: number;
+}
+
+const DEFAULT_DETERGENTS: DetergentProduct[] = [
+  {
+    id: 'det_1',
+    name: 'Lessive Liquide Parfum Royale (1.5L)',
+    price: 3500,
+    stock: 25,
+    minStock: 5,
+    category: 'liquid',
+    description: 'Lessive concentrée universelle, parfum d\'origine végétale intense.'
+  },
+  {
+    id: 'det_2',
+    name: 'Adoucissant Souffle Satiné (1L)',
+    price: 2500,
+    stock: 18,
+    minStock: 4,
+    category: 'softener',
+    description: 'Rend le linge extrêmement soyeux et diminue le temps de repassage.'
+  },
+  {
+    id: 'det_3',
+    name: 'Détachant Expert Cible-Tache (500ml)',
+    price: 4500,
+    stock: 8,
+    minStock: 3,
+    category: 'stain_remover',
+    description: 'Élimine efficacement graisses, sang, graffitis d\'encre et café.'
+  },
+  {
+    id: 'det_4',
+    name: 'Eau de Javel Ultra-Blancheur (2L)',
+    price: 1800,
+    stock: 30,
+    minStock: 8,
+    category: 'bleach',
+    description: 'Agent de blanchiment ultra-luminescent, aseptisant textile actif.'
+  },
+  {
+    id: 'det_5',
+    name: 'Poudre Active Multi-Fibres (3Kg)',
+    price: 5000,
+    stock: 4,
+    minStock: 5,
+    category: 'powder',
+    description: 'Formule enzymatique désincrustante pour textiles blancs et couleurs.'
+  }
+];
+
+const CATEGORY_LABELS: { [key: string]: string } = {
+  powder: 'Lessive en Poudre',
+  liquid: 'Lessive Liquide',
+  softener: 'Assouplissant',
+  stain_remover: 'Détachant',
+  bleach: 'Eau de Javel / Chlore',
+  other: 'Accessoires / Autres'
+};
+
+const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
+  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'inventory' | 'history'>('sales');
+  
+  // Custom categories state initialized from localStorage
+  const [customCategories, setCustomCategories] = useState<{ [key: string]: string }>(() => {
+    const saved = localStorage.getItem(`pressing_custom_categories_${merchant.id}`);
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const allCategories = useMemo(() => {
+    return {
+      ...CATEGORY_LABELS,
+      ...customCategories
+    };
+  }, [customCategories]);
+
+  // Products stock state
+  const [products, setProducts] = useState<DetergentProduct[]>(() => {
+    const saved = localStorage.getItem(`pressing_stock_products_${merchant.id}`);
+    return saved ? JSON.parse(saved) : DEFAULT_DETERGENTS;
+  });
+
+  // Sales state
+  const [sales, setSales] = useState<DetergentSale[]>(() => {
+    const saved = localStorage.getItem(`pressing_stock_sales_${merchant.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [stockFilter, setStockFilter] = useState<string>('all');
+  
+  // POS Cart State
+  const [cart, setCart] = useState<{ product: DetergentProduct; quantity: number }[]>([]);
+  const [discount, setDiscount] = useState<number>(0);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+
+  // Modals / Creators
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<DetergentProduct | null>(null);
+  const [selectedSale, setSelectedSale] = useState<DetergentSale | null>(null);
+
+  // Configuration Suivi Gérant (WhatsApp & Email automatique)
+  const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+  const managerEmail = merchant.managerNotifications?.email || '';
+  const autoEmailManager = merchant.managerNotifications?.notifyOnPOSSale !== false;
+
+  const getManagerSaleNotificationMessage = useCallback((s: DetergentSale) => {
+    const itemsList = s.items
+      .map(item => `• ${item.quantity}x ${item.productName} (${item.price} FCFA/u) = ${item.total} FCFA`)
+      .join('\n');
+
+    return `📢 [SUIVI GÉRANT - VENTE DE DÉTERGENT] 🛒\n` +
+           `--------------------------------\n` +
+           `• N° Vente : ${s.saleNumber}\n` +
+           `• Acheteur : ${s.customerName} (${s.customerPhone || 'Client de Passage'})\n` +
+           `• Date/Heure : ${new Date(s.date).toLocaleString('fr-FR')}\n` +
+           `--------------------------------\n` +
+           `DÉTAIL DU PANIER :\n` +
+           `${itemsList}\n` +
+           `--------------------------------\n` +
+           `• Sous-total : ${s.subtotal} FCFA\n` +
+           `• Remise : ${s.discount || 0} FCFA\n` +
+           `• TOTAL PAYÉ : ${s.total} FCFA ✅\n` +
+           `--------------------------------\n` +
+           `Rapport d'activité de vente de détergent généré en temps réel sur l'application SaaS ${merchant.name || 'ACOM'}.`;
+  }, [merchant]);
+
+  const sendSilentBackgroundSaleEmailToManager = async (sale: DetergentSale) => {
+    if (!managerEmail || !managerEmail.trim()) return;
+
+    const itemsDesc = sale.items
+      .map(item => `<li style="margin: 4px 0;"><strong>${item.quantity}x</strong> ${item.productName} (${item.price} FCFA/u) — <strong>${item.total} FCFA</strong></li>`)
+      .join('');
+
+    const title = `🛒 Notification de Vente (Produits Détergents)`;
+    const themeColor = '#10b981'; // Green for sales
+
+    const mailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+        <div style="background-color: ${themeColor}; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+          <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Pressing'}</h2>
+          <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Suivi d'Activité en Temps Réel — Gérant</p>
+        </div>
+
+        <div style="margin-top: 20px;">
+          <h3 style="color: ${themeColor}; border-bottom: 2px solid ${themeColor}; padding-bottom: 5px; margin-bottom: 15px;">${title}</h3>
+          
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 150px;"><strong>N° Vente :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${sale.saleNumber}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Client / Acheteur :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${sale.customerName} (${sale.customerPhone || 'Client de Passage'})</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;" valign="top"><strong>Articles Achetés :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                <ul style="margin: 0; padding-left: 20px;">${itemsDesc}</ul>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Sous-Total :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${sale.subtotal} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Remise Accordée :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${sale.discount || 0} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Montant Total Encaissé :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #10b981; font-size: 15px;">${sale.total} FCFA (PAYÉ EN CAISSE ✅)</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;"><strong>Date / Heure :</strong></td>
+              <td style="padding: 8px 0;">${new Date(sale.date).toLocaleString('fr-FR')}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+          Ce rapport automatique en direct a été envoyé en arrière-plan sans action requise de l'opérateur.<br/>
+          <strong>Système de Suivi de Ventes SaaS ${merchant.name || 'ACOM'}</strong>.
+        </div>
+      </div>
+    `;
+
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: managerEmail,
+          subject: `🛒 [VENTE PRODUIT] Vente n°${sale.saleNumber} - ${merchant.name || 'Pressing'}`,
+          html: mailHtml
+        })
+      });
+
+      if (response.ok) {
+        toast.success(`Rapport de Vente envoyé par email ! (Arrière-plan)`);
+        
+        // Add to history
+        const newLog = {
+          id: `mnotif_s_${Date.now()}`,
+          ticketNumber: sale.saleNumber,
+          type: 'sortie' as const,
+          method: 'email' as const,
+          timestamp: new Date().toISOString()
+        };
+        const savedNotifs = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
+        const currentNotifs = savedNotifs ? JSON.parse(savedNotifs) : [];
+        localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
+      } else {
+        console.error('Failed to send background email to manager for sale');
+      }
+    } catch (err) {
+      console.error('Error dispatching silent manager background sale mail:', err);
+    }
+  };
+
+  const dispatchManagerSaleNotif = (s: DetergentSale, method: 'whatsapp' | 'email') => {
+    const message = getManagerSaleNotificationMessage(s);
+    if (method === 'whatsapp') {
+      if (!managerPhone.trim()) {
+        toast.error('Veuillez configurer le numéro de téléphone WhatsApp du Gérant.');
+        return;
+      }
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '221' + cleaned;
+      }
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+      toast.success('Lien WhatsApp généré !');
+    } else {
+      if (!managerEmail.trim()) {
+        toast.error('Veuillez configurer l\'adresse email du Gérant.');
+        return;
+      }
+      const subject = `🛒 [DÉTERGENTS] Rapport de Vente ${s.saleNumber} - ${merchant.name || 'Pressing'}`;
+      const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+      window.open(mailtoUrl, '_blank');
+      toast.success('Rapport Email prêt !');
+    }
+
+    // Add to history
+    const newLog = {
+      id: `mnotif_s_${Date.now()}`,
+      ticketNumber: s.saleNumber,
+      type: 'sortie' as const,
+      method,
+      timestamp: new Date().toISOString()
+    };
+    const savedNotifs = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
+    const currentNotifs = savedNotifs ? JSON.parse(savedNotifs) : [];
+    localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
+  };
+
+  // Form states (Create / Edit)
+  const [formName, setFormName] = useState('');
+  const [formPrice, setFormPrice] = useState<number>(0);
+  const [formStock, setFormStock] = useState<number>(0);
+  const [formMinStock, setFormMinStock] = useState<number>(3);
+  const [formCategory, setFormCategory] = useState<string>('liquid');
+  const [formDescription, setFormDescription] = useState('');
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
+  const [newCategoryLabelInput, setNewCategoryLabelInput] = useState('');
+
+  const deleteCustomCategory = (keyToDel: string) => {
+    if (window.confirm(`Voulez-vous supprimer la catégorie "${customCategories[keyToDel]}" ? Les produits de cette catégorie resteront mais leur rayon sera à réajuster.`)) {
+      const updated = { ...customCategories };
+      delete updated[keyToDel];
+      setCustomCategories(updated);
+      localStorage.setItem(`pressing_custom_categories_${merchant.id}`, JSON.stringify(updated));
+      
+      if (formCategory === keyToDel) {
+        setFormCategory('liquid');
+      }
+      if (categoryFilter === keyToDel) {
+        setCategoryFilter('all');
+      }
+      toast.success('Rayon de catégorie personnalisé supprimé.');
+    }
+  };
+
+  // Calculate cart total
+  const cartSubtotal = useMemo(() => {
+    return cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+  }, [cart]);
+
+  const cartTotal = useMemo(() => {
+    return Math.max(0, cartSubtotal - discount);
+  }, [cartSubtotal, discount]);
+
+  // Alert count (low stock)
+  const lowStockCount = useMemo(() => {
+    return products.filter(p => p.stock <= p.minStock).length;
+  }, [products]);
+
+  // Save stocks to storage
+  const saveProductsToStorage = (updatedProducts: DetergentProduct[]) => {
+    setProducts(updatedProducts);
+    localStorage.setItem(`pressing_stock_products_${merchant.id}`, JSON.stringify(updatedProducts));
+  };
+
+  // Add Item to cart
+  const addToCart = (product: DetergentProduct) => {
+    if (product.stock <= 0) {
+      toast.error('Ce produit est en rupture de stock totale !');
+      return;
+    }
+    const existing = cart.find(it => it.product.id === product.id);
+    if (existing) {
+      if (existing.quantity >= product.stock) {
+        toast.error(`Stock disponible insuffisant (${product.stock} max) !`);
+        return;
+      }
+      setCart(cart.map(it => it.product.id === product.id ? { ...it, quantity: it.quantity + 1 } : it));
+    } else {
+      setCart([...cart, { product, quantity: 1 }]);
+    }
+    toast.success(`${product.name} ajouté au panier.`);
+  };
+
+  // Update cart item quantity
+  const updateCartQuantity = (productId: string, qty: number) => {
+    const item = cart.find(it => it.product.id === productId);
+    if (!item) return;
+
+    if (qty <= 0) {
+      setCart(cart.filter(it => it.product.id !== productId));
+    } else if (qty > item.product.stock) {
+      toast.error(`Maximum de stock disponible : ${item.product.stock}`);
+    } else {
+      setCart(cart.map(it => it.product.id === productId ? { ...it, quantity: qty } : it));
+    }
+  };
+
+  // Finalize Sale
+  const handleCheckout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0) {
+      toast.error('Votre panier est totalement vide !');
+      return;
+    }
+
+    // Verify stock one last time
+    for (const item of cart) {
+      const realProduct = products.find(p => p.id === item.product.id);
+      if (!realProduct || realProduct.stock < item.quantity) {
+        toast.error(`Stock indisponible pour ${item.product.name} !`);
+        return;
+      }
+    }
+
+    const saleNumber = `D-SL-${Date.now().toString().slice(-6)}`;
+    const newSale: DetergentSale = {
+      id: `sale_${Date.now()}`,
+      saleNumber,
+      customerName: customerName.trim() || 'Client de Passage',
+      customerPhone: customerPhone.trim(),
+      date: new Date().toISOString(),
+      items: cart.map(item => ({
+        productId: item.product.id,
+        productName: item.product.name,
+        price: item.product.price,
+        quantity: item.quantity,
+        total: item.product.price * item.quantity
+      })),
+      discount,
+      subtotal: cartSubtotal,
+      total: cartTotal
+    };
+
+    // Update stocks
+    const updatedProducts = products.map(p => {
+      const cartItem = cart.find(it => it.product.id === p.id);
+      if (cartItem) {
+        return { ...p, stock: Math.max(0, p.stock - cartItem.quantity) };
+      }
+      return p;
+    });
+
+    saveProductsToStorage(updatedProducts);
+
+    // Save sales
+    const updatedSales = [newSale, ...sales];
+    setSales(updatedSales);
+    localStorage.setItem(`pressing_stock_sales_${merchant.id}`, JSON.stringify(updatedSales));
+
+    // Register Sale in dexie central system DB for Accounting / Compta
+    try {
+      db.sales.add({
+        id: newSale.id,
+        merchantId: merchant.id,
+        items: cart.map(item => ({
+          id: item.product.id,
+          productId: item.product.id,
+          name: item.product.name,
+          quantity: item.quantity,
+          price: item.product.price,
+          total: item.quantity * item.product.price
+        })),
+        totalAmount: cartTotal,
+        paidAmount: cartTotal,
+        balance: 0,
+        payments: [{
+          id: `p_${Date.now()}`,
+          amount: cartTotal,
+          method: 'cash',
+          date: new Date().toISOString()
+        }],
+        paymentMethod: 'cash',
+        customerName: newSale.customerName,
+        customerPhone: newSale.customerPhone,
+        processedBy: 'system',
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Dexie integration failed:', err);
+    }
+
+    // Reset checkout fields
+    setCart([]);
+    setDiscount(0);
+    setCustomerName('');
+    setCustomerPhone('');
+    setSelectedSale(newSale); // show details simulator
+    toast.success(`Encaissement validé ! N° ${saleNumber}`);
+
+    // Auto-email summary to the manager in the background
+    if (autoEmailManager && managerEmail && managerEmail.trim()) {
+      sendSilentBackgroundSaleEmailToManager(newSale);
+    }
+  };
+
+  // Add/Edit Product Handler
+  const handleSaveProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName.trim() || formPrice <= 0) {
+      toast.error('Veuillez renseigner le nom et un prix valide.');
+      return;
+    }
+
+    if (editingProduct) {
+      const updated = products.map(p => p.id === editingProduct.id ? {
+        ...p,
+        name: formName,
+        price: formPrice,
+        stock: formStock,
+        minStock: formMinStock,
+        category: formCategory,
+        description: formDescription
+      } : p);
+      saveProductsToStorage(updated);
+      toast.success('Caractéristiques du détergent mises à jour !');
+      setEditingProduct(null);
+    } else {
+      const newProd: DetergentProduct = {
+        id: `det_${Date.now()}`,
+        name: formName,
+        price: formPrice,
+        stock: formStock,
+        minStock: formMinStock,
+        category: formCategory,
+        description: formDescription
+      };
+      saveProductsToStorage([newProd, ...products]);
+      toast.success('Nouveau détergent référencé avec succès !');
+      setShowAddModal(false);
+    }
+
+    // Reset Form
+    setFormName('');
+    setFormPrice(0);
+    setFormStock(0);
+    setFormMinStock(3);
+    setFormCategory('liquid');
+    setFormDescription('');
+  };
+
+  // Load form for editing
+  const startEditProduct = (prod: DetergentProduct) => {
+    setEditingProduct(prod);
+    setFormName(prod.name);
+    setFormPrice(prod.price);
+    setFormStock(prod.stock);
+    setFormMinStock(prod.minStock);
+    setFormCategory(prod.category);
+    setFormDescription(prod.description);
+  };
+
+  // Delete product
+  const deleteProduct = (id: string) => {
+    if (window.confirm('Voulez-vous supprimer définitivement ce produit du catalogue ?')) {
+      const updated = products.filter(p => p.id !== id);
+      saveProductsToStorage(updated);
+      toast.success('Produit retiré du catalogue pressing.');
+    }
+  };
+
+  // Quick Restock increment
+  const quickRestock = (productId: string, units: number) => {
+    const updated = products.map(p => p.id === productId ? { ...p, stock: p.stock + units } : p);
+    saveProductsToStorage(updated);
+    toast.success(`Stock approvisionné de +${units} unités !`);
+  };
+
+  // Print Sale/Detergent receipt PDF
+  const handleDownloadSalePDF = (sale: DetergentSale) => {
+    const pdf = new jsPDF('p', 'mm', [80, 140]);
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(10);
+    
+    let y = 10;
+    pdf.text(merchant.name || 'ACOM Pressing', 40, y, { align: 'center' });
+    y += 5;
+    pdf.setFontSize(8);
+    pdf.text(merchant.address || 'Service de Lavage Professionnel', 40, y, { align: 'center' });
+    y += 7;
+    pdf.line(5, y, 75, y);
+    y += 6;
+    
+    pdf.setFont('courier', 'bold');
+    pdf.text(`RECU CLIENT : ${sale.saleNumber}`, 5, y);
+    y += 5;
+    pdf.setFont('courier', 'normal');
+    pdf.text(`Client  : ${sale.customerName}`, 5, y);
+    y += 4;
+    pdf.text(`Contact : ${sale.customerPhone || 'N/A'}`, 5, y);
+    y += 4;
+    pdf.text(`Date    : ${format(new Date(sale.date), 'dd/MM/yyyy HH:mm')}`, 5, y);
+    y += 5;
+    pdf.line(5, y, 75, y);
+    y += 5;
+
+    pdf.setFont('courier', 'bold');
+    pdf.text('Detergents & Produits', 5, y);
+    y += 5;
+    pdf.setFont('courier', 'normal');
+
+    sale.items.forEach(item => {
+      pdf.text(`- ${item.productName.slice(0, 14).padEnd(14, ' ')} ${item.quantity}x : ${item.total} F`, 5, y);
+      y += 4;
+    });
+
+    y += 2;
+    pdf.line(5, y, 75, y);
+    y += 5;
+
+    pdf.text(`Sous-total  : ${sale.subtotal} FCFA`, 5, y);
+    y += 4;
+    if (sale.discount > 0) {
+      pdf.text(`Remise accordé: -${sale.discount} FCFA`, 5, y);
+      y += 4;
+    }
+    
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(10);
+    pdf.text(`TOTAL PAYE  : ${sale.total} FCFA`, 5, y);
+    y += 7;
+    pdf.setFont('courier', 'normal');
+    pdf.setFontSize(8);
+    pdf.text('Merci de votre achat !', 40, y, { align: 'center' });
+    y += 4;
+    pdf.text('ACOM Technologie Workspace', 40, y, { align: 'center' });
+
+    pdf.save(`Recu_Achat_Produit_${sale.saleNumber}.pdf`);
+    toast.success('Reçu de vente PDF généré !');
+  };
+
+  const totalStockValue = useMemo(() => {
+    return products.reduce((acc, p) => acc + (p.stock * p.price), 0);
+  }, [products]);
+
+  const totalStockQty = useMemo(() => {
+    return products.reduce((acc, p) => acc + p.stock, 0);
+  }, [products]);
+
+  // Filters search product
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          p.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCat = categoryFilter === 'all' || p.category === categoryFilter;
+      
+      let matchStock = true;
+      if (stockFilter === 'out_of_stock') {
+        matchStock = p.stock <= 0;
+      } else if (stockFilter === 'low') {
+        matchStock = p.stock <= p.minStock && p.stock > 0;
+      } else if (stockFilter === 'ok') {
+        matchStock = p.stock > p.minStock;
+      }
+      return matchSearch && matchCat && matchStock;
+    });
+  }, [products, searchQuery, categoryFilter, stockFilter]);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+      {/* Header section with low stock metrics */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-black text-ink tracking-tight flex items-center gap-2">
+              🧪 Gestion du Stock & Vente Directe
+            </h2>
+            {lowStockCount > 0 && (
+              <span className="px-2.5 py-1 bg-amber-50 text-amber-600 font-bold text-[10px] uppercase rounded-full border border-amber-200 animate-pulse">
+                ⚠️ {lowStockCount} alertes
+              </span>
+            )}
+          </div>
+          <p className="text-gray-500 text-xs mt-1">
+            Approvisionnement des détergents et point de vente directe de produits nettoyants pour pressing.
+          </p>
+        </div>
+
+        {/* Local Mini Tabs selector */}
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl w-fit border border-black/5 shrink-0 self-end lg:self-auto">
+          <button
+            onClick={() => { setActiveSubTab('sales'); setSelectedSale(null); }}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'sales' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            💸 Encaisser Vente
+          </button>
+          <button
+            onClick={() => { setActiveSubTab('inventory'); setEditingProduct(null); }}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'inventory' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            🧪 Stock Produits
+          </button>
+          <button
+            onClick={() => setActiveSubTab('history')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'history' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            📜 Historique ({sales.length})
+          </button>
+        </div>
+      </div>
+
+      {activeSubTab !== 'history' && (
+        <div className="space-y-6">
+          {/* Quick Metrics Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-[#fcfcf9] p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Valeur Marchande Stock</span>
+                <span className="text-sm font-mono font-black text-ink">{(totalStockValue).toLocaleString()} F</span>
+              </div>
+              <div className="p-2 bg-white rounded-lg border border-gray-100 text-primary">
+                <DollarSign className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="bg-[#fcfcf9] p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Unités en Stock</span>
+                <span className="text-sm font-mono font-black text-indigo-600">{totalStockQty} u</span>
+              </div>
+              <div className="p-2 bg-white rounded-lg border border-gray-100 text-indigo-600">
+                <Package className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="bg-[#fcfcf9] p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Alertes Niveau Bas</span>
+                <span className="text-sm font-mono font-black text-rose-600 flex items-center gap-1">
+                  {lowStockCount} {lowStockCount > 0 && <span className="animate-pulse">⚠️</span>}
+                </span>
+              </div>
+              <div className="p-2 bg-white rounded-lg border border-gray-100 text-rose-500">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+            </div>
+          </div>
+
+          {/* Unified Filter Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-3xl border border-gray-100 shadow-xs gap-4">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Rechercher par nom, usage, description..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-primary/20 profile-search-input"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-xs"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-end">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider">Rayon :</span>
+                <select
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-50 border border-transparent focus:border-primary/20 rounded-2xl text-xs font-black uppercase tracking-wider text-[#1e293b] outline-none"
+                >
+                  <option value="all">Tous les Rayons (Catégories)</option>
+                  {Object.entries(allCategories).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider">Niveau :</span>
+                <select
+                  value={stockFilter}
+                  onChange={e => setStockFilter(e.target.value)}
+                  className="px-3 py-2 bg-gray-50 border border-transparent focus:border-primary/20 rounded-2xl text-xs font-black uppercase tracking-wider text-[#1e293b] outline-none"
+                >
+                  <option value="all">Tous les Etats</option>
+                  <option value="out_of_stock">Rupture de Stock 🔴</option>
+                  <option value="low">Stock Bas / Réassort ⚠️</option>
+                  <option value="ok">Disponible en Stock ✅</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'sales' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* POS Catalog Left */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {filteredProducts.map(p => {
+                const isUnderStock = p.stock <= p.minStock;
+                const isOutOfStock = p.stock <= 0;
+                return (
+                  <div 
+                    key={p.id} 
+                    className={`bg-white rounded-3xl p-5 border shadow-sm transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group hover:shadow-md ${
+                      isOutOfStock ? 'opacity-75 border-rose-100' : isUnderStock ? 'border-amber-200 bg-amber-50/10' : 'border-gray-100'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-500 font-bold text-[9px] rounded uppercase tracking-wider">
+                          {allCategories[p.category] || p.category}
+                        </span>
+                        {isOutOfStock ? (
+                          <span className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[8px] rounded uppercase font-black">Rupture 🔴</span>
+                        ) : isUnderStock ? (
+                          <span className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-600 font-bold text-[8px] rounded uppercase font-black">Stock Bas ⚠️</span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-100 text-emerald-600 font-bold text-[8px] rounded uppercase font-black">Disponible</span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-black text-ink group-hover:text-primary transition-colors leading-snug">{p.name}</h4>
+                      <p className="text-[10px] text-gray-400 mt-1 line-clamp-2 leading-relaxed">{p.description}</p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-end border-t border-gray-50 pt-3">
+                        <div>
+                          <p className="text-[8px] font-mono text-gray-400 uppercase tracking-widest">Prix unitaire</p>
+                          <p className="font-mono font-black text-sm text-primary">{p.price.toLocaleString()} F</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[8px] font-mono text-gray-400 uppercase tracking-widest">Stock Restant</p>
+                          <p className={`font-mono text-xs font-black ${isOutOfStock ? 'text-rose-600 font-black' : isUnderStock ? 'text-amber-600' : 'text-gray-800'}`}>
+                            {p.stock} unités
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => addToCart(p)}
+                        disabled={isOutOfStock}
+                        className="w-full py-2.5 bg-primary hover:bg-primary-hover disabled:bg-gray-100 disabled:text-gray-400 font-bold text-xs uppercase tracking-wider text-white rounded-xl transition shadow shadow-primary/15 flex items-center justify-center gap-1.5"
+                      >
+                        <ShoppingCart className="w-4 h-4" /> Vendre cet article
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {filteredProducts.length === 0 && (
+                <div className="col-span-full p-12 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                  <p className="text-gray-400 font-bold text-xs">Aucun detergent ou produit ne correspond à ces critères.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* POS Cart Sidebar Right */}
+          <div className="lg:col-span-5 space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-wider text-gray-400">Panier de Vente Directe</h4>
+
+            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 relative overflow-hidden">
+              <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-cyan-500 to-indigo-500" />
+
+              {cart.length === 0 ? (
+                <div className="p-8 text-center space-y-3">
+                  <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 border border-gray-100/50 mx-auto">
+                    <ShoppingCart className="w-5 h-5 opacity-60" />
+                  </div>
+                  <p className="text-xs text-gray-400 font-bold">Sélectionnez des détergents à droite pour alimenter le panier.</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                  {cart.map(item => (
+                    <div key={item.product.id} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100 flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <h5 className="text-[11px] font-black text-ink truncate leading-tight">{item.product.name}</h5>
+                        <p className="text-[10px] text-gray-400 font-mono font-bold mt-0.5">{(item.product.price).toLocaleString()} F/u</p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
+                          className="w-6 h-6 bg-white border border-gray-200 rounded-lg font-bold text-gray-600 flex items-center justify-center text-xs hover:bg-gray-100"
+                        >
+                          -
+                        </button>
+                        <span className="font-mono text-xs font-black px-1.5 min-w-[16px] text-center text-ink">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
+                          className="w-6 h-6 bg-white border border-gray-200 rounded-lg font-bold text-gray-600 flex items-center justify-center text-xs hover:bg-gray-100"
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <div className="text-right min-w-[70px] shrink-0">
+                        <span className="font-mono font-black text-xs text-ink">{(item.product.price * item.quantity).toLocaleString()} F</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {cart.length > 0 && (
+                <form onSubmit={handleCheckout} className="space-y-4 pt-4 border-t border-dashed border-gray-100">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nom du client</label>
+                      <input
+                        type="text"
+                        placeholder="Client de Passage"
+                        value={customerName}
+                        onChange={e => setCustomerName(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold ring-offset-white border border-transparent focus:ring-1 focus:ring-primary/20 focus:border-primary/20 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Contact Téléphone</label>
+                      <input
+                        type="text"
+                        placeholder="ex: 77 123 45 67"
+                        value={customerPhone}
+                        onChange={e => setCustomerPhone(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold ring-offset-white border border-transparent focus:ring-1 focus:ring-primary/20 focus:border-primary/20 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Accordez un rabais (FCFA)</label>
+                    <input
+                      type="number"
+                      placeholder="Remise immédiate"
+                      value={discount || ''}
+                      onChange={e => setDiscount(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 bg-gray-50 rounded-xl font-mono text-xs font-bold ring-offset-white border border-transparent focus:ring-1 focus:ring-primary/20 focus:border-primary/20 outline-none text-right"
+                    />
+                  </div>
+
+                  <div className="space-y-2 bg-[#fbfbf9] p-4 rounded-2xl border border-gray-100">
+                    <div className="flex justify-between items-center text-[10px] text-gray-500 font-bold">
+                      <span>Total brut articles :</span>
+                      <span className="font-mono">{(cartSubtotal).toLocaleString()} FCFA</span>
+                    </div>
+                    {discount > 0 && (
+                      <div className="flex justify-between items-center text-[10px] text-rose-500 font-bold">
+                        <span>Remise octroyée :</span>
+                        <span className="font-mono">-{discount.toLocaleString()} FCFA</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-xs text-ink font-black pt-2 border-t border-gray-100">
+                      <span>Total Net Encaissé :</span>
+                      <span className="text-sm font-mono text-primary font-black">{(cartTotal).toLocaleString()} FCFA</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-[#1e293b] hover:bg-black font-bold text-xs uppercase tracking-widest text-white rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                  >
+                    🛒 Valider l'Encaissement
+                  </button>
+                </form>
+              )}
+
+              {selectedSale && (
+                <div className="flex flex-col gap-2 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                  <p className="text-[10px] font-bold text-emerald-700 text-center">🎉 Enregistrement réussi de la transaction !</p>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadSalePDF(selectedSale)}
+                    className="w-full bg-primary hover:bg-primary-hover text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition"
+                  >
+                    <Download className="w-4 h-4" /> Télécharger Reçu (PDF)
+                  </button>
+
+                  <div className="border-t border-emerald-200 mt-2.5 pt-2.5 space-y-2">
+                    <p className="text-[9px] font-mono font-bold text-emerald-800 uppercase tracking-widest text-center flex items-center justify-center gap-1.5">
+                      <span>👑</span> Suivi Temps Réel du Gérant (Divergents & Ventes)
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => dispatchManagerSaleNotif(selectedSale, 'whatsapp')}
+                        className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Gérant
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dispatchManagerSaleNotif(selectedSale, 'email')}
+                        className="py-2 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                      >
+                        <Mail className="w-3.5 h-3.5" /> E-mail Gérant
+                      </button>
+                    </div>
+                    {autoEmailManager && managerEmail ? (
+                      <p className="text-[8px] text-emerald-600 font-bold font-mono text-center">
+                        📨 Rapport automatique expédié en arrière-plan à {managerEmail}
+                      </p>
+                    ) : (
+                      <p className="text-[8px] text-gray-400 font-bold font-mono text-center">
+                        ⚠️ Mail automatique inactif ou adresse non configurée
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : activeSubTab === 'inventory' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Creator form Drawer Left */}
+          <div className="lg:col-span-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+            <h3 className="text-md font-black text-ink pb-2 border-b border-gray-100 flex items-center gap-1.5">
+              {editingProduct ? '📝 Éditer le Detergent' : '🧪 Référencer un Détergent'}
+            </h3>
+
+            <form onSubmit={handleSaveProduct} className="space-y-4">
+              <div>
+                <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Nom du détergent</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="ex: Lessive Liquide Eucalyptus 1.5L"
+                  value={formName}
+                  onChange={e => setFormName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-gray-50/30 text-xs font-bold text-ink"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Prix Vente (FCFA)</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="3500"
+                    value={formPrice || ''}
+                    onChange={e => setFormPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-gray-50/30 text-xs font-mono font-bold text-ink"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Rayon / Catégorie</label>
+                  {!isAddingNewCategory ? (
+                    <select
+                      value={formCategory}
+                      onChange={e => {
+                        if (e.target.value === 'ADD_NEW_CATEGORY') {
+                          setIsAddingNewCategory(true);
+                          setNewCategoryLabelInput('');
+                        } else {
+                          setFormCategory(e.target.value);
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white text-xs font-black text-ink uppercase outline-none focus:ring-1 focus:ring-primary/25"
+                    >
+                      {Object.entries(allCategories).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                      <option value="ADD_NEW_CATEGORY" className="text-primary font-bold">+ ➕ AJOUTER UNE CATÉGORIE</option>
+                    </select>
+                  ) : (
+                    <div className="flex flex-col gap-2 p-2 bg-gray-50 border border-gray-200 rounded-xl">
+                      <input
+                        type="text"
+                        placeholder="Nom de la catégorie (ex: Désodorisant)"
+                        value={newCategoryLabelInput}
+                        onChange={e => setNewCategoryLabelInput(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white text-xs font-bold text-ink outline-none"
+                        autoFocus
+                      />
+                      <div className="flex gap-1.5 justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingNewCategory(false);
+                            setFormCategory('liquid');
+                          }}
+                          className="px-2 py-1 text-[9px] font-mono font-bold text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-md uppercase tracking-wider transition"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const trimmed = newCategoryLabelInput.trim();
+                            if (trimmed) {
+                              const newCatKey = `custom_${Date.now()}`;
+                              const updated = { ...customCategories, [newCatKey]: trimmed };
+                              setCustomCategories(updated);
+                              localStorage.setItem(`pressing_custom_categories_${merchant.id}`, JSON.stringify(updated));
+                              setFormCategory(newCatKey);
+                              setIsAddingNewCategory(false);
+                              toast.success(`Catégorie "${trimmed}" ajoutée avec succès !`);
+                            } else {
+                              toast.error("Veuillez entrer un nom valide.");
+                            }
+                          }}
+                          className="px-2 py-1 text-[9px] font-mono font-bold text-white bg-[#1e293b] hover:bg-black rounded-md uppercase tracking-wider transition"
+                        >
+                          Enregistrer
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {Object.keys(customCategories).length > 0 && (
+                    <div className="mt-2 text-left">
+                      <span className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">
+                        Catégories Perso (cliquer sur × pour supprimer) :
+                      </span>
+                      <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1 bg-gray-50/50 rounded-lg border border-dashed border-gray-100">
+                        {Object.entries(customCategories).map(([key, label]) => (
+                          <span
+                            key={key}
+                            className="inline-flex items-center gap-1.5 px-1.5 py-0.5 bg-white border border-gray-200 text-gray-700 rounded text-[9px] font-bold"
+                          >
+                            {label}
+                            <button
+                              type="button"
+                              onClick={() => deleteCustomCategory(key)}
+                              className="text-gray-400 hover:text-red-500 font-extrabold text-xs ml-0.5 transition"
+                              title="Supprimer cette catégorie"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Stock Initial</label>
+                  <input
+                    type="number"
+                    placeholder="10"
+                    value={formStock || ''}
+                    onChange={e => setFormStock(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-gray-50/30 text-xs font-mono font-bold text-ink"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Seuil Alerte</label>
+                  <input
+                    type="number"
+                    placeholder="3"
+                    value={formMinStock || ''}
+                    onChange={e => setFormMinStock(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-gray-50/30 text-xs font-mono font-bold text-ink"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Brève Description d'usage</label>
+                <textarea
+                  rows={2}
+                  placeholder="Informations ou dosage du produit..."
+                  value={formDescription}
+                  onChange={e => setFormDescription(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-gray-50/30 text-xs font-medium text-gray-600"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-gray-50 flex gap-2">
+                {editingProduct && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setFormName('');
+                      setFormPrice(0);
+                      setFormStock(0);
+                      setFormMinStock(3);
+                      setFormCategory('liquid');
+                      setFormDescription('');
+                    }}
+                    className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold text-xs uppercase text-gray-600 transition"
+                  >
+                    Annuler
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  className="flex-[2] py-3 bg-primary hover:bg-primary-hover text-white rounded-xl font-bold text-xs uppercase tracking-wider transition shadow-md"
+                >
+                  {editingProduct ? 'Enregistrer Modif.' : 'Créer l\'Article'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Listings Table Right */}
+          <div className="lg:col-span-8 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden space-y-4">
+            <h3 className="text-md font-black text-ink uppercase tracking-wider">Catalogue & Niveau de Stock</h3>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-[9px] font-mono font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50">
+                    <th className="px-6 py-4">Nom du produit</th>
+                    <th className="px-6 py-4">Rayon</th>
+                    <th className="px-6 py-4 text-right">Prix Habituel</th>
+                    <th className="px-6 py-4 text-center">Niveau de Stock</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-center">Action Approvisionneur</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 text-xs">
+                  {filteredProducts.map(p => {
+                    const isUnderStock = p.stock <= p.minStock;
+                    const isOutOfStock = p.stock <= 0;
+                    const isEditingThis = editingProduct?.id === p.id;
+                    return (
+                      <tr key={p.id} className={`hover:bg-gray-50/30 transition-all ${isEditingThis ? 'bg-primary/5 border-l-2 border-l-primary font-bold' : ''}`}>
+                        <td className="px-6 py-3 font-bold">
+                          <div className="font-bold text-ink text-xs">{p.name}</div>
+                          <div className="text-[10px] text-gray-400 font-medium limit-1 max-w-[200px] truncate">{p.description}</div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-black text-[9px] uppercase tracking-wider">
+                            {allCategories[p.category] || p.category}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3 text-right font-mono font-bold text-ink">{(p.price).toLocaleString()} F</td>
+                        <td className="px-6 py-3 text-center">
+                          <div className="flex flex-col items-center">
+                            <span className="font-mono font-black text-xs text-ink">{p.stock} u</span>
+                            <div className="w-16 bg-gray-100 h-1.5 rounded-full overflow-hidden mt-1">
+                              <div 
+                                className={`h-full rounded-full ${isOutOfStock ? 'bg-red-500' : isUnderStock ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                                style={{ width: `${Math.min(100, (p.stock / (p.minStock * 4)) * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          {isOutOfStock ? (
+                            <span className="text-[9px] font-black text-rose-500 uppercase tracking-wider">Rupture ⛔</span>
+                          ) : isUnderStock ? (
+                            <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider">Réassort 🚨</span>
+                          ) : (
+                            <span className="text-[9px] font-black text-emerald-500 uppercase tracking-wider">Sain OK</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => quickRestock(p.id, 5)}
+                              className="px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-[9px] rounded uppercase tracking-wider transition"
+                            >
+                              +5
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => quickRestock(p.id, 15)}
+                              className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold text-[9px] rounded uppercase tracking-wider transition"
+                            >
+                              +15
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 text-right space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => startEditProduct(p)}
+                            className="p-1 px-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded"
+                            title="Modifier"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteProduct(p.id)}
+                            className="p-1 px-1.5 hover:bg-red-50 text-red-500 rounded"
+                            title="Retirer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="text-center py-10 text-gray-400 font-bold text-xs bg-gray-50/20">
+                        Aucun detergent ou produit ne correspond à ces critères de recherche ou de filtre.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Sales history listings subtab */
+        <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-black text-ink uppercase tracking-wider">Historique de Ventes Produits</h3>
+            <span className="text-xs font-mono text-gray-400 uppercase tracking-widest font-bold">Ventes directes détergent</span>
+          </div>
+
+          {sales.length === 0 ? (
+            <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              <p className="text-gray-400 font-bold text-xs">Aucune vente directe enregistrée pour le moment.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest bg-gray-50/40">
+                    <th className="px-6 py-4">N° Transaction</th>
+                    <th className="px-6 py-4">Date de Vente</th>
+                    <th className="px-6 py-4">Client</th>
+                    <th className="px-6 py-4">Articles achetés</th>
+                    <th className="px-6 py-4 text-right">Remise</th>
+                    <th className="px-6 py-4 text-right">Recette Net</th>
+                    <th className="px-6 py-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-xs">
+                  {sales.map(s => (
+                    <tr key={s.id} className="hover:bg-gray-50/50 transition">
+                      <td className="px-6 py-4 font-mono font-black text-ink">{s.saleNumber}</td>
+                      <td className="px-6 py-4 text-gray-500 font-mono">{format(new Date(s.date), 'dd/MM/yyyy HH:mm')}</td>
+                      <td className="px-6 py-4 font-bold">
+                        <div>{s.customerName}</div>
+                        <div className="text-[10px] text-gray-400">{s.customerPhone || 'Sans contact'}</div>
+                      </td>
+                      <td className="px-6 py-4 max-w-[200px]">
+                        <div className="truncate font-bold text-gray-600">
+                          {s.items.map(it => `${it.productName} (x${it.quantity})`).join(', ')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono text-gray-500">{s.discount.toLocaleString()} F</td>
+                      <td className="px-6 py-4 text-right font-mono font-black text-primary">{(s.total).toLocaleString()} F</td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5 font-sans">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadSalePDF(s)}
+                            className="px-3 py-1.5 bg-[#1e293b] hover:bg-black text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition"
+                          >
+                            Reçu PDF
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => dispatchManagerSaleNotif(s, 'whatsapp')}
+                            className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            title="Relayer au gérant par WhatsApp"
+                          >
+                            <MessageSquare className="w-3 h-3" /> WA
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => dispatchManagerSaleNotif(s, 'email')}
+                            className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            title="Relayer au gérant par Mail"
+                          >
+                            <Mail className="w-3 h-3" /> Mail
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </motion.div>

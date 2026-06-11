@@ -72,6 +72,14 @@ export const AcomSaaSSettings = () => {
         color: "bg-red-500",
         image: "https://picsum.photos/seed/medical/800/600",
         link: "/merchant/saas?type=medical"
+      },
+      {
+        title: "Gestion de pressing (Pressings / Vente)",
+        description: "Gérez vos commandes, le cycle de nettoyage et boostez vos ventes de produits additionnels.",
+        iconName: "WashingMachine",
+        color: "bg-cyan-500",
+        image: "https://picsum.photos/seed/laundry/800/600",
+        link: "/merchant/saas?type=pressing"
       }
     ]
   };
