@@ -200,9 +200,17 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
                 <ShieldAlert className="w-8 h-8" />
               </div>
               <p className="text-sm font-semibold text-gray-800 mb-2">Accès Caméra Bloqué</p>
-              <p className="text-xs text-gray-500 max-w-xs mb-4">
+              <p className="text-xs text-gray-500 max-w-xs mb-3">
                 {errorMsg}
               </p>
+              <div className="bg-yellow-50 text-yellow-800 text-xs text-left p-3 rounded-lg mb-4 max-w-xs border border-yellow-200">
+                <p className="font-bold mb-1">💡 Solutions :</p>
+                <ul className="list-disc pl-4 space-y-1 text-[10px]">
+                  <li>Ouvrez l'application dans <strong>un nouvel onglet</strong>. (Certains navigateurs bloquent la caméra dans cet aperçu).</li>
+                  <li>Cliquez sur l'icône de caméra dans la barre d'adresse pour autoriser.</li>
+                  <li>Assurez-vous qu'aucune autre application n'utilise la caméra.</li>
+                </ul>
+              </div>
 
               <div className="flex gap-2 w-full">
                 <button 
