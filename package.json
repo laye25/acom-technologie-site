@@ -21,6 +21,7 @@
     "appId": "com.acom.gestion",
     "productName": "Acom Gestion Desktop",
     "npmRebuild": false,
+    "icon": "public/icon.png",
     "directories": {
       "output": "release"
     },
@@ -31,7 +32,8 @@
       "public/icon.png"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "public/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -42,8 +44,12 @@
       "shortcutName": "Acom Gestion Desktop"
     },
     "mac": {
-      "target": "dmg",
-      "identity": null
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null,
+      "icon": "public/icon.png"
     }
   },
   "dependencies": {

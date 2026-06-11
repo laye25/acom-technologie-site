@@ -40,11 +40,11 @@ jobs:
 
       - name: Build Electron Desktop App (Windows)
         if: matrix.os == 'windows-latest'
-        run: npx electron-builder --win nsis --publish never
+        run: npx electron-builder --win --publish never
 
       - name: Build Electron Desktop App (macOS)
         if: matrix.os == 'macos-latest'
-        run: npx electron-builder --mac dmg --publish never
+        run: npx electron-builder --mac --publish never
 
       - name: Upload Artifact (Windows)
         if: matrix.os == 'windows-latest'
@@ -58,5 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Acom-Gestion-Desktop-MacOS
-          path: release/*.dmg
+          path: |
+            release/*.dmg
+            release/*.zip
 

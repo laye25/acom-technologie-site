@@ -148,26 +148,75 @@ async function startServer() {
   });
 
 
+  // Helper to validate email addresses and "Name <email@domain>" format
+  function cleanAndValidateFromEmail(email: any): string {
+    const defaultFrom = "Acom Technologie <service-technique@acomtechnologie.com>";
+    if (!email || typeof email !== 'string') {
+      return defaultFrom;
+    }
+    
+    const trimmed = email.trim();
+    
+    // Simple checks for email containing @ and .
+    // Accept standard: test@example.com
+    // Accept name with email inside brackets: Name <test@example.com>
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const nameWithEmailRegex = /^[^<]+<[^\s@]+@[^\s@]+\.[^\s@]+>$/;
+    
+    if (emailRegex.test(trimmed) || nameWithEmailRegex.test(trimmed)) {
+      return trimmed;
+    }
+    
+    console.warn(`[Email Service] Format de l'expéditeur ("from") invalide détecté: "${trimmed}". Rabattement sur la valeur par défaut: "${defaultFrom}"`);
+    return defaultFrom;
+  }
+
   // Email sending
   app.post("/api/send-email", async (req, res) => {
     try {
-      const { to, subject, html } = req.body;
+      const { to, subject, html, from, de } = req.body;
       
       if (!process.env.RESEND_API_KEY) {
         return res.json({ success: true, message: "Email simulation (API key missing)" });
       }
 
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const fromEmail = process.env.RESEND_FROM || "Acom Technologie <service-technique@acomtechnologie.com>";
-      const { data, error } = await resend.emails.send({
+      
+      // Extract from request body if available (both standard 'from' and French 'de'), 
+      // then try environment variable, and fallback to default.
+      const fromEmailRaw = from || de || process.env.RESEND_FROM;
+      let fromEmail = cleanAndValidateFromEmail(fromEmailRaw);
+      
+      let result = await resend.emails.send({
         from: fromEmail,
-        to: [to],
+        to: Array.isArray(to) ? to : [to],
         subject: subject,
         html: html,
       });
 
+      let { data, error } = result;
+
+      // If the default sender fails due to a domain/from field restriction,
+      // attempt a fallback to Resend's standard 'onboarding@resend.dev' sandbox address
+      if (error && error.message && (error.message.includes("from") || error.message.includes("domain") || error.message.includes("registered"))) {
+        console.warn("Resend default sender rejected. Retrying with onboarding@resend.dev fallback...");
+        fromEmail = "onboarding@resend.dev";
+        const retryResult = await resend.emails.send({
+          from: fromEmail,
+          to: Array.isArray(to) ? to : [to],
+          subject: subject,
+          html: html,
+        });
+        data = retryResult.data;
+        error = retryResult.error;
+      }
+
       if (error) {
-        return res.status(500).json({ error: error.message, details: error });
+        let userFriendlyError = error.message;
+        if (error.message.includes("domain") || error.message.includes("from") || error.message.includes("registered")) {
+          userFriendlyError = `L'adresse d'expéditeur '${fromEmail}' n'est pas autorisée sur votre compte Resend. Veuillez vérifier votre domaine sur Resend ou configurer la variable d'environnement RESEND_FROM avec une adresse d'expéditeur valide de votre domaine enregistré (ex: service@votredomaine.com).`;
+        }
+        return res.status(500).json({ error: userFriendlyError, details: error });
       }
 
       res.json({ success: true, data });
