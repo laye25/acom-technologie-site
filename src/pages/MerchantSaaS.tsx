@@ -38,6 +38,8 @@ import {
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import { showMailSuccessToast } from '../components/MailSuccessToast';
+import { AcomZoneMerchantPanel } from '../components/AcomZoneMerchantPanel';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { billingService } from '../services/billingService';
@@ -2017,6 +2019,20 @@ const MerchantSaaS = () => {
         break;
     }
     
+    // Inject AcomZone tab dynamically above Settings for all SaaS types
+    const settingsIdx = tabs.findIndex(t => t.id === 'settings');
+    const acomZoneTab = { 
+      id: 'acom_zone', 
+      label: 'AcomZone', 
+      icon: Store,
+      group: type === 'scolaire' ? 'Services Clientèle' : undefined
+    };
+    if (settingsIdx !== -1) {
+      tabs.splice(settingsIdx, 0, acomZoneTab);
+    } else {
+      tabs.push(acomZoneTab);
+    }
+    
     return tabs;
   };
 
@@ -2242,6 +2258,7 @@ const MerchantSaaS = () => {
           {activeTab === 'pressing_receipt' && <PressingReceiptManager key="pressing_receipt" merchant={merchant} />}
           {activeTab === 'pressing_stock' && <PressingStockManager key="pressing_stock" merchant={merchant} />}
           {activeTab === 'pressing_tarifs' && <PressingTarifsManager key="pressing_tarifs" merchant={merchant} />}
+          {activeTab === 'acom_zone' && <AcomZoneMerchantPanel key="acom_zone" merchant={merchant} />}
         </AnimatePresence>
 
         {/* SaaS Footer */}
@@ -6878,18 +6895,25 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             })
           })
           .then(async (res) => {
+            let data: any = {};
+            try {
+              const text = await res.text();
+              data = text ? JSON.parse(text) : {};
+            } catch (e) {
+              console.error("Failed to parse response as JSON:", e);
+              data = { error: `Format de réponse invalide (Erreur serveur)` };
+            }
             if (res.ok) {
-              const data = await res.json();
               if (data.message && data.message.includes("missing")) {
                 setEmailSendStatus('simulated');
               } else if (data.success) {
                 setEmailSendStatus('success');
+                showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
               } else {
                 setEmailSendStatus('error');
                 setEmailSendError(data.error || "Erreur de transmission");
               }
             } else {
-              const data = await res.json().catch(() => ({}));
               setEmailSendStatus('error');
               setEmailSendError(data.error || `Erreur serveur (${res.status})`);
             }
@@ -7823,7 +7847,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                             {emailSendStatus === 'success' && (
                               <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-emerald-600 font-semibold bg-emerald-50/50 p-2 rounded-lg">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                Email envoyé en arrière-plan avec succès !
+                                Ce mail envoyé en arrière-plan avec succès !
                               </div>
                             )}
                             {emailSendStatus === 'simulated' && (
@@ -22935,6 +22959,8 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [closureMailFeedback, setClosureMailFeedback] = useState<Record<string, boolean>>({});
+
   const [closureDate, setClosureDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [cashierName, setCashierName] = useState('');
   const [actualCash, setActualCash] = useState<number>(0);
@@ -23317,6 +23343,9 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                     const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
                     sentEmail = success;
                     newClosure.sentToManager = success;
+                    if (success) {
+                      showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+                    }
                   }
 
                   // Update State & localstorage
@@ -23423,7 +23452,8 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                             const ok = await sendSilentBackgroundClosureEmailToManager(c);
                             toast.dismiss();
                             if (ok) {
-                              toast.success('Rapport envoyé avec succès !');
+                              showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+                              setClosureMailFeedback(prev => ({ ...prev, [c.id]: true }));
                             } else {
                               dispatchManagerClosureNotif(c, 'email');
                             }
@@ -23433,6 +23463,12 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                           <Mail className="w-3.5 h-3.5" /> E-mail Direct
                         </button>
                       </div>
+                      {closureMailFeedback[c.id] && (
+                        <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg justify-center border border-emerald-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          Ce mail envoyé en arrière-plan avec succès !
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -23523,6 +23559,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
   const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
   const managerEmail = merchant.managerNotifications?.email || '';
   const autoEmailManager = merchant.managerNotifications?.notifyOnCashClosure !== false;
+  
+  const [ticketMailFeedback, setTicketMailFeedback] = useState<Record<string, boolean>>({});
+  const [closureMailFeedback, setClosureMailFeedback] = useState<Record<string, boolean>>({});
   
   const [managerNotifsHistory, setManagerNotifsHistory] = useState<{ id: string; ticketNumber: string; type: 'entrée' | 'sortie'; method: 'whatsapp' | 'email'; timestamp: string }[]>(() => {
     const saved = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
@@ -23725,7 +23764,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     }
   }, [merchant]);
 
-  const dispatchManagerNotif = (t: PressingTicket, flowType: 'entrée' | 'sortie', method: 'whatsapp' | 'email') => {
+  const dispatchManagerNotif = async (t: PressingTicket, flowType: 'entrée' | 'sortie', method: 'whatsapp' | 'email') => {
     const message = getManagerNotificationMessage(t, flowType);
     if (method === 'whatsapp') {
       if (!managerPhone.trim()) {
@@ -23739,26 +23778,42 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
       toast.success('Rapport de suivi WhatsApp configuré !');
+      
+      // Add to local history
+      const newLog = {
+        id: `mnotif_${Date.now()}`,
+        ticketNumber: t.ticketNumber,
+        type: flowType,
+        method,
+        timestamp: new Date().toISOString()
+      };
+      setManagerNotifsHistory(prev => [newLog, ...prev]);
     } else {
       if (!managerEmail.trim()) {
         toast.error('Veuillez configurer l\'adresse email du Gérant dans l\'onglet Réglages.');
         return;
       }
-      const subject = `[TEMPS RÉEL] ${flowType.toUpperCase()} - Ticket ${t.ticketNumber} - ${merchant.name || 'Pressing'}`;
-      const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-      window.open(mailtoUrl, '_blank');
-      toast.success('Email de rapport de suivi prêt !');
+      toast.loading('Envoi du rapport par mail...');
+      const ok = await sendSilentBackgroundEmailToManager(t, flowType);
+      toast.dismiss();
+      if (ok) {
+        setTicketMailFeedback(prev => ({ ...prev, [t.id]: true }));
+      } else {
+        const subject = `[TEMPS RÉEL] ${flowType.toUpperCase()} - Ticket ${t.ticketNumber} - ${merchant.name || 'Pressing'}`;
+        const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+        window.open(mailtoUrl, '_blank');
+        
+        // Add to local history
+        const newLog = {
+          id: `mnotif_${Date.now()}`,
+          ticketNumber: t.ticketNumber,
+          type: flowType,
+          method,
+          timestamp: new Date().toISOString()
+        };
+        setManagerNotifsHistory(prev => [newLog, ...prev]);
+      }
     }
-
-    // Add to local history
-    const newLog = {
-      id: `mnotif_${Date.now()}`,
-      ticketNumber: t.ticketNumber,
-      type: flowType,
-      method,
-      timestamp: new Date().toISOString()
-    };
-    setManagerNotifsHistory(prev => [newLog, ...prev]);
   };
 
   const sendSilentBackgroundEmailToManager = async (ticket: PressingTicket, flowType: 'entrée' | 'sortie') => {
@@ -23878,7 +23933,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       });
 
       if (response.ok) {
-        toast.success(`Rapport Gérant envoyé par email ! (Arrière-plan)`);
+        showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
         
         // Add to local history
         const newLog = {
@@ -23889,11 +23944,14 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
           timestamp: new Date().toISOString()
         };
         setManagerNotifsHistory(prev => [newLog, ...prev]);
+        return true;
       } else {
         console.error('Failed to send background email to manager');
+        return false;
       }
     } catch (error) {
       console.error('Error dispatching silent manager background mail:', error);
+      return false;
     }
   };
 
@@ -24871,6 +24929,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         <Mail className="w-3.5 h-3.5" /> E-mail Gérant
                       </button>
                     </div>
+                    {ticketMailFeedback[selectedTicket.id] && (
+                      <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg justify-center border border-emerald-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Ce mail envoyé en arrière-plan avec succès !
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -25033,6 +25097,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
                     sentEmail = success;
                     newClosure.sentToManager = success;
+                    if (success) {
+                      showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+                    }
                   }
 
                   // Update State & localstorage
@@ -25134,7 +25201,8 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                               const ok = await sendSilentBackgroundClosureEmailToManager(c);
                               toast.dismiss();
                               if (ok) {
-                                toast.success('Rapport envoyé avec succès !');
+                                showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+                                setClosureMailFeedback(prev => ({ ...prev, [c.id]: true }));
                               } else {
                                 dispatchManagerClosureNotif(c, 'email');
                               }
@@ -25144,6 +25212,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                             <Mail className="w-3.5 h-3.5" /> E-mail Direct
                           </button>
                         </div>
+                        {closureMailFeedback[c.id] && (
+                          <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg justify-center border border-emerald-100">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Ce mail envoyé en arrière-plan avec succès !
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -25643,6 +25717,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       <Mail className="w-3 h-3" /> E-mail
                     </button>
                   </div>
+                  {ticketMailFeedback[viewingTicket.id] && (
+                    <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 mt-2 p-1.5 rounded-lg justify-center border border-emerald-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      Ce mail envoyé en arrière-plan avec succès !
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-xl border border-indigo-100/50">
                     <div className="col-span-2 text-[9px] font-mono font-black text-indigo-700 uppercase tracking-wider mb-0.5 text-center">
@@ -25663,6 +25743,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       <Mail className="w-3 h-3" /> E-mail
                     </button>
                   </div>
+                  {ticketMailFeedback[viewingTicket.id] && (
+                    <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 mt-2 p-1.5 rounded-lg justify-center border border-emerald-100">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      Ce mail envoyé en arrière-plan avec succès !
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -25782,6 +25868,8 @@ const CATEGORY_LABELS: { [key: string]: string } = {
 
 const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const [activeSubTab, setActiveSubTab] = useState<'sales' | 'inventory' | 'history'>('sales');
+  
+  const [saleMailFeedback, setSaleMailFeedback] = useState<Record<string, boolean>>({});
   
   // Custom categories state initialized from localStorage
   const [customCategories, setCustomCategories] = useState<{ [key: string]: string }>(() => {
@@ -25922,7 +26010,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       });
 
       if (response.ok) {
-        toast.success(`Rapport de Vente envoyé par email ! (Arrière-plan)`);
+        showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
         
         // Add to history
         const newLog = {
@@ -25935,15 +26023,18 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         const savedNotifs = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
         const currentNotifs = savedNotifs ? JSON.parse(savedNotifs) : [];
         localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
+        return true;
       } else {
         console.error('Failed to send background email to manager for sale');
+        return false;
       }
     } catch (err) {
       console.error('Error dispatching silent manager background sale mail:', err);
+      return false;
     }
   };
 
-  const dispatchManagerSaleNotif = (s: DetergentSale, method: 'whatsapp' | 'email') => {
+  const dispatchManagerSaleNotif = async (s: DetergentSale, method: 'whatsapp' | 'email') => {
     const message = getManagerSaleNotificationMessage(s);
     if (method === 'whatsapp') {
       if (!managerPhone.trim()) {
@@ -25957,28 +26048,46 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
       toast.success('Lien WhatsApp généré !');
+      
+      // Add to history
+      const newLog = {
+        id: `mnotif_s_${Date.now()}`,
+        ticketNumber: s.saleNumber,
+        type: 'sortie' as const,
+        method,
+        timestamp: new Date().toISOString()
+      };
+      const savedNotifs = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
+      const currentNotifs = savedNotifs ? JSON.parse(savedNotifs) : [];
+      localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
     } else {
       if (!managerEmail.trim()) {
         toast.error('Veuillez configurer l\'adresse email du Gérant.');
         return;
       }
-      const subject = `🛒 [DÉTERGENTS] Rapport de Vente ${s.saleNumber} - ${merchant.name || 'Pressing'}`;
-      const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-      window.open(mailtoUrl, '_blank');
-      toast.success('Rapport Email prêt !');
+      toast.loading('Envoi du rapport par mail...');
+      const ok = await sendSilentBackgroundSaleEmailToManager(s);
+      toast.dismiss();
+      if (ok) {
+        setSaleMailFeedback(prev => ({ ...prev, [s.id]: true }));
+      } else {
+        const subject = `🛒 [DÉTERGENTS] Rapport de Vente ${s.saleNumber} - ${merchant.name || 'Pressing'}`;
+        const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+        window.open(mailtoUrl, '_blank');
+        
+        // Add to history
+        const newLog = {
+          id: `mnotif_s_${Date.now()}`,
+          ticketNumber: s.saleNumber,
+          type: 'sortie' as const,
+          method,
+          timestamp: new Date().toISOString()
+        };
+        const savedNotifs = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
+        const currentNotifs = savedNotifs ? JSON.parse(savedNotifs) : [];
+        localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
+      }
     }
-
-    // Add to history
-    const newLog = {
-      id: `mnotif_s_${Date.now()}`,
-      ticketNumber: s.saleNumber,
-      type: 'sortie' as const,
-      method,
-      timestamp: new Date().toISOString()
-    };
-    const savedNotifs = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
-    const currentNotifs = savedNotifs ? JSON.parse(savedNotifs) : [];
-    localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
   };
 
   // Form states (Create / Edit)
@@ -26671,6 +26780,12 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         <Mail className="w-3.5 h-3.5" /> E-mail Gérant
                       </button>
                     </div>
+                    {saleMailFeedback[selectedSale.id] && (
+                      <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg justify-center border border-emerald-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Ce mail envoyé en arrière-plan avec succès !
+                      </div>
+                    )}
                     {autoEmailManager && managerEmail ? (
                       <p className="text-[8px] text-emerald-600 font-bold font-mono text-center">
                         📨 Rapport automatique expédié en arrière-plan à {managerEmail}

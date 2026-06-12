@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import { Settings, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { showMailSuccessToast } from '../MailSuccessToast';
 import { db } from '../../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Merchant } from '../../types';
@@ -85,6 +86,8 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     return parseFloat(actualCash.toString().replace(/\s/g, '').replace(',', '.')) || 0;
   }, [actualCash]);
 
+
+  const [closureMailFeedback, setClosureMailFeedback] = useState<Record<string, boolean>>({});
 
   const getManagerClosureNotificationMessage = useCallback((c: CashClosure) => {
     const diffSign = c.discrepancy >= 0 ? '+' : '';
@@ -205,7 +208,7 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     }
   }, [managerEmail, merchant]);
 
-  const dispatchManagerClosureNotif = (c: CashClosure, method: 'whatsapp' | 'email') => {
+  const dispatchManagerClosureNotif = async (c: CashClosure, method: 'whatsapp' | 'email') => {
     const textNotif = getManagerClosureNotificationMessage(c);
     
     if (method === 'whatsapp') {
@@ -214,9 +217,17 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
       window.open(url, '_blank');
       toast.success('Rapport prêt pour envoi via WhatsApp !');
     } else {
-      const url = `mailto:${managerEmail}?subject=${encodeURIComponent(`📊 CLÔTURE DE CAISSE JOURNALIÈRE — ${c.date}`)}&body=${encodeURIComponent(textNotif)}`;
-      window.open(url, '_blank');
-      toast.success("Rapport prêt dans votre logiciel d'e-mail !");
+      toast.loading('Envoi du rapport par mail...');
+      const ok = await sendSilentBackgroundClosureEmailToManager(c);
+      toast.dismiss();
+      if (ok) {
+        showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+        setClosureMailFeedback(prev => ({ ...prev, [c.id]: true }));
+      } else {
+        const url = `mailto:${managerEmail}?subject=${encodeURIComponent(`📊 CLÔTURE DE CAISSE JOURNALIÈRE — ${c.date}`)}&body=${encodeURIComponent(textNotif)}`;
+        window.open(url, '_blank');
+        toast.success("Rapport prêt dans votre logiciel d'e-mail !");
+      }
     }
   };
 
@@ -250,7 +261,12 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
 
     if (autoEmailManager && managerEmail) {
       toast.promise(
-        sendSilentBackgroundClosureEmailToManager(newClosure),
+        sendSilentBackgroundClosureEmailToManager(newClosure).then(ok => {
+          if (ok) {
+            showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+          }
+          return ok;
+        }),
         {
           loading: 'Envoi du rapport au gérant...',
           success: 'Rapport envoyé au gérant avec succès',
@@ -425,21 +441,29 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
                       </span>
                     </div>
                   </div>
-                  <div className="flex flex-row sm:flex-col gap-2 shrink-0">
-                    <button
-                      onClick={() => dispatchManagerClosureNotif(c, 'whatsapp')}
-                      disabled={!managerPhone}
-                      className="text-[10px] font-bold px-3 py-1.5 bg-[#25D366]/10 text-[#25D366] rounded-lg hover:bg-[#25D366]/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      WhatsApp
-                    </button>
-                    <button
-                      onClick={() => dispatchManagerClosureNotif(c, 'email')}
-                      disabled={!managerEmail}
-                      className="text-[10px] font-bold px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Renvoyer Mail
-                    </button>
+                  <div className="flex flex-col items-center sm:items-end gap-2 shrink-0">
+                    <div className="flex flex-row sm:flex-col gap-2">
+                      <button
+                        onClick={() => dispatchManagerClosureNotif(c, 'whatsapp')}
+                        disabled={!managerPhone}
+                        className="text-[10px] font-bold px-3 py-1.5 bg-[#25D366]/10 text-[#25D366] rounded-lg hover:bg-[#25D366]/20 transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        WhatsApp
+                      </button>
+                      <button
+                        onClick={() => dispatchManagerClosureNotif(c, 'email')}
+                        disabled={!managerEmail}
+                        className="text-[10px] font-bold px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Renvoyer Mail
+                      </button>
+                    </div>
+                    {closureMailFeedback[c.id] && (
+                      <div className="text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg border border-emerald-100 flex items-center gap-1 max-w-[120px] text-center leading-tight">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                        Ce mail envoyé en arrière-plan avec succès !
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
