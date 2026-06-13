@@ -68,10 +68,26 @@ function createSolidPng(width, height, r, g, b) {
 
 function ensurePngExists() {
   const outPath = path.resolve('public', 'icon.png');
-  if (!fs.existsSync(outPath)) {
-    console.log('Creating simple default fallback icon...');
+  let isValid = false;
+  try {
+    if (fs.existsSync(outPath)) {
+      const fd = fs.openSync(outPath, 'r');
+      const header = Buffer.alloc(8);
+      fs.readSync(fd, header, 0, 8, 0);
+      fs.closeSync(fd);
+      
+      // Valid PNG bytes: 89 50 4E 47 0D 0A 1A 0A
+      isValid = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47 &&
+                header[4] === 0x0D && header[5] === 0x0A && header[6] === 0x1A && header[7] === 0x0A;
+    }
+  } catch (err) {
+    isValid = false;
+  }
+
+  if (!isValid) {
+    console.log('Creating simple default fallback icon because the existing one is missing or corrupted...');
     try {
-      const fallbackImage = createSolidPng(512, 512, 75, 85, 99); // Slate-600 color
+      const fallbackImage = createSolidPng(512, 512, 124, 58, 237); // Clean brand purple
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       fs.writeFileSync(outPath, fallbackImage);
       console.log('Saved basic native fallback icon to', outPath);
