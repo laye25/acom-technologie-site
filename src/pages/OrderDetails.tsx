@@ -1154,6 +1154,26 @@ const OrderDetails = () => {
                         <a href={value as string} target="_blank" rel="noopener noreferrer" className="text-primary font-bold text-sm flex items-center gap-2">
                           Voir le document
                         </a>
+                      ) : Array.isArray(value) ? (
+                        <div className="space-y-2 mt-2">
+                          {value.map((item: any, i: number) => {
+                            if (typeof item === 'object' && item !== null) {
+                              return (
+                                <div key={i} className="text-xs bg-white text-gray-950 p-3 rounded-2xl border border-black/5 flex justify-between items-center font-medium">
+                                  <div>
+                                    <p className="font-bold">{item.name || `Article #${i+1}`}</p>
+                                    {item.sku && <p className="text-[10px] font-mono text-gray-400">SKU: {item.sku}</p>}
+                                  </div>
+                                  <div className="text-right ml-4 shrink-0 font-mono text-[10px]">
+                                    <span>{item.quantity || 1} x {(item.unitPrice || item.price)?.toLocaleString()} FCFA</span>
+                                    {(item.subtotal || ((item.unitPrice || item.price) * (item.quantity || 1))) && <strong className="block text-gray-900">{(item.subtotal || ((item.unitPrice || item.price) * (item.quantity || 1))).toLocaleString()} FCFA</strong>}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return <p key={i} className="text-gray-900 text-sm font-bold">{String(item)}</p>;
+                          })}
+                        </div>
                       ) : (
                         <p className="text-gray-900 font-bold text-sm sm:text-base break-all">
                           {typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : String(value)}

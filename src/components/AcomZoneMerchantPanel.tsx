@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
@@ -8,7 +9,8 @@ import { toast } from 'react-hot-toast';
 import { 
   Store, ShoppingCart, ShieldCheck, Clock, CheckCircle2, XCircle, ArrowRight, Wrench, 
   HardHat, Car, Users, GraduationCap, Stethoscope, Briefcase, Shirt, Sparkles, Filter, 
-  Trash2, Phone, Mail, MapPin, DollarSign, Calendar, RefreshCw, Send, Plus, Search, Info, Check
+  Trash2, Phone, Mail, MapPin, DollarSign, Calendar, RefreshCw, Send, Plus, Search, Info, Check,
+  Eye
 } from 'lucide-react';
 
 interface AcomZoneMerchantPanelProps {
@@ -294,6 +296,13 @@ export const AcomZoneMerchantPanel: React.FC<AcomZoneMerchantPanelProps> = ({ me
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              to={`/acomzone/${merchant.id}`}
+              className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest rounded-xl active:scale-95 transition-all shadow-xl shadow-emerald-500/20"
+            >
+              <Eye className="w-4 h-4" />
+              <span>Voir mon établissement</span>
+            </Link>
             <button 
               onClick={generateSimulatedOrder}
               disabled={isSimulating}
@@ -620,13 +629,30 @@ export const AcomZoneMerchantPanel: React.FC<AcomZoneMerchantPanelProps> = ({ me
 
                       {saasType !== 'pressing' && saasType !== 'medical' && saasType !== 'scolaire' && saasType !== 'entreprise' && saasType !== 'chantier' && saasType !== 'transport' && saasType !== 'rh' && (
                         <>
-                          <div>
-                            <span className="text-gray-400 block mb-0.5">Panier de produits</span>
-                            <span className="text-gray-900 font-bold">{selectedOrder.details?.items || 'Articles'}</span>
+                          <div className="col-span-2">
+                            <span className="text-gray-400 block mb-1">Panier de produits</span>
+                            {Array.isArray(selectedOrder.details?.items) ? (
+                              <div className="space-y-2 mt-1">
+                                {selectedOrder.details.items.map((item: any, i: number) => (
+                                  <div key={i} className="flex justify-between items-center text-xs bg-gray-50 p-2 rounded-xl border border-gray-100 font-medium">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-gray-950 font-bold truncate">{item.name}</p>
+                                      {item.sku && <p className="text-[10px] text-gray-400 font-mono">SKU: {item.sku}</p>}
+                                    </div>
+                                    <div className="text-right ml-4 shrink-0 font-mono text-[11px] text-gray-700">
+                                      <span>{item.quantity} x {(item.unitPrice || item.price)?.toLocaleString()} FCFA</span>
+                                      <strong className="block text-gray-900">{(item.subtotal || ((item.unitPrice || item.price) * item.quantity))?.toLocaleString()} FCFA</strong>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-gray-900 font-bold block">{selectedOrder.details?.items || 'Articles'}</span>
+                            )}
                           </div>
                           <div>
                             <span className="text-gray-400 block mb-0.5">Mode de retrait</span>
-                            <span className="text-gray-900 font-bold text-orange-600">{selectedOrder.details?.method || 'Livraison à domicile'}</span>
+                            <span className="text-gray-900 font-bold text-orange-600 block">{selectedOrder.details?.method || 'Livraison à domicile'}</span>
                           </div>
                         </>
                       )}
@@ -776,9 +802,12 @@ function renderShortSpec(order: Order, type: string) {
         </span>
       );
     default:
+      const itemsLabel = Array.isArray(details.items)
+        ? details.items.map((it: any) => `${it.name} (x${it.quantity})`).join(', ')
+        : (details.items || "Commande boutique");
       return (
         <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded w-fit float-left mt-1">
-          🛍️ Boutique: {details.items || "Commande boutique"}
+          🛍️ Boutique: {itemsLabel}
         </span>
       );
   }

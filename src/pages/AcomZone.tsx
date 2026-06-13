@@ -1,15 +1,18 @@
-import React, { useState, useMemo } from 'react';
-import { motion } from 'motion/react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, Building2, ChevronRight, MapPin, Search, Star, ArrowRight, Home, ShoppingBag, Utensils, Scissors, Car, Target,
-  Briefcase, HeartPulse, GraduationCap, Truck, HardHat, SquareActivity, Shirt, Map as MapIcon, Grid
+  Briefcase, HeartPulse, GraduationCap, Truck, HardHat, SquareActivity, Shirt, Map as MapIcon, Grid,
+  User, FileText, CheckCircle, XCircle, Eye, Calendar, Phone, ClipboardList, Info, ArrowLeft, Clock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useFirestoreData } from '../hooks/useFirestoreData';
-import { Merchant } from '../types';
+import { Merchant, Order } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
+import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -88,6 +91,252 @@ function MerchantMarker({ merchant }: { merchant: Merchant }) {
   );
 }
 
+// Helper to render beautiful SaaS purchased content based on the sector/merchantType
+function renderSaaSPurchasedContent(order: any, saasType?: string) {
+  const type = saasType || order.details?.saasSector || 'boutique';
+  const details = order.details || {};
+
+  switch (type) {
+    case 'pressing':
+      return (
+        <div className="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-2 text-left">
+          <div className="flex items-center gap-2 text-teal-700 font-bold text-xs">
+            <Shirt className="w-4 h-4" />
+            <span>Service Pressing &amp; Nettoyage</span>
+          </div>
+          <p className="text-gray-900 font-black text-sm">{order.serviceName || 'Lavage complet'}</p>
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-gray-600 font-medium">
+            {details.items && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Vêtements</span>
+                <span className="font-bold text-gray-800">{details.items}</span>
+              </div>
+            )}
+            {details.mode && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Lavage</span>
+                <span className="font-bold text-gray-800">{details.mode}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    case 'medical':
+      return (
+        <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 space-y-2 text-left">
+          <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
+            <SquareActivity className="w-4 h-4" />
+            <span>Rendez-vous Clinique &amp; Santé</span>
+          </div>
+          <p className="text-gray-900 font-black text-sm">{order.serviceName || 'Consultation'}</p>
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-gray-600 font-medium">
+            {details.patientName && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Patient</span>
+                <span className="font-bold text-gray-800">{details.patientName}</span>
+              </div>
+            )}
+            {details.motif && (
+              <div className="col-span-2">
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Motif de Consultation</span>
+                <span className="font-bold text-gray-800">{details.motif}</span>
+              </div>
+            )}
+            {details.doctor && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Médecin</span>
+                <span className="font-bold text-gray-800">{details.doctor}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    case 'scolaire':
+      return (
+        <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 space-y-2 text-left">
+          <div className="flex items-center gap-2 text-blue-700 font-bold text-xs">
+            <GraduationCap className="w-4 h-4" />
+            <span>Dossier Inscription &amp; Écrans Scolaires</span>
+          </div>
+          <p className="text-gray-900 font-black text-sm">{order.serviceName || 'Candidature Scolaire'}</p>
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-gray-600 font-medium">
+            {details.student && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Élève / Étudiant</span>
+                <span className="font-bold text-gray-800">{details.student}</span>
+              </div>
+            )}
+            {details.level && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Classe / Niveau</span>
+                <span className="font-bold text-gray-800">{details.level}</span>
+              </div>
+            )}
+            {details.birthDate && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Date de Naissance</span>
+                <span className="font-bold text-gray-800">{details.birthDate}</span>
+              </div>
+            )}
+            {details.parentNotes && (
+              <div className="col-span-2">
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Note Parent</span>
+                <span className="font-bold text-gray-800">{details.parentNotes}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    case 'entreprise':
+    case 'service':
+      return (
+        <div className="bg-pink-50/50 border border-pink-100 rounded-2xl p-4 space-y-2 text-left">
+          <div className="flex items-center gap-2 text-pink-700 font-bold text-xs">
+            <Briefcase className="w-4 h-4" />
+            <span>Intervention Maintenance &amp; Services</span>
+          </div>
+          <p className="text-gray-900 font-black text-sm">{order.serviceName || 'Dépannage professionnel'}</p>
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-gray-600 font-medium">
+            {details.type && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Type d'Assistance</span>
+                <span className="font-bold text-gray-800">{details.type}</span>
+              </div>
+            )}
+            {details.tech && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Technicien</span>
+                <span className="font-bold text-gray-800">{details.tech}</span>
+              </div>
+            )}
+            <div>
+              <span className="block text-gray-400 text-[10px] uppercase font-bold">Urgence</span>
+              <span className={`font-bold ${details.urgent ? 'text-red-650' : 'text-gray-800'}`}>
+                {details.urgent ? '🚨 Très Urgent' : 'Normal'}
+              </span>
+            </div>
+            {details.notes && (
+              <div className="col-span-2">
+                <span className="block text-gray-400 text-[10px] uppercase font-bold font-bold">Détails panne</span>
+                <span className="font-bold text-gray-800">{details.notes}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    case 'chantier':
+      return (
+        <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-4 space-y-2 text-left">
+          <div className="flex items-center gap-2 text-amber-700 font-bold text-xs">
+            <HardHat className="w-4 h-4" />
+            <span>Approvisionnement Chantier (BTP)</span>
+          </div>
+          <p className="text-gray-900 font-black text-sm">{order.serviceName || 'Matériaux Gros-Œuvre'}</p>
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-gray-600 font-medium">
+            {details.item && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Matériaux / Quantité</span>
+                <span className="font-bold text-gray-800">{details.item}</span>
+              </div>
+            )}
+            {details.deliverySite && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Lieu Destination</span>
+                <span className="font-bold text-gray-800">{details.deliverySite}</span>
+              </div>
+            )}
+            {details.supervisor && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Superviseur</span>
+                <span className="font-bold text-gray-800">{details.supervisor}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    case 'transport':
+      return (
+        <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 space-y-2 text-left">
+          <div className="flex items-center gap-2 text-indigo-700 font-bold text-xs">
+            <Car className="w-4 h-4" />
+            <span>Réservation Trajet &amp; Logistique</span>
+          </div>
+          <p className="text-gray-900 font-black text-sm">{order.serviceName || 'Déplacement express'}</p>
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-gray-600 font-medium">
+            {details.from && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Zone Départ</span>
+                <span className="font-bold text-gray-800">{details.from}</span>
+              </div>
+            )}
+            {details.to && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Zone Arrivée</span>
+                <span className="font-bold text-gray-800">{details.to}</span>
+              </div>
+            )}
+            {details.carModel && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Véhicule</span>
+                <span className="font-bold text-gray-800">{details.carModel}</span>
+              </div>
+            )}
+            {details.flightNo && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Vol</span>
+                <span className="font-bold text-gray-800">{details.flightNo}</span>
+              </div>
+            )}
+            {details.hours && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Durée</span>
+                <span className="font-bold text-gray-800">{details.hours}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    case 'rh':
+      return (
+        <div className="bg-purple-50/50 border border-purple-100 rounded-2xl p-4 space-y-2 text-left">
+          <div className="flex items-center gap-2 text-purple-700 font-bold text-xs">
+            <User className="w-4 h-4" />
+            <span>Dossier de Recrutement / Statut RH</span>
+          </div>
+          <p className="text-gray-900 font-black text-sm">{order.serviceName}</p>
+          <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-gray-600 font-medium">
+            {details.candidate && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Postulé</span>
+                <span className="font-bold text-gray-800">{details.candidate}</span>
+              </div>
+            )}
+            {details.diploma && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Diplôme</span>
+                <span className="font-bold text-gray-800">{details.diploma}</span>
+              </div>
+            )}
+            {details.experience && (
+              <div>
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Expérience</span>
+                <span className="font-bold text-gray-800">{details.experience}</span>
+              </div>
+            )}
+            {details.ratingGrade && (
+              <div className="col-span-2">
+                <span className="block text-gray-400 text-[10px] uppercase font-bold">Évaluation RH</span>
+                <span className="font-bold text-gray-800">{details.ratingGrade}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    default:
+      return null;
+  }
+}
+
 export default function AcomZone() {
   const { data: cloudMerchants, loading: cloudLoading } = useFirestoreData<Merchant>({
     tableName: 'merchants',
@@ -99,10 +348,59 @@ export default function AcomZone() {
   const merchants = cloudMerchants.length > 0 ? cloudMerchants : localMerchants;
   const loading = cloudLoading && merchants.length === 0;
 
+  const { user, profile } = useAuth();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedZone, setSelectedZone] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'map'>('map');
+  const [viewMode, setViewMode] = useState<'grid' | 'map' | 'client'>('map');
+
+  // Client workspace states
+  const [clientSearchInput, setClientSearchInput] = useState('');
+  const [submittedSearchToken, setSubmittedSearchToken] = useState('');
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
+
+  // Retrieve local orders reactively
+  const localOrders = useLiveQuery(() => db.orders.toArray()) || [];
+
+  // Logged in user orders auto-discovery
+  const userOrders = useMemo(() => {
+    if (!user) return [];
+    return localOrders.filter(o => {
+      const isAcomZoneOrder = o.pillar === 'saas' || !!o.details?.saasSector || !!o.details?.simulated;
+      if (!isAcomZoneOrder) return false;
+
+      const isUidMatch = o.userId === user.uid;
+      const isEmailMatch = (o.clientEmail && user.email && o.clientEmail.toLowerCase() === user.email.toLowerCase()) || 
+                           (o.details?.clientEmail && user.email && o.details.clientEmail.toLowerCase() === user.email.toLowerCase());
+      const isPhoneMatch = (profile as any)?.phone && (o.clientPhone === (profile as any).phone || o.details?.clientPhone === (profile as any).phone);
+      return isUidMatch || isEmailMatch || isPhoneMatch;
+    }).sort((a, b) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tB - tA;
+    });
+  }, [localOrders, user, profile]);
+
+  // Manually searched orders
+  const searchedOrders = useMemo(() => {
+    const token = submittedSearchToken.trim().toLowerCase();
+    if (!token) return [];
+    return localOrders.filter(o => {
+      const isAcomZoneOrder = o.pillar === 'saas' || !!o.details?.saasSector || !!o.details?.simulated;
+      if (!isAcomZoneOrder) return false;
+
+      const matchId = o.id?.toLowerCase().includes(token);
+      const matchEmail = o.clientEmail?.toLowerCase().includes(token) || o.details?.clientEmail?.toLowerCase().includes(token);
+      const matchPhone = o.clientPhone?.includes(token) || o.details?.clientPhone?.includes(token);
+      const matchName = o.clientName?.toLowerCase().includes(token);
+      return matchId || matchEmail || matchPhone || matchName;
+    }).sort((a, b) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tB - tA;
+    });
+  }, [localOrders, submittedSearchToken]);
 
   // Extract unique zones from existing merchants' addresses
   const availableZones = useMemo(() => {
@@ -246,13 +544,296 @@ export default function AcomZone() {
               <Grid className="w-4 h-4" />
               Liste
             </button>
+            <button
+              onClick={() => setViewMode('client')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                viewMode === 'client' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              Espace Client
+            </button>
           </div>
         </div>
       </section>
 
       {/* Results Content */}
       <section className="px-6 md:px-12 max-w-7xl mx-auto">
-        {loading ? (
+        {viewMode === 'client' ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-10"
+          >
+            {/* Client Workspace Title Segment */}
+            <div className="max-w-4xl mx-auto text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-violet-100/80 text-violet-700 text-xs font-bold shadow-sm">
+                <ClipboardList className="w-4 h-4 text-violet-600" />
+                <span>Espace Client Securisé • Sénégal</span>
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-gray-900 leading-tight">
+                Suivi de vos commandes & réservations
+              </h2>
+              <p className="text-gray-500 max-w-xl mx-auto leading-relaxed text-sm sm:text-base font-medium">
+                Retrouvez instantanément l'état de toutes vos commandes passées auprès de nos boutiques et partenaires sur AcomZone.
+              </p>
+            </div>
+
+            <div className="max-w-4xl mx-auto space-y-8">
+              {/* Logged in auto-discovery alert */}
+              {user && (
+                <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center shrink-0">
+                      <User className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-sm sm:text-base">Génération par session active</h4>
+                      <p className="text-xs text-gray-400 font-medium leading-normal mt-0.5">
+                        Connecté en tant que <strong className="text-emerald-700">{profile?.displayName || user.email}</strong>. Vos commandes AcomZone sont chargées automatiquement.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-xs font-black font-mono text-emerald-700 bg-emerald-100/60 px-3 py-1.5 rounded-full w-fit">
+                    {userOrders.length} {userOrders.length > 1 ? 'commandes' : 'commande'}
+                  </div>
+                </div>
+              )}
+
+              {/* Search Box Card */}
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-10 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-48 h-48 bg-violet-100/40 rounded-full blur-2xl opacity-60 pointer-events-none" />
+                <h3 className="font-black text-gray-900 text-lg mb-2 flex items-center gap-2 relative z-10">
+                  <Search className="w-5 h-5 text-violet-600" />
+                  Rechercher manuellement vos commandes
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 mb-6 font-medium relative z-10">
+                  Saisissez votre numéro de téléphone, votre e-mail de contact ou l'identifiant exact de votre devis/commande.
+                </p>
+
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!clientSearchInput.trim()) {
+                    toast.error("Veuillez saisir des coordonnées pour lancer la recherche");
+                    return;
+                  }
+                  setSubmittedSearchToken(clientSearchInput);
+                  toast.success("Suivi de commandes actualisé");
+                }} className="flex flex-col sm:flex-row gap-3 relative z-10">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="Ex: 771234567, client@email.sn, ou acom_..."
+                      value={clientSearchInput}
+                      onChange={(e) => setClientSearchInput(e.target.value)}
+                      className="w-full bg-gray-50 p-4 pl-12 rounded-2xl border border-gray-200 text-sm outline-none font-bold text-gray-800 placeholder-gray-400 focus:border-violet-600 focus:bg-white transition-all focus:ring-4 focus:ring-violet-100"
+                    />
+                    <Phone className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                    {clientSearchInput && (
+                      <button
+                        type="button"
+                        onClick={() => { setClientSearchInput(''); setSubmittedSearchToken(''); }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 rounded-full transition-colors"
+                      >
+                        <XCircle className="w-4 h-4 text-gray-400" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="submit"
+                    className="p-4 bg-gray-900 text-white font-bold rounded-2xl hover:bg-violet-600 transition-all flex items-center justify-center gap-2 shadow-md"
+                  >
+                    <Search className="w-5 h-5" />
+                    <span>Rechercher</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Combined orders display section */}
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-black text-lg text-gray-900 leading-tight">
+                    {submittedSearchToken ? 'Résultats de recherche' : 'Vos commandes récentes'}
+                  </h3>
+                  {submittedSearchToken && (
+                    <button
+                      onClick={() => { setSubmittedSearchToken(''); setClientSearchInput(''); }}
+                      className="text-xs font-bold text-violet-600 hover:text-violet-800"
+                    >
+                      Effacer la recherche
+                    </button>
+                  )}
+                </div>
+                
+                {/* Compute the visible orders */}
+                {(() => {
+                  const visibleOrders = submittedSearchToken ? searchedOrders : userOrders;
+                  
+                  if (visibleOrders.length === 0) {
+                    return (
+                      <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-sm">
+                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <ClipboardList className="w-8 h-8 text-gray-300" />
+                        </div>
+                        <p className="text-gray-500 text-sm font-bold max-w-md mx-auto">
+                          {submittedSearchToken 
+                            ? `Aucune commande trouvée pour "${submittedSearchToken}". Assurez-vous d'avoir saisi les coordonnées exactes utilisées lors de l'achat.`
+                            : "Aucune commande trouvée pour votre session active. Utilisez le champ ci-dessus avec votre numéro de téléphone."}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-6">
+                      {visibleOrders.map((order: Order) => {
+                        // Find matching merchant details
+                        const matchingMerchant = merchants.find(m => m.id === ((order as any).partnerId || (order as any).merchantId));
+                        
+                        // Helper status mapping
+                        const getStatusDetails = (status: string) => {
+                          switch(status) {
+                            case 'pending': 
+                              return { label: 'En attente', color: 'text-amber-700 bg-amber-50 border border-amber-100', icon: Clock };
+                            case 'confirmed': 
+                              return { label: 'Confirmée', color: 'text-blue-700 bg-blue-50 border border-blue-100', icon: CheckCircle };
+                            case 'completed': 
+                              return { label: 'Terminée', color: 'text-emerald-700 bg-emerald-50 border border-emerald-100', icon: CheckCircle };
+                            case 'cancelled': 
+                              return { label: 'Annulée', color: 'text-red-700 bg-red-50 border border-red-100', icon: XCircle };
+                            default: 
+                              return { label: 'En cours', color: 'text-indigo-700 bg-indigo-50 border border-indigo-100', icon: Clock };
+                          }
+                        };
+                        
+                        const statusInfo = getStatusDetails(order.status);
+                        const StatusIcon = statusInfo.icon;
+                        
+                        const formattedDate = order.createdAt 
+                          ? new Date(order.createdAt).toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : 'Date inconnue';
+
+                        return (
+                          <div key={order.id} className="bg-white rounded-3xl border border-gray-100 p-6 flex flex-col lg:flex-row justify-between gap-6 hover:shadow-md transition-all">
+                            <div className="space-y-4 flex-1">
+                              {/* Merchant Header */}
+                              <div className="flex items-center gap-3">
+                                {matchingMerchant?.logo ? (
+                                  <img src={matchingMerchant.logo} alt={matchingMerchant.name} className="w-10 h-10 rounded-full border border-gray-100 object-cover" />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-black">
+                                    {matchingMerchant?.name?.charAt(0).toUpperCase() || 'M'}
+                                  </div>
+                                )}
+                                <div>
+                                  <h4 className="font-black text-gray-900 text-sm sm:text-base">{matchingMerchant?.name || 'Commerçant Partenaire'}</h4>
+                                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{matchingMerchant?.type || 'Boutique'}</p>
+                                </div>
+                              </div>
+
+                              {/* Order Meta details */}
+                              <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 bg-gray-50 p-3 sm:p-4 rounded-2xl border border-gray-150 text-xs text-gray-500 font-medium">
+                                <div>
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">ID Commande</span>
+                                  <span className="font-mono font-bold text-gray-900 truncate">#{order.id?.slice(-8).toUpperCase()}</span>
+                                </div>
+                                <div className="w-px h-6 bg-gray-200 hidden sm:block self-center" />
+                                <div>
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Date de Commande</span>
+                                  <span className="text-gray-900 font-bold">{formattedDate}</span>
+                                </div>
+                                <div className="w-px h-6 bg-gray-200 hidden sm:block self-center" />
+                                <div>
+                                  <span className="block text-[10px] text-gray-400 font-bold uppercase">Mode de Retrait</span>
+                                  <span className="text-orange-600 font-bold">{order.details?.method || 'Livraison à domicile'}</span>
+                                </div>
+                              </div>
+
+                              {/* Product item display */}
+                              <div className="pt-2">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">Détails de la prestation</span>
+                                {(() => {
+                                  const saasContent = renderSaaSPurchasedContent(order, matchingMerchant?.type || order.details?.saasSector || 'boutique');
+                                  if (saasContent) return saasContent;
+
+                                  if (Array.isArray(order.details?.items)) {
+                                    return (
+                                      <div className="space-y-1.5">
+                                        {order.details.items.map((it: any, i: number) => (
+                                          <div key={i} className="flex justify-between items-center text-xs bg-gray-50/50 p-2 rounded-xl border border-gray-100/60 font-medium max-w-sm">
+                                            <span className="text-gray-800 font-bold max-w-[200px] truncate">{it.name}</span>
+                                            <span className="font-mono text-gray-500 ml-2">x{it.quantity}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <p className="text-gray-900 text-sm font-bold flex items-center gap-2">
+                                      <ShoppingBag className="w-4 h-4 text-violet-500" />
+                                      {order.serviceName || order.details?.items || 'Articles divers'}
+                                    </p>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+
+                            {/* Status, Total & Tracking Actions */}
+                            <div className="lg:w-64 shrink-0 flex flex-col justify-between items-start lg:items-end gap-3 lg:text-right border-t lg:border-t-0 border-gray-100 pt-4 lg:pt-0">
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1.5">Statut de la demande</span>
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-full text-xs font-black shadow-sm ${statusInfo.color}`}>
+                                  <StatusIcon className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{statusInfo.label}</span>
+                                </span>
+                              </div>
+
+                              <div>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5 animate-pulse">Montant Total</span>
+                                <strong className="text-xl font-black text-violet-600 font-mono">
+                                  {order.totalPrice?.toLocaleString()} FCFA
+                                </strong>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2 w-full lg:justify-end pt-2">
+                                <button
+                                  onClick={() => setSelectedOrderDetails(order)}
+                                  className="flex-1 lg:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-violet-50 hover:bg-violet-600 hover:text-white text-violet-700 font-bold text-xs rounded-xl transition-all border border-violet-100"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  <span>Détails</span>
+                                </button>
+                                
+                                {matchingMerchant?.phone && (
+                                  <a
+                                    href={`https://wa.me/${matchingMerchant.phone.replace(/[^0-9]/g, '')}?text=Bonjour%20${encodeURIComponent(matchingMerchant.name)}%2C%20je%20souhaite%20suivre%20ma%20commande%20%23${order.id?.slice(-8).toUpperCase()}`}
+                                    target="_blank"
+                                    referrerPolicy="no-referrer"
+                                    className="flex-1 lg:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#25D366] hover:bg-[#128C7E] text-white font-bold text-xs rounded-xl transition-all"
+                                  >
+                                    <Phone className="w-4 h-4" />
+                                    <span>WhatsApp</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </motion.div>
+        ) : loading ? (
           <div className="flex justify-center items-center py-20">
             <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
           </div>
@@ -392,6 +973,228 @@ export default function AcomZone() {
           </>
         )}
       </section>
+
+      {/* Detail overlay modal */}
+      <AnimatePresence>
+        {selectedOrderDetails && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedOrderDetails(null)}>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-white rounded-3xl w-full max-w-xl max-h-[85vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative custom-scrollbar border border-gray-150"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-start border-b border-gray-150 pb-4 mb-6">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-violet-100 text-[#7C3AED] rounded-full text-[10px] font-black uppercase tracking-wider mb-2">
+                    Détails de Commande
+                  </div>
+                  <h3 className="font-black text-xl text-gray-900 leading-tight">
+                    Commande #{selectedOrderDetails.id?.slice(-8).toUpperCase()}
+                  </h3>
+                </div>
+                <button 
+                  onClick={() => setSelectedOrderDetails(null)}
+                  className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-gray-400 hover:text-gray-600" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Merchant info block */}
+                {(() => {
+                  const matchedMerch = merchants.find(m => m.id === ((selectedOrderDetails as any).partnerId || (selectedOrderDetails as any).merchantId));
+                  return (
+                    <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                      {matchedMerch?.logo ? (
+                        <img src={matchedMerch.logo} className="w-12 h-12 rounded-xl object-cover border border-gray-200" alt="" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center text-violet-700 font-black text-lg">
+                          {matchedMerch?.name?.charAt(0).toUpperCase() || 'M'}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-black text-gray-900 text-sm sm:text-base truncate">{matchedMerch?.name || 'Commerçant Partenaire'}</h4>
+                        <p className="text-xs text-gray-400 font-bold uppercase truncate">{matchedMerch?.address || 'Sénégal'}</p>
+                      </div>
+                      {matchedMerch?.phone && (
+                        <a href={`tel:${matchedMerch.phone}`} className="p-3 bg-white text-violet-700 rounded-xl hover:bg-violet-100 border border-violet-100 transition-colors shadow-sm shrink-0">
+                          <Phone className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Client Info card */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+                  <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider text-gray-400">Informations Client</h4>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="block text-gray-400 mb-0.5">Nom complet</span>
+                      <span className="text-gray-950 font-bold">{selectedOrderDetails.clientName || 'Client anonyme'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-gray-400 mb-0.5">Téléphone</span>
+                      <span className="text-gray-950 font-bold font-mono">{selectedOrderDetails.details?.clientPhone || (selectedOrderDetails as any).clientPhone || 'Non renseigné'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-gray-400 mb-0.5">Adresse de livraison</span>
+                      <span className="text-gray-950 font-bold">{selectedOrderDetails.details?.clientAddress || 'Point de vente / retrait sur place'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cart & Items summary */}
+                <div className="space-y-3">
+                  <h4 className="font-bold text-gray-900 text-xs uppercase tracking-wider text-gray-400">Détails de la prestation</h4>
+                  {(() => {
+                    const matchedMerch = merchants.find(m => m.id === ((selectedOrderDetails as any).partnerId || (selectedOrderDetails as any).merchantId));
+                    const saasContent = renderSaaSPurchasedContent(selectedOrderDetails, matchedMerch?.type || selectedOrderDetails.details?.saasSector || 'boutique');
+                    if (saasContent) return saasContent;
+
+                    if (Array.isArray(selectedOrderDetails.details?.items)) {
+                      return (
+                        <div className="space-y-2">
+                          {selectedOrderDetails.details.items.map((it: any, k: number) => (
+                            <div key={k} className="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                              <div>
+                                <p className="font-black text-gray-950 text-xs sm:text-sm">{it.name}</p>
+                                {it.sku && <p className="text-[10px] text-gray-400 font-mono">SKU: {it.sku}</p>}
+                              </div>
+                              <div className="text-right font-mono text-xs text-gray-700 ml-4 font-bold">
+                                <span>{it.quantity} x {(it.unitPrice || it.price)?.toLocaleString()} FCFA</span>
+                                <strong className="block text-gray-955">{(it.subtotal || ((it.unitPrice || it.price) * it.quantity)).toLocaleString()} FCFA</strong>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm font-bold text-gray-900 flex items-center gap-2">
+                        <ShoppingBag className="w-5 h-5 text-violet-500" />
+                        {selectedOrderDetails.serviceName || selectedOrderDetails.details?.items || 'Articles divers'}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Subtotal & Total Pricing Details */}
+                <div className="bg-violet-50/50 p-5 rounded-2xl border border-violet-100/50 space-y-2">
+                  <div className="flex justify-between text-xs text-gray-500 font-medium">
+                    <span>Sous-total</span>
+                    <span className="font-mono">{(selectedOrderDetails.totalPrice || 0).toLocaleString()} FCFA</span>
+                  </div>
+                  <div className="h-px bg-violet-100 my-2" />
+                  <div className="flex justify-between items-center">
+                    <span className="font-black text-gray-900 text-sm">Montant Total</span>
+                    <span className="text-lg font-black text-[#7C3AED] font-mono">{(selectedOrderDetails.totalPrice || 0).toLocaleString()} FCFA</span>
+                  </div>
+                </div>
+
+                {/* Custom/Sector fields display */}
+                {(() => {
+                  const skipKeys = ['clientPhone', 'clientAddress', 'saasSector', 'simulated', 'items', 'quantity', 'unitPrice', 'method', 'clientEmail'];
+                  const customFields = Object.entries(selectedOrderDetails.details || {})
+                    .filter(([key]) => !skipKeys.includes(key));
+                    
+                  if (customFields.length === 0) return null;
+                  
+                  return (
+                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
+                      <h5 className="font-bold text-gray-600 text-[11px] uppercase tracking-wider mb-2">Options personnalisées</h5>
+                      <div className="grid grid-cols-1 gap-3.5 text-xs font-medium">
+                        {customFields.map(([k, val]) => {
+                          const isImage = typeof val === 'string' && (val.startsWith('data:image') || val.match(/\.(jpeg|jpg|png|gif)$/i));
+                          const isPdf = typeof val === 'string' && (val.startsWith('data:application/pdf') || val.toLowerCase().endsWith('.pdf'));
+                          const isPendingUpload = typeof val === 'string' && val === 'pending_upload';
+                          const isObject = typeof val === 'object' && val !== null && !Array.isArray(val);
+
+                          return (
+                            <div key={k} className="border-b border-gray-150/40 pb-2.5 last:border-0 last:pb-0">
+                              <span className="block text-gray-400 capitalize text-[10px] mb-1">
+                                {k.replace(/([A-Z])/g, ' $1').trim()}
+                              </span>
+                              
+                              {isImage ? (
+                                <div className="mt-1 bg-white p-1 rounded-lg border border-gray-150 inline-block">
+                                  <img 
+                                    src={val as string} 
+                                    alt={k} 
+                                    className="max-h-24 max-w-full rounded object-contain cursor-zoom-in"
+                                    onClick={() => window.open(val as string, '_blank')}
+                                  />
+                                </div>
+                              ) : isPdf ? (
+                                <a 
+                                  href={val as string} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="inline-flex items-center gap-1.5 text-violet-700 font-bold hover:underline bg-white px-2.5 py-1.5 rounded-xl border border-gray-150 text-[11px] transition-all"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  <span>Voir le document</span>
+                                </a>
+                              ) : isPendingUpload ? (
+                                <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg font-bold text-[10px]">
+                                  <Clock className="w-3 h-3 animate-spin text-amber-500" />
+                                  En attente de téléversement
+                                </span>
+                              ) : isObject ? (
+                                <div className="space-y-1.5 mt-1 bg-white p-2.5 rounded-xl border border-gray-150">
+                                  {Object.entries(val).map(([subK, subVal]) => (
+                                    <div key={subK} className="flex justify-between items-center text-[10px] py-1 border-b border-gray-50 last:border-0 last:py-0">
+                                      <span className="text-gray-400 capitalize">{subK.replace(/([A-Z])/g, ' $1').trim()} :</span>
+                                      <span className="text-gray-900 font-bold">{typeof subVal === 'boolean' ? (subVal ? 'Oui' : 'Non') : String(subVal)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : Array.isArray(val) ? (
+                                <div className="space-y-1.5 mt-1">
+                                  {val.map((item: any, idx: number) => (
+                                    <div key={idx} className="bg-white p-2 rounded-xl border border-gray-150 text-[10px] text-gray-900 font-bold">
+                                      {typeof item === 'object' && item !== null ? JSON.stringify(item) : String(item)}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-900 font-bold block break-all whitespace-pre-wrap leading-relaxed">
+                                  {typeof val === 'boolean' ? (val ? 'Oui' : 'Non') : String(val)}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="mt-8 pt-4 border-t border-gray-100 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderDetails(null)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl text-xs transition-colors"
+                >
+                  Fermer
+                </button>
+                <Link
+                  to={`/acomzone/${(selectedOrderDetails as any).partnerId || (selectedOrderDetails as any).merchantId || ''}`}
+                  className="flex-1 py-3 bg-gray-900 hover:bg-violet-700 text-white font-bold rounded-2xl text-xs text-center transition-colors"
+                >
+                  Visiter la boutique
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

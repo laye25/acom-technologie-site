@@ -86,7 +86,7 @@ const AIAssistant: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 max-md:bottom-4 max-md:right-4 z-[9999] flex flex-col items-end">
+    <div className="fixed bottom-6 left-6 max-md:bottom-4 max-md:left-4 z-[9999] flex flex-col items-start">
       <AnimatePresence>
         {isOpen && (
           <motion.div

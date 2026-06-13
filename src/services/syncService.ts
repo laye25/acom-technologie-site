@@ -860,8 +860,22 @@ export const syncService = {
     try {
       console.log('Pushing pending local data to cloud...');
       
+      // 0. Push Merchant Profile
+      try {
+        const localMerchant = await db.merchants.get(merchantId);
+        if (localMerchant) {
+           const { merchantRepository } = await import('../data/repositories/merchant.repository');
+           await merchantRepository.update(merchantId, localMerchant as any).catch(async () => {
+             // If it doesn't exist, create it
+             await merchantRepository.create({ ...localMerchant, id: merchantId } as any);
+           });
+        }
+      } catch (e) {
+        console.warn('Failed to push merchant profile:', e);
+      }
+
       // 1. Pending Sales
-      const pendingSales = await db.sales.where('syncStatus').equals('pending').toArray();
+      const pendingSales = await db.sales.where('syncStatus').anyOf('pending', 'local-only').toArray();
       for (const sale of pendingSales) {
         try {
           const { syncStatus, ...data } = sale as any;
@@ -874,13 +888,15 @@ export const syncService = {
       }
 
       // 2. Pending Products
-      const pendingProducts = await db.products.where('syncStatus').equals('pending').toArray();
+      const pendingProducts = await db.products.where('syncStatus').anyOf('pending', 'local-only').toArray();
       for (const product of pendingProducts) {
         try {
           const { syncStatus, ...data } = product as any;
           const { merchantProductRepository } = await import('../data/repositories/merchant-product.repository');
           if (product.id && product.id.length > 20) { // Assume it already exists if long ID
-             await merchantProductRepository.update(product.id, data);
+             await merchantProductRepository.update(product.id, data).catch(async () => {
+               await merchantProductRepository.create({ ...data, id: product.id } as any);
+             });
           } else {
              await merchantProductRepository.create(data as any);
           }
@@ -891,13 +907,15 @@ export const syncService = {
       }
 
       // 3. Pending Expenses
-      const pendingExpenses = await db.expenses.where('syncStatus').equals('pending').toArray();
+      const pendingExpenses = await db.expenses.where('syncStatus').anyOf('pending', 'local-only').toArray();
       for (const expense of pendingExpenses) {
         try {
           const { syncStatus, ...data } = expense as any;
           const { merchantExpenseRepository } = await import('../data/repositories/merchant-expense.repository');
           if (expense.id && expense.id.length > 20) {
-            await merchantExpenseRepository.update(expense.id, data);
+             await merchantExpenseRepository.update(expense.id, data).catch(async () => {
+               await merchantExpenseRepository.create({ ...data, id: expense.id } as any);
+             });
           } else {
             await merchantExpenseRepository.create(data as any);
           }

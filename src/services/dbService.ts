@@ -437,22 +437,18 @@ export const dbService = {
       
       let id = product.id || uuidv4();
       const merchantId = product.merchantId || (product as any).merchant_id;
-      const merchant = merchantId ? await db.merchants.get(merchantId) : null;
       
-      if (merchant?.licenseType !== 'local') {
-        try {
-          if (product.id) {
-            await merchantProductRepository.update(product.id, data);
-          } else {
-            const remoteId = await merchantProductRepository.create(data as any);
-            id = remoteId;
-          }
-        } catch (error) {
-          console.warn('Product cloud sync failed, saving locally');
-          data.syncStatus = 'pending';
+      // Always attempt cloud save so products appear on AcomZone catalog
+      try {
+        if (product.id) {
+          await merchantProductRepository.update(product.id, data);
+        } else {
+          const remoteId = await merchantProductRepository.create(data as any);
+          id = remoteId;
         }
-      } else {
-        data.syncStatus = 'local-only';
+      } catch (error) {
+        console.warn('Product cloud sync failed, saving locally');
+        data.syncStatus = 'pending';
       }
 
       await db.products.put({ ...data, id } as any);

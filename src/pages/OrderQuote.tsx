@@ -237,11 +237,13 @@ const OrderQuote = () => {
                       {service?.description || 'Développement et mise en place de votre solution digitale personnalisée.'}
                     </p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {Object.entries(order.details || {}).map(([key, value]) => (
-                        <span key={key} className="px-3 py-1 bg-gray-50 rounded-lg text-[10px] font-bold text-gray-500 border border-black/5">
-                          {key}: {String(value)}
-                        </span>
-                      ))}
+                      {Object.entries(order.details || {})
+                        .filter(([key]) => key !== 'items')
+                        .map(([key, value]) => (
+                          <span key={key} className="px-3 py-1 bg-gray-50 rounded-lg text-[10px] font-bold text-gray-500 border border-black/5">
+                            {key.replace(/([A-Z])/g, ' $1').trim()}: {typeof value === 'boolean' ? (value ? 'Oui' : 'Non') : String(value)}
+                          </span>
+                        ))}
                     </div>
                   </td>
                   <td className="py-8 text-center font-bold text-gray-900">1</td>

@@ -138,8 +138,8 @@ service cloud.firestore {
     
     match /orders/{orderId} {
       allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || resource.data.userId == request.auth.uid || hasAnyAdminRole() || resource.data.partner_id == request.auth.uid || resource.data.partnerId == request.auth.uid);
-      // Règle assouplie pour le test
-      allow create: if isAuthenticated(); 
+      // Règle assouplie pour permettre la commande client sans connexion obligatoire
+      allow create: if true; 
       allow update: if hasAnyAdminRole() || (
         isAuthenticated() && 
         (
@@ -285,8 +285,11 @@ service cloud.firestore {
     }
 
     match /merchant_products/{productId} {
-      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
-      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+      allow read: if true;
+      allow create: if hasOwnership(incoming()) || hasAnyAdminRole();
+      allow update: if hasOwnership(incoming()) || hasAnyAdminRole() || 
+                      (request.resource.data.diff(resource.data).changedKeys().hasOnly(['stockQuantity', 'updatedAt', 'updated_at']));
+      allow delete: if hasOwnership(existing()) || hasAnyAdminRole();
     }
     
     match /merchant_sales/{saleId} {

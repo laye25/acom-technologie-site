@@ -24,7 +24,7 @@ import {
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
   Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket,
   Filter, SlidersHorizontal, ArrowUpDown, Tag, Scissors, Palette, ScanLine, PenTool, BookOpen,
-  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key, Bus, Utensils, WashingMachine
+  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key, Bus, Utensils, WashingMachine, ShoppingBag
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -1996,6 +1996,7 @@ const MerchantSaaS = () => {
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'pressing_receipt', label: '🧺 Fiche Réception', icon: ClipboardList },
           { id: 'pressing_stock', label: 'Vente & Stock', icon: Package },
+          { id: 'inventory', label: 'Catalogue En Ligne', icon: ShoppingBag },
           { id: 'pressing_tarifs', label: '⚙️ Paramètres Tarifs', icon: DollarSign },
           { id: 'pressing_closure', label: '🔒 Clôture de Caisse', icon: LockIcon },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
@@ -22830,9 +22831,59 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
     return saved ? JSON.parse(saved) : DEFAULT_TARIFS;
   });
 
-  const handleSave = () => {
-    localStorage.setItem(`pressing_tarifs_${merchant.id}`, JSON.stringify(tarifs));
-    toast.success('Tarifs de pressing sauvegardés avec succès !');
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSave = async () => {
+    setSyncing(true);
+    try {
+      localStorage.setItem(`pressing_tarifs_${merchant.id}`, JSON.stringify(tarifs));
+      
+      // Auto-sync these articles as products so AcomZone clients can see them
+      const articleNames: Record<string, string> = {
+        chemise: 'Chemise', pantalon: 'Pantalon', costume: 'Costume',
+        robe: 'Robe', drap: 'Drap', couverture: 'Couverture',
+        rideau: 'Rideau', autre: 'Autre (Pièce)'
+      };
+
+      const promises = Object.entries(tarifs.articles).map(([key, price]) => {
+        return dbService.merchantProducts.save({
+          id: `press_art_${key}_${merchant.id}`,
+          merchantId: merchant.id,
+          name: articleNames[key] || key,
+          price: price,
+          category: 'Pressing & Nettoyage',
+          description: `Service de nettoyage et repassage professionnel pour ${articleNames[key] || key}.`,
+          stockQuantity: 999, // infinite
+          images: ["https://images.unsplash.com/photo-1545155998-20bedb51d206?auto=format&fit=crop&w=600&q=80"]
+        } as any);
+      });
+
+      const weightProducts = Object.entries(tarifs.poids).map(([key, price]) => {
+        const weightNames: Record<string, string> = {
+          standard: 'Lavage au Poids (Standard) - Par Kg',
+          premium: 'Lavage au Poids (Premium) - Par Kg',
+          express: 'Lavage au Poids (Express) - Par Kg'
+        };
+        return dbService.merchantProducts.save({
+          id: `press_poids_${key}_${merchant.id}`,
+          merchantId: merchant.id,
+          name: weightNames[key] || `Lavage au poids (${key})`,
+          price: price,
+          category: 'Service au Kilo',
+          description: `Tarification au kilo pour le nettoyage en mode ${key}.`,
+          stockQuantity: 999,
+          images: ["https://images.unsplash.com/photo-1545155998-20bedb51d206?auto=format&fit=crop&w=600&q=80"]
+        } as any);
+      });
+
+      await Promise.all([...promises, ...weightProducts]);
+
+      toast.success('Tarifs de pressing sauvegardés avec succès !');
+    } catch (e) {
+      toast.error('Erreur lors de la synchronisation.');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -22846,7 +22897,8 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
         </div>
         <button
           onClick={handleSave}
-          className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 transition-all flex items-center gap-2"
+          disabled={syncing}
+          className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
         >
           <Save className="w-4 h-4" /> Enregistrer les Tarifs
         </button>
