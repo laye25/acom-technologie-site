@@ -73,11 +73,24 @@ export default function AcomZoneMerchant() {
     realtime: true
   });
 
-  const { data: products, loading: loadingProducts } = useFirestoreData<MerchantProduct>({
+  const { data: products1, loading: loadingProducts1 } = useFirestoreData<MerchantProduct>({
     tableName: 'merchant_products',
     realtime: true,
     where: merchantId ? [['merchantId', '==', merchantId]] : undefined
   });
+
+  const { data: products2, loading: loadingProducts2 } = useFirestoreData<MerchantProduct>({
+    tableName: 'merchant_products',
+    realtime: true,
+    where: merchantId ? [['merchant_id', '==', merchantId]] : undefined
+  });
+
+  const products = useMemo(() => {
+    const combined = [...products1, ...products2];
+    const unique = new Map();
+    combined.forEach(p => unique.set(p.id, p));
+    return Array.from(unique.values());
+  }, [products1, products2]);
 
   useEffect(() => {
     const sourceMerchants = merchants.length > 0 ? merchants : localMerchants;
@@ -335,6 +348,10 @@ export default function AcomZoneMerchant() {
     setIsSubmittingOrder(true);
     try {
       const isPressing = saasType === 'pressing';
+      const discount = 0;
+      const paymentStatus = 'unpaid';
+      const amountPaid = 0;
+      const paymentMethod = 'none';
       const bookingData: any = {
         userId: "acom_client_" + Math.random().toString(36).substr(2, 9),
         merchantId: merchant.id,
@@ -624,7 +641,7 @@ export default function AcomZoneMerchant() {
   }, [sourceProducts, searchQuery, selectedCategory, selectedSubCategory, selectedSize, selectedColor, stockFilter, sortBy]);
 
   // Loading indicator helper
-  const isLoading = (loadingMerchants || loadingProducts) && merchants.length === 0 && localMerchants.length === 0;
+  const isLoading = (loadingMerchants || loadingProducts1 || loadingProducts2) && merchants.length === 0 && localMerchants.length === 0;
 
   if (isLoading) {
     return (

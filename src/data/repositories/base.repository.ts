@@ -71,7 +71,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, this.collectionName);
-      return '';
+      throw error;
     }
   }
 
@@ -88,6 +88,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
       await setDoc(docRef, dataToUpdate, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${this.collectionName}/${id}`);
+      throw error;
     }
   }
 
@@ -104,6 +105,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
       await setDoc(docRef, dataToSave, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${this.collectionName}/${id}`);
+      throw error;
     }
   }
 
@@ -116,6 +118,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
       await deleteDoc(docRef);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `${this.collectionName}/${id}`);
+      throw error;
     }
   }
 

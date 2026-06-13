@@ -6,6 +6,20 @@ import { Jimp } from 'jimp';
 const configPath = path.resolve('firebase-applet-config.json');
 if (!fs.existsSync(configPath)) {
   console.log('No firebase config found, skipping icon fetch.');
+  
+  // Safety check: ensure public/icon.png exists so electron-builder doesn't crash
+  const outPath = path.resolve('public', 'icon.png');
+  if (!fs.existsSync(outPath)) {
+    console.log('Creating simple default fallback icon...');
+    try {
+      const fallbackImage = new Jimp({ width: 512, height: 512, color: 0x4B5563FF }); // Beautiful slate-600 color
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      await fallbackImage.write(outPath);
+      console.log('Saved basic fallback icon to', outPath);
+    } catch (err) {
+      console.error('Failed to create fallback icon:', err);
+    }
+  }
   process.exit(0);
 }
 

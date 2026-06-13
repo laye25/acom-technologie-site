@@ -854,6 +854,50 @@ export const syncService = {
     }
   },
 
+  async forceUploadAllLocalData(merchantId: string) {
+    try {
+      console.log('Force uploading all local data to cloud...');
+      
+      // 0. Push Merchant Profile
+      try {
+        const localMerchant = await db.merchants.get(merchantId);
+        if (localMerchant) {
+           const { merchantRepository } = await import('../data/repositories/merchant.repository');
+           await merchantRepository.update(merchantId, localMerchant as any).catch(async () => {
+             await merchantRepository.create({ ...localMerchant, id: merchantId } as any);
+           });
+        }
+      } catch (e) {
+        console.warn('Failed to push merchant profile:', e);
+      }
+
+      // 1. All Local Products
+      const allProducts = await db.products.where('merchantId').equals(merchantId).toArray();
+      const { merchantProductRepository } = await import('../data/repositories/merchant-product.repository');
+      for (const product of allProducts) {
+        try {
+          const { syncStatus, ...data } = product as any;
+          if (product.id && product.id.length > 20 && !product.id.startsWith('local_')) { 
+             await merchantProductRepository.update(product.id, data).catch(async () => {
+               await merchantProductRepository.create({ ...data, id: product.id } as any);
+             });
+          } else {
+             const newId = await merchantProductRepository.create(data as any);
+             if (newId) {
+               await db.products.delete(product.id);
+               await db.products.put({ ...product, id: newId, syncStatus: 'synced' } as any);
+             }
+          }
+        } catch (e) {
+          console.warn('Failed to force push product:', product.id);
+        }
+      }
+      console.log('Force upload complete.');
+    } catch (e) {
+        console.error('Fatal error during force upload', e);
+    }
+  },
+
   async pushPendingData(merchantId: string) {
     if (!(await this.isOnline(merchantId))) return;
     

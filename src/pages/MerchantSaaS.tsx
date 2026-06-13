@@ -4220,8 +4220,9 @@ const MerchantDashboard = ({
             ) : (
               <button 
                 onClick={async () => {
-                  const toastId = toast.loading('Synchronisation des données...');
+                  const toastId = toast.loading('Synchronisation des données vers le cloud...');
                   try {
+                    await syncService.forceUploadAllLocalData(merchant.id!);
                     await syncService.pushPendingData(merchant.id!);
                     await syncService.syncProducts(merchant.id!);
                     await syncService.syncSales(merchant.id!);
@@ -4230,7 +4231,7 @@ const MerchantDashboard = ({
                       await (syncService as any).pushSchoolPortalData(merchant.id!);
                       await syncService.syncSchoolPortalData(merchant.id!, true);
                     }
-                    toast.success('Données synchronisées !', { id: toastId });
+                    toast.success('Données synchronisées avec succès !', { id: toastId });
                   } catch (e) {
                     toast.error('Échec de la synchronisation', { id: toastId });
                   }
