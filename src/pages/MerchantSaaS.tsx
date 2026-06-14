@@ -22806,18 +22806,10 @@ interface PressingTicket {
   weightService: string;
   weightKg: number;
   supplements: {
-    repassage: boolean;
-    express: boolean;
-    detachage: boolean;
-    livraison: boolean;
-    premiumPack: boolean;
+    [key: string]: boolean;
   };
   supplementTarifs: {
-    repassage: number;
-    express: number;
-    detachage: number;
-    livraison: number;
-    premiumPack: number;
+    [key: string]: number;
   };
   discount: number;
   subtotal: number;
@@ -24260,6 +24252,19 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     }
   }, [merchant.id]);
 
+  const getSupplementDisplayName = (key: string) => {
+    const staticLabels: Record<string, string> = {
+      repassage: '👔 Repassage',
+      express: '⚡ Lavage Express (unit.)',
+      detachage: '🔬 Détachage spécial',
+      livraison: '🚚 Livraison à domicile',
+      premiumPack: '💎 Emballage Premium',
+    };
+    const rawName = (tarifs as any).supplements_display_names?.[key];
+    if (rawName) return `✨ ${rawName}`;
+    return staticLabels[key] || `✨ ${key.charAt(0).toUpperCase() + key.slice(1)}`;
+  };
+
   const [tickets, setTickets] = useState<PressingTicket[]>(() => {
     const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
     return saved ? JSON.parse(saved) : [];
@@ -24364,21 +24369,47 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
 
   const [weightKg, setWeightKg] = useState<number>(0);
 
-  const [supplements, setSupplements] = useState({
-    repassage: false,
-    express: false,
-    detachage: false,
-    livraison: false,
-    premiumPack: false,
+  const [supplements, setSupplements] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    const currentSupps = tarifs.supplements || DEFAULT_TARIFS.supplements || {};
+    Object.keys(currentSupps).forEach(key => {
+      initial[key] = false;
+    });
+    return initial;
   });
 
-  const supplementTarifs = {
-    repassage: tarifs.supplements?.repassage !== undefined ? tarifs.supplements.repassage : 500,
-    express: tarifs.supplements?.express !== undefined ? tarifs.supplements.express : 1000,
-    detachage: tarifs.supplements?.detachage !== undefined ? tarifs.supplements.detachage : 800,
-    livraison: tarifs.supplements?.livraison !== undefined ? tarifs.supplements.livraison : 1500,
-    premiumPack: tarifs.supplements?.premiumPack !== undefined ? tarifs.supplements.premiumPack : 500,
-  };
+  const supplementTarifs = useMemo(() => {
+    const prices: Record<string, number> = {};
+    const defaultSupps = DEFAULT_TARIFS.supplements || {};
+    const currentSupps = tarifs.supplements || {};
+    const keys = new Set([...Object.keys(defaultSupps), ...Object.keys(currentSupps)]);
+    keys.forEach(key => {
+      prices[key] = currentSupps[key] !== undefined ? currentSupps[key] : (defaultSupps[key] || 0);
+    });
+    return prices;
+  }, [tarifs]);
+
+  // Synchronize dynamic keys of supplements when tarifs change
+  useEffect(() => {
+    setSupplements(prev => {
+      const next = { ...prev };
+      let changed = false;
+      const currentSupps = tarifs.supplements || DEFAULT_TARIFS.supplements || {};
+      Object.keys(currentSupps).forEach(key => {
+        if (next[key] === undefined) {
+          next[key] = false;
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach(key => {
+        if (currentSupps[key] === undefined) {
+          delete next[key];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [tarifs]);
 
   const [discount, setDiscount] = useState<number>(0);
   const [selectedTicket, setSelectedTicket] = useState<PressingTicket | null>(null);
@@ -25042,12 +25073,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     });
     setArticlesQty(resetQty);
     setWeightKg(0);
-    setSupplements({
-      repassage: false,
-      express: false,
-      detachage: false,
-      livraison: false,
-      premiumPack: false,
+    setSupplements(prev => {
+      const reset: Record<string, boolean> = {};
+      Object.keys(prev).forEach(k => {
+        reset[k] = false;
+      });
+      return reset;
     });
     setDiscount(0);
     setNotes('');
@@ -25189,15 +25220,20 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       pdf.text('Suppléments :', 5, y);
       y += 4;
       activeSupps.forEach(k => {
-        const cost = ticket.supplementTarifs[k as keyof typeof ticket.supplementTarifs] || 0;
-        const labels: { [key: string]: string } = {
-          repassage: 'Repassage',
-          express: 'Lavage Express (unit.)',
-          detachage: 'Détachage spécial',
-          livraison: 'Livraison à domicile',
-          premiumPack: 'Emballage Premium',
-        };
-        pdf.text(`  + ${labels[k].slice(0, 13).padEnd(13, ' ')} : ${cost} FCFA`, 5, y);
+        const cost = ticket.supplementTarifs[k] || 0;
+        let displayName = (tarifs as any).supplements_display_names?.[k] || k;
+        displayName = displayName.replace(/[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+        if (!displayName) {
+          const fallbackLabels: Record<string, string> = {
+            repassage: 'Repassage',
+            express: 'Lavage Express',
+            detachage: 'Detachage',
+            livraison: 'Livraison',
+            premiumPack: 'Emballage Premium'
+          };
+          displayName = fallbackLabels[k] || k;
+        }
+        pdf.text(`  + ${displayName.slice(0, 13).padEnd(13, ' ')} : ${cost} FCFA`, 5, y);
         y += 4;
       });
     }
@@ -25522,13 +25558,15 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                 {Object.keys(supplements).map((key) => {
                   const active = supplements[key as keyof typeof supplements];
                   const price = supplementTarifs[key as keyof typeof supplementTarifs];
-                  const labels: { [key: string]: string } = {
+                  const staticLabels: Record<string, string> = {
                     repassage: '👔 Repassage',
                     express: '⚡ Lavage Express (unit.)',
                     detachage: '🔬 Détachage spécial',
                     livraison: '🚚 Livraison à domicile',
                     premiumPack: '💎 Emballage Premium',
                   };
+                  const rawName = (tarifs as any).supplements_display_names?.[key];
+                  const displayName = rawName ? `✨ ${rawName}` : (staticLabels[key] || `✨ ${key.charAt(0).toUpperCase() + key.slice(1)}`);
                   return (
                     <button
                       type="button"
@@ -25540,7 +25578,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                           : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'
                       }`}
                     >
-                      <span className="uppercase font-black leading-tight">{labels[key]}</span>
+                      <span className="uppercase font-black leading-tight break-words line-clamp-2">{displayName}</span>
                       <span className="font-mono font-bold opacity-80">+{price} FCFA</span>
                     </button>
                   );
@@ -26339,18 +26377,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     )}
 
                     {/* Supplements */}
-                    {Object.keys(viewingTicket.supplements).filter(k => viewingTicket.supplements[k as keyof typeof viewingTicket.supplements]).map(k => {
-                      const cost = viewingTicket.supplementTarifs[k as keyof typeof viewingTicket.supplementTarifs] || 0;
-                      const labels: { [key: string]: string } = {
-                        repassage: '👔 Repassage',
-                        express: '⚡ Lavage Express',
-                        detachage: '🔬 Détachage spécial',
-                        livraison: '🚚 Livraison à domicile',
-                        premiumPack: '💎 Emballage Premium',
-                      };
+                    {Object.keys(viewingTicket.supplements).filter(k => viewingTicket.supplements[k]).map(k => {
+                      const cost = viewingTicket.supplementTarifs[k] || 0;
+                      const displayName = getSupplementDisplayName(k);
                       return (
                         <div key={k} className="flex justify-between p-3 text-xs bg-indigo-50/10 text-indigo-700">
-                          <span>+ {labels[k]}</span>
+                          <span>+ {displayName}</span>
                           <span className="font-mono font-bold">+{cost.toLocaleString()} FCFA</span>
                         </div>
                       )
