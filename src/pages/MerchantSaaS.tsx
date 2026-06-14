@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, Package, ShoppingCart, PieChart, Plus, Trash2, Trash2 as Trash,
   Edit2, Search, Loader2, Save, X, TrendingUp, Download, Eye,
-  DollarSign, ArrowUpRight, ArrowDownRight, AlertCircle,
+  DollarSign, ArrowUpRight, ArrowDownRight, AlertCircle, Info,
   BarChart3, Settings, User, Phone, Mail, MapPin,
   Calculator, Receipt, CreditCard, Smartphone, Banknote,
   Clock, CheckCircle, TrendingDown, ArrowRight, FileText, Truck,
@@ -2020,20 +2020,7 @@ const MerchantSaaS = () => {
         break;
     }
     
-    // Inject AcomZone tab dynamically above Settings for all SaaS types
-    const settingsIdx = tabs.findIndex(t => t.id === 'settings');
-    const acomZoneTab = { 
-      id: 'acom_zone', 
-      label: 'AcomZone', 
-      icon: Store,
-      group: type === 'scolaire' ? 'Services Clientèle' : undefined
-    };
-    if (settingsIdx !== -1) {
-      tabs.splice(settingsIdx, 0, acomZoneTab);
-    } else {
-      tabs.push(acomZoneTab);
-    }
-    
+    // AcomZone is now isolated in the header directly, not injected in tabs list
     return tabs;
   };
 
@@ -2171,8 +2158,22 @@ const MerchantSaaS = () => {
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <NetworkStatusIndicator position="inline" plan={merchant.plan} />
+              
+              <button
+                onClick={() => setActiveTab('acom_zone')}
+                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                  activeTab === 'acom_zone' 
+                    ? 'bg-[#0a0a0a] text-white shadow-lg shadow-black/20 ring-2 ring-violet-500 scale-105' 
+                    : 'bg-[#0a0a0a] text-white hover:bg-neutral-900 hover:scale-105'
+                }`}
+                title="Accéder à l'espace AcomZone"
+              >
+                <Store className="w-4 h-4 text-violet-400" />
+                <span>AcomZone</span>
+              </button>
+
               <button
                 onClick={() => setActiveTab('build')}
                 className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
@@ -22754,19 +22755,16 @@ const AppointmentManager = ({ merchant }: { merchant: Merchant }) => {
 
 interface PressingTarifs {
   articles: {
-    chemise: number;
-    pantalon: number;
-    costume: number;
-    robe: number;
-    drap: number;
-    couverture: number;
-    rideau: number;
-    autre: number;
+    [key: string]: number;
   };
   poids: {
-    standard: number;
-    premium: number;
-    express: number;
+    [key: string]: number;
+  };
+  supplements?: {
+    [key: string]: number;
+  };
+  supplements_labels?: {
+    [key: string]: string;
   };
 }
 
@@ -22785,6 +22783,13 @@ const DEFAULT_TARIFS: PressingTarifs = {
     standard: 1000,
     premium: 1500,
     express: 2000
+  },
+  supplements: {
+    repassage: 500,
+    express: 1000,
+    detachage: 800,
+    livraison: 1500,
+    premiumPack: 500
   }
 };
 
@@ -22798,7 +22803,7 @@ interface PressingTicket {
   expectedDeliveryDate?: string;
   billingType: 'article' | 'poids';
   articles: { [key: string]: number };
-  weightService: 'standard' | 'premium' | 'express';
+  weightService: string;
   weightKg: number;
   supplements: {
     repassage: boolean;
@@ -22826,13 +22831,344 @@ interface PressingTicket {
   sentNotifications?: { id: string; type: 'whatsapp' | 'email'; templateName: string; msg: string; timestamp: string }[];
 }
 
+// Beautiful customized Alert Popup like the "Notification Gérant" layout
+interface AcomAlertPopupProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  message: string;
+  type?: 'success' | 'warning' | 'error' | 'info';
+  onConfirm?: () => void;
+  confirmText?: string;
+  showCancel?: boolean;
+}
+
+const AcomAlertPopup: React.FC<AcomAlertPopupProps> = ({
+  isOpen,
+  onClose,
+  title,
+  subtitle = 'ALERTE SYSTÈME',
+  message,
+  type = 'info',
+  onConfirm,
+  confirmText = "D'ACCORD",
+  showCancel = false
+}) => {
+  if (!isOpen) return null;
+
+  let colorBg = 'bg-indigo-50';
+  let colorText = 'text-indigo-600';
+  let btnColors = 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/25';
+  let IconComponent = Info;
+
+  if (type === 'success') {
+    colorBg = 'bg-indigo-50';
+    colorText = 'text-indigo-600';
+    btnColors = 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/25';
+    IconComponent = CheckCircle;
+  } else if (type === 'error') {
+    colorBg = 'bg-rose-50';
+    colorText = 'text-rose-600';
+    btnColors = 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/25';
+    IconComponent = AlertCircle;
+  } else if (type === 'warning') {
+    colorBg = 'bg-amber-50';
+    colorText = 'text-amber-600';
+    btnColors = 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/25';
+    IconComponent = AlertCircle;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="relative max-w-sm w-full bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 pt-16 text-center space-y-6 mt-10 transition-all transform scale-100">
+        
+        {/* Floating Circle Overlay */}
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100/50">
+          <div className={`w-20 h-20 ${colorBg} ${colorText} rounded-full flex items-center justify-center shadow-inner relative`}>
+            {type === 'success' ? (
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 19v-8.93a2 2 0 01.89-1.664l8-5.333a2 2 0 012.22 0l8 5.333A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
+              </svg>
+            ) : (
+              <IconComponent className="w-10 h-10 stroke-[2.5]" />
+            )}
+            {type === 'success' && (
+              <span className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full w-6 h-6 text-xs font-black flex items-center justify-center border-2 border-white shadow-sm">1</span>
+            )}
+          </div>
+        </div>
+
+        {/* Text Area */}
+        <div className="space-y-2">
+          {subtitle && (
+            <span className="text-[10px] tracking-widest font-black uppercase text-gray-400 block">{subtitle}</span>
+          )}
+          <h4 className="text-lg font-black text-slate-800 leading-tight">{title}</h4>
+          <p className="text-xs text-gray-500 font-medium leading-relaxed px-1 whitespace-pre-line">{message}</p>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-2.5 pt-2">
+          {showCancel && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-4 text-xs font-bold text-gray-400 hover:text-gray-600 bg-gray-50 border border-gray-100 rounded-2xl active:scale-95 transition-all outline-none"
+            >
+              ANNULER
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (onConfirm) {
+                onConfirm();
+              } else {
+                onClose();
+              }
+            }}
+            className={`flex-1 py-4 text-xs font-black uppercase tracking-wider text-white ${btnColors} rounded-2xl active:scale-95 transition-all shadow-md`}
+          >
+            {confirmText}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
   const [tarifs, setTarifs] = useState<PressingTarifs>(() => {
     const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
-    return saved ? JSON.parse(saved) : DEFAULT_TARIFS;
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_TARIFS;
+    if (!parsed.supplements) {
+      parsed.supplements = { ...DEFAULT_TARIFS.supplements };
+    }
+    return parsed;
   });
 
   const [syncing, setSyncing] = useState(false);
+
+  // Unified pop-up state
+  const [popup, setPopup] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    message: string;
+    type: 'success' | 'warning' | 'error' | 'info';
+    onConfirm?: () => void;
+    confirmText?: string;
+    showCancel?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'warning' | 'error' | 'info' = 'info',
+    onConfirm?: () => void,
+    showCancel?: boolean,
+    confirmText: string = "D'ACCORD",
+    subtitle: string = 'ALERTE SYSTÈME'
+  ) => {
+    setPopup({
+      isOpen: true,
+      title,
+      subtitle,
+      message,
+      type,
+      onConfirm: onConfirm ? () => {
+        onConfirm();
+        setPopup(prev => ({ ...prev, isOpen: false }));
+      } : undefined,
+      showCancel,
+      confirmText
+    });
+  };
+
+
+  // States for adding dynamic items
+  const [newArticleName, setNewArticleName] = useState('');
+  const [newArticlePrice, setNewArticlePrice] = useState<number | ''>('');
+  const [showAddArticle, setShowAddArticle] = useState(false);
+
+  const [newPoidsName, setNewPoidsName] = useState('');
+  const [newPoidsPrice, setNewPoidsPrice] = useState<number | ''>('');
+  const [showAddPoids, setShowAddPoids] = useState(false);
+
+  const [newSupplementName, setNewSupplementName] = useState('');
+  const [newSupplementDesc, setNewSupplementDesc] = useState('');
+  const [newSupplementPrice, setNewSupplementPrice] = useState<number | ''>('');
+  const [showAddSupplement, setShowAddSupplement] = useState(false);
+
+  const handleAddArticle = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newArticleName.trim()) {
+      showAlert('Vêtement manquant', 'Veuillez spécifier le nom du vêtement.', 'error');
+      return;
+    }
+    const nameKey = newArticleName.trim().toLowerCase();
+    const price = typeof newArticlePrice === 'number' ? newArticlePrice : 0;
+
+    if (tarifs.articles[nameKey] !== undefined) {
+      showAlert('Article existant', "Cet article existe déjà dans votre grille tarifaire.", 'error');
+      return;
+    }
+
+    setTarifs(prev => ({
+      ...prev,
+      articles: {
+        ...prev.articles,
+        [nameKey]: price
+      }
+    }));
+
+    setNewArticleName('');
+    setNewArticlePrice('');
+    setShowAddArticle(false);
+    showAlert('Félicitations !', 'Nouvel article ajouté financièrement ! Cliquez sur Enregistrer pour confirmer.', 'success', undefined, false, "D'ACCORD", "AJOUT CAPTURE");
+  };
+
+  const handleAddPoids = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPoidsName.trim()) {
+      showAlert('Nom manquant', 'Veuillez spécifier le nom du forfait ou formule.', 'error');
+      return;
+    }
+    const poidsKey = newPoidsName.trim().toLowerCase();
+    const price = typeof newPoidsPrice === 'number' ? newPoidsPrice : 0;
+
+    if (tarifs.poids[poidsKey] !== undefined) {
+      showAlert('Formule existante', 'Cette formule Kg existe déjà.', 'error');
+      return;
+    }
+
+    setTarifs(prev => ({
+      ...prev,
+      poids: {
+        ...prev.poids,
+        [poidsKey]: price
+      }
+    }));
+
+    setNewPoidsName('');
+    setNewPoidsPrice('');
+    setShowAddPoids(false);
+    showAlert('Félicitations !', 'Nouveau forfait Kg ajouté financièrement ! Cliquez sur Enregistrer pour confirmer.', 'success', undefined, false, "D'ACCORD", "AJOUT CAPTURE");
+  };
+
+  const handleRemoveArticle = (key: string) => {
+    showAlert(
+      'Supprimer un article ?',
+      `Attention : Vous allez retirer temporairement l'article "${key}" de votre grille.\nCliquez sur Enregistrer pour confirmer définitivement.`,
+      'warning',
+      () => {
+        const updatedArticles = { ...tarifs.articles };
+        delete updatedArticles[key];
+        setTarifs(prev => ({
+          ...prev,
+          articles: updatedArticles
+        }));
+        showAlert('Retiré !', "L'article a été retiré de la grille temporaire.", 'success');
+      },
+      true,
+      'SUPPRIMER'
+    );
+  };
+
+  const handleRemovePoids = (key: string) => {
+    showAlert(
+      'Supprimer un forfait ?',
+      `Attention : Vous allez retirer temporairement la formule Kg "${key}" de votre grille.\nCliquez sur Enregistrer pour confirmer définitivement.`,
+      'warning',
+      () => {
+        const updatedPoids = { ...tarifs.poids };
+        delete updatedPoids[key];
+        setTarifs(prev => ({
+          ...prev,
+          poids: updatedPoids
+        }));
+        showAlert('Retiré !', "La formule de lavage a été retirée de la grille.", 'success');
+      },
+      true,
+      'SUPPRIMER'
+    );
+  };
+
+  const handleAddSupplement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSupplementName.trim()) {
+      showAlert('Prestation manquante', 'Veuillez spécifier le nom de la prestation optionnelle.', 'error');
+      return;
+    }
+    const rawName = newSupplementName.trim();
+    const key = rawName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+    
+    if (!key) {
+      showAlert('Nom non valide', "Le nom de la prestation contient des caractères non autorisés.", 'error');
+      return;
+    }
+
+    const currentSupplements = tarifs.supplements || DEFAULT_TARIFS.supplements || {};
+    if (currentSupplements[key] !== undefined) {
+      showAlert('Prestation existante', "Cette prestation optionnelle existe déjà.", 'error');
+      return;
+    }
+
+    const price = typeof newSupplementPrice === 'number' ? newSupplementPrice : 0;
+    const desc = newSupplementDesc.trim() || 'Prestation optionnelle complémentaire';
+
+    setTarifs(prev => ({
+      ...prev,
+      supplements: {
+        ...(prev.supplements || DEFAULT_TARIFS.supplements || {}),
+        [key]: price
+      },
+      supplements_labels: {
+        ...prev.supplements_labels,
+        [key]: desc
+      },
+      supplements_display_names: {
+        ...(prev as any).supplements_display_names,
+        [key]: rawName
+      }
+    }));
+
+    setNewSupplementName('');
+    setNewSupplementDesc('');
+    setNewSupplementPrice('');
+    setShowAddSupplement(false);
+    showAlert('Félicitations !', 'Nouvelle prestation optionnelle ajoutée financièrement ! Cliquez sur Enregistrer pour confirmer.', 'success', undefined, false, "D'ACCORD", "AJOUT CAPTURE");
+  };
+
+  const handleRemoveSupplement = (key: string) => {
+    showAlert(
+      'Supprimer une prestation ?',
+      `Attention : Vous allez retirer la prestation optionnelle "${key}" de votre grille.\nCliquez sur Enregistrer pour confirmer définitivement.`,
+      'warning',
+      () => {
+        const updatedSupplements = { ...(tarifs.supplements || DEFAULT_TARIFS.supplements || {}) };
+        delete updatedSupplements[key];
+        const updatedLabels = { ...tarifs.supplements_labels };
+        delete updatedLabels[key];
+        setTarifs(prev => ({
+          ...prev,
+          supplements: updatedSupplements,
+          supplements_labels: updatedLabels
+        }));
+        showAlert('Retirée !', "La prestation optionnelle a été retirée de la grille temporaire.", 'success');
+      },
+      true,
+      'SUPPRIMER'
+    );
+  };
 
   const handleSave = async () => {
     setSyncing(true);
@@ -22850,7 +23186,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
         return dbService.merchantProducts.save({
           id: `press_art_${key}_${merchant.id}`,
           merchantId: merchant.id,
-          name: articleNames[key] || key,
+          name: articleNames[key] || key.charAt(0).toUpperCase() + key.slice(1),
           price: price,
           category: 'Pressing & Nettoyage',
           description: `Service de nettoyage et repassage professionnel pour ${articleNames[key] || key}.`,
@@ -22868,7 +23204,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
         return dbService.merchantProducts.save({
           id: `press_poids_${key}_${merchant.id}`,
           merchantId: merchant.id,
-          name: weightNames[key] || `Lavage au poids (${key})`,
+          name: weightNames[key] || `Lavage au poids (${key.charAt(0).toUpperCase() + key.slice(1)})`,
           price: price,
           category: 'Service au Kilo',
           description: `Tarification au kilo pour le nettoyage en mode ${key}.`,
@@ -22879,9 +23215,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
 
       await Promise.all([...promises, ...weightProducts]);
 
-      toast.success('Tarifs de pressing sauvegardés avec succès !');
+      showAlert('Enregistrement Réussi', 'Les tarifs de pressing et prestations optionnelles ont été sauvegardés avec succès !', 'success', undefined, false, "D'ACCORD", "SAAS PRESSING");
     } catch (e) {
-      toast.error('Erreur lors de la synchronisation.');
+      showAlert('Erreur de sauvegarde', 'Erreur lors de la synchronisation de vos tarifs.', 'error');
     } finally {
       setSyncing(false);
     }
@@ -22907,29 +23243,276 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Article Billing */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
-          <div className="border-b border-gray-100 pb-4">
-            <h3 className="text-lg font-black text-ink flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-indigo-500" /> Tarifs par Article (Vêtements)
-            </h3>
-            <p className="text-gray-400 text-xs mt-0.5">Tarifs unitaires appliqués lors du dépôt de vêtements individuels.</p>
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between">
+          <div className="space-y-6">
+            <div className="border-b border-gray-100 pb-4 flex justify-between items-center bg-white">
+              <div>
+                <h3 className="text-lg font-black text-ink flex items-center gap-2">
+                  <Calculator className="w-5 h-5 text-indigo-500" /> Tarifs par Article (Vêtements)
+                </h3>
+                <p className="text-gray-400 text-xs mt-0.5">Tarifs unitaires appliqués lors du dépôt de vêtements individuels.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {Object.keys(tarifs.articles).map((key) => {
+                const typedKey = key as keyof typeof tarifs.articles;
+                return (
+                  <div key={key} className="p-4 bg-gray-50 rounded-2xl border border-gray-100/50 flex flex-col gap-2 relative group transition-all hover:shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-xs text-ink uppercase tracking-wider capitalize truncate pr-4">{key}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveArticle(key)}
+                        className="text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg p-1.5 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title="Détruire cette ligne d'article"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        value={tarifs.articles[typedKey]}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          setTarifs({
+                            ...tarifs,
+                            articles: { ...tarifs.articles, [key]: val }
+                          });
+                        }}
+                        className="w-full pl-4 pr-16 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                      <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {Object.keys(tarifs.articles).map((key) => {
-              const typedKey = key as keyof typeof tarifs.articles;
-              return (
-                <div key={key} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex flex-col gap-2">
-                  <span className="font-bold text-xs text-ink uppercase tracking-wider capitalize">{key}</span>
-                  <div className="relative flex items-center">
+          <div className="pt-4 border-t border-dashed border-gray-100 mt-6">
+            {showAddArticle ? (
+              <form onSubmit={handleAddArticle} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
+                <span className="text-[10px] uppercase tracking-widest text-indigo-500 font-bold block">➕ Nouvel Article de Vêtements</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom de l'article</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ex: Veste en jean, Doudoune, Sac"
+                      value={newArticleName}
+                      onChange={e => setNewArticleName(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix Unitaire (FCFA)</label>
                     <input
                       type="number"
-                      value={tarifs.articles[typedKey]}
+                      required
+                      placeholder="ex: 1500"
+                      value={newArticlePrice}
+                      onChange={e => setNewArticlePrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddArticle(false); setNewArticleName(''); setNewArticlePrice(''); }}
+                    className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-[10px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Ajouter
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddArticle(true)}
+                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-indigo-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-indigo-600 transition-all bg-gray-50/10 hover:bg-indigo-500/5"
+              >
+                <Plus className="w-4 h-4 text-indigo-500" /> AJOUTER UN NOUVEL ARTICLE
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Weight Billing (Kg) */}
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between">
+          <div className="space-y-6">
+            <div className="border-b border-gray-100 pb-4">
+              <h3 className="text-lg font-black text-ink flex items-center gap-2">
+                <WashingMachine className="w-5 h-5 text-cyan-500" /> Tarifs au Kilogramme (Kg)
+              </h3>
+              <p className="text-gray-400 text-xs mt-0.5">Recommandé pour les sacs de linge en vrac, laverie standard et blanchisseries.</p>
+            </div>
+
+            <div className="space-y-4">
+              {Object.keys(tarifs.poids).map((key) => {
+                const typedKey = key as keyof typeof tarifs.poids;
+                const labels: { [key: string]: string } = {
+                  standard: 'Lavage Standard',
+                  premium: 'Lavage Premium / Délicat',
+                  express: 'Lavage Express 24h'
+                };
+                return (
+                  <div key={key} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-gray-50 rounded-2xl border border-gray-100/50 gap-4 relative group transition-all hover:shadow-sm">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-ink block capitalize truncate max-w-[200px]">{labels[key] || key}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePoids(key)}
+                          className="text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg p-1 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          title="Détruire ce forfait kilo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <span className="text-[10px] text-gray-400">Prise en charge professionnelle</span>
+                    </div>
+                    <div className="relative flex items-center w-full sm:w-48 shrink-0">
+                      <input
+                        type="number"
+                        value={tarifs.poids[typedKey]}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          setTarifs({
+                            ...tarifs,
+                            poids: { ...tarifs.poids, [key]: val }
+                          });
+                        }}
+                        className="w-full pl-4 pr-20 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                      <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA/Kg</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-dashed border-gray-100 mt-6">
+            {showAddPoids ? (
+              <form onSubmit={handleAddPoids} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
+                <span className="text-[10px] uppercase tracking-widest text-cyan-600 font-bold block">➕ Nouveau Forfait / Formule Kilogramme</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Désignation (ex: Express 12h, Grosse Couette)</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ex: Lavage Ultra-Rapide, Literie"
+                      value={newPoidsName}
+                      onChange={e => setNewPoidsName(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix par Kilo (FCFA/Kg)</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="ex: 1200"
+                      value={newPoidsPrice}
+                      onChange={e => setNewPoidsPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddPoids(false); setNewPoidsName(''); setNewPoidsPrice(''); }}
+                    className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-[10px] font-bold text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Ajouter
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddPoids(true)}
+                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-cyan-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-cyan-600 transition-all bg-gray-50/10 hover:bg-cyan-500/5"
+              >
+                <Plus className="w-4 h-4 text-cyan-500" /> AJOUTER UN FORFAIT KG
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Supplements Billing (Prestations Optionnelles) */}
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 lg:col-span-2">
+          <div className="border-b border-gray-100 pb-4">
+            <h3 className="text-lg font-black text-ink flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" /> Tarifs des Prestations Optionnelles (Suppléments)
+            </h3>
+            <p className="text-gray-400 text-xs mt-0.5">Services complémentaires applicables en supplément de la prestation de base d'un dépôt.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {Object.keys(tarifs.supplements || DEFAULT_TARIFS.supplements || {}).map((key) => {
+              const labels: Record<string, string> = {
+                repassage: 'Repassage seul / repassage sup',
+                express: 'Traitement Express (Urgent)',
+                detachage: 'Détachage Ciblé',
+                livraison: 'Livraison à Domicile',
+                premiumPack: 'Emballage Premium / cintre'
+              };
+              const displayNames: Record<string, string> = {
+                repassage: 'Repassage',
+                express: 'Express / Urgent',
+                detachage: 'Détachage',
+                livraison: 'Livraison',
+                premiumPack: 'Pack Premium cintre'
+              };
+
+              const displayName = (tarifs as any).supplements_display_names?.[key] || displayNames[key] || key;
+              const description = tarifs.supplements_labels?.[key] || labels[key] || 'Prestation optionnelle complémentaire';
+
+              return (
+                <div key={key} className="p-4 bg-gray-50 rounded-2xl border border-gray-100/50 flex flex-col gap-2 relative group transition-all hover:shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-ink uppercase tracking-wider capitalize truncate pr-4">{displayName}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSupplement(key)}
+                      className="text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg p-1 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      title="Supprimer cette prestation optionnelle"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-400 leading-tight pr-6 min-h-[20px]">{description}</p>
+                  <div className="relative flex items-center mt-1">
+                    <input
+                      type="number"
+                      value={tarifs.supplements?.[key] !== undefined ? tarifs.supplements[key] : (DEFAULT_TARIFS.supplements as any)[key]}
                       onChange={(e) => {
                         const val = Math.max(0, parseInt(e.target.value) || 0);
                         setTarifs({
                           ...tarifs,
-                          articles: { ...tarifs.articles, [key]: val }
+                          supplements: {
+                            ...(tarifs.supplements || DEFAULT_TARIFS.supplements || {}),
+                            [key]: val
+                          }
                         });
                       }}
                       className="w-full pl-4 pr-16 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -22940,52 +23523,83 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
               );
             })}
           </div>
-        </div>
 
-        {/* Weight Billing (Kg) */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
-          <div className="border-b border-gray-100 pb-4">
-            <h3 className="text-lg font-black text-ink flex items-center gap-2">
-              <WashingMachine className="w-5 h-5 text-cyan-500" /> Tarifs au Kilogramme (Kg)
-            </h3>
-            <p className="text-gray-400 text-xs mt-0.5">Recommandé pour les sacs de linge en vrac, laverie standard et blanchisseries.</p>
-          </div>
-
-          <div className="space-y-4">
-            {Object.keys(tarifs.poids).map((key) => {
-              const typedKey = key as keyof typeof tarifs.poids;
-              const labels: { [key: string]: string } = {
-                standard: 'Lavage Standard',
-                premium: 'Lavage Premium / Délicat',
-                express: 'Lavage Express 24h'
-              };
-              return (
-                <div key={key} className="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-gray-50 rounded-2xl border border-gray-100 gap-4">
+          <div className="pt-4 border-t border-dashed border-gray-100 mt-6">
+            {showAddSupplement ? (
+              <form onSubmit={handleAddSupplement} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
+                <span className="text-[10px] uppercase tracking-widest text-amber-500 font-bold block flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 animate-spin-slow" /> Nouvelle Prestation Optionnelle (Supplément)
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <span className="font-bold text-sm text-ink block">{labels[key]}</span>
-                    <span className="text-[10px] text-gray-400">Prise en charge professionnelle</span>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du service</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="ex: Parfumage, Pliage sous vide"
+                      value={newSupplementName}
+                      onChange={e => setNewSupplementName(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                    />
                   </div>
-                  <div className="relative flex items-center w-full sm:w-48">
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Description / Détails</label>
+                    <input
+                      type="text"
+                      placeholder="ex: Parfum de luxe lavande / vanille"
+                      value={newSupplementDesc}
+                      onChange={e => setNewSupplementDesc(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tarif Supplémentaire (FCFA)</label>
                     <input
                       type="number"
-                      value={tarifs.poids[typedKey]}
-                      onChange={(e) => {
-                        const val = Math.max(0, parseInt(e.target.value) || 0);
-                        setTarifs({
-                          ...tarifs,
-                          poids: { ...tarifs.poids, [key]: val }
-                        });
-                      }}
-                      className="w-full pl-4 pr-20 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                      required
+                      placeholder="ex: 500"
+                      value={newSupplementPrice}
+                      onChange={e => setNewSupplementPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none focus:ring-2 focus:ring-primary/20"
                     />
-                    <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA/Kg</span>
                   </div>
                 </div>
-              );
-            })}
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddSupplement(false); setNewSupplementName(''); setNewSupplementDesc(''); setNewSupplementPrice(''); }}
+                    className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-[10px] font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-lg flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Ajouter
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddSupplement(true)}
+                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-amber-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-amber-600 transition-all bg-gray-50/10 hover:bg-amber-500/5"
+              >
+                <Plus className="w-4 h-4 text-amber-500" /> AJOUTER UNE PRESTATION OPTIONNELLE
+              </button>
+            )}
           </div>
         </div>
+
       </div>
+
+      {/* Modern custom Alert Popup for all messages and notifications in tariffs */}
+      <AcomAlertPopup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+        {...popup}
+      />
     </motion.div>
   );
 };
@@ -23018,6 +23632,48 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
   const [cashierName, setCashierName] = useState('');
   const [actualCash, setActualCash] = useState<number>(0);
   const [closureNotes, setClosureNotes] = useState('');
+
+  // Unified pop-up state for PressingClosureManager
+  const [popup, setPopup] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    message: string;
+    type: 'success' | 'warning' | 'error' | 'info';
+    onConfirm?: () => void;
+    confirmText?: string;
+    showCancel?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'warning' | 'error' | 'info' = 'info',
+    onConfirm?: () => void,
+    showCancel?: boolean,
+    confirmText: string = "D'ACCORD",
+    subtitle: string = 'ALERTE SYSTÈME'
+  ) => {
+    setPopup({
+      isOpen: true,
+      title,
+      subtitle,
+      message,
+      type,
+      onConfirm: onConfirm ? () => {
+        onConfirm();
+        setPopup(prev => ({ ...prev, isOpen: false }));
+      } : undefined,
+      showCancel,
+      confirmText
+    });
+  };
 
   const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
   const managerEmail = merchant.managerNotifications?.email || '';
@@ -23225,11 +23881,11 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const url = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${managerPhone.replace(/\s+/g, '')}&text=${encodeURIComponent(textNotif)}`;
       window.open(url, '_blank');
-      toast.success('Rapport prêt pour envoi via WhatsApp !');
+      showAlert('Rapport WhatsApp', 'Rapport de clôture prêt pour envoi via WhatsApp ! Nous avons ouvert la messagerie.', 'success', undefined, false, "D'ACCORD", "COMMUNICATION EN COURS");
     } else {
       const url = `mailto:${managerEmail}?subject=${encodeURIComponent(`📊 CLÔTURE DE CAISSE JOURNALIÈRE — ${c.date}`)}&body=${encodeURIComponent(textNotif)}`;
       window.open(url, '_blank');
-      toast.success("Rapport prêt dans votre logiciel d'e-mail !");
+      showAlert('Rapport Email', "Rapport de clôture prêt dans votre logiciel d'e-mail !", 'success', undefined, false, "D'ACCORD", "COMMUNICATION EN COURS");
     }
   };
 
@@ -23363,55 +24019,82 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                 type="button"
                 onClick={async () => {
                   if (!cashierName.trim()) {
-                    toast.error('Veuillez spécifier votre nom de Caissier.');
+                    showAlert('Nom Opérateur Manquant', 'Veuillez spécifier votre nom de Caissier.', 'error');
                     return;
                   }
                   
-                  // Check if closure already exists for this date to prevent duplicate
-                  if (closures.some(c => c.date === closureDate)) {
-                    if (!confirm(`Une clôture de caisse existe déjà pour le ${closureDate}. Voulez-vous la remplacer ?`)) {
-                      return;
-                    }
-                  }
+                  const runClosureCreation = async () => {
+                    const newClosure: PressingClosure = {
+                      id: `closure_${Date.now()}`,
+                      date: closureDate,
+                      timestamp: new Date().toISOString(),
+                      cashierName: cashierName.trim(),
+                      totalPressingRevenue: dailyPressingRevenue,
+                      totalDetergentRevenue: dailyDetergentRevenue,
+                      totalExpenses: dailyExpensesTotal,
+                      totalTheoreticalRevenue,
+                      actualCashCounted: actualCash,
+                      discrepancy: actualCash - totalTheoreticalRevenue,
+                      notes: closureNotes.trim(),
+                      status: 'closed',
+                      sentToManager: false
+                    };
 
-                  const newClosure: PressingClosure = {
-                    id: `closure_${Date.now()}`,
-                    date: closureDate,
-                    timestamp: new Date().toISOString(),
-                    cashierName: cashierName.trim(),
-                    totalPressingRevenue: dailyPressingRevenue,
-                    totalDetergentRevenue: dailyDetergentRevenue,
-                    totalExpenses: dailyExpensesTotal, // Capture expenses perfectly
-                    totalTheoreticalRevenue,
-                    actualCashCounted: actualCash,
-                    discrepancy: actualCash - totalTheoreticalRevenue,
-                    notes: closureNotes.trim(),
-                    status: 'closed',
-                    sentToManager: false
+                    let sentEmail = false;
+                    if (autoEmailManager && managerEmail && managerEmail.trim()) {
+                      const toastId = toast.loading('Envoi automatique du rapport de clôture au Gérant...');
+                      const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
+                      sentEmail = success;
+                      newClosure.sentToManager = success;
+                      toast.dismiss(toastId);
+                      if (success) {
+                        showAlert(
+                          'Notification Gérant',
+                          'Ce mail envoyé en arrière-plan avec succès !',
+                          'success',
+                          undefined,
+                          false,
+                          "D'ACCORD",
+                          "ENVOI D'E-MAIL"
+                        );
+                      } else {
+                        showAlert(
+                          'Notification Échouée',
+                          'Échec de l\'envoi du rapport par email en arrière-plan.',
+                          'error',
+                          undefined,
+                          false,
+                          "D'ACCORD",
+                          "E-MAIL INTROUVABLE"
+                        );
+                      }
+                    }
+
+                    // Update State & localstorage
+                    setClosures(prev => {
+                      const filtered = prev.filter(c => c.date !== closureDate);
+                      return [newClosure, ...filtered];
+                    });
+
+                    // Reset inputs
+                    setActualCash(0);
+                    setClosureNotes('');
+                    showAlert('Clôture Enregistrée', `Clôture du ${closureDate} enregistrée à l'instant avec succès !`, 'success', undefined, false, "D'ACCORD", "COFFRE FORT");
                   };
 
-                  let sentEmail = false;
-                  if (autoEmailManager && managerEmail && managerEmail.trim()) {
-                    toast.loading('Envoi automatique du rapport de clôture au Gérant...');
-                    const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
-                    sentEmail = success;
-                    newClosure.sentToManager = success;
-                    if (success) {
-                      showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
-                    }
+                  // Check if closure already exists for this date to prevent duplicate
+                  if (closures.some(c => c.date === closureDate)) {
+                    showAlert(
+                      'Écraser la clôture existante ?',
+                      `Une clôture de caisse existe déjà pour le ${closureDate}.\nVoulez-vous la remplacer par ce nouveau rapprochement ?`,
+                      'warning',
+                      runClosureCreation,
+                      true,
+                      'REMPLACER'
+                    );
+                  } else {
+                    await runClosureCreation();
                   }
-
-                  // Update State & localstorage
-                  setClosures(prev => {
-                    const filtered = prev.filter(c => c.date !== closureDate);
-                    return [newClosure, ...filtered];
-                  });
-
-                  // Reset inputs
-                  setActualCash(0);
-                  setClosureNotes('');
-                  toast.dismiss();
-                  toast.success(`Clôture du ${closureDate} enregistrée à l'instant avec succès !`);
                 }}
                 className="w-full bg-primary hover:bg-[#c93b3b] text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-2xl transition duration-200 flex items-center justify-center gap-2 shadow"
               >
@@ -23501,11 +24184,19 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                         <button
                           type="button"
                           onClick={async () => {
-                            toast.loading('Envoi du rapport par mail...');
+                            const toastId = toast.loading('Envoi du rapport par mail...');
                             const ok = await sendSilentBackgroundClosureEmailToManager(c);
-                            toast.dismiss();
+                            toast.dismiss(toastId);
                             if (ok) {
-                              showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+                              showAlert(
+                                'Notification Gérant',
+                                'Ce mail envoyé en arrière-plan avec succès !',
+                                'success',
+                                undefined,
+                                false,
+                                "D'ACCORD",
+                                "ENVOI D'E-MAIL"
+                              );
                               setClosureMailFeedback(prev => ({ ...prev, [c.id]: true }));
                             } else {
                               dispatchManagerClosureNotif(c, 'email');
@@ -23530,6 +24221,13 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
           )}
         </div>
       </div>
+
+      {/* Modern custom Alert Popup for all messages and notifications in closure manager */}
+      <AcomAlertPopup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+        {...popup}
+      />
     </motion.div>
   );
 };
@@ -23537,15 +24235,77 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
 const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'active' | 'history' | 'closures'>('create');
   
-  const [tarifs] = useState<PressingTarifs>(() => {
+  const [tarifs, setTarifs] = useState<PressingTarifs>(() => {
     const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
-    return saved ? JSON.parse(saved) : DEFAULT_TARIFS;
+    const parsed = saved ? JSON.parse(saved) : DEFAULT_TARIFS;
+    if (!parsed.supplements) {
+      parsed.supplements = { ...DEFAULT_TARIFS.supplements };
+    }
+    return parsed;
   });
+
+  // Re-sync tariffs from localStorage whenever the component is active to ensure newly added items display instantly
+  useEffect(() => {
+    const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.supplements) {
+          parsed.supplements = { ...DEFAULT_TARIFS.supplements };
+        }
+        setTarifs(parsed);
+      } catch (err) {
+        console.error("Syntax loading tariffs in PressingReceiptManager", err);
+      }
+    }
+  }, [merchant.id]);
 
   const [tickets, setTickets] = useState<PressingTicket[]>(() => {
     const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Unified pop-up state for PressingReceiptManager
+  const [popup, setPopup] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    message: string;
+    type: 'success' | 'warning' | 'error' | 'info';
+    onConfirm?: () => void;
+    confirmText?: string;
+    showCancel?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'warning' | 'error' | 'info' = 'info',
+    onConfirm?: () => void,
+    showCancel?: boolean,
+    confirmText: string = "D'ACCORD",
+    subtitle: string = 'ALERTE SYSTÈME'
+  ) => {
+    setPopup({
+      isOpen: true,
+      title,
+      subtitle,
+      message,
+      type,
+      onConfirm: onConfirm ? () => {
+        onConfirm();
+        setPopup(prev => ({ ...prev, isOpen: false }));
+      } : undefined,
+      showCancel,
+      confirmText
+    });
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -23561,18 +24321,47 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
   });
   const [billingType, setBillingType] = useState<'article' | 'poids'>('article');
   
-  const [articlesQty, setArticlesQty] = useState<{ [key: string]: number }>({
-    chemise: 0,
-    pantalon: 0,
-    costume: 0,
-    robe: 0,
-    drap: 0,
-    couverture: 0,
-    rideau: 0,
-    autre: 0,
+  const [articlesQty, setArticlesQty] = useState<{ [key: string]: number }>(() => {
+    const initialQty: { [key: string]: number } = {};
+    Object.keys(tarifs.articles).forEach(key => {
+      initialQty[key] = 0;
+    });
+    return initialQty;
   });
 
-  const [weightService, setWeightService] = useState<'standard' | 'premium' | 'express'>('standard');
+  // Dynamic articlesQty keys synchronization with current tarifs.articles keys
+  useEffect(() => {
+    setArticlesQty(prev => {
+      const next = { ...prev };
+      let changed = false;
+      Object.keys(tarifs.articles).forEach(key => {
+        if (next[key] === undefined) {
+          next[key] = 0;
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach(key => {
+        if (tarifs.articles[key] === undefined) {
+          delete next[key];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [tarifs]);
+
+  const [weightService, setWeightService] = useState<string>(() => {
+    const keys = Object.keys(tarifs.poids);
+    return keys.includes('standard') ? 'standard' : keys[0] || '';
+  });
+
+  useEffect(() => {
+    const keys = Object.keys(tarifs.poids);
+    if (keys.length > 0 && !keys.includes(weightService)) {
+      setWeightService(keys[0]);
+    }
+  }, [tarifs, weightService]);
+
   const [weightKg, setWeightKg] = useState<number>(0);
 
   const [supplements, setSupplements] = useState({
@@ -23584,11 +24373,11 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
   });
 
   const supplementTarifs = {
-    repassage: 500,
-    express: 1000,
-    detachage: 800,
-    livraison: 1500,
-    premiumPack: 500,
+    repassage: tarifs.supplements?.repassage !== undefined ? tarifs.supplements.repassage : 500,
+    express: tarifs.supplements?.express !== undefined ? tarifs.supplements.express : 1000,
+    detachage: tarifs.supplements?.detachage !== undefined ? tarifs.supplements.detachage : 800,
+    livraison: tarifs.supplements?.livraison !== undefined ? tarifs.supplements.livraison : 1500,
+    premiumPack: tarifs.supplements?.premiumPack !== undefined ? tarifs.supplements.premiumPack : 500,
   };
 
   const [discount, setDiscount] = useState<number>(0);
@@ -24155,7 +24944,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     const message = getManagerClosureNotificationMessage(c);
     if (method === 'whatsapp') {
       if (!managerPhone.trim()) {
-        toast.error('Veuillez configurer le numéro de téléphone WhatsApp du Gérant.');
+        showAlert('Numéro non configuré', 'Veuillez configurer le numéro de téléphone WhatsApp du Gérant.', 'error');
         return;
       }
       let cleaned = managerPhone.replace(/[^0-9]/g, '');
@@ -24164,23 +24953,23 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       }
       const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
-      toast.success('Rapport de clôture WhatsApp ouvert !');
+      showAlert('Rapport WhatsApp', 'Rapport de clôture WhatsApp ouvert avec succès ! Vous pouvez maintenant l\'envoyer.', 'success', undefined, false, "D'ACCORD", "RAPPORTS");
     } else {
       if (!managerEmail.trim()) {
-        toast.error('Veuillez configurer l\'adresse email du Gérant.');
+        showAlert('Email non configuré', "Veuillez configurer l'adresse email du Gérant.", 'error');
         return;
       }
       const subject = `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`;
       const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
       window.open(mailtoUrl, '_blank');
-      toast.success('Rapport Email prêt !');
+      showAlert('Rapport Email', 'Le rapport Email de clôture a été ouvert dans votre messagerie avec succès !', 'success', undefined, false, "D'ACCORD", "RAPPORTS");
     }
-  }, [managerPhone, managerEmail, merchant, getManagerClosureNotificationMessage]);
+  }, [managerPhone, managerEmail, merchant, getManagerClosureNotificationMessage, showAlert]);
 
   const handleCreateTicket = (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientName.trim()) {
-      toast.error('Veuillez renseigner le nom du client.');
+      showAlert('Nom Client Obligatoire', 'Veuillez renseigner le nom du client pour enregistrer la réception.', 'warning');
       return;
     }
 
@@ -24216,7 +25005,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     const updated = [newTicket, ...tickets];
     setTickets(updated);
     localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
-    toast.success(`Fiche de réception enregistrée ! Ticket : ${ticketNumber}`);
+    showAlert('Fiche Enregistrée', `La fiche de réception a été enregistrée avec succès !\nTicket N° : ${ticketNumber}`, 'success', undefined, false, "D'ACCORD", "RÉCEPTION");
 
     // Track as Sales inside system DB
     try {
@@ -24247,16 +25036,11 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     setClientName('');
     setClientPhone('');
     setClientEmail('');
-    setArticlesQty({
-      chemise: 0,
-      pantalon: 0,
-      costume: 0,
-      robe: 0,
-      drap: 0,
-      couverture: 0,
-      rideau: 0,
-      autre: 0,
+    const resetQty: { [key: string]: number } = {};
+    Object.keys(tarifs.articles).forEach(k => {
+      resetQty[k] = 0;
     });
+    setArticlesQty(resetQty);
     setWeightKg(0);
     setSupplements({
       repassage: false,
@@ -24289,7 +25073,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     if (selectedTicket && selectedTicket.id === ticketId) {
       setSelectedTicket({ ...selectedTicket, status: nextStatus });
     }
-    toast.success('Statut de réception mis à jour !');
+    showAlert('Statut Mis à Jour', 'Le statut de suivi réception a été mis à jour avec succès !', 'success', undefined, false, "D'ACCORD", "SUIVI AUTOMATIQUE");
 
     // Auto-email to manager in background on status change (exit/outing alerts)
     if (targetTicket && autoEmailManager && managerEmail && managerEmail.trim()) {
@@ -24298,16 +25082,23 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
   };
 
   const deleteTicket = (ticketId: string) => {
-    if (window.confirm('Voulez-vous supprimer définitivement ce ticket ?')) {
-      const updated = tickets.filter(t => t.id !== ticketId);
-      setTickets(updated);
-      localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
-      setSelectedTicket(null);
-      if (viewingTicket && viewingTicket.id === ticketId) {
-        setViewingTicket(null);
-      }
-      toast.success('Ticket supprimé de la base locale !');
-    }
+    showAlert(
+      'Suppression Ticket ?',
+      'Voulez-vous supprimer définitivement ce ticket ? Cette action efface définitivement la fiche locale.',
+      'warning',
+      () => {
+        const updated = tickets.filter(t => t.id !== ticketId);
+        setTickets(updated);
+        localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
+        setSelectedTicket(null);
+        if (viewingTicket && viewingTicket.id === ticketId) {
+          setViewingTicket(null);
+        }
+        showAlert('Ticket Supprimé', 'Le ticket de pressing a été supprimé de la base locale !', 'success', undefined, false, "D'ACCORD", "CORBEILLE");
+      },
+      true,
+      'SUPPRIMER'
+    );
   };
 
   const filteredTickets = useMemo(() => {
@@ -24686,12 +25477,21 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Forfait de Lavage</label>
                       <select
                         value={weightService}
-                        onChange={(e) => setWeightService(e.target.value as any)}
+                        onChange={(e) => setWeightService(e.target.value)}
                         className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-bold text-xs text-ink outline-none focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="standard">Lavage Standard ({tarifs.poids.standard} FCFA/Kg)</option>
-                        <option value="premium">Lavage Premium ({tarifs.poids.premium} FCFA/Kg)</option>
-                        <option value="express">Lavage Express ({tarifs.poids.express} FCFA/Kg)</option>
+                        {Object.keys(tarifs.poids).map(key => {
+                          const labels: { [key: string]: string } = {
+                            standard: 'Lavage Standard',
+                            premium: 'Lavage Premium / Délicat',
+                            express: 'Lavage Express 24h'
+                          };
+                          return (
+                            <option key={key} value={key}>
+                              {labels[key] || key.charAt(0).toUpperCase() + key.slice(1)} ({tarifs.poids[key]} FCFA/Kg)
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     <div>
@@ -24894,10 +25694,10 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   <div className="border-t border-dashed border-gray-200 pt-3">
                     <p className="font-bold uppercase text-ink mb-1">Suppléments actifs :</p>
                     <div className="space-y-1">
-                      {Object.keys(supplements).filter(k => supplements[k as keyof typeof supplements]).map(k => (
+                      {Object.keys(supplements).filter(k => supplements[k]).map(k => (
                         <div key={k} className="flex justify-between text-indigo-500">
-                          <span>+ {k === 'premiumPack' ? 'emb. premium' : k}</span>
-                          <span>+{supplementTarifs[k as keyof typeof supplementTarifs]} FCFA</span>
+                          <span>+ {getSupplementDisplayName(k)}</span>
+                          <span>+{supplementTarifs[k] || 0} FCFA</span>
                         </div>
                       ))}
                     </div>
@@ -25826,6 +26626,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
         )}
       </AnimatePresence>
+
+      <AcomAlertPopup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+        {...popup}
+      />
     </motion.div>
   );
 };
