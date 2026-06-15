@@ -820,6 +820,11 @@ export const syncService = {
     try {
       const lastSyncKey = 'last_sync_portfolio_items';
       const lastSyncStr = localStorage.getItem(lastSyncKey);
+      
+      if (lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 3600000) {
+        return;
+      }
+      
       const constraints: any[] = [];
       
       if (lastSyncStr) {
@@ -832,8 +837,10 @@ export const syncService = {
       const remoteData = await repo.getAll(constraints);
       if (remoteData && remoteData.length > 0) {
         await db.portfolio_items.bulkPut(remoteData);
+        localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
+      } else {
+        localStorage.setItem(lastSyncKey, Date.now().toString());
       }
-      localStorage.setItem(lastSyncKey, (Date.now() - 60000).toString());
     } catch (error) {
       console.error('Sync portfolio items failed:', error);
     }

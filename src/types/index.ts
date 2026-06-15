@@ -620,6 +620,7 @@ export interface MerchantSale {
   items: MerchantSaleItem[];
   totalAmount: number;
   paidAmount: number;
+  totalCost?: number;
   balance: number;
   payments: MerchantSalePayment[];
   paymentMethod: 'cash' | 'card' | 'mobile_money' | 'split';

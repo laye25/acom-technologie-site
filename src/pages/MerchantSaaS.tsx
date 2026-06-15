@@ -3742,6 +3742,120 @@ const MerchantDashboard = ({
   const [fileToRestore, setFileToRestore] = useState<File | null>(null);
   const [dashboardSelectedMonth, setDashboardSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
 
+  // Load pressing-specific data if merchant type is pressing
+  const pressingTickets = useMemo<PressingTicket[]>(() => {
+    if (merchant.type !== 'pressing') return [];
+    try {
+      const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, merchant.type]);
+
+  const pressingProductSales = useMemo<any[]>(() => {
+    if (merchant.type !== 'pressing') return [];
+    try {
+      const saved = localStorage.getItem(`pressing_stock_sales_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, merchant.type]);
+
+  const pressingDashboardTarifs = useMemo(() => {
+    if (merchant.type !== 'pressing') return null;
+    try {
+      const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, [merchant.id, merchant.type]);
+
+  const pressingDashboardStats = useMemo(() => {
+    if (merchant.type !== 'pressing') return null;
+
+    const filteredTickets = dashboardSelectedMonth 
+      ? pressingTickets.filter(t => t.depositDate && t.depositDate.startsWith(dashboardSelectedMonth))
+      : pressingTickets;
+      
+    const filteredProductSales = dashboardSelectedMonth
+      ? pressingProductSales.filter(s => s.date && s.date.startsWith(dashboardSelectedMonth))
+      : pressingProductSales;
+
+    const totalTicketsAmount = filteredTickets.reduce((sum, t) => sum + (t.total || 0), 0);
+    const totalTicketsPaid = filteredTickets.reduce((sum, t) => sum + (t.amountPaid || 0), 0);
+    const totalTicketsDue = Math.max(0, totalTicketsAmount - totalTicketsPaid);
+    
+    const totalTicketsCost = filteredTickets.reduce((sum, t) => {
+      if (typeof t.totalCost === 'number') return sum + t.totalCost;
+      
+      let retroCost = 0;
+      const aCosts = pressingDashboardTarifs?.articles_costs || {};
+      const pCosts = pressingDashboardTarifs?.poids_costs || {};
+      const sCosts = pressingDashboardTarifs?.supplements_costs || {};
+
+      if (t.billingType === 'article' && t.articles) {
+        retroCost += Object.keys(t.articles).reduce((acc, key) => {
+           let defaultCost = 0;
+           if (key === 'chemise') defaultCost = 100;
+           if (key === 'pantalon') defaultCost = 150;
+           if (key === 'costume') defaultCost = 300;
+           if (key === 'robe') defaultCost = 200;
+           if (key === 'drap') defaultCost = 150;
+           if (key === 'couverture') defaultCost = 400;
+           if (key === 'rideau') defaultCost = 300;
+           if (key === 'autre') defaultCost = 100;
+           return acc + (t.articles[key] * (aCosts[key] !== undefined ? aCosts[key] : defaultCost));
+        }, 0);
+      } else if (t.billingType === 'poids' && t.weightKg) {
+         let defaultCost = 0;
+         if (t.weightService === 'standard') defaultCost = 200;
+         if (t.weightService === 'premium') defaultCost = 300;
+         if (t.weightService === 'express') defaultCost = 400;
+         retroCost += t.weightKg * (pCosts[t.weightService] !== undefined ? pCosts[t.weightService] : defaultCost);
+      }
+
+      if (t.supplements) {
+        retroCost += Object.keys(t.supplements).reduce((acc, key) => {
+           if (!t.supplements[key]) return acc;
+           let defaultCost = 0;
+           if (key === 'repassage') defaultCost = 100;
+           if (key === 'express') defaultCost = 200;
+           if (key === 'detachage') defaultCost = 150;
+           if (key === 'livraison') defaultCost = 400;
+           if (key === 'premiumPack') defaultCost = 100;
+           return acc + (sCosts[key] !== undefined ? sCosts[key] : defaultCost);
+        }, 0);
+      }
+      return sum + retroCost;
+    }, 0);
+    
+    const totalProductsAmount = filteredProductSales.reduce((sum, s) => sum + (s.total || 0), 0);
+    const totalProductsCost = filteredProductSales.reduce((sum, s) => sum + (s.totalCost || 0), 0);
+    
+    const totalRevenue = totalTicketsAmount + totalProductsAmount;
+    const totalCost = totalTicketsCost + totalProductsCost;
+    const totalProfit = totalRevenue - totalCost;
+    const totalEncashed = totalTicketsPaid + totalProductsAmount;
+    
+    return {
+      totalTicketsAmount,
+      totalTicketsPaid,
+      totalTicketsDue,
+      totalTicketsCost,
+      totalProductsAmount,
+      totalProductsCost,
+      totalRevenue,
+      totalCost,
+      totalProfit,
+      totalEncashed,
+      ticketsCount: filteredTickets.length,
+      salesCount: filteredProductSales.length
+    };
+  }, [pressingTickets, pressingProductSales, merchant.type, dashboardSelectedMonth, pressingDashboardTarifs]);
+
   // States for Smart School Multi-Send communication hub on dashboard
   const [dashboardSchoolTab, setDashboardSchoolTab] = useState<'inscriptions' | 'broadcast'>('inscriptions');
   const [broadcastSelectedStudents, setBroadcastSelectedStudents] = useState<string[]>([]);
@@ -4485,26 +4599,26 @@ const MerchantDashboard = ({
       )}
       <>
         {(merchant.type === 'boutique' || !merchant.type) && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-              <StatCard title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
-              <StatCard title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+            <StatCard title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
+            <StatCard title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
+          </div>
+        )}
+          
+        {(merchant.type === 'boutique' || !merchant.type || merchant.type === 'pressing') && (
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-2 text-primary font-bold">
+              <Calendar className="w-5 h-5 text-indigo-600" />
+              <span>Période des statistiques de vente</span>
             </div>
-            
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-2 text-primary font-bold">
-                <Calendar className="w-5 h-5 text-indigo-600" />
-                <span>Période des statistiques de vente</span>
-              </div>
-              <input
-                type="month"
-                value={dashboardSelectedMonth}
-                onChange={(e) => setDashboardSelectedMonth(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-colors"
-                max={new Date().toISOString().slice(0, 7)}
-              />
-            </div>
-          </>
+            <input
+              type="month"
+              value={dashboardSelectedMonth}
+              onChange={(e) => setDashboardSelectedMonth(e.target.value)}
+              className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-colors"
+              max={new Date().toISOString().slice(0, 7)}
+            />
+          </div>
         )}
         <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${(merchant.type === 'boutique' || !merchant.type) ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-4'}`}>
 
@@ -4555,6 +4669,30 @@ const MerchantDashboard = ({
               <>
                 <StatCard title="Interventions" value={stats.specialized.interventions} icon={Wrench} color="text-blue-600" bgColor="bg-blue-50" description="En cours" />
                 <StatCard title="Revenu Total" value={stats.revenue.total} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description="Cumulé" />
+              </>
+            )}
+            {merchant.type === 'pressing' && (
+              <>
+                <StatCard 
+                  title="Recettes Pressing" 
+                  value={pressingDashboardStats?.totalTicketsAmount || 0} 
+                  currency={merchant.currency} 
+                  icon={ClipboardList} 
+                  color="text-indigo-600" 
+                  bgColor="bg-indigo-50" 
+                  description={`${pressingDashboardStats?.ticketsCount || 0} fiches de dépôts`} 
+                  profitDetails={{ value: (pressingDashboardStats?.totalTicketsAmount || 0) - (pressingDashboardStats?.totalTicketsCost || 0) }}
+                />
+                <StatCard 
+                  title="Ventes Produits" 
+                  value={pressingDashboardStats?.totalProductsAmount || 0} 
+                  currency={merchant.currency} 
+                  icon={Package} 
+                  color="text-emerald-600" 
+                  bgColor="bg-emerald-50" 
+                  description={`${pressingDashboardStats?.salesCount || 0} ventes détergents`} 
+                  profitDetails={{ value: (pressingDashboardStats?.totalProductsAmount || 0) - (pressingDashboardStats?.totalProductsCost || 0) }}
+                />
               </>
             )}
             <StatCard title="Dépenses" value={stats.expenses.total} currency={merchant.currency} icon={BarChart3} color="text-red-600" bgColor="bg-red-50" description="Total cumulé" />
@@ -4782,369 +4920,582 @@ const MerchantDashboard = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Transactions */}
-        <div className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
-          <div className="flex items-center justify-between mb-10">
-            <div>
-              <h3 className="text-2xl font-black text-ink">Flux Financiers</h3>
-              <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Dernières opérations</p>
-            </div>
-            <button className="p-3 hover:bg-gray-50 rounded-2xl transition-all border border-black/5 group">
-              <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-primary transition-colors" />
-            </button>
-          </div>
-          <div className="space-y-5">
-            {recentTransactions.length === 0 ? (
-              <div className="py-16 flex flex-col items-center justify-center text-center">
-                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                  <ArrowUpRight className="w-8 h-8 text-gray-200" />
-                </div>
-                <p className="text-gray-400 text-sm font-medium">Aucune transaction enregistrée</p>
+      {merchant.type === 'pressing' ? (
+        <div className="space-y-8">
+          {/* 1. Récapitulatif Général de l'Activité (General Summary Card/Grid) */}
+          <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h3 className="text-2xl font-black text-ink">📊 Récapitulatif Général</h3>
+                <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+                  Bilan d'activité Pressing & Ventes de produits
+                </p>
               </div>
-            ) : (
-              recentTransactions.map((tx: any) => (
-                <div key={tx.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-5 hover:bg-gray-50/50 rounded-[1.5rem] transition-all border border-transparent hover:border-gray-100 group gap-4">
-                  <div className="flex items-center space-x-4 md:space-x-5 flex-1 min-w-0 w-full sm:w-auto">
-                    <div className={`w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 ${
-                      tx.type === 'sale' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
-                    }`}>
-                      {tx.type === 'sale' ? <ArrowUpRight className="w-5 h-5 md:w-6 md:h-6" /> : <ArrowDownRight className="w-5 h-5 md:w-6 md:h-6" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black text-ink text-sm md:text-base leading-tight truncate">
-                        {tx.type === 'sale' ? (tx.customerName || (
-                          merchant.type === 'scolaire' ? 'Paiement Frais' :
-                          merchant.type === 'medical' ? 'Consultation' :
-                          merchant.type === 'chantier' ? 'Facture Travaux' :
-                          merchant.type === 'transport' ? 'Course/Trajet' :
-                          merchant.type === 'rh' ? 'Opération RH' :
-                          merchant.type === 'entreprise' ? 'Intervention' :
-                          'Vente POS'
-                        )) : tx.title}
-                      </p>
-                      <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest mt-1 truncate">
-                        {format(new Date(tx.date), 'dd MMMM yyyy', { locale: fr })}
-                      </p>
-                    </div>
+              <div className="px-4 py-2 bg-primary/5 border border-primary/10 rounded-xl">
+                <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">
+                  MODE HYBRIDE ACTIF
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Pressing Activity Column */}
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block mb-1">🧺 Prestations Pressing</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-ink">{(pressingDashboardStats?.totalTicketsAmount || 0).toLocaleString()}</span>
+                    <span className="text-[10px] font-mono font-bold text-gray-400">{merchant.currency || 'FCFA'}</span>
                   </div>
-                  <div className="text-left sm:text-right w-full sm:w-auto shrink-0 pl-16 sm:pl-0 mt-2 sm:mt-0 min-w-0">
-                    <p className={`font-mono font-black text-base truncate ${tx.type === 'sale' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {tx.type === 'sale' ? '+' : '-'}{tx.type === 'sale' ? tx.totalAmount.toLocaleString() : tx.amount.toLocaleString()} 
-                      <span className="text-[10px] ml-1 opacity-60">{merchant.currency}</span>
-                    </p>
-                    <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1 truncate">
-                      {tx.paymentMethod || tx.category || 'Général'}
-                    </p>
+                  <p className="text-[11px] text-gray-500 mt-2 font-medium">Nombre de fiches : <strong>{pressingDashboardStats?.ticketsCount}</strong></p>
+                </div>
+                <div className="border-t border-slate-200/50 mt-4 pt-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center text-emerald-600 font-semibold">
+                    <span>Montant encaissé :</span>
+                    <span className="font-mono">{(pressingDashboardStats?.totalTicketsPaid || 0).toLocaleString()} {merchant.currency || 'FCFA'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-rose-500 font-semibold">
+                    <span>Reste à payer :</span>
+                    <span className="font-mono">{(pressingDashboardStats?.totalTicketsDue || 0).toLocaleString()} {merchant.currency || 'FCFA'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700 font-bold mt-1.5 pt-1.5 border-t border-slate-200/50">
+                    <span>Marge Nette (Encaissé) :</span>
+                    <span className="font-mono">{((pressingDashboardStats?.totalTicketsPaid || 0) - (pressingDashboardStats?.totalTicketsCost || 0)).toLocaleString()} {merchant.currency || 'FCFA'}</span>
                   </div>
                 </div>
-              ))
+              </div>
+
+              {/* Product Sales Column */}
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block mb-1">🛒 Vente de Produits</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-ink">{(pressingDashboardStats?.totalProductsAmount || 0).toLocaleString()}</span>
+                    <span className="text-[10px] font-mono font-bold text-gray-400">{merchant.currency || 'FCFA'}</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-2 font-medium">Nombre de ventes : <strong>{pressingDashboardStats?.salesCount}</strong></p>
+                </div>
+                <div className="border-t border-slate-200/50 mt-4 pt-3 space-y-1.5 text-xs text-gray-500">
+                  <div className="flex justify-between items-center">
+                    <span>Boutique détergents :</span>
+                    <span className="font-semibold text-slate-700 font-mono">{(pressingDashboardStats?.totalProductsAmount || 0).toLocaleString()} {merchant.currency || 'FCFA'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-emerald-600 font-semibold">
+                    <span>Encaissé Direct :</span>
+                    <span>100%</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700 font-bold mt-1.5 pt-1.5 border-t border-slate-200/50">
+                    <span>Marge Nette (Encaissé) :</span>
+                    <span className="font-mono">{((pressingDashboardStats?.totalProductsAmount || 0) - (pressingDashboardStats?.totalProductsCost || 0)).toLocaleString()} {merchant.currency || 'FCFA'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial Summary Column */}
+              <div className="bg-primary/[0.02] border border-primary/10 rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest block mb-1">💰 Recettes Globales</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-primary">{(pressingDashboardStats?.totalRevenue || 0).toLocaleString()}</span>
+                    <span className="text-[10px] font-mono font-bold text-primary">{merchant.currency || 'FCFA'}</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-2 font-medium">Somme cumulée estimée (Services + Ventes)</p>
+                </div>
+                <div className="border-t border-primary/10 mt-4 pt-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between items-center text-indigo-600 font-semibold">
+                    <span>Total Encaissé Réel :</span>
+                    <span className="font-mono">{(pressingDashboardStats?.totalEncashed || 0).toLocaleString()} {merchant.currency || 'FCFA'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-700 font-bold">
+                    <span>Marge Nette (Encaissé) :</span>
+                    <span className="font-mono">{((pressingDashboardStats?.totalEncashed || 0) - (pressingDashboardStats?.totalCost || 0) - stats.expenses.total).toLocaleString()} {merchant.currency || 'FCFA'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* 2. Tableau distinct : Informations Pressing (Dépôts / Tickets) */}
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-ink">🧺 Suivi des Prestations Pressing</h3>
+                  <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mt-1">Dernières fiches de réception client</p>
+                </div>
+                <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg border border-indigo-100">
+                  {pressingTickets.length} DÉPÔTS
+                </span>
+              </div>
+
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                {pressingTickets.length === 0 ? (
+                  <div className="py-12 text-center opacity-30 flex flex-col items-center justify-center">
+                    <ClipboardList className="w-10 h-10 mb-3 text-gray-400" />
+                    <p className="text-xs font-black uppercase tracking-widest">Aucune fiche enregistrée</p>
+                  </div>
+                ) : (
+                  [...pressingTickets].slice(0, 15).map((ticket: PressingTicket) => (
+                    <div key={ticket.id} className="p-4 bg-gray-50 hover:bg-white border hover:border-gray-100 transition-all rounded-2xl flex flex-col sm:flex-row justify-between items-baseline sm:items-center gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center font-mono font-black text-xs text-primary shrink-0">
+                          #{ticket.ticketNumber}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-gray-900 truncate">{ticket.clientName}</p>
+                          <p className="text-[9px] font-mono text-gray-400 font-bold uppercase mt-0.5 tracking-wider">
+                            Dépôt: {format(new Date(ticket.depositDate), 'dd MMM yyyy', { locale: fr })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 sm:self-center">
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                          ticket.paymentStatus === 'paid' 
+                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                            : ticket.paymentStatus === 'partial'
+                              ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                              : 'bg-rose-50 text-rose-600 border border-rose-100'
+                        }`}>
+                          {ticket.paymentStatus === 'paid' ? 'Payé' : ticket.paymentStatus === 'partial' ? 'Acompte' : 'Impayé'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
+                          ticket.status === 'delivered' 
+                            ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' 
+                            : ticket.status === 'ready'
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 animate-pulse'
+                              : ticket.status === 'in_progress'
+                                ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                : 'bg-gray-100 text-gray-600 border border-gray-200'
+                        }`}>
+                          {ticket.status === 'delivered' ? 'Livré' : ticket.status === 'ready' ? 'Prêt' : ticket.status === 'in_progress' ? 'Encours' : 'Déposé'}
+                        </span>
+                      </div>
+
+                      <div className="sm:text-right">
+                        <p className="text-xs font-mono font-black text-ink">{ticket.total.toLocaleString()} {merchant.currency || 'FCFA'}</p>
+                        <p className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">{ticket.billingType === 'article' ? 'Unitaire' : 'Par Kg'}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* 3. Tableau distinct : Ventes de Produits (Boutique détergents) */}
+            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-ink">🛒 Vente de Produits Directe</h3>
+                  <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mt-1">Détails des ventes boutique détergents</p>
+                </div>
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-lg border border-emerald-100">
+                  {pressingProductSales.length} VENTES
+                </span>
+              </div>
+
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                {pressingProductSales.length === 0 ? (
+                  <div className="py-12 text-center opacity-30 flex flex-col items-center justify-center">
+                    <Package className="w-10 h-10 mb-3 text-gray-400" />
+                    <p className="text-xs font-black uppercase tracking-widest">Aucune vente enregistrée</p>
+                  </div>
+                ) : (
+                  [...pressingProductSales].slice(0, 15).map((sale: any) => (
+                    <div key={sale.id} className="p-4 bg-gray-50 hover:bg-white border hover:border-gray-100 transition-all rounded-2xl flex flex-col sm:flex-row justify-between items-baseline sm:items-center gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center font-mono font-bold text-xs text-emerald-600 shrink-0">
+                          SL
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-gray-900 truncate">{sale.customerName || 'Client de Passage'}</p>
+                          <p className="text-[9px] font-mono text-gray-400 font-bold uppercase mt-0.5">
+                            {format(new Date(sale.date), 'dd MMM yyyy à HH:mm', { locale: fr })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="max-w-[150px] truncate block text-[9px] font-mono font-bold text-gray-500 bg-white border border-gray-100 px-2.5 py-1 rounded-lg">
+                        {sale.items?.map((it: any) => `${it.productName} (x${it.quantity})`).join(', ') || 'Produits divers'}
+                      </div>
+
+                      <div className="sm:text-right">
+                        <p className="text-xs font-mono font-black text-emerald-600">+{sale.total.toLocaleString()} {merchant.currency || 'FCFA'}</p>
+                        <p className="text-[9px] font-mono text-gray-400 uppercase tracking-widest mt-0.5 font-bold">Payé</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Recent Transactions */}
+          <div className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
+            <div className="flex items-center justify-between mb-10">
+              <div>
+                <h3 className="text-2xl font-black text-ink">Flux Financiers</h3>
+                <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Dernières opérations</p>
+              </div>
+              <button className="p-3 hover:bg-gray-50 rounded-2xl transition-all border border-black/5 group">
+                <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-primary transition-colors" />
+              </button>
+            </div>
+            <div className="space-y-5">
+              {recentTransactions.length === 0 ? (
+                <div className="py-16 flex flex-col items-center justify-center text-center">
+                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                    <ArrowUpRight className="w-8 h-8 text-gray-200" />
+                  </div>
+                  <p className="text-gray-400 text-sm font-medium">Aucune transaction enregistrée</p>
+                </div>
+              ) : (
+                recentTransactions.map((tx: any) => (
+                  <div key={tx.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-5 hover:bg-gray-50/50 rounded-[1.5rem] transition-all border border-transparent hover:border-gray-100 group gap-4">
+                    <div className="flex items-center space-x-4 md:space-x-5 flex-1 min-w-0 w-full sm:w-auto">
+                      <div className={`w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-2xl flex items-center justify-center border transition-transform group-hover:scale-110 ${
+                        tx.type === 'sale' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
+                      }`}>
+                        {tx.type === 'sale' ? <ArrowUpRight className="w-5 h-5 md:w-6 md:h-6" /> : <ArrowDownRight className="w-5 h-5 md:w-6 md:h-6" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-ink text-sm md:text-base leading-tight truncate">
+                          {tx.type === 'sale' ? (tx.customerName || (
+                            merchant.type === 'scolaire' ? 'Paiement Frais' :
+                            merchant.type === 'medical' ? 'Consultation' :
+                            merchant.type === 'chantier' ? 'Facture Travaux' :
+                            merchant.type === 'transport' ? 'Course/Trajet' :
+                            merchant.type === 'rh' ? 'Opération RH' :
+                            merchant.type === 'entreprise' ? 'Intervention' :
+                            'Vente POS'
+                          )) : tx.title}
+                        </p>
+                        <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest mt-1 truncate">
+                          {format(new Date(tx.date), 'dd MMMM yyyy', { locale: fr })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-left sm:text-right w-full sm:w-auto shrink-0 pl-16 sm:pl-0 mt-2 sm:mt-0 min-w-0">
+                      <p className={`font-mono font-black text-base truncate ${tx.type === 'sale' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {tx.type === 'sale' ? '+' : '-'}{tx.type === 'sale' ? tx.totalAmount.toLocaleString() : tx.amount.toLocaleString()} 
+                        <span className="text-[10px] ml-1 opacity-60">{merchant.currency}</span>
+                      </p>
+                      <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1 truncate">
+                        {tx.paymentMethod || tx.category || 'Général'}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Dynamic Alerts / Quick View */}
+          <div className="bg-white p-6 sm:p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
+            {merchant.type === 'scolaire' ? (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-black text-ink">Dernières Inscriptions</h3>
+                    <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Suivi des effectifs de l'établissement</p>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full border border-emerald-100 uppercase tracking-widest">
+                    {students.length.toString().padStart(3, '0')} ÉLÈVES
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {students.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <GraduationCap className="w-8 h-8 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-medium">Aucun élève inscrit</p>
+                    </div>
+                  ) : (
+                    students.slice(0, 5).map((student: any) => (
+                      <div key={student.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-[1.25rem] border border-gray-100 hover:bg-white hover:shadow-lg transition-all group">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-105 transition-transform">
+                            <GraduationCap className="w-6 h-6 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-black text-ink text-sm leading-tight">{student.name}</p>
+                            <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Classe: {student.class || student.grade || student.class_id || student.classId || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-mono font-black text-gray-400 uppercase">{student.enrollmentDate}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : merchant.type === 'medical' ? (
+              <>
+                <div className="flex items-center justify-between mb-10">
+                  <div>
+                    <h3 className="text-2xl font-black text-ink">Prochains Rendez-vous</h3>
+                    <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Planification des consultations</p>
+                  </div>
+                  <span className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black rounded-full border border-rose-100 uppercase tracking-widest">
+                    {appointments.length.toString().padStart(3, '0')} RDV
+                  </span>
+                </div>
+                <div className="space-y-5">
+                  {appointments.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <Calendar className="w-8 h-8 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-medium">Aucun rendez-vous prévu</p>
+                    </div>
+                  ) : (
+                    appointments.slice(0, 5).map((apt: any) => (
+                      <div key={apt.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                        <div className="flex items-center space-x-5">
+                          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                            <Calendar className="w-7 h-7 text-rose-500" />
+                          </div>
+                          <div>
+                            <p className="font-black text-ink text-base leading-tight">{apt.patientName}</p>
+                            <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{apt.time} - {apt.reason}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono font-black text-gray-400 uppercase">{apt.date}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : merchant.type === 'chantier' ? (
+              <>
+                <div className="flex items-center justify-between mb-10">
+                  <div>
+                    <h3 className="text-2xl font-black text-ink">État des Projets</h3>
+                    <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Suivi de l'avancement BTP</p>
+                  </div>
+                  <span className="px-4 py-1.5 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full border border-amber-100 uppercase tracking-widest">
+                    {projects.length.toString().padStart(2, '0')} PROJETS
+                  </span>
+                </div>
+                <div className="space-y-6">
+                  {projects.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <HardHat className="w-8 h-8 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-medium">Aucun projet en cours</p>
+                    </div>
+                  ) : (
+                    projects.slice(0, 5).map((project: any) => (
+                      <div key={project.id} className="flex flex-col p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                        <div className="flex items-center justify-between mb-5">
+                          <div className="flex items-center space-x-5">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5">
+                              <HardHat className="w-6 h-6 text-amber-600" />
+                            </div>
+                            <div>
+                              <p className="font-black text-ink text-base leading-tight">{project.name}</p>
+                              <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Budget: {project.budget.toLocaleString()} {merchant.currency}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs font-mono font-black text-amber-600">{project.progress}%</span>
+                        </div>
+                        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${project.progress}%` }}
+                            className="h-full bg-amber-500" 
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : merchant.type === 'transport' ? (
+              <>
+                <div className="flex items-center justify-between mb-10">
+                  <div>
+                    <h3 className="text-2xl font-black text-ink">État de la Flotte</h3>
+                    <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Disponibilité des véhicules</p>
+                  </div>
+                  <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 uppercase tracking-widest">
+                    {vehicles.length.toString().padStart(2, '0')} VÉHICULES
+                  </span>
+                </div>
+                <div className="space-y-5">
+                  {vehicles.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <Car className="w-8 h-8 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-medium">Aucun véhicule enregistré</p>
+                    </div>
+                  ) : (
+                    vehicles.slice(0, 5).map((vehicle: any) => (
+                      <div key={vehicle.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                        <div className="flex items-center space-x-5">
+                          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                            <Car className="w-7 h-7 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-black text-ink text-base leading-tight">{vehicle.model}</p>
+                            <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{vehicle.plateNumber}</p>
+                          </div>
+                        </div>
+                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                          vehicle.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
+                        }`}>
+                          {vehicle.status === 'active' ? 'Disponible' : 'Indisponible'}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : merchant.type === 'rh' ? (
+              <>
+                <div className="flex items-center justify-between mb-10">
+                  <div>
+                    <h3 className="text-2xl font-black text-ink">Derniers Recrutements</h3>
+                    <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Gestion du capital humain</p>
+                  </div>
+                  <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full border border-indigo-100 uppercase tracking-widest">
+                    {employees.length.toString().padStart(2, '0')} EMPLOYÉS
+                  </span>
+                </div>
+                <div className="space-y-5">
+                  {employees.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center">
+                      <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                        <Users className="w-8 h-8 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-medium">Aucun employé enregistré</p>
+                    </div>
+                  ) : (
+                    employees.slice(0, 5).map((emp: any) => (
+                      <div key={emp.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
+                        <div className="flex items-center space-x-5">
+                          <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
+                            <User className="w-7 h-7 text-indigo-600" />
+                          </div>
+                          <div>
+                            <p className="font-black text-ink text-base leading-tight">{emp.firstName} {emp.lastName}</p>
+                            <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{emp.position}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono font-black text-gray-400 uppercase">{emp.hireDate}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : merchant.type === 'entreprise' ? (
+              <>
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-ink">Interventions Récentes</h3>
+                    <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Suivi des prestations de service</p>
+                  </div>
+                  <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 shadow-sm">
+                    {interventions.length.toString().padStart(3, '0')} ACTES
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {interventions.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center bg-gray-50/30 rounded-[2rem] border border-dashed border-gray-200">
+                      <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-black/5">
+                        <Wrench className="w-10 h-10 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-black uppercase tracking-widest">Aucune intervention</p>
+                    </div>
+                  ) : (
+                    interventions.slice(0, 5).map((inter: any) => (
+                      <div key={inter.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-black/5 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="flex items-center space-x-5">
+                          <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100 group-hover:scale-110 transition-transform">
+                            <Wrench className="w-7 h-7 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-black text-base text-ink leading-tight">{inter.customerName}</p>
+                            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-0.5">{inter.serviceType}</p>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                          inter.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                        }`}>
+                          {inter.status === 'completed' ? 'TERMINÉ' : 'EN COURS'}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-ink">Articles en Rupture</h3>
+                    <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Stock actuellement épuisé</p>
+                  </div>
+                  <span className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black rounded-full border border-rose-100 shadow-sm">
+                    {products.filter(p => Number(p.stockQuantity || 0) <= 0).length.toString().padStart(2, '0')} RUPTURES
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {products.filter(p => Number(p.stockQuantity || 0) <= 0).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center bg-emerald-50/30 rounded-[2rem] border border-dashed border-emerald-200">
+                      <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100">
+                        <CheckCircle className="w-10 h-10 text-emerald-500" />
+                      </div>
+                      <p className="text-emerald-600 font-black uppercase tracking-widest">Aucune Rupture !</p>
+                      <p className="text-xs text-emerald-500/60 mt-2 font-mono font-bold">Stocks disponibles</p>
+                    </div>
+                  ) : (
+                    products.filter(p => Number(p.stockQuantity || 0) <= 0).slice(0, 5).map((product) => (
+                      <div key={product.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-rose-100 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="absolute inset-y-0 left-0 w-1 bg-rose-500"></div>
+                        <div className="flex items-center space-x-5">
+                          <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100 group-hover:scale-110 transition-transform">
+                            <Package className="w-7 h-7 text-rose-500" />
+                          </div>
+                          <div>
+                            <p className="font-black text-base text-ink leading-tight">{product.name}</p>
+                            <div className="flex items-center space-x-2 mt-1">
+                              <span className="text-[10px] font-mono text-rose-600 font-black uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded-md">
+                                STOCK: {product.stockQuantity || 0}
+                              </span>
+                              <span className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
+                                MIN: {product.minStockLevel || 5}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 shadow-sm mb-3 uppercase tracking-[0.2em]">
+                            ÉPUISÉ
+                          </span>
+                          {setActiveTab && (
+                            <button 
+                              onClick={() => setActiveTab('inventory')} 
+                              className="text-[10px] font-black text-primary hover:text-primary-hover uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
+                            >
+                              Réapprovisionner
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>
-
-        {/* Dynamic Alerts / Quick View */}
-        <div className="bg-white p-6 sm:p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
-          {merchant.type === 'scolaire' ? (
-            <>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-xl font-black text-ink">Dernières Inscriptions</h3>
-                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Suivi des effectifs de l'établissement</p>
-                </div>
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full border border-emerald-100 uppercase tracking-widest">
-                  {students.length.toString().padStart(3, '0')} ÉLÈVES
-                </span>
-              </div>
-              <div className="space-y-4">
-                {students.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                      <GraduationCap className="w-8 h-8 text-gray-200" />
-                    </div>
-                    <p className="text-gray-400 text-sm font-medium">Aucun élève inscrit</p>
-                  </div>
-                ) : (
-                  students.slice(0, 5).map((student: any) => (
-                    <div key={student.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-[1.25rem] border border-gray-100 hover:bg-white hover:shadow-lg transition-all group">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-105 transition-transform">
-                          <GraduationCap className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-black text-ink text-sm leading-tight">{student.name}</p>
-                          <p className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Classe: {student.class || student.grade || student.class_id || student.classId || 'N/A'}</p>
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-mono font-black text-gray-400 uppercase">{student.enrollmentDate}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : merchant.type === 'medical' ? (
-            <>
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h3 className="text-2xl font-black text-ink">Prochains Rendez-vous</h3>
-                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Planification des consultations</p>
-                </div>
-                <span className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black rounded-full border border-rose-100 uppercase tracking-widest">
-                  {appointments.length.toString().padStart(3, '0')} RDV
-                </span>
-              </div>
-              <div className="space-y-5">
-                {appointments.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                      <Calendar className="w-8 h-8 text-gray-200" />
-                    </div>
-                    <p className="text-gray-400 text-sm font-medium">Aucun rendez-vous prévu</p>
-                  </div>
-                ) : (
-                  appointments.slice(0, 5).map((apt: any) => (
-                    <div key={apt.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
-                      <div className="flex items-center space-x-5">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
-                          <Calendar className="w-7 h-7 text-rose-500" />
-                        </div>
-                        <div>
-                          <p className="font-black text-ink text-base leading-tight">{apt.patientName}</p>
-                          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{apt.time} - {apt.reason}</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-mono font-black text-gray-400 uppercase">{apt.date}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : merchant.type === 'chantier' ? (
-            <>
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h3 className="text-2xl font-black text-ink">État des Projets</h3>
-                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Suivi de l'avancement BTP</p>
-                </div>
-                <span className="px-4 py-1.5 bg-amber-50 text-amber-600 text-[10px] font-black rounded-full border border-amber-100 uppercase tracking-widest">
-                  {projects.length.toString().padStart(2, '0')} PROJETS
-                </span>
-              </div>
-              <div className="space-y-6">
-                {projects.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                      <HardHat className="w-8 h-8 text-gray-200" />
-                    </div>
-                    <p className="text-gray-400 text-sm font-medium">Aucun projet en cours</p>
-                  </div>
-                ) : (
-                  projects.slice(0, 5).map((project: any) => (
-                    <div key={project.id} className="flex flex-col p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
-                      <div className="flex items-center justify-between mb-5">
-                        <div className="flex items-center space-x-5">
-                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5">
-                            <HardHat className="w-6 h-6 text-amber-600" />
-                          </div>
-                          <div>
-                            <p className="font-black text-ink text-base leading-tight">{project.name}</p>
-                            <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Budget: {project.budget.toLocaleString()} {merchant.currency}</p>
-                          </div>
-                        </div>
-                        <span className="text-xs font-mono font-black text-amber-600">{project.progress}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${project.progress}%` }}
-                          className="h-full bg-amber-500" 
-                        />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : merchant.type === 'transport' ? (
-            <>
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h3 className="text-2xl font-black text-ink">État de la Flotte</h3>
-                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Disponibilité des véhicules</p>
-                </div>
-                <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 uppercase tracking-widest">
-                  {vehicles.length.toString().padStart(2, '0')} VÉHICULES
-                </span>
-              </div>
-              <div className="space-y-5">
-                {vehicles.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                      <Car className="w-8 h-8 text-gray-200" />
-                    </div>
-                    <p className="text-gray-400 text-sm font-medium">Aucun véhicule enregistré</p>
-                  </div>
-                ) : (
-                  vehicles.slice(0, 5).map((vehicle: any) => (
-                    <div key={vehicle.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
-                      <div className="flex items-center space-x-5">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
-                          <Car className="w-7 h-7 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-black text-ink text-base leading-tight">{vehicle.model}</p>
-                          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{vehicle.plateNumber}</p>
-                        </div>
-                      </div>
-                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
-                        vehicle.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
-                      }`}>
-                        {vehicle.status === 'active' ? 'Disponible' : 'Indisponible'}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : merchant.type === 'rh' ? (
-            <>
-              <div className="flex items-center justify-between mb-10">
-                <div>
-                  <h3 className="text-2xl font-black text-ink">Derniers Recrutements</h3>
-                  <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Gestion du capital humain</p>
-                </div>
-                <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full border border-indigo-100 uppercase tracking-widest">
-                  {employees.length.toString().padStart(2, '0')} EMPLOYÉS
-                </span>
-              </div>
-              <div className="space-y-5">
-                {employees.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                      <Users className="w-8 h-8 text-gray-200" />
-                    </div>
-                    <p className="text-gray-400 text-sm font-medium">Aucun employé enregistré</p>
-                  </div>
-                ) : (
-                  employees.slice(0, 5).map((emp: any) => (
-                    <div key={emp.id} className="flex items-center justify-between p-5 bg-gray-50/50 rounded-[1.5rem] border border-gray-100 hover:bg-white hover:shadow-xl transition-all group">
-                      <div className="flex items-center space-x-5">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
-                          <User className="w-7 h-7 text-indigo-600" />
-                        </div>
-                        <div>
-                          <p className="font-black text-ink text-base leading-tight">{emp.firstName} {emp.lastName}</p>
-                          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">{emp.position}</p>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-mono font-black text-gray-400 uppercase">{emp.hireDate}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : merchant.type === 'entreprise' ? (
-            <>
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-xl font-black text-ink">Interventions Récentes</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Suivi des prestations de service</p>
-                </div>
-                <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-full border border-blue-100 shadow-sm">
-                  {interventions.length.toString().padStart(3, '0')} ACTES
-                </span>
-              </div>
-              <div className="space-y-4">
-                {interventions.length === 0 ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center bg-gray-50/30 rounded-[2rem] border border-dashed border-gray-200">
-                    <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-black/5">
-                      <Wrench className="w-10 h-10 text-gray-200" />
-                    </div>
-                    <p className="text-gray-400 text-sm font-black uppercase tracking-widest">Aucune intervention</p>
-                  </div>
-                ) : (
-                  interventions.slice(0, 5).map((inter: any) => (
-                    <div key={inter.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-black/5 hover:shadow-xl transition-all group relative overflow-hidden">
-                      <div className="flex items-center space-x-5">
-                        <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center border border-blue-100 group-hover:scale-110 transition-transform">
-                          <Wrench className="w-7 h-7 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-black text-base text-ink leading-tight">{inter.customerName}</p>
-                          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-0.5">{inter.serviceType}</p>
-                        </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
-                        inter.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
-                      }`}>
-                        {inter.status === 'completed' ? 'TERMINÉ' : 'EN COURS'}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-xl font-black text-ink">Articles en Rupture</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Stock actuellement épuisé</p>
-                </div>
-                <span className="px-4 py-1.5 bg-rose-50 text-rose-600 text-[10px] font-black rounded-full border border-rose-100 shadow-sm">
-                  {products.filter(p => Number(p.stockQuantity || 0) <= 0).length.toString().padStart(2, '0')} RUPTURES
-                </span>
-              </div>
-              <div className="space-y-4">
-                {products.filter(p => Number(p.stockQuantity || 0) <= 0).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center bg-emerald-50/30 rounded-[2rem] border border-dashed border-emerald-200">
-                    <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-emerald-100">
-                      <CheckCircle className="w-10 h-10 text-emerald-500" />
-                    </div>
-                    <p className="text-emerald-600 font-black uppercase tracking-widest">Aucune Rupture !</p>
-                    <p className="text-xs text-emerald-500/60 mt-2 font-mono font-bold">Stocks disponibles</p>
-                  </div>
-                ) : (
-                  products.filter(p => Number(p.stockQuantity || 0) <= 0).slice(0, 5).map((product) => (
-                    <div key={product.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-rose-100 hover:shadow-xl transition-all group relative overflow-hidden">
-                      <div className="absolute inset-y-0 left-0 w-1 bg-rose-500"></div>
-                      <div className="flex items-center space-x-5">
-                        <div className="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100 group-hover:scale-110 transition-transform">
-                          <Package className="w-7 h-7 text-rose-500" />
-                        </div>
-                        <div>
-                          <p className="font-black text-base text-ink leading-tight">{product.name}</p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span className="text-[10px] font-mono text-rose-600 font-black uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded-md">
-                              STOCK: {product.stockQuantity || 0}
-                            </span>
-                            <span className="text-[10px] font-mono text-gray-400 font-bold uppercase tracking-widest">
-                              MIN: {product.minStockLevel || 5}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 shadow-sm mb-3 uppercase tracking-[0.2em]">
-                          ÉPUISÉ
-                        </span>
-                        {setActiveTab && (
-                          <button 
-                            onClick={() => setActiveTab('inventory')} 
-                            className="text-[10px] font-black text-primary hover:text-primary-hover uppercase tracking-[0.2em] transition-colors whitespace-nowrap"
-                          >
-                            Réapprovisionner
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      )}
       </>
     </motion.div>
   );
@@ -5164,7 +5515,7 @@ const AccountingRow = ({ label, value, currency, icon: Icon, color }: any) => (
   </div>
 );
 
-const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, description, isLarge }: any) => {
+const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, description, isLarge, profitDetails }: any) => {
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : String(value || '0');
   const textLength = formattedValue.length + (currency ? currency.length : 0);
   
@@ -5214,6 +5565,14 @@ const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, descript
           <p className="text-[9px] sm:text-[10px] text-gray-400 mt-3 font-mono font-bold uppercase tracking-widest relative z-10 line-clamp-2">
             {description}
           </p>
+        )}
+        {profitDetails && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[10px] font-bold">
+            <span className="text-gray-500 uppercase tracking-widest">{profitDetails.label || 'Bénéfice Net'}</span>
+            <span className={`${profitDetails.value >= 0 ? 'text-primary' : 'text-rose-500'} font-mono`}>
+              {profitDetails.value >= 0 ? '+' : ''}{profitDetails.value.toLocaleString()} {currency}
+            </span>
+          </div>
         )}
       </div>
     </div>
@@ -6291,7 +6650,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 border-t border-dashed border-gray-100">
                   <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix d'achat</label>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Coût intrant par unité (Prix d'achat)</label>
                     <div className="relative">
                       <input 
                         type="text" 
@@ -9398,29 +9757,153 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
 
 // --- Merchant Reports ---
 const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
+  const [reportSelectedMonth, setReportSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+
   const sales = useLiveQuery(() => db.sales.where('merchantId').equals(merchant.id).toArray(), [merchant.id]) || [];
   const expenses = useLiveQuery(() => db.expenses.where('merchantId').equals(merchant.id).toArray(), [merchant.id]) || [];
   const products = useLiveQuery(() => db.products.where('merchantId').equals(merchant.id).toArray(), [merchant.id]) || [];
 
-  const financialSummary = useMemo(() => {
-    const totalRevenue = sales.reduce((acc, s) => acc + s.totalAmount, 0);
-    const totalCollected = sales.reduce((acc, s) => acc + (s.paidAmount !== undefined ? s.paidAmount : s.totalAmount), 0);
-    const totalPending = sales.reduce((acc, s) => acc + (s.balance || 0), 0);
-    const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
-    
-    const totalCOGS = sales.reduce((acc, sale) => {
-      return acc + (sale.items || []).reduce((itemAcc, item) => {
-        const product = products.find(p => p.id === item.productId);
-        const cost = (item as any).costPrice || (product?.costPrice || 0);
-        return itemAcc + ((item.quantity || 0) * cost);
-      }, 0);
-    }, 0);
+  const pressingTickets = useMemo<PressingTicket[]>(() => {
+    if (merchant.type !== 'pressing') return [];
+    try {
+      const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, merchant.type]);
 
+  const pressingProductSales = useMemo<DetergentSale[]>(() => {
+    if (merchant.type !== 'pressing') return [];
+    try {
+      const saved = localStorage.getItem(`pressing_stock_sales_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, merchant.type]);
+
+  const pressingTarifs = useMemo(() => {
+    if (merchant.type !== 'pressing') return null;
+    try {
+      const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, [merchant.id, merchant.type]);
+
+  const financialSummary = useMemo(() => {
+    let totalRevenue = 0;
+    let totalCollected = 0;
+    let totalPending = 0;
+    
+    const filteredExpenses = reportSelectedMonth
+      ? expenses.filter(e => {
+          const d = e.createdAt?.seconds ? new Date(e.createdAt.seconds * 1000) : new Date(e.createdAt);
+          return d.toISOString().startsWith(reportSelectedMonth);
+        })
+      : expenses;
+      
+    let totalExpenses = filteredExpenses.reduce((acc, e) => acc + e.amount, 0);
+    let totalCOGS = 0;
+
+    if (merchant.type === 'pressing') {
+      const filteredTickets = reportSelectedMonth
+        ? pressingTickets.filter(t => t.depositDate && t.depositDate.startsWith(reportSelectedMonth))
+        : pressingTickets;
+        
+      const filteredProducts = reportSelectedMonth
+        ? pressingProductSales.filter(s => s.date && s.date.startsWith(reportSelectedMonth))
+        : pressingProductSales;
+
+      const ticketsAmount = filteredTickets.reduce((sum, t) => sum + t.total, 0);
+      const ticketsPaid = filteredTickets.reduce((sum, t) => sum + (t.amountPaid || 0), 0);
+      
+      const ticketsCost = filteredTickets.reduce((sum, t) => {
+        if (typeof t.totalCost === 'number') return sum + t.totalCost;
+        
+        // Retro-compute cost for old tickets without totalCost
+        let retroCost = 0;
+        const aCosts = pressingTarifs?.articles_costs || {};
+        const pCosts = pressingTarifs?.poids_costs || {};
+        const sCosts = pressingTarifs?.supplements_costs || {};
+
+        if (t.billingType === 'article' && t.articles) {
+          retroCost += Object.keys(t.articles).reduce((acc, key) => {
+             // Fallbacks for default values if not explicitly in custom tarifs
+             let defaultCost = 0;
+             if (key === 'chemise') defaultCost = 100;
+             if (key === 'pantalon') defaultCost = 150;
+             if (key === 'costume') defaultCost = 300;
+             if (key === 'robe') defaultCost = 200;
+             if (key === 'drap') defaultCost = 150;
+             if (key === 'couverture') defaultCost = 400;
+             if (key === 'rideau') defaultCost = 300;
+             if (key === 'autre') defaultCost = 100;
+             return acc + (t.articles[key] * (aCosts[key] !== undefined ? aCosts[key] : defaultCost));
+          }, 0);
+        } else if (t.billingType === 'poids' && t.weightKg) {
+           let defaultCost = 0;
+           if (t.weightService === 'standard') defaultCost = 200;
+           if (t.weightService === 'premium') defaultCost = 300;
+           if (t.weightService === 'express') defaultCost = 400;
+           retroCost += t.weightKg * (pCosts[t.weightService] !== undefined ? pCosts[t.weightService] : defaultCost);
+        }
+
+        if (t.supplements) {
+          retroCost += Object.keys(t.supplements).reduce((acc, key) => {
+             if (!t.supplements[key]) return acc;
+             let defaultCost = 0;
+             if (key === 'repassage') defaultCost = 100;
+             if (key === 'express') defaultCost = 200;
+             if (key === 'detachage') defaultCost = 150;
+             if (key === 'livraison') defaultCost = 400;
+             if (key === 'premiumPack') defaultCost = 100;
+             return acc + (sCosts[key] !== undefined ? sCosts[key] : defaultCost);
+          }, 0);
+        }
+        return sum + retroCost;
+      }, 0);
+
+      const productsAmount = filteredProducts.reduce((sum, s) => sum + s.total, 0);
+      const productsCost = filteredProducts.reduce((sum, s) => sum + (s.totalCost || 0), 0);
+      
+      totalRevenue = ticketsAmount + productsAmount;
+      totalCollected = ticketsPaid + productsAmount; // Product sales are 100% paid
+      totalPending = Math.max(0, ticketsAmount - ticketsPaid);
+      totalCOGS = ticketsCost + productsCost;
+    } else {
+      const filteredSales = reportSelectedMonth
+        ? sales.filter(s => {
+            const d = s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000) : new Date(s.createdAt);
+            return d.toISOString().startsWith(reportSelectedMonth);
+          })
+        : sales;
+
+      totalRevenue = filteredSales.reduce((acc, s) => acc + s.totalAmount, 0);
+      totalCollected = filteredSales.reduce((acc, s) => acc + (s.paidAmount !== undefined ? s.paidAmount : s.totalAmount), 0);
+      totalPending = filteredSales.reduce((acc, s) => acc + (s.balance || 0), 0);
+      
+      totalCOGS = filteredSales.reduce((acc, sale) => {
+        if (typeof sale.totalCost === 'number') {
+          return acc + sale.totalCost;
+        }
+        return acc + (sale.items || []).reduce((itemAcc, item) => {
+          const product = products.find(p => p.id === item.productId);
+          const cost = (item as any).costPrice || (product?.costPrice || 0);
+          return itemAcc + ((item.quantity || 0) * cost);
+        }, 0);
+      }, 0);
+    }
+
+    const grossMargin = totalCollected - totalCOGS;
     const netProfit = totalCollected - totalCOGS - totalExpenses;
     const margin = totalCollected > 0 ? (netProfit / totalCollected) * 100 : 0;
+    const cashFlow = totalCollected - totalExpenses; // Approximate cash flow
 
-    return { totalRevenue, totalCollected, totalPending, totalExpenses, netProfit, margin, totalCOGS };
-  }, [sales, expenses, products]);
+    return { totalRevenue, totalCollected, totalPending, totalExpenses, netProfit, margin, totalCOGS, grossMargin, cashFlow };
+  }, [sales, expenses, products, merchant.type, pressingTickets, pressingProductSales, reportSelectedMonth]);
 
   const monthlyData = useMemo(() => {
     // Group sales and expenses by month for the last 6 months
@@ -9432,25 +9915,40 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
 
     return months.map(month => {
       const label = format(month, 'MMM yy', { locale: fr });
-      const monthSales = sales.filter(s => {
-        const d = s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000) : new Date(s.createdAt);
-        return isSameMonth(d, month);
-      });
+      
       const monthExpenses = expenses.filter(e => {
         const d = e.createdAt?.seconds ? new Date(e.createdAt.seconds * 1000) : new Date(e.createdAt);
         return isSameMonth(d, month);
       });
-      
-      const rev = monthSales.reduce((acc, s) => acc + s.totalAmount, 0);
       const exp = monthExpenses.reduce((acc, e) => acc + e.amount, 0);
-      
-      const cogs = monthSales.reduce((acc, sale) => {
-        return acc + (sale.items || []).reduce((itemAcc, item) => {
-          const product = products.find(p => p.id === item.productId);
-          const cost = (item as any).costPrice || (product?.costPrice || 0);
-          return itemAcc + ((item.quantity || 0) * cost);
+
+      let rev = 0;
+      let cogs = 0;
+
+      if (merchant.type === 'pressing') {
+        const monthTickets = pressingTickets.filter(t => isSameMonth(new Date(t.depositDate), month));
+        const monthProductSales = pressingProductSales.filter(s => isSameMonth(new Date(s.date), month));
+        
+        rev = monthTickets.reduce((acc, t) => acc + t.total, 0) + monthProductSales.reduce((acc, s) => acc + s.total, 0);
+        cogs = monthTickets.reduce((acc, t) => acc + (t.totalCost || 0), 0) + monthProductSales.reduce((acc, s) => acc + (s.totalCost || 0), 0);
+      } else {
+        const monthSales = sales.filter(s => {
+          const d = s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000) : new Date(s.createdAt);
+          return isSameMonth(d, month);
+        });
+        
+        rev = monthSales.reduce((acc, s) => acc + s.totalAmount, 0);
+        cogs = monthSales.reduce((acc, sale) => {
+          if (typeof sale.totalCost === 'number') {
+            return acc + sale.totalCost;
+          }
+          return acc + (sale.items || []).reduce((itemAcc, item) => {
+            const product = products.find(p => p.id === item.productId);
+            const cost = (item as any).costPrice || (product?.costPrice || 0);
+            return itemAcc + ((item.quantity || 0) * cost);
+          }, 0);
         }, 0);
-      }, 0);
+      }
       
       return {
         name: label,
@@ -9459,11 +9957,18 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
         Profit: rev - cogs - exp
       };
     });
-  }, [sales, expenses, products]);
+  }, [sales, expenses, products, merchant.type, pressingTickets, pressingProductSales]);
 
   const categoryData = useMemo(() => {
     const categories: Record<string, number> = {};
-    expenses.forEach(e => {
+    const filteredExpenses = reportSelectedMonth
+      ? expenses.filter(e => {
+          const d = e.createdAt?.seconds ? new Date(e.createdAt.seconds * 1000) : new Date(e.createdAt);
+          return d.toISOString().startsWith(reportSelectedMonth);
+        })
+      : expenses;
+      
+    filteredExpenses.forEach(e => {
       categories[e.category] = (categories[e.category] || 0) + e.amount;
     });
     
@@ -9475,7 +9980,7 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
         const percentage = financialSummary.totalExpenses > 0 ? (value / financialSummary.totalExpenses * 100) : 0;
         return { name, value, percentage: percentage.toFixed(0) };
       });
-  }, [expenses, financialSummary.totalExpenses]);
+  }, [expenses, financialSummary.totalExpenses, reportSelectedMonth]);
 
   // Export financial transactions to CSV
   const exportToCSV = () => {
@@ -9610,21 +10115,23 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
         doc.text(`${pdfFormatNum(value)} ${merchant.currency}`, x + 5, yPos + 13);
       };
 
-      const boxWidth = 53;
+      const boxWidth = 39;
       const boxHeight = 18;
-      const bGap = 55;
+      const bGap = 42;
 
-      // Draw first row of KPIs
+      // Draw first row of KPIs (4 columns)
       drawKpi('Chiffre d\'Affaires', financialSummary.totalRevenue, margin, y, boxWidth, boxHeight, [99, 102, 241]); // Indigo
       drawKpi('Total Encaissé', financialSummary.totalCollected, margin + bGap, y, boxWidth, boxHeight, [16, 185, 129]); // Emerald
       drawKpi('Reste à Recouvrer', financialSummary.totalPending, margin + bGap * 2, y, boxWidth, boxHeight, [245, 158, 11]); // Amber
+      drawKpi('Coût Achat (COGS)', financialSummary.totalCOGS || 0, margin + bGap * 3, y, boxWidth, boxHeight, [249, 115, 22]); // Orange
 
       y += boxHeight + 4;
 
-      // Draw second row of KPIs
-      drawKpi('Coût Achat (Marchandises)', financialSummary.totalCOGS || 0, margin, y, boxWidth, boxHeight, [245, 158, 11]); // Amber
-      drawKpi('Charges & Dépenses', financialSummary.totalExpenses, margin + bGap, y, boxWidth, boxHeight, [244, 63, 94]); // Rose
-      drawKpi('Résultat Fiscal (Profit)', financialSummary.netProfit, margin + bGap * 2, y, boxWidth, boxHeight, [59, 130, 246]); // Blue
+      // Draw second row of KPIs (4 columns)
+      drawKpi('Marge Brute', financialSummary.grossMargin || 0, margin, y, boxWidth, boxHeight, [6, 182, 212]); // Cyan
+      drawKpi('Total Dépenses', financialSummary.totalExpenses, margin + bGap, y, boxWidth, boxHeight, [244, 63, 94]); // Rose
+      drawKpi('Flux Trésorerie', financialSummary.cashFlow || 0, margin + bGap * 2, y, boxWidth, boxHeight, [99, 102, 241]); // Indigo
+      drawKpi('Bénéfice Net', financialSummary.netProfit, margin + bGap * 3, y, boxWidth, boxHeight, [59, 130, 246]); // Blue
       
       y += boxHeight + 14;
 
@@ -9796,13 +10303,30 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2 text-primary font-bold">
+          <Calendar className="w-5 h-5 text-indigo-600" />
+          <span>Période des statistiques de vente</span>
+        </div>
+        <input
+          type="month"
+          value={reportSelectedMonth}
+          onChange={(e) => setReportSelectedMonth(e.target.value)}
+          className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-colors"
+          max={new Date().toISOString().slice(0, 7)}
+        />
+      </div>
+
       {/* Financial KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <ReportKPI cardColor="primary" label="Ventes Totales" value={financialSummary.totalRevenue} currency={merchant.currency} icon={DollarSign} />
         <ReportKPI cardColor="emerald" label="Total Encaissé" value={financialSummary.totalCollected} currency={merchant.currency} icon={CheckCircle} />
         <ReportKPI cardColor="amber" label="Reste à Recouvrer" value={financialSummary.totalPending} currency={merchant.currency} icon={Clock} />
         <ReportKPI cardColor="orange" label="Coût d'Achat" value={financialSummary.totalCOGS || 0} currency={merchant.currency} icon={ShoppingCart} />
+        
+        <ReportKPI cardColor="cyan" label="Marge Brute" value={financialSummary.grossMargin || 0} currency={merchant.currency} icon={BarChart3} />
         <ReportKPI cardColor="rose" label="Total Dépenses" value={financialSummary.totalExpenses} currency={merchant.currency} icon={TrendingDown} />
+        <ReportKPI cardColor="indigo" label="Flux de Trésorerie" value={financialSummary.cashFlow || 0} currency={merchant.currency} icon={Banknote} />
         <ReportKPI cardColor="blue" label="Bénéfice Net" value={financialSummary.netProfit} currency={merchant.currency} icon={TrendingUp} />
       </div>
 
@@ -22766,6 +23290,15 @@ interface PressingTarifs {
   supplements_labels?: {
     [key: string]: string;
   };
+  articles_costs?: {
+    [key: string]: number;
+  };
+  poids_costs?: {
+    [key: string]: number;
+  };
+  supplements_costs?: {
+    [key: string]: number;
+  };
 }
 
 const DEFAULT_TARIFS: PressingTarifs = {
@@ -22790,6 +23323,28 @@ const DEFAULT_TARIFS: PressingTarifs = {
     detachage: 800,
     livraison: 1500,
     premiumPack: 500
+  },
+  articles_costs: {
+    chemise: 100,
+    pantalon: 150,
+    costume: 300,
+    robe: 200,
+    drap: 150,
+    couverture: 400,
+    rideau: 300,
+    autre: 100
+  },
+  poids_costs: {
+    standard: 200,
+    premium: 300,
+    express: 400
+  },
+  supplements_costs: {
+    repassage: 100,
+    express: 200,
+    detachage: 150,
+    livraison: 400,
+    premiumPack: 100
   }
 };
 
@@ -22815,12 +23370,14 @@ interface PressingTicket {
   subtotal: number;
   supplementTotal: number;
   total: number;
+  totalCost?: number;
   status: 'deposed' | 'in_progress' | 'ready' | 'delivered';
   paymentStatus?: 'unpaid' | 'partial' | 'paid';
   paymentMethod?: 'cash' | 'mobile_money' | 'card' | 'other';
   amountPaid?: number;
   notes?: string;
   sentNotifications?: { id: string; type: 'whatsapp' | 'email'; templateName: string; msg: string; timestamp: string }[];
+  selectedStockProducts?: { id: string; name: string; qty: number; price: number; costPrice: number }[];
 }
 
 // Beautiful customized Alert Popup like the "Notification Gérant" layout
@@ -22938,6 +23495,15 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
     if (!parsed.supplements) {
       parsed.supplements = { ...DEFAULT_TARIFS.supplements };
     }
+    if (!parsed.articles_costs) {
+      parsed.articles_costs = { ...DEFAULT_TARIFS.articles_costs };
+    }
+    if (!parsed.poids_costs) {
+      parsed.poids_costs = { ...DEFAULT_TARIFS.poids_costs };
+    }
+    if (!parsed.supplements_costs) {
+      parsed.supplements_costs = { ...DEFAULT_TARIFS.supplements_costs };
+    }
     return parsed;
   });
 
@@ -22989,15 +23555,18 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
   // States for adding dynamic items
   const [newArticleName, setNewArticleName] = useState('');
   const [newArticlePrice, setNewArticlePrice] = useState<number | ''>('');
+  const [newArticleCost, setNewArticleCost] = useState<number | ''>('');
   const [showAddArticle, setShowAddArticle] = useState(false);
 
   const [newPoidsName, setNewPoidsName] = useState('');
   const [newPoidsPrice, setNewPoidsPrice] = useState<number | ''>('');
+  const [newPoidsCost, setNewPoidsCost] = useState<number | ''>('');
   const [showAddPoids, setShowAddPoids] = useState(false);
 
   const [newSupplementName, setNewSupplementName] = useState('');
   const [newSupplementDesc, setNewSupplementDesc] = useState('');
   const [newSupplementPrice, setNewSupplementPrice] = useState<number | ''>('');
+  const [newSupplementCost, setNewSupplementCost] = useState<number | ''>('');
   const [showAddSupplement, setShowAddSupplement] = useState(false);
 
   const handleAddArticle = (e: React.FormEvent) => {
@@ -23008,6 +23577,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
     }
     const nameKey = newArticleName.trim().toLowerCase();
     const price = typeof newArticlePrice === 'number' ? newArticlePrice : 0;
+    const cost = typeof newArticleCost === 'number' ? newArticleCost : 0;
 
     if (tarifs.articles[nameKey] !== undefined) {
       showAlert('Article existant', "Cet article existe déjà dans votre grille tarifaire.", 'error');
@@ -23019,11 +23589,16 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
       articles: {
         ...prev.articles,
         [nameKey]: price
+      },
+      articles_costs: {
+        ...(prev.articles_costs || {}),
+        [nameKey]: cost
       }
     }));
 
     setNewArticleName('');
     setNewArticlePrice('');
+    setNewArticleCost('');
     setShowAddArticle(false);
     showAlert('Félicitations !', 'Nouvel article ajouté financièrement ! Cliquez sur Enregistrer pour confirmer.', 'success', undefined, false, "D'ACCORD", "AJOUT CAPTURE");
   };
@@ -23036,6 +23611,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
     }
     const poidsKey = newPoidsName.trim().toLowerCase();
     const price = typeof newPoidsPrice === 'number' ? newPoidsPrice : 0;
+    const cost = typeof newPoidsCost === 'number' ? newPoidsCost : 0;
 
     if (tarifs.poids[poidsKey] !== undefined) {
       showAlert('Formule existante', 'Cette formule Kg existe déjà.', 'error');
@@ -23047,11 +23623,16 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
       poids: {
         ...prev.poids,
         [poidsKey]: price
+      },
+      poids_costs: {
+        ...(prev.poids_costs || {}),
+        [poidsKey]: cost
       }
     }));
 
     setNewPoidsName('');
     setNewPoidsPrice('');
+    setNewPoidsCost('');
     setShowAddPoids(false);
     showAlert('Félicitations !', 'Nouveau forfait Kg ajouté financièrement ! Cliquez sur Enregistrer pour confirmer.', 'success', undefined, false, "D'ACCORD", "AJOUT CAPTURE");
   };
@@ -23064,9 +23645,12 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
       () => {
         const updatedArticles = { ...tarifs.articles };
         delete updatedArticles[key];
+        const updatedCosts = { ...tarifs.articles_costs };
+        delete updatedCosts[key];
         setTarifs(prev => ({
           ...prev,
-          articles: updatedArticles
+          articles: updatedArticles,
+          articles_costs: updatedCosts
         }));
         showAlert('Retiré !', "L'article a été retiré de la grille temporaire.", 'success');
       },
@@ -23083,9 +23667,12 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
       () => {
         const updatedPoids = { ...tarifs.poids };
         delete updatedPoids[key];
+        const updatedCosts = { ...tarifs.poids_costs };
+        delete updatedCosts[key];
         setTarifs(prev => ({
           ...prev,
-          poids: updatedPoids
+          poids: updatedPoids,
+          poids_costs: updatedCosts
         }));
         showAlert('Retiré !', "La formule de lavage a été retirée de la grille.", 'success');
       },
@@ -23115,6 +23702,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
     }
 
     const price = typeof newSupplementPrice === 'number' ? newSupplementPrice : 0;
+    const cost = typeof newSupplementCost === 'number' ? newSupplementCost : 0;
     const desc = newSupplementDesc.trim() || 'Prestation optionnelle complémentaire';
 
     setTarifs(prev => ({
@@ -23130,12 +23718,17 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
       supplements_display_names: {
         ...(prev as any).supplements_display_names,
         [key]: rawName
+      },
+      supplements_costs: {
+        ...(prev.supplements_costs || {}),
+        [key]: cost
       }
     }));
 
     setNewSupplementName('');
     setNewSupplementDesc('');
     setNewSupplementPrice('');
+    setNewSupplementCost('');
     setShowAddSupplement(false);
     showAlert('Félicitations !', 'Nouvelle prestation optionnelle ajoutée financièrement ! Cliquez sur Enregistrer pour confirmer.', 'success', undefined, false, "D'ACCORD", "AJOUT CAPTURE");
   };
@@ -23235,14 +23828,14 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Article Billing */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between">
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between overflow-hidden">
           <div className="space-y-6">
             <div className="border-b border-gray-100 pb-4 flex justify-between items-center bg-white">
               <div>
                 <h3 className="text-lg font-black text-ink flex items-center gap-2">
                   <Calculator className="w-5 h-5 text-indigo-500" /> Tarifs par Article (Vêtements)
                 </h3>
-                <p className="text-gray-400 text-xs mt-0.5">Tarifs unitaires appliqués lors du dépôt de vêtements individuels.</p>
+                <p className="text-gray-400 text-xs mt-0.5">Tarifs unitaires et coûts intrants appliqués lors du dépôt de vêtements individuels.</p>
               </div>
             </div>
 
@@ -23262,6 +23855,8 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
+                    
+                    {/* Prix Public */}
                     <div className="relative flex items-center">
                       <input
                         type="number"
@@ -23273,9 +23868,26 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                             articles: { ...tarifs.articles, [key]: val }
                           });
                         }}
-                        className="w-full pl-4 pr-16 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
                       />
-                      <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA</span>
+                      <span className="absolute right-4 text-[9px] font-mono font-bold text-gray-400">Prix</span>
+                    </div>
+
+                    {/* Coût Intrant */}
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        value={tarifs.articles_costs?.[typedKey] !== undefined ? tarifs.articles_costs[typedKey] : (DEFAULT_TARIFS.articles_costs || {} as any)[typedKey] || 0}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          setTarifs({
+                            ...tarifs,
+                            articles_costs: { ...(tarifs.articles_costs || {}), [key]: val }
+                          });
+                        }}
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-indigo-500 outline-none focus:ring-1 focus:ring-indigo-300 shadow-inner"
+                      />
+                      <span className="absolute right-4 text-[9px] font-mono font-bold text-indigo-400">Intrant</span>
                     </div>
                   </div>
                 );
@@ -23287,34 +23899,44 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             {showAddArticle ? (
               <form onSubmit={handleAddArticle} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
                 <span className="text-[10px] uppercase tracking-widest text-indigo-500 font-bold block">➕ Nouvel Article de Vêtements</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom de l'article</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du vêtement</label>
                     <input
                       type="text"
                       required
-                      placeholder="ex: Veste en jean, Doudoune, Sac"
+                      placeholder="ex: Sac"
                       value={newArticleName}
                       onChange={e => setNewArticleName(e.target.value)}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix Unitaire (FCFA)</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix Client (FCFA)</label>
                     <input
                       type="number"
                       required
                       placeholder="ex: 1500"
                       value={newArticlePrice}
                       onChange={e => setNewArticlePrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût Intrant (FCFA)</label>
+                    <input
+                      type="number"
+                      placeholder="ex: 200"
+                      value={newArticleCost}
+                      onChange={e => setNewArticleCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-indigo-200 font-mono text-xs text-indigo-500 text-right pr-4 outline-none"
                     />
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
-                    onClick={() => { setShowAddArticle(false); setNewArticleName(''); setNewArticlePrice(''); }}
+                    onClick={() => { setShowAddArticle(false); setNewArticleName(''); setNewArticlePrice(''); setNewArticleCost(''); }}
                     className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
                   >
                     Annuler
@@ -23373,20 +23995,40 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                       </div>
                       <span className="text-[10px] text-gray-400">Prise en charge professionnelle</span>
                     </div>
-                    <div className="relative flex items-center w-full sm:w-48 shrink-0">
-                      <input
-                        type="number"
-                        value={tarifs.poids[typedKey]}
-                        onChange={(e) => {
-                          const val = Math.max(0, parseInt(e.target.value) || 0);
-                          setTarifs({
-                            ...tarifs,
-                            poids: { ...tarifs.poids, [key]: val }
-                          });
-                        }}
-                        className="w-full pl-4 pr-20 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                      <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA/Kg</span>
+                    <div className="flex flex-col gap-1.5 w-full sm:w-48 shrink-0">
+                      {/* Prix Kg */}
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          value={tarifs.poids[typedKey]}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            setTarifs({
+                              ...tarifs,
+                              poids: { ...tarifs.poids, [key]: val }
+                            });
+                          }}
+                          className="w-full pl-4 pr-20 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                        <span className="absolute right-4 text-[9px] font-mono font-bold text-gray-400">FCFA/Kg</span>
+                      </div>
+
+                      {/* Coût Intrant Kg */}
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          value={tarifs.poids_costs?.[typedKey] !== undefined ? tarifs.poids_costs[typedKey] : (DEFAULT_TARIFS.poids_costs || {} as any)[typedKey] || 0}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            setTarifs({
+                              ...tarifs,
+                              poids_costs: { ...(tarifs.poids_costs || {}), [key]: val }
+                            });
+                          }}
+                          className="w-full pl-4 pr-20 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-cyan-600 outline-none focus:ring-1 focus:ring-cyan-300 shadow-inner"
+                        />
+                        <span className="absolute right-4 text-[9px] font-mono font-bold text-cyan-500">Intrant</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -23398,16 +24040,16 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             {showAddPoids ? (
               <form onSubmit={handleAddPoids} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
                 <span className="text-[10px] uppercase tracking-widest text-cyan-600 font-bold block">➕ Nouveau Forfait / Formule Kilogramme</span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Désignation (ex: Express 12h, Grosse Couette)</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Désignation (ex: Express 12h)</label>
                     <input
                       type="text"
                       required
                       placeholder="ex: Lavage Ultra-Rapide, Literie"
                       value={newPoidsName}
                       onChange={e => setNewPoidsName(e.target.value)}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
                     />
                   </div>
                   <div>
@@ -23418,14 +24060,24 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                       placeholder="ex: 1200"
                       value={newPoidsPrice}
                       onChange={e => setNewPoidsPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût par Kilo (FCFA/Kg)</label>
+                    <input
+                      type="number"
+                      placeholder="ex: 300"
+                      value={newPoidsCost}
+                      onChange={e => setNewPoidsCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-cyan-200 font-mono text-xs text-cyan-600 text-right pr-4 outline-none"
                     />
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
-                    onClick={() => { setShowAddPoids(false); setNewPoidsName(''); setNewPoidsPrice(''); }}
+                    onClick={() => { setShowAddPoids(false); setNewPoidsName(''); setNewPoidsPrice(''); setNewPoidsCost(''); }}
                     className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
                   >
                     Annuler
@@ -23493,23 +24145,46 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                     </button>
                   </div>
                   <p className="text-[10px] text-gray-400 leading-tight pr-6 min-h-[20px]">{description}</p>
-                  <div className="relative flex items-center mt-1">
-                    <input
-                      type="number"
-                      value={tarifs.supplements?.[key] !== undefined ? tarifs.supplements[key] : (DEFAULT_TARIFS.supplements as any)[key]}
-                      onChange={(e) => {
-                        const val = Math.max(0, parseInt(e.target.value) || 0);
-                        setTarifs({
-                          ...tarifs,
-                          supplements: {
-                            ...(tarifs.supplements || DEFAULT_TARIFS.supplements || {}),
-                            [key]: val
-                          }
-                        });
-                      }}
-                      className="w-full pl-4 pr-16 py-2.5 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                    />
-                    <span className="absolute right-4 text-[10px] font-mono font-bold text-gray-400">FCFA</span>
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    {/* Prix Client */}
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        value={tarifs.supplements?.[key] !== undefined ? tarifs.supplements[key] : (DEFAULT_TARIFS.supplements as any)[key]}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          setTarifs({
+                            ...tarifs,
+                            supplements: {
+                              ...(tarifs.supplements || DEFAULT_TARIFS.supplements || {}),
+                              [key]: val
+                            }
+                          });
+                        }}
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                      <span className="absolute right-4 text-[9px] font-mono font-bold text-gray-400">Prix</span>
+                    </div>
+
+                    {/* Coût Intrant */}
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        value={tarifs.supplements_costs?.[key] !== undefined ? tarifs.supplements_costs[key] : (DEFAULT_TARIFS.supplements_costs || {} as any)[key] || 0}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          setTarifs({
+                            ...tarifs,
+                            supplements_costs: {
+                              ...(tarifs.supplements_costs || {}),
+                              [key]: val
+                            }
+                          });
+                        }}
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-amber-600 outline-none focus:ring-1 focus:ring-amber-300 shadow-inner"
+                      />
+                      <span className="absolute right-4 text-[9px] font-mono font-bold text-amber-500">Intrant</span>
+                    </div>
                   </div>
                 </div>
               );
@@ -23522,7 +24197,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                 <span className="text-[10px] uppercase tracking-widest text-amber-500 font-bold block flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 animate-spin-slow" /> Nouvelle Prestation Optionnelle (Supplément)
                 </span>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du service</label>
                     <input
@@ -23531,35 +24206,45 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                       placeholder="ex: Parfumage, Pliage sous vide"
                       value={newSupplementName}
                       onChange={e => setNewSupplementName(e.target.value)}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
                     />
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Description / Détails</label>
                     <input
                       type="text"
-                      placeholder="ex: Parfum de luxe lavande / vanille"
+                      placeholder="ex: Parfum de luxe"
                       value={newSupplementDesc}
                       onChange={e => setNewSupplementDesc(e.target.value)}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tarif Supplémentaire (FCFA)</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tarif Supplément (FCFA)</label>
                     <input
                       type="number"
                       required
                       placeholder="ex: 500"
                       value={newSupplementPrice}
                       onChange={e => setNewSupplementPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none focus:ring-2 focus:ring-primary/20"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût Intrant (FCFA)</label>
+                    <input
+                      type="number"
+                      placeholder="ex: 100"
+                      value={newSupplementCost}
+                      onChange={e => setNewSupplementCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-amber-200 font-mono text-xs text-amber-500 text-right pr-4 outline-none"
                     />
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
-                    onClick={() => { setShowAddSupplement(false); setNewSupplementName(''); setNewSupplementDesc(''); setNewSupplementPrice(''); }}
+                    onClick={() => { setShowAddSupplement(false); setNewSupplementName(''); setNewSupplementDesc(''); setNewSupplementPrice(''); setNewSupplementCost(''); }}
                     className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
                   >
                     Annuler
@@ -24233,6 +24918,15 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     if (!parsed.supplements) {
       parsed.supplements = { ...DEFAULT_TARIFS.supplements };
     }
+    if (!parsed.articles_costs) {
+      parsed.articles_costs = { ...DEFAULT_TARIFS.articles_costs };
+    }
+    if (!parsed.poids_costs) {
+      parsed.poids_costs = { ...DEFAULT_TARIFS.poids_costs };
+    }
+    if (!parsed.supplements_costs) {
+      parsed.supplements_costs = { ...DEFAULT_TARIFS.supplements_costs };
+    }
     return parsed;
   });
 
@@ -24244,6 +24938,15 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         const parsed = JSON.parse(saved);
         if (!parsed.supplements) {
           parsed.supplements = { ...DEFAULT_TARIFS.supplements };
+        }
+        if (!parsed.articles_costs) {
+          parsed.articles_costs = { ...DEFAULT_TARIFS.articles_costs };
+        }
+        if (!parsed.poids_costs) {
+          parsed.poids_costs = { ...DEFAULT_TARIFS.poids_costs };
+        }
+        if (!parsed.supplements_costs) {
+          parsed.supplements_costs = { ...DEFAULT_TARIFS.supplements_costs };
         }
         setTarifs(parsed);
       } catch (err) {
@@ -24486,6 +25189,27 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     const val = (subtotal + supplementTotal) - discount;
     return Math.max(0, val);
   }, [subtotal, supplementTotal, discount]);
+
+  const totalCost = useMemo(() => {
+    let cost = 0;
+    if (billingType === 'article') {
+      cost += Object.keys(articlesQty).reduce((acc, key) => {
+        const qty = articlesQty[key];
+        const unitCost = tarifs.articles_costs?.[key as keyof typeof tarifs.articles_costs] || (DEFAULT_TARIFS.articles_costs as any)[key] || 0;
+        return acc + (qty * unitCost);
+      }, 0);
+    } else {
+      const costPerKg = tarifs.poids_costs?.[weightService] || (DEFAULT_TARIFS.poids_costs as any)[weightService] || 0;
+      cost += weightKg * costPerKg;
+    }
+
+    cost += Object.keys(supplements).reduce((acc, key) => {
+      const active = supplements[key as keyof typeof supplements];
+      const suppCost = tarifs.supplements_costs?.[key as keyof typeof tarifs.supplements_costs] || (DEFAULT_TARIFS.supplements_costs as any)[key] || 0;
+      return acc + (active ? suppCost : 0);
+    }, 0);
+    return cost;
+  }, [billingType, articlesQty, weightService, weightKg, supplements, tarifs]);
 
   // Synchronize amountPaid automatically with dynamic changes
   useEffect(() => {
@@ -25025,6 +25749,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       subtotal,
       supplementTotal,
       total,
+      totalCost,
       status: 'deposed',
       paymentStatus,
       paymentMethod,
@@ -26676,6 +27401,7 @@ interface DetergentProduct {
   id: string;
   name: string;
   price: number;
+  costPrice?: number;
   stock: number;
   minStock: number;
   category: string;
@@ -26692,12 +27418,14 @@ interface DetergentSale {
     productId: string;
     productName: string;
     price: number;
+    costPrice?: number;
     quantity: number;
     total: number;
   }[];
   discount: number;
   subtotal: number;
   total: number;
+  totalCost?: number;
 }
 
 const DEFAULT_DETERGENTS: DetergentProduct[] = [
@@ -26984,6 +27712,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   // Form states (Create / Edit)
   const [formName, setFormName] = useState('');
   const [formPrice, setFormPrice] = useState<number>(0);
+  const [formCostPrice, setFormCostPrice] = useState<number>(0);
   const [formStock, setFormStock] = useState<number>(0);
   const [formMinStock, setFormMinStock] = useState<number>(3);
   const [formCategory, setFormCategory] = useState<string>('liquid');
@@ -27079,22 +27808,28 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     }
 
     const saleNumber = `D-SL-${Date.now().toString().slice(-6)}`;
+    const newSaleItems = cart.map(item => ({
+      productId: item.product.id,
+      productName: item.product.name,
+      price: item.product.price,
+      costPrice: item.product.costPrice || 0,
+      quantity: item.quantity,
+      total: item.product.price * item.quantity
+    }));
+    
+    const newSaleTotalCost = newSaleItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+
     const newSale: DetergentSale = {
       id: `sale_${Date.now()}`,
       saleNumber,
       customerName: customerName.trim() || 'Client de Passage',
       customerPhone: customerPhone.trim(),
       date: new Date().toISOString(),
-      items: cart.map(item => ({
-        productId: item.product.id,
-        productName: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
-        total: item.product.price * item.quantity
-      })),
+      items: newSaleItems,
       discount,
       subtotal: cartSubtotal,
-      total: cartTotal
+      total: cartTotal,
+      totalCost: newSaleTotalCost
     };
 
     // Update stocks
@@ -27172,6 +27907,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         ...p,
         name: formName,
         price: formPrice,
+        costPrice: formCostPrice,
         stock: formStock,
         minStock: formMinStock,
         category: formCategory,
@@ -27185,6 +27921,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         id: `det_${Date.now()}`,
         name: formName,
         price: formPrice,
+        costPrice: formCostPrice,
         stock: formStock,
         minStock: formMinStock,
         category: formCategory,
@@ -27198,6 +27935,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     // Reset Form
     setFormName('');
     setFormPrice(0);
+    setFormCostPrice(0);
     setFormStock(0);
     setFormMinStock(3);
     setFormCategory('liquid');
@@ -27209,6 +27947,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setEditingProduct(prod);
     setFormName(prod.name);
     setFormPrice(prod.price);
+    setFormCostPrice(prod.costPrice || 0);
     setFormStock(prod.stock);
     setFormMinStock(prod.minStock);
     setFormCategory(prod.category);
@@ -27713,7 +28452,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Prix Vente (FCFA)</label>
                   <input
@@ -27723,6 +28462,16 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                     value={formPrice || ''}
                     onChange={e => setFormPrice(Math.max(0, parseInt(e.target.value) || 0))}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-gray-50/30 text-xs font-mono font-bold text-ink"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-mono font-bold text-amber-500 uppercase tracking-widest mb-1">Coût par unité</label>
+                  <input
+                    type="number"
+                    placeholder="1500"
+                    value={formCostPrice || ''}
+                    onChange={e => setFormCostPrice(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-dashed border-amber-200 outline-none focus:ring-1 focus:ring-amber-300 bg-amber-50/30 text-xs font-mono font-bold text-amber-900"
                   />
                 </div>
                 <div>

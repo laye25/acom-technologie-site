@@ -85,12 +85,8 @@ const Navbar = () => {
 
   const handlePrefetch = (path: string) => {
     // Point 3: Intelligent Prefetching
-    if (path === '/portfolio') {
-      prefetchCollection('portfolio');
-    } else if (path === '/blog') {
-      prefetchCollection('blog_posts');
-    } else if (path === '/') {
-      prefetchCollection('services');
+    if (path === '/blog') {
+      // prefetch removed
     }
   };
 
@@ -181,7 +177,6 @@ const Navbar = () => {
                 <Link
                   key={link.path}
                   to={link.path}
-                  onMouseEnter={() => handlePrefetch(link.path)}
                   className={`relative px-4 py-2 text-sm font-medium transition-colors group ${
                     location.pathname === link.path 
                       ? 'text-primary' 
