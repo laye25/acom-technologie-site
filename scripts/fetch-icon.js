@@ -144,26 +144,53 @@ async function fetchIcon() {
       if (matches && matches.length === 3) {
         const buffer = Buffer.from(matches[2], 'base64');
         
-        console.log('Writing custom DB database logo directly to public/icon.png...');
-        const outPath = path.resolve('public', 'icon.png');
-        fs.mkdirSync(path.dirname(outPath), { recursive: true });
-        fs.writeFileSync(outPath, buffer);
-        console.log(`Successfully saved processed db icon to ${outPath}`);
-        
-        // Overwrite package.json to point to icon.png
-        const packageJsonPath = path.resolve('package.json');
-        const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-        if (pkg.build) {
-          pkg.build.icon = "public/icon.png";
-          if (pkg.build.win) pkg.build.win.icon = "public/icon.png";
-          if (pkg.build.mac) pkg.build.mac.icon = "public/icon.png";
-          
-          pkg.build.files = pkg.build.files || [];
-          if (!pkg.build.files.includes("public/icon.png")) {
-            pkg.build.files.push("public/icon.png");
+        let customValid = false;
+        try {
+          if (buffer.length >= 24) {
+            const hasSignature = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47 &&
+                                 buffer[4] === 0x0D && buffer[5] === 0x0A && buffer[6] === 0x1A && buffer[7] === 0x0A;
+            if (hasSignature) {
+              const width = buffer.readUInt32BE(16);
+              const height = buffer.readUInt32BE(20);
+              console.log(`Fetched custom logo dimensions: ${width}x${height}`);
+              if (width >= 512 && height >= 512) {
+                customValid = true;
+              } else {
+                console.log(`Custom PNG is too small (${width}x${height}). Required minimum: 512x512.`);
+              }
+            } else {
+              console.log('Custom DB logo is not a valid PNG format (macOS/Windows desktop builders strictly require PNG for .png extensions).');
+            }
           }
-          fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
-          console.log('Updated package.json to use public/icon.png for all build configurations');
+        } catch (e) {
+          console.error('Failed to parse fetched custom logo headers:', e);
+        }
+
+        if (customValid) {
+          console.log('Writing custom DB database logo directly to public/icon.png...');
+          const outPath = path.resolve('public', 'icon.png');
+          fs.mkdirSync(path.dirname(outPath), { recursive: true });
+          fs.writeFileSync(outPath, buffer);
+          console.log(`Successfully saved processed db icon to ${outPath}`);
+          
+          // Overwrite package.json to point to icon.png
+          const packageJsonPath = path.resolve('package.json');
+          const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          if (pkg.build) {
+            pkg.build.icon = "public/icon.png";
+            if (pkg.build.win) pkg.build.win.icon = "public/icon.png";
+            if (pkg.build.mac) pkg.build.mac.icon = "public/icon.png";
+            
+            pkg.build.files = pkg.build.files || [];
+            if (!pkg.build.files.includes("public/icon.png")) {
+              pkg.build.files.push("public/icon.png");
+            }
+            fs.writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2));
+            console.log('Updated package.json to use public/icon.png for all build configurations');
+          }
+        } else {
+          console.log('Custom DB logo rejected (either not a PNG or smaller than 512x512). Ensuring solid fallback PNG is present instead.');
+          ensurePngExists();
         }
       }
     } else {
