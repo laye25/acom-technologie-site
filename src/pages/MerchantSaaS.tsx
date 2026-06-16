@@ -830,6 +830,609 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
   }
 };
 
+const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: '80mm' | 'A4', tarifs: any, handleDownloadPDF: any) => {
+  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+  const isDesktop = typeof window !== 'undefined' && 
+    (window.hasOwnProperty('process') || navigator.userAgent.toLowerCase().indexOf('electron') > -1);
+  
+  if (isMobile) {
+    toast.success("Impression Pressing mobile : Préparation du document PDF...", { position: 'top-center' });
+    handleDownloadPDF(ticket);
+    return;
+  }
+
+  const fmt = (num: number) => {
+    if (num === undefined || num === null || isNaN(num)) return '0';
+    const parts = Math.round(num).toString().split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return parts.join('.');
+  };
+
+  const formattedDepositDate = ticket.depositDate;
+  const formattedDeliveryDate = ticket.expectedDeliveryDate || '-';
+
+  let htmlContent = "";
+
+  if (formatType === '80mm') {
+    htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ticket Pressing - ${ticket.ticketNumber}</title>
+  <style>
+    @media print {
+      @page {
+        size: 80mm auto;
+        margin: 0;
+      }
+      body {
+        margin: 0;
+        padding: 4mm;
+        width: 72mm;
+      }
+    }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #000;
+      background-color: #fff;
+      margin: 0 auto;
+      padding: 6mm;
+      width: 72mm;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-bold { font-weight: bold; }
+    .flex { display: flex; }
+    .justify-between { justify-content: space-between; }
+    .logo-container { text-align: center; margin-bottom: 3mm; }
+    .logo { max-width: 32mm; max-height: 16mm; object-fit: contain; }
+    .divider { border-top: 1px dashed #000; margin: 3mm 0; }
+    .merchant-name { font-size: 13px; font-weight: bold; margin-bottom: 1mm; text-transform: uppercase; }
+    .doc-title { font-size: 11px; font-weight: bold; margin: 2mm 0; letter-spacing: 1px; text-transform: uppercase; }
+    .item-table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+    .item-table th { border-bottom: 1px solid #000; font-weight: bold; text-align: left; padding-bottom: 1mm; }
+    .item-table td { padding: 1.5mm 0; vertical-align: top; }
+    .total-section { margin-top: 3mm; font-size: 11px; }
+    .footer { margin-top: 6mm; font-size: 9px; text-align: center; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  ${merchant.logo ? `<div class="logo-container"><img class="logo" src="${merchant.logo}" alt="Logo" /></div>` : ''}
+  <div class="text-center">
+    <div class="merchant-name">${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+    ${merchant.address ? `<div>${merchant.address.replace(/"/g, '&quot;')}</div>` : ''}
+    ${merchant.phone ? `<div>Tél: ${merchant.phone}</div>` : ''}
+    ${merchant.email ? `<div>Email: ${merchant.email}</div>` : ''}
+  </div>
+  
+  <div class="divider"></div>
+  
+  <div class="flex justify-between">
+    <span>Ticket N°: ${ticket.ticketNumber}</span>
+  </div>
+  <div style="margin-top: 1mm;">Client : <span class="text-bold">${ticket.clientName.replace(/"/g, '&quot;')}</span></div>
+  ${ticket.clientPhone ? `<div>Tél    : ${ticket.clientPhone}</div>` : ''}
+  <div>Dépôt  : ${formattedDepositDate}</div>
+  <div>Retrait: ${formattedDeliveryDate} (Prévu)</div>
+  
+  <div class="divider"></div>
+  
+  <div class="text-center text-bold doc-title">TICKET REÇU DE CAISSE</div>
+  
+  <table class="item-table">
+    <thead>
+      <tr>
+        <th style="width: 50%;">Article</th>
+        <th class="text-center" style="width: 15%;">Qté</th>
+        <th class="text-right" style="width: 35%;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${ticket.billingType === 'article' ? 
+        Object.keys(ticket.articles).filter(k => ticket.articles[k] > 0).map(k => {
+          const qty = ticket.articles[k];
+          const singlePrice = tarifs.articles[k as keyof typeof tarifs.articles] || 0;
+          return `
+            <tr>
+              <td style="text-transform: capitalize;">${k}</td>
+              <td class="text-center">${qty}</td>
+              <td class="text-right">${fmt(qty * singlePrice)}</td>
+            </tr>
+          `;
+        }).join('')
+        : `
+          <tr>
+            <td>Lavage au poids (${ticket.weightKg} Kg, ${ticket.weightService})</td>
+            <td class="text-center">1</td>
+            <td class="text-right">${fmt(ticket.weightKg * (tarifs.poids[ticket.weightService] || 0))}</td>
+          </tr>
+        `
+      }
+      
+      ${Object.keys(ticket.supplements).filter(k => ticket.supplements[k]).map(k => {
+        const cost = ticket.supplementTarifs[k] || 0;
+        let displayName = tariffsDisplayLabels[k] || k;
+        return `
+          <tr>
+            <td>+ ${displayName}</td>
+            <td class="text-center">1</td>
+            <td class="text-right">${fmt(cost)}</td>
+          </tr>
+        `;
+      }).join('')}
+    </tbody>
+  </table>
+  
+  <div class="divider"></div>
+  
+  <div class="total-section">
+    <div class="flex justify-between">
+      <span>Sous-total:</span>
+      <span>${fmt(ticket.subtotal + ticket.supplementTotal)} FCFA</span>
+    </div>
+    ${ticket.discount > 0 ? `
+      <div class="flex justify-between" style="color: red;">
+        <span>Remise:</span>
+        <span>-${fmt(ticket.discount)} FCFA</span>
+      </div>
+    ` : ''}
+    <div class="flex justify-between text-bold" style="font-size: 13px; margin-top: 1.5mm; margin-bottom: 2mm;">
+      <span>TOTAL TTC</span>
+      <span>${fmt(ticket.total)} FCFA</span>
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div class="flex justify-between">
+      <span>Mode de Paiement:</span>
+      <span class="text-bold" style="text-transform: uppercase;">${ticket.paymentMethod || 'cash'}</span>
+    </div>
+    <div class="flex justify-between">
+      <span>Montant versé:</span>
+      <span>${fmt(ticket.amountPaid || 0)} FCFA</span>
+    </div>
+    <div class="flex justify-between text-bold">
+      <span>Reste à payer:</span>
+      <span>${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
+    </div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  ${ticket.notes ? `
+    <div style="font-size: 9px; margin-bottom: 4mm;">
+      <strong>Note :</strong> ${ticket.notes}
+    </div>
+    <div class="divider"></div>
+  ` : ''}
+  
+  <div class="footer">
+    <p class="text-bold">Merci de votre confiance !</p>
+    <p>Veuillez présenter ce ticket lors du retrait du linge.</p>
+    <p style="font-size: 8px; font-family: monospace; color: #777; margin-top: 4mm;">Généré par Acom Technologie Desktop</p>
+  </div>
+</body>
+</html>
+    `;
+  } else {
+    htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Facture Pressing A4 - ${ticket.ticketNumber}</title>
+  <style>
+    @media print {
+      @page {
+        size: A4;
+        margin: 15mm;
+      }
+      body {
+        margin: 0;
+        background-color: #fff;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+    }
+    .print-container {
+      background-color: #fff;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 35px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      position: relative;
+    }
+    @media print {
+      .print-container {
+        box-shadow: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+    }
+    
+    .accent-bg {
+      background-color: #3b82f6;
+    }
+    .accent-text {
+      color: #3b82f6;
+    }
+    
+    .header-layout {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 25px;
+    }
+    .company-logo {
+      max-width: 140px;
+      max-height: 65px;
+      object-fit: contain;
+      margin-bottom: 12px;
+    }
+    .company-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .doc-banner {
+      font-size: 20px;
+      font-weight: 900;
+      text-align: right;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+    .doc-ref {
+      font-family: monospace;
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+    
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 25px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 15px;
+    }
+    .section-title {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .client-card {
+      background-color: #f8fafc;
+      padding: 15px;
+      border-radius: 12px;
+      border: 1px solid #f1f5f9;
+    }
+    .client-name {
+      font-size: 13px;
+      font-weight: 750;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    
+    .modern-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 25px;
+    }
+    .modern-table th {
+      background-color: #f8fafc;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+      text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .modern-table td {
+      padding: 11px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+      font-size: 11px;
+    }
+    .modern-table tr:nth-child(even) {
+      background-color: #fcfdfe;
+    }
+    
+    .totals-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 30px;
+    }
+    .totals-box {
+      width: 280px;
+      background-color: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      padding: 14px;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      font-size: 11px;
+      color: #475569;
+    }
+    .totals-row.grand-total {
+      border-top: 1px solid #e2e8f0;
+      margin-top: 8px;
+      padding-top: 10px;
+      font-size: 14px;
+      font-weight: 850;
+      color: #0f172a;
+    }
+    
+    .signature-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 50px;
+      margin-top: 40px;
+      padding-top: 25px;
+      border-top: 1px dashed #e2e8f0;
+    }
+    .signature-area {
+      height: 60px;
+      border-bottom: 1px solid #cbd5e1;
+      margin-bottom: 8px;
+    }
+    
+    .footer-center {
+      text-align: center;
+      font-size: 8px;
+      color: #94a3b8;
+      margin-top: 60px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    <div style="height: 4px; border-radius: 4px; margin-bottom: 25px;" class="accent-bg"></div>
+
+    <div class="header-layout">
+      <div>
+        ${merchant.logo ? `<img class="company-logo" src="${merchant.logo}" alt="Logo" />` : ''}
+        <div class="company-name">${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+        <div style="color: #64748b; font-size: 10px; font-weight: 500; line-height: 1.4;">
+          ${merchant.address ? `<div>${merchant.address.replace(/"/g, '&quot;')}</div>` : ''}
+          ${merchant.phone ? `<div>Tél: ${merchant.phone}</div>` : ''}
+          ${merchant.email ? `<div>Email: ${merchant.email}</div>` : ''}
+        </div>
+      </div>
+      
+      <div style="text-align: right;">
+        <div class="doc-banner accent-text">
+          BON DE RÉCEPTION PRESSING (A4)
+        </div>
+        <div class="doc-ref">
+          N° ${ticket.ticketNumber}<br>
+          Date dépôt : ${formattedDepositDate}<br>
+          Retrait prévu : ${formattedDeliveryDate}
+        </div>
+      </div>
+    </div>
+
+    <div class="meta-grid">
+      <div>
+        <div class="section-title">Client d'établissement :</div>
+        <div class="client-card">
+          <div class="client-name">${ticket.clientName.replace(/"/g, '&quot;')}</div>
+          ${ticket.clientPhone ? `<div style="color: #64748b; margin-top: 2px;">Tél: ${ticket.clientPhone}</div>` : ''}
+          ${ticket.clientEmail ? `<div style="color: #64748b; margin-top: 2px;">Email: ${ticket.clientEmail}</div>` : ''}
+        </div>
+      </div>
+      
+      <div>
+        <div class="section-title">Détails Traitement Linge :</div>
+        <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
+          <div><strong>Facturation :</strong> ${ticket.billingType === 'article' ? 'Par Article' : 'Au Poids (Kg)'}</div>
+          <div><strong>Statut de Paiement :</strong> ${ticket.paymentStatus === 'paid' ? 'Entièrement réglé' : ticket.paymentStatus === 'partial' ? 'Acompte versé' : 'À régler au retrait'}</div>
+        </div>
+      </div>
+    </div>
+
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th>Désignation Prestation (Services Pressing & Linge)</th>
+          <th class="text-right" style="width: 20%;">Tarif Unitaire</th>
+          <th class="text-center" style="width: 15%;">Quantité</th>
+          <th class="text-right" style="width: 25%;">Montant Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${ticket.billingType === 'article' ? 
+          Object.keys(ticket.articles).filter(k => ticket.articles[k] > 0).map(k => {
+            const qty = ticket.articles[k];
+            const singlePrice = tarifs.articles[k as keyof typeof tarifs.articles] || 0;
+            return `
+              <tr>
+                <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">👕 Prestation : ${k}</td>
+                <td class="text-right">${fmt(singlePrice)} FCFA</td>
+                <td class="text-center">${qty}</td>
+                <td class="text-right" style="font-weight: 700;">${fmt(qty * singlePrice)} FCFA</td>
+              </tr>
+            `;
+          }).join('')
+          : `
+            <tr>
+              <td style="font-weight: 600; color: #0f172a;">Lavage au poids (${ticket.weightKg} Kg, ${ticket.weightService})</td>
+              <td class="text-right">${fmt(tarifs.poids[ticket.weightService] || 0)} FCFA/Kg</td>
+              <td class="text-center">${ticket.weightKg}</td>
+              <td class="text-right" style="font-weight: 700;">${fmt(ticket.weightKg * (tarifs.poids[ticket.weightService] || 0))} FCFA</td>
+            </tr>
+          `
+        }
+        
+        ${Object.keys(ticket.supplements).filter(k => ticket.supplements[k]).map(k => {
+          const cost = ticket.supplementTarifs[k] || 0;
+          let displayName = tariffsDisplayLabels[k] || k;
+          return `
+            <tr>
+              <td style="font-weight: 600; color: #3b82f6;">✨ Supplément : ${displayName}</td>
+              <td class="text-right">${fmt(cost)} FCFA</td>
+              <td class="text-center">1</td>
+              <td class="text-right" style="font-weight: 700;">${fmt(cost)} FCFA</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+
+    <div class="totals-wrapper">
+      <div class="totals-box">
+        <div class="totals-row">
+          <span>Sous-total Prestations</span>
+          <span style="font-weight: 600;">${fmt(ticket.subtotal + ticket.supplementTotal)} FCFA</span>
+        </div>
+        ${ticket.discount > 0 ? `
+          <div class="totals-row" style="color: red;">
+            <span>Remise de Caisse :</span>
+            <span>-${fmt(ticket.discount)} FCFA</span>
+          </div>
+        ` : ''}
+        <div class="totals-row grand-total">
+          <span>TOTAL TTC PAYER</span>
+          <span class="accent-text">${fmt(ticket.total)} FCFA</span>
+        </div>
+        
+        <div class="totals-row" style="margin-top: 5px; border-top: 1px dashed #e2e8f0; padding-top: 5px;">
+          <span>Règlement / Versé :</span>
+          <span>${fmt(ticket.amountPaid || 0)} FCFA</span>
+        </div>
+        <div class="totals-row">
+          <span>Reste à percevoir :</span>
+          <span style="font-weight: bold; color: ${ticket.total - (ticket.amountPaid || 0) > 0 ? '#e11d48' : '#16a34a'}">${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
+        </div>
+      </div>
+    </div>
+
+    ${ticket.notes ? `
+      <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-bottom: 15px; border: 1px dashed #e2e8f0; padding: 10px; border-radius: 8px;">
+        <strong>Instructions de lavage :</strong> ${ticket.notes}
+      </div>
+    ` : ''}
+
+    <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
+      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
+    </div>
+
+    <div class="signature-container">
+      <div>
+        <div class="section-title">Déchargement Client (Dépôt)</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
+        <div class="signature-area"></div>
+      </div>
+      <div style="text-align: right;">
+        <div class="section-title">Visa de Réception Pressing</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
+        <div class="signature-area"></div>
+      </div>
+    </div>
+
+    <div class="footer-center">
+      Solution de Pressing Acom Gestion v1.0 - Émise numériquement
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  let printFrame = document.getElementById('print-iframe') as HTMLIFrameElement;
+  if (printFrame) {
+    printFrame.parentNode?.removeChild(printFrame);
+  }
+
+  printFrame = document.createElement('iframe');
+  printFrame.id = 'print-iframe';
+  printFrame.style.position = 'fixed';
+  printFrame.style.top = '-9999px';
+  printFrame.style.left = '-9999px';
+  printFrame.style.width = formatType === 'A4' ? '850px' : '400px';
+  printFrame.style.height = '1100px';
+  printFrame.style.border = 'none';
+  printFrame.style.opacity = '0.01';
+  document.body.appendChild(printFrame);
+
+  const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+  if (frameDoc) {
+    frameDoc.open();
+    frameDoc.write(htmlContent);
+    frameDoc.close();
+    
+    setTimeout(() => {
+      try {
+        if (!printFrame?.contentWindow) {
+          throw new Error("No contentWindow found on print iframe");
+        }
+        
+        if (isDesktop) {
+          const printWin = window.open('', '_blank', formatType === 'A4' ? 'width=900,height=1000' : 'width=450,height=800');
+          if (printWin) {
+            printWin.document.open();
+            printWin.document.write(htmlContent);
+            printWin.document.close();
+            
+            setTimeout(() => {
+              try {
+                printWin.focus();
+                printWin.print();
+              } catch (e) {
+                console.error("Popup pressing window print failed:", e);
+              }
+            }, 800);
+            
+            toast.success("Impression Pressing lancée...", { position: 'top-center' });
+            return;
+          }
+        }
+
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        toast.success("Aperçu d'impression Pressing ouvert !", { position: 'top-center' });
+      } catch (err) {
+        console.warn("Iframe direct printing failed, triggering PDF fallback...", err);
+        handleDownloadPDF(ticket);
+      }
+    }, 500);
+  }
+};
+
+const tariffsDisplayLabels: Record<string, string> = {
+  repassage: 'Repassage',
+  express: 'Lavage Express (unit.)',
+  detachage: 'Détachage spécial',
+  livraison: 'Livraison à domicile',
+  premiumPack: 'Emballage Premium'
+};
+
+
 const pdfFormatNum = (num: number) => {
   if (num === undefined || num === null || isNaN(num)) return '0';
   const parts = Math.round(num).toString().split('.');
@@ -26633,13 +27236,23 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               {selectedTicket && (
                 <div className="flex flex-col gap-2 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/60">
                   <p className="text-xs font-bold text-indigo-700 text-center">🎉 Nouveau ticket enregistré avec succès !</p>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadPDF(selectedTicket)}
-                    className="w-full bg-[#1e293b] hover:bg-black text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition"
-                  >
-                    <Download className="w-4 h-4 animate-bounce" /> Imprimer le Ticket de Caisse (PDF)
-                  </button>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => printPressingTicketDirect(merchant, selectedTicket, '80mm', tarifs, handleDownloadPDF)}
+                      className="bg-gray-905 bg-[#1e293b] hover:bg-black text-white font-bold text-[10px] sm:text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition text-center shadow-sm"
+                    >
+                      <Printer className="w-4 h-4" /> Ticket Caisse (80mm)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => printPressingTicketDirect(merchant, selectedTicket, 'A4', tarifs, handleDownloadPDF)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] sm:text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition text-center shadow-sm"
+                    >
+                      <FileText className="w-4 h-4" /> Format A4
+                    </button>
+                  </div>
 
                   <div className="border-t border-indigo-200/50 mt-2.5 pt-2.5 space-y-2">
                     <p className="text-[9px] font-mono font-bold text-indigo-700 uppercase tracking-widest text-center flex items-center justify-center gap-1.5">
@@ -27109,11 +27722,18 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                           <Eye className="w-3 h-3" /> Détails
                         </button>
                         <button
-                          onClick={() => handleDownloadPDF(ticket)}
-                          className="p-1 px-2.5 bg-gray-900 text-white rounded-lg hover:bg-primary font-bold text-[9px] transition inline-flex items-center"
-                          title="Télécharger PDF"
+                          onClick={() => printPressingTicketDirect(merchant, ticket, '80mm', tarifs, handleDownloadPDF)}
+                          className="p-1 px-2.5 bg-gray-950 text-white rounded-lg hover:bg-black font-bold text-[9px] transition inline-flex items-center gap-1"
+                          title="Imprimer Ticket (80mm)"
                         >
-                          PDF
+                          <Printer className="w-3 h-3" /> Roll (80mm)
+                        </button>
+                        <button
+                          onClick={() => printPressingTicketDirect(merchant, ticket, 'A4', tarifs, handleDownloadPDF)}
+                          className="p-1 px-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-[9px] transition inline-flex items-center gap-1"
+                          title="Imprimer Format A4"
+                        >
+                          <FileText className="w-3 h-3" /> A4
                         </button>
                         <button
                           onClick={() => deleteTicket(ticket.id)}
@@ -27482,10 +28102,17 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               <div className="bg-gray-50 p-4 border-t border-gray-100 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => handleDownloadPDF(viewingTicket)}
-                  className="flex-1 bg-gray-900 hover:bg-black text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition"
+                  onClick={() => printPressingTicketDirect(merchant, viewingTicket, '80mm', tarifs, handleDownloadPDF)}
+                  className="flex-1 bg-gray-950 hover:bg-black text-white font-bold text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition"
                 >
-                  <Printer className="w-4 h-4" /> Ré-Imprimer Ticket PDF
+                  <Printer className="w-3.5 h-3.5" /> Roll (80mm)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => printPressingTicketDirect(merchant, viewingTicket, 'A4', tarifs, handleDownloadPDF)}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition"
+                >
+                  <FileText className="w-3.5 h-3.5" /> Client A4
                 </button>
                 <button
                   type="button"
