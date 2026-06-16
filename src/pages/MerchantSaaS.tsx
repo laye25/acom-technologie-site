@@ -39,6 +39,7 @@ import {
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { showMailSuccessToast } from '../components/MailSuccessToast';
+import { getApiUrl } from '../lib/api';
 import { triggerAcomAlert, AcomAlertEventProvider } from '../components/AcomAlertEventProvider';
 import { AcomZoneMerchantPanel } from '../components/AcomZoneMerchantPanel';
 import { jsPDF } from 'jspdf';
@@ -2124,6 +2125,16 @@ const MerchantSaaS = () => {
   const [loggedTeacherProfile, setLoggedTeacherProfile] = useState<any>(null);
   const [loggedParentProfile, setLoggedParentProfile] = useState<any>(null);
   const [loggedStudentProfile, setLoggedStudentProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (merchant?.managerNotifications?.apiBaseUrl) {
+      try {
+        localStorage.setItem('acom_desktop_api_base_url', merchant.managerNotifications.apiBaseUrl);
+      } catch (e) {
+        console.error('Failed to cache apiBaseUrl:', e);
+      }
+    }
+  }, [merchant]);
   const activeTeacherId = typeof window !== 'undefined' ? localStorage.getItem('activeTeacherId') : null;
   const activeParentId = typeof window !== 'undefined' ? localStorage.getItem('activeParentId') : null;
   const activeStudentId = typeof window !== 'undefined' ? localStorage.getItem('activeStudentId') : null;
@@ -3579,7 +3590,7 @@ const PlanUpgradeModal = ({
         throw new Error("La clé publique Stripe (VITE_STRIPE_PUBLISHABLE_KEY) n'est pas configurée.");
       }
 
-      const response = await fetch('/api/create-payment-intent', {
+      const response = await fetch(getApiUrl('/api/create-payment-intent'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -7856,7 +7867,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
 
           setEmailSendStatus('sending');
           setEmailSendError(null);
-          fetch('/api/send-email', {
+          fetch(getApiUrl('/api/send-email'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -11585,6 +11596,24 @@ const MerchantSettings = ({
                 placeholder="gerant@boutique.com"
                 className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
               />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">URL Serveur API (Optionnel pour Desktop)</label>
+              <input
+                type="text"
+                value={formData.managerNotifications?.apiBaseUrl || ''}
+                onChange={e => {
+                  const val = e.target.value;
+                  setFormData({
+                    ...formData,
+                    managerNotifications: { ...(formData.managerNotifications || {}), apiBaseUrl: val }
+                  });
+                  localStorage.setItem('acom_desktop_api_base_url', val);
+                }}
+                placeholder="ex: https://mon-serveur-acom.run.app"
+                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              />
+              <p className="text-[10px] text-gray-400 mt-1 font-medium">Requis pour faire fonctionner le suivi Gérant en arrière-plan (E-mails) sur l&apos;application Desktop locale.</p>
             </div>
           </div>
 
@@ -25189,7 +25218,7 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch('/api/send-email', {
+      const response = await fetch(getApiUrl('/api/send-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -26195,7 +26224,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch('/api/send-email', {
+      const response = await fetch(getApiUrl('/api/send-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -26398,7 +26427,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch('/api/send-email', {
+      const response = await fetch(getApiUrl('/api/send-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -26439,6 +26468,47 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       showAlert('Rapport Email', 'Le rapport Email de clôture a été ouvert dans votre messagerie avec succès !', 'success', undefined, false, "D'ACCORD", "RAPPORTS");
     }
   }, [managerPhone, managerEmail, merchant, getManagerClosureNotificationMessage, showAlert]);
+
+  const resetFormFields = () => {
+    setClientName('');
+    setClientPhone('');
+    setClientEmail('');
+    const resetQty: { [key: string]: number } = {};
+    Object.keys(tarifs.articles).forEach(k => {
+      resetQty[k] = 0;
+    });
+    setArticlesQty(resetQty);
+    setWeightKg(0);
+    setSupplements(prev => {
+      const reset: Record<string, boolean> = {};
+      Object.keys(prev).forEach(k => {
+        reset[k] = false;
+      });
+      return reset;
+    });
+    setDiscount(0);
+    setNotes('');
+    setPaymentStatus('paid');
+    setPaymentMethod('cash');
+    setAmountPaid(0);
+    setSelectedTicket(null);
+    toast.success('Formulaire réinitialisé.');
+  };
+
+  const handleSendClientWhatsApp = (t: PressingTicket) => {
+    if (!t.clientPhone || !t.clientPhone.trim()) {
+      toast.error("Veuillez renseigner le téléphone du client.");
+      return;
+    }
+    const message = `Bonjour ${t.clientName}, votre dépôt du ${t.depositDate} au pressing ${merchant.name || 'ACOM'} a bien été enregistré. Ticket N°: ${t.ticketNumber}. Prix : ${t.total} FCFA. Versé: ${t.amountPaid || 0} FCFA. Retrait prévu: ${t.expectedDeliveryDate || 'N/A'}. Merci de votre confiance !`;
+    let cleaned = t.clientPhone.replace(/[^0-9]/g, '');
+    if (cleaned.length === 9 && cleaned.startsWith('7')) {
+      cleaned = '221' + cleaned;
+    }
+    const url = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+    toast.success('Message WhatsApp client prêt !');
+  };
 
   const handleCreateTicket = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26507,29 +26577,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       console.error(err);
     }
 
-    // Reset Form
-    setClientName('');
-    setClientPhone('');
-    setClientEmail('');
-    const resetQty: { [key: string]: number } = {};
-    Object.keys(tarifs.articles).forEach(k => {
-      resetQty[k] = 0;
-    });
-    setArticlesQty(resetQty);
-    setWeightKg(0);
-    setSupplements(prev => {
-      const reset: Record<string, boolean> = {};
-      Object.keys(prev).forEach(k => {
-        reset[k] = false;
-      });
-      return reset;
-    });
-    setDiscount(0);
-    setNotes('');
-    setPaymentStatus('paid');
-    setPaymentMethod('cash');
-    setAmountPaid(0);
-
+    // Do not reset form states immediately to allow printing/WhatsApp/PDF options
     // Open detail simulator immediately
     setSelectedTicket(newTicket);
 
@@ -26798,7 +26846,16 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Form Panel */}
           <form onSubmit={handleCreateTicket} className="lg:col-span-7 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
-            <h3 className="text-lg font-black text-ink border-b border-gray-50 pb-3">Informations de la Commande</h3>
+            <div className="flex justify-between items-center border-b border-gray-50 pb-3">
+              <h3 className="text-lg font-black text-ink">Informations de la Commande</h3>
+              <button
+                type="button"
+                onClick={resetFormFields}
+                className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition border border-rose-200"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> NOUVEAU CLIENT
+              </button>
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
@@ -27133,7 +27190,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                 </div>
 
                 <div className="space-y-1 text-gray-500">
-                  <p className="text-gray-900 font-bold">N° : PR-2026-#### (Généré à la création)</p>
+                  <p className="text-gray-900 font-bold">
+                    {selectedTicket ? `N° d'enregistrement : ${selectedTicket.ticketNumber}` : "N° : PR-2026-#### (Généré à la création)"}
+                  </p>
                   <p>Client : <span className="text-ink font-bold">{clientName || '________________'}</span></p>
                   <p>Contact : <span className="text-ink font-bold">{clientPhone || '________________'}</span></p>
                   <p>Dépôt : <span className="font-bold">{depositDate}</span></p>
@@ -27234,52 +27293,88 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               </div>
 
               {selectedTicket && (
-                <div className="flex flex-col gap-2 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/60">
-                  <p className="text-xs font-bold text-indigo-700 text-center">🎉 Nouveau ticket enregistré avec succès !</p>
+                <div className="flex flex-col gap-2.5 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100/60 shadow-inner">
+                  <p className="text-xs font-black text-indigo-700 text-center animate-pulse">🎉 Nouveau ticket enregistré : {selectedTicket.ticketNumber}</p>
                   
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Print & PDF Buttons */}
+                  <div className="grid grid-cols-2 gap-2 mt-1">
                     <button
                       type="button"
                       onClick={() => printPressingTicketDirect(merchant, selectedTicket, '80mm', tarifs, handleDownloadPDF)}
-                      className="bg-gray-905 bg-[#1e293b] hover:bg-black text-white font-bold text-[10px] sm:text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition text-center shadow-sm"
+                      className="bg-[#1e293b] hover:bg-black text-white font-bold text-[10px] sm:text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition text-center shadow-sm"
+                      title="Imprimer direct Roll 80mm"
                     >
-                      <Printer className="w-4 h-4" /> Ticket Caisse (80mm)
+                      <Printer className="w-4 h-4" /> Ticket Roll (80mm)
                     </button>
                     <button
                       type="button"
                       onClick={() => printPressingTicketDirect(merchant, selectedTicket, 'A4', tarifs, handleDownloadPDF)}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] sm:text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition text-center shadow-sm"
+                      title="Imprimer direct A4"
                     >
-                      <FileText className="w-4 h-4" /> Format A4
+                      <FileText className="w-4 h-4" /> Format A4 Client
                     </button>
                   </div>
 
-                  <div className="border-t border-indigo-200/50 mt-2.5 pt-2.5 space-y-2">
-                    <p className="text-[9px] font-mono font-bold text-indigo-700 uppercase tracking-widest text-center flex items-center justify-center gap-1.5">
+                  {/* Actions Area */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Download PDF button as requested ("téléchargement par pdf") */}
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadPDF(selectedTicket)}
+                      className="py-2 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[10px] sm:text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm border border-gray-200"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Télécharger PDF
+                    </button>
+
+                    {/* WhatsApp Client button as requested ("envois de par WhatsApp") */}
+                    <button
+                      type="button"
+                      onClick={() => handleSendClientWhatsApp(selectedTicket)}
+                      className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] sm:text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Client
+                    </button>
+                  </div>
+
+                  {/* Supervisor notifications */}
+                  <div className="border-t border-indigo-200/50 mt-1.5 pt-2">
+                    <p className="text-[9px] font-mono font-bold text-indigo-700 uppercase tracking-widest text-center flex items-center justify-center gap-1.5 mb-1.5">
                       <span>👑</span> Suivi Temps Réel du Gérant (Dépôt / Entrée)
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => dispatchManagerNotif(selectedTicket, 'entrée', 'whatsapp')}
-                        className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                        className="py-1.5 px-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[9px] font-bold rounded-xl flex items-center justify-center gap-1 transition shadow-sm"
                       >
-                        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Gérant
+                        <MessageSquare className="w-3 h-3 text-emerald-600" /> WhatsApp Gérant
                       </button>
                       <button
                         type="button"
                         onClick={() => dispatchManagerNotif(selectedTicket, 'entrée', 'email')}
-                        className="py-2 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                        className="py-1.5 px-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-[9px] font-bold rounded-xl flex items-center justify-center gap-1 transition shadow-sm"
                       >
-                        <Mail className="w-3.5 h-3.5" /> E-mail Gérant
+                        <Mail className="w-3 h-3 text-indigo-600" /> E-mail Gérant
                       </button>
                     </div>
                     {ticketMailFeedback[selectedTicket.id] && (
-                      <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg justify-center border border-emerald-100">
+                      <div className="mt-1.5 flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg justify-center border border-emerald-100">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         Ce mail envoyé en arrière-plan avec succès !
                       </div>
                     )}
+                  </div>
+
+                  {/* Reset form for a fresh client order */}
+                  <div className="border-t border-indigo-200/50 mt-1 pt-2">
+                    <button
+                      type="button"
+                      onClick={resetFormFields}
+                      className="w-full py-2.5 px-3 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[11px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition hover:scale-[1.02] duration-150 shadow-md"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} /> Commencer un Nouveau Client
+                    </button>
                   </div>
                 </div>
               )}
@@ -28362,7 +28457,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch('/api/send-email', {
+      const response = await fetch(getApiUrl('/api/send-email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
