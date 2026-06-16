@@ -72,20 +72,32 @@ function ensurePngExists() {
   try {
     if (fs.existsSync(outPath)) {
       const fd = fs.openSync(outPath, 'r');
-      const header = Buffer.alloc(8);
-      fs.readSync(fd, header, 0, 8, 0);
+      const header = Buffer.alloc(24);
+      fs.readSync(fd, header, 0, 24, 0);
       fs.closeSync(fd);
       
       // Valid PNG bytes: 89 50 4E 47 0D 0A 1A 0A
-      isValid = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47 &&
-                header[4] === 0x0D && header[5] === 0x0A && header[6] === 0x1A && header[7] === 0x0A;
+      const hasSignature = header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47 &&
+                           header[4] === 0x0D && header[5] === 0x0A && header[6] === 0x1A && header[7] === 0x0A;
+      
+      if (hasSignature) {
+        // Read width and height from PNG IHDR chunk (offsets 16-19 and 20-23)
+        const width = header.readUInt32BE(16);
+        const height = header.readUInt32BE(20);
+        console.log(`Checking existing icon dimensions: ${width}x${height}`);
+        if (width >= 512 && height >= 512) {
+          isValid = true;
+        } else {
+          console.log(`Existing icon is too small (${width}x${height}). Needs to be at least 512x512.`);
+        }
+      }
     }
   } catch (err) {
     isValid = false;
   }
 
   if (!isValid) {
-    console.log('Creating simple default fallback icon because the existing one is missing or corrupted...');
+    console.log('Creating simple default 512x512 fallback icon because the existing one is missing, corrupted, or too small...');
     try {
       const fallbackImage = createSolidPng(512, 512, 124, 58, 237); // Clean brand purple
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
