@@ -76,3 +76,13 @@
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: #d1d5db;
 }
+
+@keyframes scan {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(240px); }
+}
+
+.animate-scan {
+  animation: scan 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+

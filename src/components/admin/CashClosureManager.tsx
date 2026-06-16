@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Settings, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { showMailSuccessToast } from '../MailSuccessToast';
+import { AcomAlertPopup } from '../AcomAlertPopup';
 import { db } from '../../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Merchant } from '../../types';
@@ -27,10 +28,45 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     return saved ? JSON.parse(saved) : [];
   });
 
+  useEffect(() => {
+    localStorage.setItem(`cash_closures_${merchant.id}`, JSON.stringify(closures));
+  }, [closures, merchant.id]);
+
   const [closureDate, setClosureDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [cashierName, setCashierName] = useState('');
   const [actualCash, setActualCash] = useState<string>('');
   const [closureNotes, setClosureNotes] = useState('');
+
+  const [popup, setPopup] = useState<any>({
+    isOpen: false,
+    onClose: () => setPopup(prev => ({ ...prev, isOpen: false })),
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'warning' | 'error' | 'info' = 'info',
+    subtitle?: string,
+    showCancel = false,
+    confirmText = "D'ACCORD",
+    onConfirm?: () => void
+  ) => {
+    setPopup({
+      isOpen: true,
+      onClose: () => setPopup(prev => ({ ...prev, isOpen: false })),
+      title,
+      message,
+      type,
+      subtitle,
+      showCancel,
+      confirmText,
+      onConfirm
+    });
+  };
+
 
   const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
   const managerEmail = merchant.managerNotifications?.email || '';
@@ -42,6 +78,10 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
 
   const expenses = useLiveQuery(() => 
     db.expenses.where('merchantId').equals(merchant.id).toArray()
+  , [merchant.id]) || [];
+
+  const products = useLiveQuery(() => 
+    db.products.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
 
   const dailySales = useMemo(() => sales.filter(s => {
@@ -86,6 +126,8 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     return parseFloat(actualCash.toString().replace(/\s/g, '').replace(',', '.')) || 0;
   }, [actualCash]);
 
+  const lowStockItems = useMemo(() => products.filter(p => Number(p.stockQuantity || 0) > 0 && Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)), [products]);
+  const outOfStockItems = useMemo(() => products.filter(p => Number(p.stockQuantity || 0) <= 0), [products]);
 
   const [closureMailFeedback, setClosureMailFeedback] = useState<Record<string, boolean>>({});
 
@@ -93,7 +135,7 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     const diffSign = c.discrepancy >= 0 ? '+' : '';
     const diffText = c.discrepancy === 0 ? 'Parfait (0 FCFA)' : `${diffSign}${c.discrepancy} FCFA`;
     
-    return `👑 [CLÔTURE DE CAISSE JOURNALIÈRE] 📊\n` +
+    let message = `👑 [CLÔTURE DE CAISSE JOURNALIÈRE] 📊\n` +
            `--------------------------------\n` +
            `• Date d'Activité : ${c.date}\n` +
            `• Date Clôture : ${new Date(c.timestamp).toLocaleString('fr-FR')}\n` +
@@ -106,12 +148,26 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
            `• SOLDE ATTENDU (Théorique) : ${c.totalTheoreticalRevenue.toLocaleString()} FCFA\n` +
            `• ESPÈCES RÉELLES COMPTÉES : ${c.actualCashCounted.toLocaleString()} FCFA\n` +
            `• ÉCART DE CAISSE : ${diffText} (${c.discrepancy < 0 ? '⚠️ MANQUANT' : c.discrepancy > 0 ? '🟢 SURPLUS' : '✅ EQUILIBRE'})\n` +
-           `--------------------------------\n` +
-           `OBSERVATIONS :\n` +
+           `--------------------------------\n`;
+
+    if (lowStockItems.length > 0 || outOfStockItems.length > 0) {
+      message += `🚨 ALERTES STOCK :\n`;
+      if (outOfStockItems.length > 0) {
+        message += `❌ Épuisés : ${outOfStockItems.map(p => p.name).join(', ')}\n`;
+      }
+      if (lowStockItems.length > 0) {
+        message += `⚠️ Point de rupture : ${lowStockItems.map(p => `${p.name} (${p.stockQuantity || 0})`).join(', ')}\n`;
+      }
+      message += `--------------------------------\n`;
+    }
+
+    message += `OBSERVATIONS :\n` +
            `"${c.notes || 'Aucun commentaire.'}"\n` +
            `--------------------------------\n` +
            `Rapport de clôture journalier transmis en Temps Réel via l'application SaaS ${merchant.name || 'ACOM'}.`;
-  }, [merchant]);
+           
+    return message;
+  }, [merchant, lowStockItems, outOfStockItems]);
 
   const sendSilentBackgroundClosureEmailToManager = useCallback(async (c: CashClosure) => {
     if (!managerEmail || !managerEmail.trim()) return false;
@@ -180,6 +236,23 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
               <td style="padding: 12px 0 0 0; font-style: italic; color: #475569;">"${c.notes}"</td>
             </tr>
             ` : ''}
+            ${(lowStockItems.length > 0 || outOfStockItems.length > 0) ? `
+            <tr>
+              <td colspan="2" style="padding: 15px 0 5px 0; font-weight: bold; color: #ef4444; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">🚨 ALERTES STOCK :</td>
+            </tr>
+            ${outOfStockItems.length > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">❌ Articles Épuisés :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #ef4444;">${outOfStockItems.map(p => p.name).join(', ')}</td>
+            </tr>
+            ` : ''}
+            ${lowStockItems.length > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">⚠️ Point de Rupture :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #f59e0b;">${lowStockItems.map(p => `${p.name} (${p.stockQuantity || 0})`).join(', ')}</td>
+            </tr>
+            ` : ''}
+            ` : ''}
           </table>
         </div>
 
@@ -206,7 +279,7 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
       console.error('Error dispatching silent manager background mail:', error);
       return false;
     }
-  }, [managerEmail, merchant]);
+  }, [managerEmail, merchant, lowStockItems, outOfStockItems]);
 
   const dispatchManagerClosureNotif = async (c: CashClosure, method: 'whatsapp' | 'email') => {
     const textNotif = getManagerClosureNotificationMessage(c);
@@ -215,18 +288,18 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const url = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${managerPhone.replace(/\s+/g, '')}&text=${encodeURIComponent(textNotif)}`;
       window.open(url, '_blank');
-      toast.success('Rapport prêt pour envoi via WhatsApp !');
+      showAlert('Notification Gérant', 'Rapport prêt pour envoi via WhatsApp !', 'success', "WHATSAPP");
     } else {
-      toast.loading('Envoi du rapport par mail...');
+      const toastId = toast.loading('Envoi du rapport par mail...');
       const ok = await sendSilentBackgroundClosureEmailToManager(c);
-      toast.dismiss();
+      toast.dismiss(toastId);
       if (ok) {
-        showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+        showAlert('Notification Gérant', 'Ce mail envoyé en arrière-plan avec succès !', 'success', "ENVOI D'E-MAIL");
         setClosureMailFeedback(prev => ({ ...prev, [c.id]: true }));
       } else {
         const url = `mailto:${managerEmail}?subject=${encodeURIComponent(`📊 CLÔTURE DE CAISSE JOURNALIÈRE — ${c.date}`)}&body=${encodeURIComponent(textNotif)}`;
         window.open(url, '_blank');
-        toast.success("Rapport prêt dans votre logiciel d'e-mail !");
+        showAlert('Notification Gérant', "Rapport prêt dans votre logiciel d'e-mail !", 'success', "EMAIL");
       }
     }
   };
@@ -235,7 +308,7 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     e.preventDefault();
     
     if (!cashierName.trim()) {
-      toast.error('Veuillez indiquer le nom du caissier');
+      showAlert('Alerte', 'Veuillez indiquer le nom du caissier', 'error', 'Saisie Incomplète');
       return;
     }
 
@@ -255,24 +328,21 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
       notes: closureNotes
     };
 
-    setClosures(prev => [newClosure, ...prev]);
+    setClosures(prev => {
+      const filtered = prev.filter(c => c.date !== closureDate);
+      return [newClosure, ...filtered];
+    });
     
-    toast.success('Clôture de caisse enregistrée avec succès !');
+    showAlert('Transaction Réussie', 'Clôture de caisse enregistrée avec succès !', 'success', 'Système');
 
     if (autoEmailManager && managerEmail) {
-      toast.promise(
-        sendSilentBackgroundClosureEmailToManager(newClosure).then(ok => {
-          if (ok) {
-            showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
-          }
-          return ok;
-        }),
-        {
-          loading: 'Envoi du rapport au gérant...',
-          success: 'Rapport envoyé au gérant avec succès',
-          error: "Erreur lors de l'envoi du rapport auto"
+      const toastId = toast.loading('Envoi du rapport au gérant...');
+      sendSilentBackgroundClosureEmailToManager(newClosure).then(ok => {
+        toast.dismiss(toastId);
+        if (ok) {
+          showAlert('Notification Gérant', 'Ce mail envoyé en arrière-plan avec succès !', 'success', "ENVOI D'E-MAIL");
         }
-      );
+      });
     }
     
     setCashierName('');
@@ -388,6 +458,22 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
                 </div>
               )}
 
+              {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
+                <div className="p-4 bg-orange-50 rounded-2xl border border-orange-200">
+                  <h4 className="text-sm font-bold text-orange-800 mb-2">🚨 Alertes de Stock</h4>
+                  {outOfStockItems.length > 0 && (
+                    <div className="text-xs text-orange-900 mb-1">
+                      <span className="font-bold text-red-600">❌ Épuisés :</span> {outOfStockItems.map(p => p.name).join(', ')}
+                    </div>
+                  )}
+                  {lowStockItems.length > 0 && (
+                    <div className="text-xs text-orange-900">
+                      <span className="font-bold text-orange-600">⚠️ Point de rupture :</span> {lowStockItems.map(p => `${p.name} (${p.stockQuantity || 0})`).join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1.5">Observations / Justifications</label>
                 <textarea
@@ -471,6 +557,8 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
           </div>
         </div>
       </div>
+    
+      <AcomAlertPopup {...popup} />
     </motion.div>
   );
 };

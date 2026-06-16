@@ -39,6 +39,7 @@ import {
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { showMailSuccessToast } from '../components/MailSuccessToast';
+import { triggerAcomAlert, AcomAlertEventProvider } from '../components/AcomAlertEventProvider';
 import { AcomZoneMerchantPanel } from '../components/AcomZoneMerchantPanel';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -49,6 +50,7 @@ import { DailyBriefing } from '../components/DailyBriefing';
 import { OptimizedImage } from '../components/OptimizedImage';
 import { NetworkStatusIndicator } from '../components/NetworkStatusIndicator';
 import { BarcodeScanner } from '../components/BarcodeScanner';
+import ScannerModal from '../components/ScannerModal';
 import { payDunyaService } from '../services/payDunyaService';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -2111,6 +2113,7 @@ const MerchantSaaS = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pt-6 md:pt-12 lg:pt-24 pb-12">
+      <AcomAlertEventProvider />
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="flex flex-col mb-6 md:mb-12 gap-6">
@@ -3993,9 +3996,9 @@ const MerchantDashboard = ({
 
     // Point 6: Aggregation - Use aggregated stats if available, otherwise fallback to in-memory calculation
     const revenue = merchantStats?.revenue ? {
-      today: merchantStats.lastUpdate === today ? merchantStats.revenue.today : 0,
-      month: merchantStats.lastMonth === thisMonth ? merchantStats.revenue.month : 0,
-      year: merchantStats.lastYear === thisYear ? merchantStats.revenue.year : 0,
+      today: merchantStats.lastUpdate === today ? merchantStats.revenue.today : sumSales(salesToday),
+      month: merchantStats.lastMonth === thisMonth ? merchantStats.revenue.month : sumSales(salesMonth),
+      year: merchantStats.lastYear === thisYear ? merchantStats.revenue.year : sumSales(salesYear),
       total: merchantStats.revenue.total
     } : {
       today: sumSales(salesToday),
@@ -4005,9 +4008,9 @@ const MerchantDashboard = ({
     };
 
     const expensesStats = merchantStats?.expenses ? {
-      today: merchantStats.lastUpdate === today ? merchantStats.expenses.today : 0,
-      month: merchantStats.lastMonth === thisMonth ? merchantStats.expenses.month : 0,
-      year: merchantStats.lastYear === thisYear ? merchantStats.expenses.year : 0,
+      today: merchantStats.lastUpdate === today ? merchantStats.expenses.today : sumExpenses(expensesToday),
+      month: merchantStats.lastMonth === thisMonth ? merchantStats.expenses.month : sumExpenses(expensesMonth),
+      year: merchantStats.lastYear === thisYear ? merchantStats.expenses.year : sumExpenses(expensesYear),
       total: merchantStats.expenses.total
     } : {
       today: sumExpenses(expensesToday),
@@ -4526,12 +4529,12 @@ const MerchantDashboard = ({
                     onClick={() => {
                       if (desktopOS === 'windows') {
                         window.open("https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe", '_blank');
-                        toast.success('Démarrage du téléchargement Windows...');
+                        triggerAcomAlert('Succès', 'Démarrage du téléchargement Windows...', 'success', 'SYSTÈME');
                       } else if (desktopOS === 'mac') {
                         window.open("https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg", '_blank');
-                        toast.success('Démarrage du téléchargement MacOS...');
+                        triggerAcomAlert('Succès', 'Démarrage du téléchargement MacOS...', 'success', 'SYSTÈME');
                       } else {
-                        toast.error('Version Linux non disponible pour le moment.');
+                        triggerAcomAlert('Erreur', 'Version Linux non disponible pour le moment.', 'error', 'ALERTE');
                       }
                     }}
                     className={`w-full relative group/btn overflow-hidden px-5 py-3.5 ${desktopOS === 'linux' ? 'bg-gray-600 text-gray-300 cursor-not-allowed' : 'bg-emerald-500 text-black hover:bg-emerald-400 hover:shadow-[0_0_25px_rgba(16,185,129,0.4)] active:scale-95 shadow-[0_0_15px_rgba(16,185,129,0.3)]'} rounded-xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-2.5`}
@@ -4607,17 +4610,20 @@ const MerchantDashboard = ({
           
         {(merchant.type === 'boutique' || !merchant.type || merchant.type === 'pressing') && (
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 text-primary font-bold">
-              <Calendar className="w-5 h-5 text-indigo-600" />
+            <div className="flex items-center gap-2 text-violet-600 font-bold">
+              <Calendar className="w-5 h-5 text-violet-600" />
               <span>Période des statistiques de vente</span>
             </div>
-            <input
-              type="month"
-              value={dashboardSelectedMonth}
-              onChange={(e) => setDashboardSelectedMonth(e.target.value)}
-              className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-colors"
-              max={new Date().toISOString().slice(0, 7)}
-            />
+            <div className="relative flex items-center">
+              <input
+                type="month"
+                value={dashboardSelectedMonth}
+                onChange={(e) => setDashboardSelectedMonth(e.target.value)}
+                className="relative pl-4 pr-10 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-all text-sm outline-none [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:z-10 z-0"
+                max={new Date().toISOString().slice(0, 7)}
+              />
+              <Calendar className="absolute right-3 w-4 h-4 text-slate-400 pointer-events-none z-0" />
+            </div>
           </div>
         )}
         <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${(merchant.type === 'boutique' || !merchant.type) ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-4'}`}>
@@ -5727,7 +5733,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       }
 
       if (foundName) {
-        toast.success(`Produit détecté : ${foundName.substring(0, 30)}...`, { id: "barcode-search" });
+        toast.success(`Produit détecté : ${foundName.substring(0, 30)}...`, { id: 'barcode-search' });
         setCurrentProduct(prev => {
            if (!prev) return prev;
            return {
@@ -5738,11 +5744,11 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
            };
         });
       } else {
-        toast.success(`Code-barres scanné : ${code}`, { id: "barcode-search" });
+        toast.success(`Code-barres scanné : ${code}`, { id: 'barcode-search' });
         setCurrentProduct(prev => prev ? {...prev, sku: code} : prev);
       }
     } catch (err) {
-      toast.success(`Code-barres scanné : ${code}`, { id: "barcode-search" });
+      toast.success(`Code-barres scanné : ${code}`, { id: 'barcode-search' });
       setCurrentProduct(prev => prev ? {...prev, sku: code} : prev);
     }
   };
@@ -5768,10 +5774,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
             const match = products.find(p => p.sku && p.sku.trim().toLowerCase() === code.trim().toLowerCase());
             if (match) {
               setSearchTerm(code);
-              toast.success(`Produit trouvé : ${match.name}`);
+              triggerAcomAlert('Succès', `Produit trouvé : ${match.name}`, 'success', 'SYSTÈME');
             } else {
               setSearchTerm(code);
-              toast.error("Aucun produit trouvé avec ce code : " + code);
+              triggerAcomAlert('Erreur', "Aucun produit trouvé avec ce code : " + code, 'error', 'ALERTE');
             }
           }
         }
@@ -5831,7 +5837,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
     if (!currentProduct?.name || currentProduct.price === undefined) return;
     
     if (!currentProduct.id && merchant.plan === 'FREE' && products.length >= 2) {
-      toast.error('Vous avez atteint la limite de 2 produits pour le plan TESTE. Veuillez passer au forfait supérieur.');
+      triggerAcomAlert('Erreur', 'Vous avez atteint la limite de 2 produits pour le plan TESTE. Veuillez passer au forfait supérieur.', 'error', 'ALERTE');
       if (setShowUpgradeModal) setShowUpgradeModal(true);
       return;
     }
@@ -5865,11 +5871,11 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
         }
       }
 
-      toast.success(currentProduct.id ? 'Produit mis à jour' : 'Produit ajouté');
+      triggerAcomAlert('Succès', currentProduct.id ? 'Produit mis à jour' : 'Produit ajouté', 'success', 'SYSTÈME');
       setIsEditing(false);
       setCurrentProduct(null);
     } catch (error) {
-      toast.error('Erreur lors de l\'enregistrement');
+      triggerAcomAlert('Erreur', 'Erreur lors de l\'enregistrement', 'error', 'ALERTE');
     } finally {
       setSaving(false);
     }
@@ -5900,7 +5906,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
         merchant.ownerId,
         calculatedCost
       );
-      toast.success('Stock mis à jour');
+      triggerAcomAlert('Succès', 'Stock mis à jour', 'success', 'SYSTÈME');
       setIsRestocking(false);
       setRestockData({ 
         quantity: 0, 
@@ -5910,7 +5916,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
         reason: 'Réapprovisionnement standard' 
       });
     } catch (error) {
-      toast.error('Erreur lors de la mise à jour du stock');
+      triggerAcomAlert('Erreur', 'Erreur lors de la mise à jour du stock', 'error', 'ALERTE');
     } finally {
       setSaving(false);
     }
@@ -5920,10 +5926,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
     setSaving(true);
     try {
       await dbService.merchantProducts.delete(id);
-      toast.success('Produit supprimé');
+      triggerAcomAlert('Succès', 'Produit supprimé', 'success', 'SYSTÈME');
       setDeleteConfirm(null);
     } catch (error) {
-      toast.error('Erreur lors de la suppression');
+      triggerAcomAlert('Erreur', 'Erreur lors de la suppression', 'error', 'ALERTE');
     } finally {
       setSaving(false);
     }
@@ -5987,9 +5993,9 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     if (e.key === 'Enter' && searchTerm.trim().length > 2) {
                       const match = products.find(p => p.sku && p.sku.trim().toLowerCase() === searchTerm.trim().toLowerCase());
                       if (match) {
-                        toast.success(`Produit trouvé : ${match.name}`);
+                        triggerAcomAlert('Succès', `Produit trouvé : ${match.name}`, 'success', 'SYSTÈME');
                       } else {
-                        toast.error("Aucun produit trouvé avec ce code : " + searchTerm);
+                        triggerAcomAlert('Erreur', "Aucun produit trouvé avec ce code : " + searchTerm, 'error', 'ALERTE');
                       }
                     }
                   }}
@@ -6444,31 +6450,31 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       </AnimatePresence>
 
       {/* Barcode Scanner Modal Modal */}
-      {showBarcodeScanner && (
-        <BarcodeScanner 
-          onClose={() => setShowBarcodeScanner(false)} 
-          onScan={(code) => {
-            setShowBarcodeScanner(false);
-            setSearchTerm(code);
-            const match = products.find(p => p.sku && p.sku.trim().toLowerCase() === code.trim().toLowerCase());
-            if (match) {
-               toast.success(`Produit trouvé : ${match.name}`);
-            } else {
-               toast.error("Aucun produit trouvé.");
-            }
-          }} 
-        />
-      )}
+      <ScannerModal
+        isOpen={showBarcodeScanner}
+        onClose={() => setShowBarcodeScanner(false)}
+        onScanSuccess={(code) => {
+          setShowBarcodeScanner(false);
+          setSearchTerm(code);
+          const match = products.find(p => p.sku && p.sku.trim().toLowerCase() === code.trim().toLowerCase());
+          if (match) {
+             triggerAcomAlert('Succès', `Produit trouvé : ${match.name}`, 'success', 'SYSTÈME');
+          } else {
+             triggerAcomAlert('Erreur', "Aucun produit trouvé.", 'error', 'ALERTE');
+          }
+        }}
+        title="Rechercher un produit"
+      />
 
-      {showSKUScanner && (
-        <BarcodeScanner 
-          onClose={() => setShowSKUScanner(false)} 
-          onScan={(code) => {
-            setShowSKUScanner(false);
-            handleBarcodeForNewProduct(code);
-          }} 
-        />
-      )}
+      <ScannerModal
+        isOpen={showSKUScanner}
+        onClose={() => setShowSKUScanner(false)}
+        onScanSuccess={(code) => {
+          setShowSKUScanner(false);
+          handleBarcodeForNewProduct(code);
+        }}
+        title="Scanner Code-barres / SKU"
+      />
 
       {/* Product Modal */}
       <AnimatePresence>
@@ -6845,10 +6851,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         triggerCartError("ARTICLE EN RUPTURE : " + match.name);
       } else {
         addToCart(match);
-        toast.success(`Ajouté : ${match.name}`);
+        triggerAcomAlert('Succès', `Ajouté : ${match.name}`, 'success', 'SYSTÈME');
       }
     } else {
-      toast.error(`Code non reconnu : ${code}`);
+      triggerAcomAlert('Erreur', `Code non reconnu : ${code}`, 'error', 'ALERTE');
     }
   }, [products]);
 
@@ -7042,7 +7048,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
         if (existing.quantity >= (product.stockQuantity || 0)) {
-          toast.error('Stock insuffisant');
+          triggerAcomAlert('Erreur', 'Stock insuffisant', 'error', 'ALERTE');
           return prev;
         }
         return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + 1 } : item);
@@ -7078,7 +7084,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         .count();
 
       if (salesTodayCount >= 2) {
-        toast.error('Vous avez atteint la limite de 2 ventes par jour pour le plan TESTE. Veuillez passer au forfait supérieur.');
+        triggerAcomAlert('Erreur', 'Vous avez atteint la limite de 2 ventes par jour pour le plan TESTE. Veuillez passer au forfait supérieur.', 'error', 'ALERTE');
         if (setShowUpgradeModal) setShowUpgradeModal(true);
         setIsSubmitting(false);
         return;
@@ -7270,7 +7276,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 setEmailSendStatus('simulated');
               } else if (data.success) {
                 setEmailSendStatus('success');
-                showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
+                triggerAcomAlert('Notification Gérant', "Ce mail envoyé en arrière-plan avec succès !", 'success', "ENVOI D'E-MAIL");
               } else {
                 setEmailSendStatus('error');
                 setEmailSendError(data.error || "Erreur de transmission");
@@ -7298,10 +7304,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
-      toast.success('Vente enregistrée !');
+      triggerAcomAlert('Succès', 'Vente enregistrée !', 'success', 'SYSTÈME');
     } catch (error) {
       console.error('Checkout error:', error);
-      toast.error('Erreur lors de la vente');
+      triggerAcomAlert('Erreur', 'Erreur lors de la vente', 'error', 'ALERTE');
     } finally {
       setIsSubmitting(false);
     }
@@ -7575,7 +7581,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                       setSearchTerm('');
                     } else {
                       addToCart(match);
-                      toast.success(`Ajouté : ${match.name}`);
+                      triggerAcomAlert('Succès', `Ajouté : ${match.name}`, 'success', 'SYSTÈME');
                       setSearchTerm('');
                     }
                   }
@@ -8060,15 +8066,15 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         )}
       </AnimatePresence>
 
-      {showBarcodeScanner && (
-        <BarcodeScanner 
-          onClose={() => setShowBarcodeScanner(false)} 
-          onScan={(code) => {
-            setShowBarcodeScanner(false);
-            handleBarcodeScanned(code);
-          }} 
-        />
-      )}
+      <ScannerModal
+        isOpen={showBarcodeScanner}
+        onClose={() => setShowBarcodeScanner(false)}
+        onScanSuccess={(code) => {
+          setShowBarcodeScanner(false);
+          handleBarcodeScanned(code);
+        }}
+        title="Scanner pour la caisse"
+      />
 
       {/* Receipt Modal */}
       <AnimatePresence>
@@ -8740,9 +8746,9 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       setIsAddingExpense(false);
       setNewExpense({ title: '', amount: 0, category: 'Général', description: '' });
       setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
-      toast.success('Dépense enregistrée avec succès !');
+      triggerAcomAlert('Succès', 'Dépense enregistrée avec succès !', 'success', 'SYSTÈME');
     } catch (error) {
-      toast.error('Erreur lors de l\'enregistrement');
+      triggerAcomAlert('Erreur', 'Erreur lors de l\'enregistrement', 'error', 'ALERTE');
     } finally {
       setSaving(false);
     }
@@ -8981,9 +8987,9 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
   const handleConvertQuote = async (quote: MerchantQuote) => {
     try {
       await billingService.convertQuoteToInvoice(quote, merchant);
-      toast.success('Devis converti en facture avec succès');
+      triggerAcomAlert('Succès', 'Devis converti en facture avec succès', 'success', 'SYSTÈME');
     } catch (error: any) {
-      toast.error(error.message);
+      triggerAcomAlert('Erreur', error.message, 'error', 'ALERTE');
     }
   };
 
@@ -9610,11 +9616,11 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
         ...currentSupplier,
         merchantId: merchant.id
       });
-      toast.success(currentSupplier.id ? 'Fournisseur mis à jour' : 'Fournisseur ajouté');
+      triggerAcomAlert('Succès', currentSupplier.id ? 'Fournisseur mis à jour' : 'Fournisseur ajouté', 'success', 'SYSTÈME');
       setIsEditing(false);
       setCurrentSupplier(null);
     } catch (error) {
-      toast.error('Erreur lors de l\'enregistrement');
+      triggerAcomAlert('Erreur', 'Erreur lors de l\'enregistrement', 'error', 'ALERTE');
     } finally {
       setSaving(false);
     }
@@ -9624,9 +9630,9 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
     if (!window.confirm('Supprimer ce fournisseur ?')) return;
     try {
       await dbService.merchantSuppliers.delete(id);
-      toast.success('Fournisseur supprimé');
+      triggerAcomAlert('Succès', 'Fournisseur supprimé', 'success', 'SYSTÈME');
     } catch (error) {
-      toast.error('Erreur lors de la suppression');
+      triggerAcomAlert('Erreur', 'Erreur lors de la suppression', 'error', 'ALERTE');
     }
   };
 
@@ -10044,10 +10050,10 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success('Rapport exporté sous format CSV !');
+      triggerAcomAlert('Succès', 'Rapport exporté sous format CSV !', 'success', 'SYSTÈME');
     } catch (error) {
       console.error(error);
-      toast.error("Échec de l'exportation CSV.");
+      triggerAcomAlert('Erreur', "Échec de l'exportation CSV.", 'error', 'ALERTE');
     }
   };
 
@@ -10270,7 +10276,7 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       saveOrSharePDF(doc, `rapport_financier_${merchant.name.toLowerCase().replace(/\s+/g, '_')}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
     } catch (error) {
       console.error(error);
-      toast.error('Échec de la génération du PDF.');
+      triggerAcomAlert('Erreur', 'Échec de la génération du PDF.', 'error', 'ALERTE');
     }
   };
 
@@ -10304,17 +10310,20 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       </div>
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-2 text-primary font-bold">
-          <Calendar className="w-5 h-5 text-indigo-600" />
+        <div className="flex items-center gap-2 text-violet-600 font-bold">
+          <Calendar className="w-5 h-5 text-violet-600" />
           <span>Période des statistiques de vente</span>
         </div>
-        <input
-          type="month"
-          value={reportSelectedMonth}
-          onChange={(e) => setReportSelectedMonth(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-colors"
-          max={new Date().toISOString().slice(0, 7)}
-        />
+        <div className="relative flex items-center">
+          <input
+            type="month"
+            value={reportSelectedMonth}
+            onChange={(e) => setReportSelectedMonth(e.target.value)}
+            className="relative pl-4 pr-10 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent cursor-pointer font-medium text-slate-700 bg-slate-50 hover:bg-white transition-all text-sm outline-none [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:left-0 [&::-webkit-calendar-picker-indicator]:top-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:z-10 z-0"
+            max={new Date().toISOString().slice(0, 7)}
+          />
+          <Calendar className="absolute right-3 w-4 h-4 text-slate-400 pointer-events-none z-0" />
+        </div>
       </div>
 
       {/* Financial KPIs */}
@@ -10812,9 +10821,9 @@ const MerchantSettings = ({
       link.href = url;
       link.download = `studio-acom-backup-${merchant.id}-${new Date().toISOString().split('T')[0]}.json`;
       link.click();
-      toast.success('Données exportées avec succès');
+      triggerAcomAlert('Succès', 'Données exportées avec succès', 'success', 'SYSTÈME');
     } catch (error) {
-      toast.error('Erreur lors de l\'exportation');
+      triggerAcomAlert('Erreur', 'Erreur lors de l\'exportation', 'error', 'ALERTE');
     } finally {
       setIsExporting(false);
     }
@@ -10827,10 +10836,10 @@ const MerchantSettings = ({
         await db.products.clear();
         await db.expenses.clear();
         localStorage.clear();
-        toast.success('Cache vidé. L\'application va redémarrer.');
+        triggerAcomAlert('Succès', 'Cache vidé. L\'application va redémarrer.', 'success', 'SYSTÈME');
         window.location.reload();
       } catch (error) {
-        toast.error('Erreur lors du nettoyage');
+        triggerAcomAlert('Erreur', 'Erreur lors du nettoyage', 'error', 'ALERTE');
       }
     }
   };
@@ -10841,9 +10850,9 @@ const MerchantSettings = ({
     try {
       await dbService.merchants.save({ ...formData, updatedAt: new Date() } as any);
       onUpdate(formData);
-      toast.success('Réglages mis à jour');
+      triggerAcomAlert('Succès', 'Réglages mis à jour', 'success', 'SYSTÈME');
     } catch (error) {
-      toast.error('Erreur lors de la mise à jour');
+      triggerAcomAlert('Erreur', 'Erreur lors de la mise à jour', 'error', 'ALERTE');
     } finally {
       setSaving(false);
     }
@@ -24384,6 +24393,18 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
     db.expenses.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
   , []) || [];
 
+  const products = useMemo(() => {
+    try {
+      const saved = localStorage.getItem(`pressing_stock_products_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id]);
+
+  const lowStockItems = useMemo(() => products.filter((p: any) => Number(p.stock || 0) > 0 && Number(p.stock || 0) <= (Number(p.minStock) || 5)), [products]);
+  const outOfStockItems = useMemo(() => products.filter((p: any) => Number(p.stock || 0) <= 0), [products]);
+
   // Memos for daily stats
   const dailyPressingTickets = useMemo(() => {
     return tickets.filter(t => t.depositDate === closureDate);
@@ -24430,7 +24451,7 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
     const diffSign = c.discrepancy >= 0 ? '+' : '';
     const diffText = c.discrepancy === 0 ? 'Parfait (0 FCFA)' : `${diffSign}${c.discrepancy} FCFA`;
     
-    return `👑 [CLÔTURE DE CAISSE DE PRESSING] 📊\n` +
+    let message = `👑 [CLÔTURE DE CAISSE DE PRESSING] 📊\n` +
            `--------------------------------\n` +
            `• Date d'Activité : ${c.date}\n` +
            `• Date Clôture : ${new Date(c.timestamp).toLocaleString('fr-FR')}\n` +
@@ -24444,12 +24465,26 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
            `• SOLDE ATTENDU (Théorique) : ${c.totalTheoreticalRevenue.toLocaleString()} FCFA\n` +
            `• ESPÈCES RÉELLES COMPTÉES : ${c.actualCashCounted.toLocaleString()} FCFA\n` +
            `• ÉCART DE CAISSE : ${diffText} (${c.discrepancy < 0 ? '⚠️ MANQUANT' : c.discrepancy > 0 ? '🟢 SURPLUS' : '✅ EQUILIBRE'})\n` +
-           `--------------------------------\n` +
-           `OBSERVATIONS :\n` +
+           `--------------------------------\n`;
+
+    if (lowStockItems.length > 0 || outOfStockItems.length > 0) {
+      message += `🚨 ALERTES STOCK :\n`;
+      if (outOfStockItems.length > 0) {
+        message += `❌ Épuisés : ${outOfStockItems.map(p => p.name).join(', ')}\n`;
+      }
+      if (lowStockItems.length > 0) {
+        message += `⚠️ Point de rupture : ${lowStockItems.map(p => `${p.name} (${p.stock || 0})`).join(', ')}\n`;
+      }
+      message += `--------------------------------\n`;
+    }
+
+    message += `OBSERVATIONS :\n` +
            `"${c.notes || 'Aucun commentaire.'}"\n` +
            `--------------------------------\n` +
            `Rapport de clôture journalier transmis en Temps Réel via l'application SaaS ${merchant.name || 'ACOM'}.`;
-  }, [merchant]);
+
+    return message;
+  }, [merchant, lowStockItems, outOfStockItems]);
 
   const sendSilentBackgroundClosureEmailToManager = useCallback(async (c: PressingClosure) => {
     if (!managerEmail || !managerEmail.trim()) return false;
@@ -24523,6 +24558,23 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
               <td style="padding: 12px 0 0 0; font-style: italic; color: #475569;">"${c.notes}"</td>
             </tr>
             ` : ''}
+            ${(lowStockItems.length > 0 || outOfStockItems.length > 0) ? `
+            <tr>
+              <td colspan="2" style="padding: 15px 0 5px 0; font-weight: bold; color: #ef4444; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">🚨 ALERTES STOCK :</td>
+            </tr>
+            ${outOfStockItems.length > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">❌ Articles Épuisés :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #ef4444;">${outOfStockItems.map(p => p.name).join(', ')}</td>
+            </tr>
+            ` : ''}
+            ${lowStockItems.length > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">⚠️ Point de Rupture :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #f59e0b;">${lowStockItems.map(p => `${p.name} (${p.stock || 0})`).join(', ')}</td>
+            </tr>
+            ` : ''}
+            ` : ''}
           </table>
         </div>
 
@@ -24549,7 +24601,7 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
       console.error('Error dispatching silent manager background mail:', error);
       return false;
     }
-  }, [managerEmail, merchant]);
+  }, [managerEmail, merchant, lowStockItems, outOfStockItems]);
 
   const dispatchManagerClosureNotif = (c: PressingClosure, method: 'whatsapp' | 'email') => {
     const textNotif = getManagerClosureNotificationMessage(c);
@@ -24681,6 +24733,22 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                 </div>
               )}
 
+              {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
+                <div className="p-4 bg-orange-50 rounded-2xl border border-orange-200">
+                  <h4 className="text-sm font-bold text-orange-800 mb-2">🚨 Alertes de Stock</h4>
+                  {outOfStockItems.length > 0 && (
+                    <div className="text-xs text-orange-900 mb-1">
+                      <span className="font-bold text-red-600">❌ Épuisés :</span> {outOfStockItems.map(p => p.name).join(', ')}
+                    </div>
+                  )}
+                  {lowStockItems.length > 0 && (
+                    <div className="text-xs text-orange-900">
+                      <span className="font-bold text-orange-600">⚠️ Point de rupture :</span> {lowStockItems.map(p => `${p.name} (${p.stock || 0})`).join(', ')}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Observations / Justifications</label>
                 <textarea
@@ -24718,7 +24786,9 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                     };
 
                     let sentEmail = false;
+                    let hasAttemptedEmail = false;
                     if (autoEmailManager && managerEmail && managerEmail.trim()) {
+                      hasAttemptedEmail = true;
                       const toastId = toast.loading('Envoi automatique du rapport de clôture au Gérant...');
                       const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
                       sentEmail = success;
@@ -24756,7 +24826,10 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                     // Reset inputs
                     setActualCash(0);
                     setClosureNotes('');
-                    showAlert('Clôture Enregistrée', `Clôture du ${closureDate} enregistrée à l'instant avec succès !`, 'success', undefined, false, "D'ACCORD", "COFFRE FORT");
+                    
+                    if (!hasAttemptedEmail) {
+                      showAlert('Clôture Enregistrée', `Clôture du ${closureDate} enregistrée à l'instant avec succès !`, 'success', undefined, false, "D'ACCORD", "COFFRE FORT");
+                    }
                   };
 
                   // Check if closure already exists for this date to prevent duplicate
@@ -25552,6 +25625,18 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     }
   };
 
+  const products = useMemo(() => {
+    try {
+      const saved = localStorage.getItem(`pressing_stock_products_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id]);
+
+  const lowStockItems = useMemo(() => products.filter((p: any) => Number(p.stock || 0) > 0 && Number(p.stock || 0) <= (Number(p.minStock) || 5)), [products]);
+  const outOfStockItems = useMemo(() => products.filter((p: any) => Number(p.stock || 0) <= 0), [products]);
+
   const dailyPressingTickets = useMemo(() => {
     return tickets.filter(t => t.depositDate === closureDate);
   }, [tickets, closureDate]);
@@ -25580,7 +25665,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     const diffSign = c.discrepancy >= 0 ? '+' : '';
     const diffText = c.discrepancy === 0 ? 'Parfait (0 FCFA)' : `${diffSign}${c.discrepancy} FCFA`;
     
-    return `👑 [CLÔTURE DE CAISSE DE PRESSING] 📊\n` +
+    let message = `👑 [CLÔTURE DE CAISSE DE PRESSING] 📊\n` +
            `--------------------------------\n` +
            `• Date d'Activité : ${c.date}\n` +
            `• Date Clôture : ${new Date(c.timestamp).toLocaleString('fr-FR')}\n` +
@@ -25593,12 +25678,26 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
            `• TOTAL ATTENDU : ${c.totalTheoreticalRevenue} FCFA\n` +
            `• ESPÈCES RÉELLES : ${c.actualCashCounted} FCFA\n` +
            `• ÉCART DE CAISSE : ${diffText} (${c.discrepancy < 0 ? '⚠️ MANQUANT' : c.discrepancy > 0 ? '🟢 SURPLUS' : '✅ EQUILIBRE'})\n` +
-           `--------------------------------\n` +
-           `OBSERVATIONS :\n` +
+           `--------------------------------\n`;
+
+    if (lowStockItems.length > 0 || outOfStockItems.length > 0) {
+      message += `🚨 ALERTES STOCK :\n`;
+      if (outOfStockItems.length > 0) {
+        message += `❌ Épuisés : ${outOfStockItems.map(p => p.name).join(', ')}\n`;
+      }
+      if (lowStockItems.length > 0) {
+        message += `⚠️ Point de rupture : ${lowStockItems.map(p => `${p.name} (${p.stock || 0})`).join(', ')}\n`;
+      }
+      message += `--------------------------------\n`;
+    }
+
+    message += `OBSERVATIONS :\n` +
            `"${c.notes || 'Aucun commentaire.'}"\n` +
            `--------------------------------\n` +
            `Rapport de clôture journalier transmis en Temps Réel via l'application SaaS ${merchant.name || 'ACOM'}.`;
-  }, [merchant]);
+
+    return message;
+  }, [merchant, lowStockItems, outOfStockItems]);
 
   const sendSilentBackgroundClosureEmailToManager = useCallback(async (c: PressingClosure) => {
     if (!managerEmail || !managerEmail.trim()) return false;
@@ -25668,6 +25767,23 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               <td style="padding: 12px 0 0 0; font-style: italic; color: #475569;">"${c.notes}"</td>
             </tr>
             ` : ''}
+            ${(lowStockItems.length > 0 || outOfStockItems.length > 0) ? `
+            <tr>
+              <td colspan="2" style="padding: 15px 0 5px 0; font-weight: bold; color: #ef4444; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">🚨 ALERTES STOCK :</td>
+            </tr>
+            ${outOfStockItems.length > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">❌ Articles Épuisés :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #ef4444;">${outOfStockItems.map(p => p.name).join(', ')}</td>
+            </tr>
+            ` : ''}
+            ${lowStockItems.length > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; padding-left: 10px;">⚠️ Point de Rupture :</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #f59e0b;">${lowStockItems.map(p => `${p.name} (${p.stock || 0})`).join(', ')}</td>
+            </tr>
+            ` : ''}
+            ` : ''}
           </table>
         </div>
 
@@ -25693,7 +25809,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     } catch {
       return false;
     }
-  }, [managerEmail, merchant]);
+  }, [managerEmail, merchant, lowStockItems, outOfStockItems]);
 
   const dispatchManagerClosureNotif = useCallback((c: PressingClosure, method: 'whatsapp' | 'email') => {
     const message = getManagerClosureNotificationMessage(c);
@@ -27406,6 +27522,7 @@ interface DetergentProduct {
   minStock: number;
   category: string;
   description: string;
+  sku?: string;
 }
 
 interface DetergentSale {
@@ -27717,6 +27834,9 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const [formMinStock, setFormMinStock] = useState<number>(3);
   const [formCategory, setFormCategory] = useState<string>('liquid');
   const [formDescription, setFormDescription] = useState('');
+  const [formSku, setFormSku] = useState('');
+  const [showFormSkuScanner, setShowFormSkuScanner] = useState(false);
+  const [showSearchScanner, setShowSearchScanner] = useState(false);
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
   const [newCategoryLabelInput, setNewCategoryLabelInput] = useState('');
 
@@ -27748,7 +27868,12 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
   // Alert count (low stock)
   const lowStockCount = useMemo(() => {
-    return products.filter(p => p.stock <= p.minStock).length;
+    return products.filter(p => p.stock > 0 && p.stock <= p.minStock).length;
+  }, [products]);
+
+  // Alert count (out of stock)
+  const outOfStockCount = useMemo(() => {
+    return products.filter(p => p.stock <= 0).length;
   }, [products]);
 
   // Save stocks to storage
@@ -27911,7 +28036,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         stock: formStock,
         minStock: formMinStock,
         category: formCategory,
-        description: formDescription
+        description: formDescription,
+        sku: formSku.trim() || undefined
       } : p);
       saveProductsToStorage(updated);
       toast.success('Caractéristiques du détergent mises à jour !');
@@ -27925,7 +28051,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         stock: formStock,
         minStock: formMinStock,
         category: formCategory,
-        description: formDescription
+        description: formDescription,
+        sku: formSku.trim() || undefined
       };
       saveProductsToStorage([newProd, ...products]);
       toast.success('Nouveau détergent référencé avec succès !');
@@ -27940,6 +28067,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setFormMinStock(3);
     setFormCategory('liquid');
     setFormDescription('');
+    setFormSku('');
   };
 
   // Load form for editing
@@ -27952,6 +28080,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setFormMinStock(prod.minStock);
     setFormCategory(prod.category);
     setFormDescription(prod.description);
+    setFormSku(prod.sku || '');
   };
 
   // Delete product
@@ -28045,7 +28174,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.description.toLowerCase().includes(searchQuery.toLowerCase());
+                          p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchCat = categoryFilter === 'all' || p.category === categoryFilter;
       
       let matchStock = true;
@@ -28069,9 +28199,14 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             <h2 className="text-2xl font-black text-ink tracking-tight flex items-center gap-2">
               🧪 Gestion du Stock & Vente Directe
             </h2>
+            {outOfStockCount > 0 && (
+              <span className="px-2.5 py-1 bg-red-50 text-red-600 font-bold text-[10px] uppercase rounded-full border border-red-200 animate-pulse flex items-center gap-1">
+                🔴 {outOfStockCount} Rupture{outOfStockCount > 1 ? 's' : ''}
+              </span>
+            )}
             {lowStockCount > 0 && (
               <span className="px-2.5 py-1 bg-amber-50 text-amber-600 font-bold text-[10px] uppercase rounded-full border border-amber-200 animate-pulse">
-                ⚠️ {lowStockCount} alertes
+                ⚠️ {lowStockCount} Stock Bas
               </span>
             )}
           </div>
@@ -28112,7 +28247,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       {activeSubTab !== 'history' && (
         <div className="space-y-6">
           {/* Quick Metrics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="bg-[#fcfcf9] p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Valeur Marchande Stock</span>
@@ -28136,8 +28271,20 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             <div className="bg-[#fcfcf9] p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Alertes Niveau Bas</span>
-                <span className="text-sm font-mono font-black text-rose-600 flex items-center gap-1">
+                <span className="text-sm font-mono font-black text-amber-500 flex items-center gap-1">
                   {lowStockCount} {lowStockCount > 0 && <span className="animate-pulse">⚠️</span>}
+                </span>
+              </div>
+              <div className="p-2 bg-white rounded-lg border border-gray-100 text-amber-500">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+            </div>
+
+            <div className="bg-[#fcfcf9] p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Alertes En Rupture</span>
+                <span className="text-sm font-mono font-black text-rose-600 flex items-center gap-1">
+                  {outOfStockCount} {outOfStockCount > 0 && <span className="animate-pulse">🔴</span>}
                 </span>
               </div>
               <div className="p-2 bg-white rounded-lg border border-gray-100 text-rose-500">
@@ -28148,24 +28295,42 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
           {/* Unified Filter Bar */}
           <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-3xl border border-gray-100 shadow-xs gap-4">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher par nom, usage, description..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-primary/20 profile-search-input"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-xs"
-                >
-                  ×
-                </button>
-              )}
+            <div className="flex gap-2 w-full md:w-auto items-center">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher par nom, usage, code-barres..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2 bg-gray-50 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-primary/20 profile-search-input"
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-xs"
+                  >
+                    ×
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowSearchScanner(true)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-primary hover:text-primary-hover transition-colors"
+                    title="Scanner code-barres"
+                  >
+                    <ScanLine className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSearchScanner(true)}
+                className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs rounded-2xl flex items-center gap-1.5 transition-colors uppercase tracking-wider shrink-0"
+              >
+                <ScanLine className="w-4 h-4" /> Scanner
+              </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-4 w-full md:w-auto justify-end">
@@ -28452,6 +28617,36 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 />
               </div>
 
+              <div>
+                <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1 flex justify-between items-center">
+                  <span>Code-barres / SKU (Optionnel)</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowFormSkuScanner(true)}
+                    className="text-[11px] text-primary hover:text-primary-hover font-extrabold flex items-center gap-1.5 uppercase bg-primary/15 px-3 py-1.5 rounded-full transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 shadow-xs border border-primary/10"
+                  >
+                    <ScanLine className="w-3.5 h-3.5 animate-pulse" /> Scanner
+                  </button>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="ex: 123456789123"
+                    value={formSku}
+                    onChange={e => setFormSku(e.target.value)}
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-gray-50/30 text-xs font-mono font-bold text-ink"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFormSkuScanner(true)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-primary hover:text-primary-hover transition-colors"
+                    title="Ouvrir l'appareil de scan"
+                  >
+                    <ScanLine className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Prix Vente (FCFA)</label>
@@ -28655,6 +28850,11 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         <td className="px-6 py-3 font-bold">
                           <div className="font-bold text-ink text-xs">{p.name}</div>
                           <div className="text-[10px] text-gray-400 font-medium limit-1 max-w-[200px] truncate">{p.description}</div>
+                          {p.sku && (
+                            <div className="text-[9px] font-mono font-bold text-primary mt-1 flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-md w-fit">
+                              <ScanLine className="w-2.5 h-2.5" /> {p.sku}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-3">
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-black text-[9px] uppercase tracking-wider">
@@ -28812,6 +29012,38 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           )}
         </div>
       )}
+
+      {/* Scanner Modals for Pressing */}
+      <ScannerModal
+        isOpen={showFormSkuScanner}
+        onClose={() => setShowFormSkuScanner(false)}
+        onScanSuccess={(code) => {
+          setFormSku(code);
+          setShowFormSkuScanner(false);
+          toast.success(`Code-barres scanné : ${code}`);
+        }}
+        title="Scanner le code-barres de l'article"
+      />
+
+      <ScannerModal
+        isOpen={showSearchScanner}
+        onClose={() => setShowSearchScanner(false)}
+        onScanSuccess={(code) => {
+          setSearchQuery(code);
+          setShowSearchScanner(false);
+          const matched = products.find(p => p.sku && p.sku.trim().toLowerCase() === code.trim().toLowerCase());
+          if (matched) {
+            triggerAcomAlert('Produit Trouvé', `Produit : ${matched.name} (${matched.stock}u restants)`, 'success', 'SUCCÈS');
+            toast.success(`Produit trouvé : ${matched.name}`);
+          } else {
+            triggerAcomAlert('Non Référencé', `Aucun détergent ou produit n'est associé au code : ${code}. Le code a été pré-rempli dans le formulaire de création.`, 'info', 'ALERTE');
+            // Populate form code to help them create it right away!
+            setFormSku(code);
+            setActiveSubTab('inventory');
+          }
+        }}
+        title="Rechercher par Code-barres / SKU"
+      />
     </motion.div>
   );
 };

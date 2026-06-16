@@ -2,7 +2,9 @@
   "name": "Acom Technologie - SaaS & Services",
   "description": "Plateforme de commande en ligne et solutions SaaS de gestion (Stock, Ventes, RH, BTP) pour les entreprises et commerçants.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "geolocation",
+    "microphone"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
