@@ -538,6 +538,7 @@ export interface Merchant {
     email?: string;
     notifyOnCashClosure?: boolean;
     notifyOnPOSSale?: boolean;
+    apiBaseUrl?: string;
   };
 }
 

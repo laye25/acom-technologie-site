@@ -831,6 +831,986 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
   }
 };
 
+const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80mm' | 'A4', handleDownloadPDF: any) => {
+  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+  const isDesktop = typeof window !== 'undefined' && 
+    (window.hasOwnProperty('process') || navigator.userAgent.toLowerCase().indexOf('electron') > -1);
+  
+  if (isMobile) {
+    toast.success("Impression Vente mobile : Préparation du document PDF...", { position: 'top-center' });
+    handleDownloadPDF(sale);
+    return;
+  }
+
+  const fmt = (num: number) => {
+    if (num === undefined || num === null || isNaN(num)) return '0';
+    const parts = Math.round(num).toString().split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return parts.join('.');
+  };
+
+  const formattedSaleDate = new Date(sale.date).toLocaleDateString('fr-FR') + ' ' + new Date(sale.date).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+
+  let htmlContent = "";
+
+  if (formatType === '80mm') {
+    htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ticket Vente - ${sale.saleNumber}</title>
+  <style>
+    @media print {
+      @page {
+        size: 80mm auto;
+        margin: 0;
+      }
+      body {
+        margin: 0;
+        padding: 4mm;
+        width: 72mm;
+      }
+    }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #000;
+      background-color: #fff;
+      margin: 0 auto;
+      padding: 6mm;
+      width: 72mm;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-bold { font-weight: bold; }
+    .flex { display: flex; }
+    .justify-between { justify-content: space-between; }
+    .logo-container { text-align: center; margin-bottom: 3mm; }
+    .logo { max-width: 32mm; max-height: 16mm; object-fit: contain; }
+    .divider { border-top: 1px dashed #000; margin: 3mm 0; }
+    .merchant-name { font-size: 13px; font-weight: bold; margin-bottom: 1mm; text-transform: uppercase; }
+    .doc-title { font-size: 11px; font-weight: bold; margin: 2mm 0; letter-spacing: 1px; text-transform: uppercase; }
+    .item-table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+    .item-table th { border-bottom: 1px solid #000; font-weight: bold; text-align: left; padding-bottom: 1mm; }
+    .item-table td { padding: 1.5mm 0; vertical-align: top; }
+    .total-section { margin-top: 3mm; font-size: 11px; }
+    .footer { margin-top: 6mm; font-size: 9px; text-align: center; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  ${merchant.logo ? `<div class="logo-container"><img class="logo" src="${merchant.logo}" alt="Logo" /></div>` : ''}
+  <div class="text-center">
+    <div class="merchant-name">${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+    ${merchant.address ? `<div>${merchant.address.replace(/"/g, '&quot;')}</div>` : ''}
+    ${merchant.phone ? `<div>Tél: ${merchant.phone}</div>` : ''}
+    ${merchant.email ? `<div>Email: ${merchant.email}</div>` : ''}
+  </div>
+  
+  <div class="divider"></div>
+  
+  <div class="flex justify-between">
+    <span>Facture N°: ${sale.saleNumber}</span>
+  </div>
+  <div style="margin-top: 1mm;">Client : <span class="text-bold">${sale.customerName.replace(/"/g, '&quot;')}</span></div>
+  ${sale.customerPhone ? `<div>Tél    : ${sale.customerPhone}</div>` : ''}
+  <div>Date : ${formattedSaleDate}</div>
+  
+  <div class="divider"></div>
+  
+  <div class="text-center text-bold doc-title">REÇU DE VENTE BOUTIQUE</div>
+  
+  <table class="item-table">
+    <thead>
+      <tr>
+        <th style="width: 50%;">Article</th>
+        <th class="text-center" style="width: 15%;">Qté</th>
+        <th class="text-right" style="width: 35%;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${sale.items.map((it: any) => `
+        <tr>
+          <td style="text-transform: capitalize;">${it.productName}</td>
+          <td class="text-center">${it.quantity}</td>
+          <td class="text-right">${fmt(it.total)}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div class="divider"></div>
+  
+  <div class="total-section">
+    <div class="flex justify-between">
+      <span>Sous-total:</span>
+      <span>${fmt(sale.subtotal)} FCFA</span>
+    </div>
+    ${sale.discount > 0 ? `
+      <div class="flex justify-between" style="color: red;">
+        <span>Remise:</span>
+        <span>-${fmt(sale.discount)} FCFA</span>
+      </div>
+    ` : ''}
+    <div class="flex justify-between text-bold" style="font-size: 13px; margin-top: 1.5mm; margin-bottom: 2mm;">
+      <span>TOTAL PAYÉ</span>
+      <span>${fmt(sale.total)} FCFA</span>
+    </div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <div class="footer">
+    <p class="text-bold">Merci de votre achat !</p>
+    <p>À bientôt chez ${merchant.name || 'notre établissement'}.</p>
+    <p style="font-size: 8px; font-family: monospace; color: #777; margin-top: 4mm;">Généré par Acom Technologie Desktop</p>
+  </div>
+</body>
+</html>
+    `;
+  } else {
+    // A4 Format
+    htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Facture Vente A4 - ${sale.saleNumber}</title>
+  <style>
+    @media print {
+      @page {
+        size: A4;
+        margin: 15mm;
+      }
+      body {
+        margin: 0;
+        background-color: #fff;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+    }
+    .print-container {
+      background-color: #fff;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 35px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      position: relative;
+    }
+    @media print {
+      .print-container {
+        box-shadow: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+    }
+    
+    .accent-bg {
+      background-color: #6366f1;
+    }
+    .accent-text {
+      color: #6366f1;
+    }
+    
+    .header-layout {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 25px;
+    }
+    .company-logo {
+      max-width: 140px;
+      max-height: 65px;
+      object-fit: contain;
+      margin-bottom: 12px;
+    }
+    .company-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .doc-banner {
+      font-size: 20px;
+      font-weight: 900;
+      text-align: right;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+    .doc-ref {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: bold;
+      color: #475569;
+      text-align: right;
+      margin-top: 5px;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 30px;
+      padding: 15px 0;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .info-column {
+      display: flex;
+      flex-direction: column;
+    }
+    .section-title {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    
+    .modern-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 25px;
+    }
+    .modern-table th {
+      background-color: #f1f5f9;
+      color: #475569;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    .modern-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+    .modern-table tr:hover td {
+      background-color: #f8fafc;
+    }
+    
+    .totals-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 30px;
+    }
+    .totals-box {
+      width: 320px;
+      background-color: #f8fafc;
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 11px;
+      color: #475569;
+    }
+    .grand-total {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 8px;
+      padding-top: 12px;
+    }
+    
+    .signature-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 50px;
+      margin-top: 50px;
+      margin-bottom: 35px;
+    }
+    .signature-area {
+      height: 70px;
+      border-bottom: 1px dashed #cbd5e1;
+      margin-top: 10px;
+    }
+    .footer-center {
+      text-align: center;
+      font-size: 9px;
+      color: #94a3b8;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 20px;
+    }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    <div class="header-layout">
+      <div>
+        ${merchant.logo ? `<img class="company-logo" src="${merchant.logo}" alt="Logo" />` : ''}
+        <div class="company-name">${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+        <div style="font-size: 10px; color: #64748b;">
+          ${merchant.address ? `<div>${merchant.address.replace(/"/g, '&quot;')}</div>` : ''}
+          ${merchant.phone ? `<div>Tél : ${merchant.phone}</div>` : ''}
+          ${merchant.email ? `<div>E-mail : ${merchant.email}</div>` : ''}
+        </div>
+      </div>
+      <div>
+        <div class="doc-banner accent-text">FACTURE DE VENTE</div>
+        <div class="doc-ref">N° : ${sale.saleNumber}</div>
+        <div style="text-align: right; font-size: 10px; color: #64748b; margin-top: 5px;">
+          Date de vente : <strong>${formattedSaleDate}</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-column">
+        <div class="section-title">Acheteur / Client :</div>
+        <div style="font-size: 11px; color: #0f172a; font-weight: bold;">
+          ${sale.customerName.replace(/"/g, '&quot;')}
+        </div>
+        <div style="font-size: 11px; color: #475569; margin-top: 2px;">
+          Tél : ${sale.customerPhone || 'Client de Passage'}
+        </div>
+      </div>
+      
+      <div>
+        <div class="section-title">Mode de Paiement & Expédition :</div>
+        <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
+          <div><strong>Type de transaction :</strong> Comptoir / Vente directe</div>
+          <div><strong>Statut de Paiement :</strong> Entièrement réglé (Caisse)</div>
+        </div>
+      </div>
+    </div>
+
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th>Désignation Produit (Détergents & boutique)</th>
+          <th class="text-right" style="width: 25%;">Prix Unitaire</th>
+          <th class="text-center" style="width: 15%;">Quantité</th>
+          <th class="text-right" style="width: 25%;">Montant Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sale.items.map((it: any) => `
+          <tr>
+            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 ${it.productName}</td>
+            <td class="text-right">${fmt(it.price)} FCFA</td>
+            <td class="text-center">${it.quantity}</td>
+            <td class="text-right" style="font-weight: 700;">${fmt(it.total)} FCFA</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div class="totals-wrapper">
+      <div class="totals-box">
+        <div class="totals-row">
+          <span>Sous-total articles</span>
+          <span style="font-weight: 600;">${fmt(sale.subtotal)} FCFA</span>
+        </div>
+        ${sale.discount > 0 ? `
+          <div class="totals-row" style="color: red;">
+            <span>Remise accordée :</span>
+            <span>-${fmt(sale.discount)} FCFA</span>
+          </div>
+        ` : ''}
+        <div class="totals-row grand-total">
+          <span>TOTAL PAYÉ NET</span>
+          <span class="accent-text">${fmt(sale.total)} FCFA</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
+      <strong>Conditions Générales :</strong> Les marchandises vendues et livrées sont réputées conformes à l'achat immédiat. Les articles ne sont ni repris, ni échangés une fois sortis du dépôt de vente. Merci pour votre aimable confiance.
+    </div>
+
+    <div class="signature-container">
+      <div>
+        <div class="section-title">Déchargement Client (Réception)</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature de l'acheteur</div>
+        <div class="signature-area"></div>
+      </div>
+      <div style="text-align: right;">
+        <div class="section-title font-bold">Visa de Vente Boutique</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Cashier authorized Stamp</div>
+        <div class="signature-area"></div>
+      </div>
+    </div>
+
+    <div class="footer-center">
+      Solution de Vente & Stock Acom Gestion v1.0 - Émise numériquement
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  let printFrame = document.getElementById('sale-print-iframe') as HTMLIFrameElement;
+  if (printFrame) {
+    printFrame.parentNode?.removeChild(printFrame);
+  }
+
+  printFrame = document.createElement('iframe');
+  printFrame.id = 'sale-print-iframe';
+  printFrame.style.position = 'fixed';
+  printFrame.style.top = '-9999px';
+  printFrame.style.left = '-9999px';
+  printFrame.style.width = formatType === 'A4' ? '850px' : '400px';
+  printFrame.style.height = '1100px';
+  printFrame.style.border = 'none';
+  printFrame.style.opacity = '0.01';
+  document.body.appendChild(printFrame);
+
+  const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+  if (frameDoc) {
+    frameDoc.open();
+    frameDoc.write(htmlContent);
+    frameDoc.close();
+    
+    setTimeout(() => {
+      try {
+        if (!printFrame?.contentWindow) {
+          throw new Error("No contentWindow found on print iframe");
+        }
+        
+        if (isDesktop) {
+          const printWin = window.open('', '_blank', formatType === 'A4' ? 'width=900,height=1000' : 'width=450,height=800');
+          if (printWin) {
+            printWin.document.open();
+            printWin.document.write(htmlContent);
+            printWin.document.close();
+            
+            setTimeout(() => {
+              try {
+                printWin.focus();
+                printWin.print();
+              } catch (e) {
+                console.error("Popup sales window print failed:", e);
+              }
+            }, 800);
+            
+            toast.success("Impression Vente boutique lancée...", { position: 'top-center' });
+            return;
+          }
+        }
+
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        toast.success("Aperçu d'impression Vente boutique ouvert !", { position: 'top-center' });
+      } catch (err) {
+        console.warn("Iframe direct printing failed, triggering PDF fallback...", err);
+        handleDownloadPDF(sale);
+      }
+    }, 500);
+  }
+};
+
+const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '80mm' | 'A4') => {
+  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
+  const isDesktop = typeof window !== 'undefined' && 
+    (window.hasOwnProperty('process') || navigator.userAgent.toLowerCase().indexOf('electron') > -1);
+  
+  if (isMobile) {
+    toast.success("Emission du Devis mobile (Format A4)...", { position: 'top-center' });
+    return;
+  }
+
+  const fmt = (num: number) => {
+    if (num === undefined || num === null || isNaN(num)) return '0';
+    const parts = Math.round(num).toString().split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return parts.join('.');
+  };
+
+  const formattedQuoteDate = new Date(quote.date).toLocaleDateString('fr-FR') + ' ' + new Date(quote.date).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+
+  let htmlContent = "";
+
+  if (formatType === '80mm') {
+    htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ticket Devis - ${quote.quoteNumber}</title>
+  <style>
+    @media print {
+      @page {
+        size: 80mm auto;
+        margin: 0;
+      }
+      body {
+        margin: 0;
+        padding: 4mm;
+        width: 72mm;
+      }
+    }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      color: #000;
+      background-color: #fff;
+      margin: 0 auto;
+      padding: 6mm;
+      width: 72mm;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-bold { font-weight: bold; }
+    .flex { display: flex; }
+    .justify-between { justify-content: space-between; }
+    .logo-container { text-align: center; margin-bottom: 3mm; }
+    .logo { max-width: 32mm; max-height: 16mm; object-fit: contain; }
+    .divider { border-top: 1px dashed #000; margin: 3mm 0; }
+    .merchant-name { font-size: 13px; font-weight: bold; margin-bottom: 1mm; text-transform: uppercase; }
+    .doc-title { font-size: 11px; font-weight: bold; margin: 2mm 0; letter-spacing: 1px; text-transform: uppercase; }
+    .item-table { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+    .item-table th { border-bottom: 1px solid #000; font-weight: bold; text-align: left; padding-bottom: 1mm; }
+    .item-table td { padding: 1.5mm 0; vertical-align: top; }
+    .total-section { margin-top: 3mm; font-size: 11px; }
+    .footer { margin-top: 6mm; font-size: 9px; text-align: center; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  \${merchant.logo ? \`<div class="logo-container"><img class="logo" src="\${merchant.logo}" alt="Logo" /></div>\` : ''}
+  <div class="text-center">
+    <div class="merchant-name">\${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+    \${merchant.address ? \`<div>\${merchant.address.replace(/"/g, '&quot;')}</div>\` : ''}
+    \${merchant.phone ? \`<div>Tél: \${merchant.phone}</div>\` : ''}
+    \${merchant.email ? \`<div>Email: \${merchant.email}</div>\` : ''}
+  </div>
+  
+  <div class="divider"></div>
+  
+  <div class="flex justify-between">
+    <span>Devis N°: \${quote.quoteNumber}</span>
+  </div>
+  <div style="margin-top: 1mm;">Client : <span class="text-bold">\${quote.customerName.replace(/"/g, '&quot;')}</span></div>
+  \${quote.customerPhone ? \`<div>Tél    : \${quote.customerPhone}</div>\` : ''}
+  <div>Date : \${formattedQuoteDate}</div>
+  
+  <div class="divider"></div>
+  
+  <div class="text-center text-bold doc-title">DEVIS PROFORMA BOUTIQUE</div>
+  
+  <table class="item-table">
+    <thead>
+      <tr>
+        <th style="width: 50%;">Article</th>
+        <th class="text-center" style="width: 15%;">Qté</th>
+        <th class="text-right" style="width: 35%;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      \${quote.items.map((it: any) => \`
+        <tr>
+          <td style="text-transform: capitalize;">\${it.productName}</td>
+          <td class="text-center">\${it.quantity}</td>
+          <td class="text-right">\${fmt(it.total)}</td>
+        </tr>
+      \`).join('')}
+    </tbody>
+  </table>
+  
+  <div class="divider"></div>
+  
+  <div class="total-section">
+    <div class="flex justify-between">
+      <span>Sous-total estimé:</span>
+      <span>\${fmt(quote.subtotal)} FCFA</span>
+    </div>
+    \${quote.discount > 0 ? \`
+      <div class="flex justify-between" style="color: red;">
+        <span>Remise déduite:</span>
+        <span>-\${fmt(quote.discount)} FCFA</span>
+      </div>
+    \` : ''}
+    <div class="flex justify-between text-bold" style="font-size: 13px; margin-top: 1.5mm; margin-bottom: 2mm;">
+      <span>TOTAL ESTIMÉ</span>
+      <span>\${fmt(quote.total)} FCFA</span>
+    </div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <div class="footer">
+    <p class="text-bold">Valable pour une durée de 15 jours.</p>
+    <p>Merci de votre visite chez \${merchant.name || 'notre pressing'}.</p>
+    <p style="font-size: 8px; font-family: monospace; color: #777; margin-top: 4mm;">Généré par Acom Technologie Desktop</p>
+  </div>
+</body>
+</html>
+    `;
+  } else {
+    // A4 Format
+    htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Devis Proforma A4 - \${quote.quoteNumber}</title>
+  <style>
+    @media print {
+      @page {
+        size: A4;
+        margin: 15mm;
+      }
+      body {
+        margin: 0;
+        background-color: #fff;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+      background-color: #f8fafc;
+    }
+    .print-container {
+      background-color: #fff;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 35px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      position: relative;
+    }
+    @media print {
+      .print-container {
+        box-shadow: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+    }
+    
+    .accent-bg {
+      background-color: #312e81;
+    }
+    .accent-text {
+      color: #4f46e5;
+    }
+    
+    .header-layout {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 25px;
+    }
+    .company-logo {
+      max-width: 140px;
+      max-height: 65px;
+      object-fit: contain;
+      margin-bottom: 12px;
+    }
+    .company-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .doc-banner {
+      font-size: 20px;
+      font-weight: 900;
+      text-align: right;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+    .doc-ref {
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: bold;
+      color: #312e81;
+      text-align: right;
+      margin-top: 5px;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 30px;
+      padding: 15px 0;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .info-column {
+      display: flex;
+      flex-direction: column;
+    }
+    .section-title {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    
+    .modern-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 25px;
+    }
+    .modern-table th {
+      background-color: #f1f5f9;
+      color: #475569;
+      font-size: 9px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 10px 14px;
+      text-align: left;
+    }
+    .modern-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+    .modern-table tr:hover td {
+      background-color: #f8fafc;
+    }
+    
+    .totals-wrapper {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 30px;
+    }
+    .totals-box {
+      width: 320px;
+      background-color: #f8fafc;
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 11px;
+      color: #475569;
+    }
+    .grand-total {
+      font-size: 14px;
+      font-weight: 800;
+      color: #1e1b4b;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 8px;
+      padding-top: 12px;
+    }
+    
+    .signature-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 50px;
+      margin-top: 50px;
+      margin-bottom: 35px;
+    }
+    .signature-area {
+      height: 70px;
+      border-bottom: 1px dashed #cbd5e1;
+      margin-top: 10px;
+    }
+    .footer-center {
+      text-align: center;
+      font-size: 9px;
+      color: #94a3b8;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 20px;
+    }
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    <div class="header-layout">
+      <div>
+        \${merchant.logo ? \`<img class="company-logo" src="\${merchant.logo}" alt="Logo" />\` : ''}
+        <div class="company-name">\${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+        <div style="font-size: 10px; color: #64748b;">
+          \${merchant.address ? \`<div>\${merchant.address.replace(/"/g, '&quot;')}</div>\` : ''}
+          \${merchant.phone ? \`<div>Tél : \${merchant.phone}</div>\` : ''}
+          \${merchant.email ? \`<div>E-mail : \${merchant.email}</div>\` : ''}
+        </div>
+      </div>
+      <div>
+        <div class="doc-banner accent-text">DEVIS DE VENTE BOUTIQUE</div>
+        <div class="doc-ref">Ref: \${quote.quoteNumber}</div>
+        <div style="text-align: right; font-size: 10px; color: #64748b; margin-top: 5px;">
+          Date d'émission : <strong>\${formattedQuoteDate}</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-column">
+        <div class="section-title">Destinataire (Client proposé) :</div>
+        <div style="font-size: 11px; color: #0f172a; font-weight: bold;">
+          \${quote.customerName.replace(/"/g, '&quot;')}
+        </div>
+        <div style="font-size: 11px; color: #475569; margin-top: 2px;">
+          Tél : \${quote.customerPhone || 'Sans numéro'}
+        </div>
+      </div>
+      
+      <div>
+        <div class="section-title">Informations de Validité :</div>
+        <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
+          <div><strong>Type :</strong> Devis Proforma non-contraignant</div>
+          <div><strong>Durée de validité :</strong> 15 Jours à compter de la date d'émission</div>
+        </div>
+      </div>
+    </div>
+
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th>Désignation Produit (Détergents & boutique)</th>
+          <th class="text-right" style="width: 25%;">Prix Unitaire</th>
+          <th class="text-center" style="width: 15%;">Quantité</th>
+          <th class="text-right" style="width: 25%;">Montant Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        \${quote.items.map((it: any) => \`
+          <tr>
+            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 \${it.productName}</td>
+            <td class="text-right">\${fmt(it.price)} FCFA</td>
+            <td class="text-center">\${it.quantity}</td>
+            <td class="text-right" style="font-weight: 700;">\${fmt(it.total)} FCFA</td>
+          </tr>
+        \`).join('')}
+      </tbody>
+    </table>
+
+    <div class="totals-wrapper">
+      <div class="totals-box">
+        <div class="totals-row">
+          <span>Sous-total articles estimé</span>
+          <span style="font-weight: 600;">\${fmt(quote.subtotal)} FCFA</span>
+        </div>
+        \${quote.discount > 0 ? \`
+          <div class="totals-row" style="color: red;">
+            <span>Remise déduite :</span>
+            <span>-\${fmt(quote.discount)} FCFA</span>
+          </div>
+        \` : ''}
+        <div class="totals-row grand-total">
+          <span>TOTAL ESTIMÉ NET</span>
+          <span class="accent-text" style="color: #4f46e5;">\${fmt(quote.total)} FCFA</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
+      <strong>Note de validité :</strong> Ce document est un devis proforma à titre d'estimation provisoire. Il ne constitue pas une facture définitive et ne réserve pas le stock physique de marchandises jusqu'à règlement définitif en caisse.
+    </div>
+
+    <div class="signature-container">
+      <div>
+        <div class="section-title">Bon pour accord (Client)</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature précédée de la mention "Bon pour Accord"</div>
+        <div class="signature-area"></div>
+      </div>
+      <div style="text-align: right;">
+        <div class="section-title font-bold">Visa de l'Établissement</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Authorized Signature Stamp</div>
+        <div class="signature-area"></div>
+      </div>
+    </div>
+
+    <div class="footer-center">
+      Devis Proforma Acom Gestion v1.0 - Émis numériquement
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  let printFrame = document.getElementById('quote-print-iframe') as HTMLIFrameElement;
+  if (printFrame) {
+    printFrame.parentNode?.removeChild(printFrame);
+  }
+
+  printFrame = document.createElement('iframe');
+  printFrame.id = 'quote-print-iframe';
+  printFrame.style.position = 'fixed';
+  printFrame.style.top = '-9999px';
+  printFrame.style.left = '-9999px';
+  printFrame.style.width = formatType === 'A4' ? '850px' : '400px';
+  printFrame.style.height = '1100px';
+  printFrame.style.border = 'none';
+  printFrame.style.opacity = '0.01';
+  document.body.appendChild(printFrame);
+
+  const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+  if (frameDoc) {
+    frameDoc.open();
+    frameDoc.write(htmlContent);
+    frameDoc.close();
+    
+    setTimeout(() => {
+      try {
+        if (!printFrame?.contentWindow) {
+          throw new Error("No contentWindow found on print iframe");
+        }
+        
+        if (isDesktop) {
+          const printWin = window.open('', '_blank', formatType === 'A4' ? 'width=900,height=1000' : 'width=450,height=800');
+          if (printWin) {
+            printWin.document.open();
+            printWin.document.write(htmlContent);
+            printWin.document.close();
+            
+            setTimeout(() => {
+              try {
+                printWin.focus();
+                printWin.print();
+              } catch (e) {
+                console.error("Popup quote window print failed:", e);
+              }
+            }, 800);
+            
+            toast.success("Impression Devis boutique lancée...", { position: 'top-center' });
+            return;
+          }
+        }
+
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        toast.success("Aperçu d'impression Devis proforma ouvert !", { position: 'top-center' });
+      } catch (err) {
+        console.warn("Iframe direct printing failed on devis:", err);
+      }
+    }, 500);
+  }
+};
+
 const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: '80mm' | 'A4', tarifs: any, handleDownloadPDF: any) => {
   const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
   const isDesktop = typeof window !== 'undefined' && 
@@ -921,7 +1901,7 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
   
   <div class="divider"></div>
   
-  <div class="text-center text-bold doc-title">TICKET REÇU DE CAISSE</div>
+  <div class="text-center text-bold doc-title">\${ticket.status === 'quotation' ? 'DEVIS PROFORMA' : 'TICKET REÇU DE CAISSE'}</div>
   
   <table class="item-table">
     <thead>
@@ -987,18 +1967,20 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
     
     <div class="divider"></div>
     
-    <div class="flex justify-between">
-      <span>Mode de Paiement:</span>
-      <span class="text-bold" style="text-transform: uppercase;">${ticket.paymentMethod || 'cash'}</span>
-    </div>
-    <div class="flex justify-between">
-      <span>Montant versé:</span>
-      <span>${fmt(ticket.amountPaid || 0)} FCFA</span>
-    </div>
-    <div class="flex justify-between text-bold">
-      <span>Reste à payer:</span>
-      <span>${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
-    </div>
+    \${ticket.status !== 'quotation' ? \`
+      <div class="flex justify-between">
+        <span>Mode de Paiement:</span>
+        <span class="text-bold" style="text-transform: uppercase;">\${ticket.paymentMethod || 'cash'}</span>
+      </div>
+      <div class="flex justify-between">
+        <span>Montant versé:</span>
+        <span>\${fmt(ticket.amountPaid || 0)} FCFA</span>
+      </div>
+      <div class="flex justify-between text-bold">
+        <span>Reste à payer:</span>
+        <span>\${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
+      </div>
+    \` : ''}
   </div>
   
   <div class="divider"></div>
@@ -5657,7 +6639,7 @@ const MerchantDashboard = ({
                   </div>
                 ) : (
                   [...pressingTickets].slice(0, 15).map((ticket: PressingTicket) => (
-                    <div key={ticket.id} className="p-4 bg-gray-50 hover:bg-white border hover:border-gray-100 transition-all rounded-2xl flex flex-col sm:flex-row justify-between items-baseline sm:items-center gap-3">
+                    <div key={ticket.id} className="p-4 bg-gray-50 hover:bg-white border border-gray-100/70 hover:border-gray-200 transition-all rounded-2xl flex flex-col sm:flex-row justify-between items-baseline sm:items-center gap-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center font-mono font-black text-xs text-primary shrink-0">
                           #{ticket.ticketNumber}
@@ -5723,7 +6705,7 @@ const MerchantDashboard = ({
                   </div>
                 ) : (
                   [...pressingProductSales].slice(0, 15).map((sale: any) => (
-                    <div key={sale.id} className="p-4 bg-gray-50 hover:bg-white border hover:border-gray-100 transition-all rounded-2xl flex flex-col sm:flex-row justify-between items-baseline sm:items-center gap-3">
+                    <div key={sale.id} className="p-4 bg-gray-50 hover:bg-white border border-gray-100/70 hover:border-gray-200 transition-all rounded-2xl flex flex-col sm:flex-row justify-between items-baseline sm:items-center gap-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white border border-gray-100 rounded-xl flex items-center justify-center font-mono font-bold text-xs text-emerald-600 shrink-0">
                           SL
@@ -24008,11 +24990,13 @@ interface PressingTicket {
     [key: string]: number;
   };
   discount: number;
+  discountType?: 'amount' | 'percent';
+  discountValue?: number;
   subtotal: number;
   supplementTotal: number;
   total: number;
   totalCost?: number;
-  status: 'deposed' | 'in_progress' | 'ready' | 'delivered';
+  status: 'quotation' | 'deposed' | 'in_progress' | 'ready' | 'delivered';
   paymentStatus?: 'unpaid' | 'partial' | 'paid';
   paymentMethod?: 'cash' | 'mobile_money' | 'card' | 'other';
   amountPaid?: number;
@@ -25615,7 +26599,7 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
 };
 
 const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'create' | 'active' | 'history' | 'closures'>('create');
+  const [activeSubTab, setActiveSubTab] = useState<'create' | 'active' | 'history' | 'closures' | 'quotes'>('create');
   
   const [tarifs, setTarifs] = useState<PressingTarifs>(() => {
     const saved = localStorage.getItem(`pressing_tarifs_${merchant.id}`);
@@ -25819,7 +26803,8 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     });
   }, [tarifs]);
 
-  const [discount, setDiscount] = useState<number>(0);
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [selectedTicket, setSelectedTicket] = useState<PressingTicket | null>(null);
 
   // Enhanced additional state fields
@@ -25890,10 +26875,17 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     }, 0);
   }, [supplements]);
 
+  const discountAmount = useMemo(() => {
+    if (discountType === 'percent') {
+      return Math.floor(((subtotal + supplementTotal) * discountValue) / 100);
+    }
+    return discountValue;
+  }, [discountType, discountValue, subtotal, supplementTotal]);
+
   const total = useMemo(() => {
-    const val = (subtotal + supplementTotal) - discount;
+    const val = (subtotal + supplementTotal) - discountAmount;
     return Math.max(0, val);
-  }, [subtotal, supplementTotal, discount]);
+  }, [subtotal, supplementTotal, discountAmount]);
 
   const totalCost = useMemo(() => {
     let cost = 0;
@@ -26043,7 +27035,8 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
              `• Ticket N° : ${t.ticketNumber}\n` +
              `• Client : ${t.clientName} (${t.clientPhone || 'Aucun contact'})\n` +
              `• Linge / Lots : ${articlesDesc || '0 article'}\n` +
-             `• Valeur Totale : ${t.total} FCFA\n` +
+             (t.discount > 0 ? `• Remise : ${t.discount} FCFA\n` : '') +
+             `• Valeur Nette : ${t.total} FCFA\n` +
              `• Versé initial : ${t.amountPaid || 0} FCFA\n` +
              `• Reste à encaisser : ${Math.max(0, t.total - (t.amountPaid || 0))} FCFA\n` +
              `• Statut de paiement : ${paidText}\n` +
@@ -26057,7 +27050,8 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
              `• Ticket N° : ${t.ticketNumber}\n` +
              `• Client : ${t.clientName}\n` +
              `• Nouveau Statut : ${statusLabel}\n` +
-             `• Valeur de la fiche : ${t.total} FCFA\n` +
+             (t.discount > 0 ? `• Remise : ${t.discount} FCFA\n` : '') +
+             `• Valeur Nette : ${t.total} FCFA\n` +
              `• Total Perçu : ${t.amountPaid || 0} FCFA\n` +
              `• Solde Résiduel : ${Math.max(0, t.total - (t.amountPaid || 0))} FCFA\n` +
              `• Statut de règlement : ${paidText}\n` +
@@ -26486,7 +27480,8 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       });
       return reset;
     });
-    setDiscount(0);
+    setDiscountValue(0);
+    setDiscountType('amount');
     setNotes('');
     setPaymentStatus('paid');
     setPaymentMethod('cash');
@@ -26534,7 +27529,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       weightKg: billingType === 'poids' ? weightKg : 0,
       supplements: { ...supplements },
       supplementTarifs: { ...supplementTarifs },
-      discount,
+      discount: discountAmount,
+      discountType,
+      discountValue,
       subtotal,
       supplementTotal,
       total,
@@ -26587,6 +27584,59 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     }
   };
 
+  const handleGenerateTicketQuote = () => {
+    if (!clientName.trim()) {
+      toast.error('Le nom du client est obligatoire pour établir un devis.');
+      return;
+    }
+    if (billingType === 'article' && Object.values(articlesQty).every(qty => qty === 0)) {
+      toast.error('Veuillez ajouter au moins un article pour le devis.');
+      return;
+    }
+    if (billingType === 'poids' && weightKg <= 0) {
+      toast.error('Le poids doit être supérieur à 0 pour le devis.');
+      return;
+    }
+
+    const nextNumber = tickets.length + 1;
+    const quoteNumber = `D-PR-${String(nextNumber).padStart(4, '0')}`;
+
+    const newQuote: PressingTicket = {
+      id: `q_${Date.now()}`,
+      ticketNumber: quoteNumber,
+      clientName,
+      clientPhone,
+      clientEmail,
+      depositDate: new Date().toISOString().split('T')[0],
+      expectedDeliveryDate: '',
+      billingType,
+      articles: billingType === 'article' ? { ...articlesQty } : {},
+      weightService,
+      weightKg: billingType === 'poids' ? weightKg : 0,
+      supplements: { ...supplements },
+      supplementTarifs: { ...supplementTarifs },
+      discount: discountAmount,
+      discountType,
+      discountValue,
+      subtotal,
+      supplementTotal,
+      total,
+      totalCost,
+      status: 'quotation',
+      paymentStatus: 'unpaid',
+      paymentMethod: 'other',
+      amountPaid: 0,
+      notes,
+      sentNotifications: []
+    };
+
+    const updated = [newQuote, ...tickets];
+    setTickets(updated);
+    localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
+    setSelectedTicket(newQuote);
+    toast.success(`Devis ${quoteNumber} généré avec succès !`);
+  };
+
   const updateStatus = (ticketId: string, nextStatus: PressingTicket['status']) => {
     const updated = tickets.map(t => t.id === ticketId ? { ...t, status: nextStatus } : t);
     setTickets(updated);
@@ -26631,11 +27681,13 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                           t.clientPhone.includes(searchQuery);
       
       if (activeSubTab === 'active') {
-        const isNotDelivered = t.status !== 'delivered';
+        const isNotDelivered = t.status !== 'delivered' && t.status !== 'quotation';
         const isWashMatched = washStatusFilter === 'all' || t.status === washStatusFilter;
         return matchSearch && isNotDelivered && isWashMatched;
       } else if (activeSubTab === 'history') {
         return matchSearch && t.status === 'delivered';
+      } else if (activeSubTab === 'quotes') {
+        return matchSearch && t.status === 'quotation';
       }
       return matchSearch;
     });
@@ -26656,7 +27708,10 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     y += 6;
     
     pdf.setFont('courier', 'bold');
-    pdf.text(`TICKET : ${ticket.ticketNumber}`, 5, y);
+    const docTitle = ticket.status === 'quotation' ? 'DEVIS PROFORMA' : 'TICKET RÉCEPTION';
+    pdf.text(docTitle, 40, y, { align: 'center' });
+    y += 5;
+    pdf.text(`NUMÉRO : ${ticket.ticketNumber}`, 5, y);
     y += 5;
     pdf.setFont('courier', 'normal');
     pdf.text(`Client  : ${ticket.clientName}`, 5, y);
@@ -26743,22 +27798,25 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     
     pdf.setFont('courier', 'bold');
     pdf.setFontSize(10);
-    pdf.text(`TOTAL NET : ${ticket.total} FCFA`, 5, y);
+    pdf.text(ticket.status === 'quotation' ? `MONTANT DEVIS : ${ticket.total} FCFA` : `TOTAL NET : ${ticket.total} FCFA`, 5, y);
     y += 5;
 
     pdf.setFont('courier', 'normal');
     pdf.setFontSize(8);
-    const pStatusLabel = ticket.paymentStatus === 'paid' ? 'PAYE D\'AVANCE' : ticket.paymentStatus === 'partial' ? 'ACOMPTE PAYE' : 'IMPAYE AT RETRAIT';
-    pdf.text(`Règlement : ${pStatusLabel}`, 5, y);
-    y += 4;
+    
+    if (ticket.status !== 'quotation') {
+      const pStatusLabel = ticket.paymentStatus === 'paid' ? 'PAYE D\'AVANCE' : ticket.paymentStatus === 'partial' ? 'ACOMPTE PAYE' : 'IMPAYE AT RETRAIT';
+      pdf.text(`Règlement : ${pStatusLabel}`, 5, y);
+      y += 4;
 
-    const paidVal = ticket.amountPaid || 0;
-    const remainingVal = Math.max(0, ticket.total - paidVal);
-    pdf.text(`Versé     : ${paidVal} FCFA`, 5, y);
-    y += 4;
-    pdf.setFont('courier', 'bold');
-    pdf.text(`Reste dû  : ${remainingVal} FCFA`, 5, y);
-    y += 5;
+      const paidVal = ticket.amountPaid || 0;
+      const remainingVal = Math.max(0, ticket.total - paidVal);
+      pdf.text(`Versé     : ${paidVal} FCFA`, 5, y);
+      y += 4;
+      pdf.setFont('courier', 'bold');
+      pdf.text(`Reste dû  : ${remainingVal} FCFA`, 5, y);
+      y += 5;
+    }
 
     pdf.line(5, y, 75, y);
     y += 5;
@@ -26806,6 +27864,14 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
             }`}
           >
             ✅ Historique ({tickets.filter(t => t.status === 'delivered').length})
+          </button>
+          <button
+            onClick={() => setActiveSubTab('quotes')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'quotes' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            📋 Devis ({tickets.filter(t => t.status === 'quotation').length})
           </button>
           <button
             onClick={() => setActiveSubTab('closures')}
@@ -27088,14 +28154,25 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
             </div>
 
             {/* Discount Section */}
-            <div className="pt-4 border-t border-dashed border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-3">
-                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5 font-bold">Remise immédiate (FCFA)</label>
+            <div className="pt-4 border-t border-dashed border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Type de remise</label>
+                <select
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 text-xs font-bold text-ink"
+                >
+                  <option value="amount">Montant Fixe (FCFA)</option>
+                  <option value="percent">Pourcentage (%)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">{discountType === 'percent' ? 'Valeur en pourcentage (%)' : 'Remise immédiate (FCFA)'}</label>
                 <input
                   type="number"
-                  placeholder="ex: 500"
-                  value={discount || ''}
-                  onChange={e => setDiscount(Math.max(0, parseInt(e.target.value) || 0))}
+                  placeholder={discountType === 'percent' ? "ex: 10" : "ex: 500"}
+                  value={discountValue || ''}
+                  onChange={e => setDiscountValue(Math.max(0, parseInt(e.target.value) || 0))}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono font-bold text-xs text-ink"
                 />
               </div>
@@ -27166,12 +28243,19 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-dashed border-gray-100 flex items-end">
+            <div className="pt-4 border-t border-dashed border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="submit"
                 className="w-full bg-primary hover:bg-primary-hover text-white py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
               >
-                <Plus className="w-4 h-4" /> Enregistrer le Ticket de Réception
+                <Plus className="w-4 h-4" /> Enregistrer le Ticket
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateTicketQuote}
+                className="w-full bg-indigo-50 hover:bg-slate-200 hover:text-indigo-700 font-extrabold text-xs uppercase tracking-widest text-indigo-600 border border-indigo-100 py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                📋 Etablissez DEVIS
               </button>
             </div>
           </form>
@@ -27254,10 +28338,10 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     <span>Total suppléments :</span>
                     <span className="font-bold">{(supplementTotal).toLocaleString()} FCFA</span>
                   </div>
-                  {discount > 0 && (
+                  {discountAmount > 0 && (
                     <div className="flex justify-between text-red-500 text-[10px]">
                       <span>Remise adhérent :</span>
-                      <span>-{discount.toLocaleString()} FCFA</span>
+                      <span>-{discountAmount.toLocaleString()} FCFA</span>
                     </div>
                   )}
                   <div className="flex justify-between text-ink font-black pt-1 border-t border-gray-200 text-sm">
@@ -27671,7 +28755,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden p-8 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <h3 className="text-lg font-black text-ink uppercase tracking-wider">
-              {activeSubTab === 'active' ? '⏳ Dépôts En Cours / Prêt à Livrer' : '✅ Historique des Livraisons Pressing'}
+              {activeSubTab === 'active' ? '⏳ Dépôts En Cours / Prêt à Livrer' : activeSubTab === 'history' ? '✅ Historique des Livraisons Pressing' : '📋 Devis Proforma Pressing'}
             </h3>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -27782,7 +28866,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       <td className="px-6 py-4 font-mono">
                         <div className="font-bold text-ink">{ticket.total.toLocaleString()} FCFA</div>
                         <div className="mt-1">
-                          {ticket.paymentStatus === 'paid' ? (
+                          {ticket.status === 'quotation' ? (
+                            <span className="text-[9px] bg-indigo-50 text-indigo-600 font-extrabold px-1.5 py-0.5 rounded border border-indigo-100/40">DEVIS</span>
+                          ) : ticket.paymentStatus === 'paid' ? (
                             <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-1.5 py-0.5 rounded border border-emerald-100/40">Payé 👍</span>
                           ) : ticket.paymentStatus === 'partial' ? (
                             <span className="text-[9px] bg-amber-50 text-amber-600 font-extrabold px-1.5 py-0.5 rounded border border-amber-100/40">Acompte: {ticket.amountPaid?.toLocaleString()} F</span>
@@ -27792,21 +28878,34 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <select
-                          value={ticket.status}
-                          onChange={e => updateStatus(ticket.id, e.target.value as any)}
-                          className={`font-black uppercase text-[10px] rounded-lg px-2 py-1 border outline-none ${
-                            ticket.status === 'deposed' ? 'bg-amber-50 border-amber-100 text-amber-700' :
-                            ticket.status === 'in_progress' ? 'bg-blue-50 border-blue-100 text-blue-700' :
-                            ticket.status === 'ready' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
-                            'bg-gray-100 border-gray-200 text-gray-500'
-                          }`}
-                        >
-                          <option value="deposed">Déposé 🧺</option>
-                          <option value="in_progress">En Lavage 🧼</option>
-                          <option value="ready">Prêt 👔</option>
-                          <option value="delivered">Livré ✅</option>
-                        </select>
+                        {ticket.status === 'quotation' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateStatus(ticket.id, 'deposed');
+                              setActiveSubTab('active');
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[9px] tracking-wider rounded-lg px-3 py-1.5 shadow-sm inline-flex items-center"
+                          >
+                            Convertir Panier
+                          </button>
+                        ) : (
+                          <select
+                            value={ticket.status}
+                            onChange={e => updateStatus(ticket.id, e.target.value as any)}
+                            className={`font-black uppercase text-[10px] rounded-lg px-2 py-1 border outline-none ${
+                              ticket.status === 'deposed' ? 'bg-amber-50 border-amber-100 text-amber-700' :
+                              ticket.status === 'in_progress' ? 'bg-blue-50 border-blue-100 text-blue-700' :
+                              ticket.status === 'ready' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
+                              'bg-gray-100 border-gray-200 text-gray-500'
+                            }`}
+                          >
+                            <option value="deposed">Déposé 🧺</option>
+                            <option value="in_progress">En Lavage 🧼</option>
+                            <option value="ready">Prêt 👔</option>
+                            <option value="delivered">Livré ✅</option>
+                          </select>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right space-x-1 shrink-0">
                         <button
@@ -27959,28 +29058,30 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     </div>
                   )}
                   <div className="flex justify-between text-slate-900 font-black text-sm pt-1 border-t border-slate-100">
-                    <span>Prix global net :</span>
+                    <span>{viewingTicket.status === 'quotation' ? 'Montant Devis :' : 'Prix global net :'}</span>
                     <span>{viewingTicket.total.toLocaleString()} FCFA</span>
                   </div>
 
-                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1 mt-3">
-                    <div className="flex justify-between text-[10px] text-gray-500 font-sans">
-                      <span>Statut de paiement :</span>
-                      <span className="font-bold uppercase tracking-wider">
-                        {viewingTicket.paymentStatus === 'paid' ? "Payé d'avance 🟢" : viewingTicket.paymentStatus === 'partial' ? 'Acompte versé 🟡' : 'Impayé au retrait 🔴'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-indigo-600 font-sans font-bold">
-                      <span>Montant Versé :</span>
-                      <span>{(viewingTicket.amountPaid || 0).toLocaleString()} FCFA</span>
-                    </div>
-                    {viewingTicket.total - (viewingTicket.amountPaid || 0) > 0 && (
-                      <div className="flex justify-between text-rose-600 font-sans font-black">
-                        <span>Solde dû :</span>
-                        <span>{(viewingTicket.total - (viewingTicket.amountPaid || 0)).toLocaleString()} FCFA</span>
+                  {viewingTicket.status !== 'quotation' && (
+                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1 mt-3">
+                      <div className="flex justify-between text-[10px] text-gray-500 font-sans">
+                        <span>Statut de paiement :</span>
+                        <span className="font-bold uppercase tracking-wider">
+                          {viewingTicket.paymentStatus === 'paid' ? "Payé d'avance 🟢" : viewingTicket.paymentStatus === 'partial' ? 'Acompte versé 🟡' : 'Impayé au retrait 🔴'}
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      <div className="flex justify-between text-indigo-600 font-sans font-bold">
+                        <span>Montant Versé :</span>
+                        <span>{(viewingTicket.amountPaid || 0).toLocaleString()} FCFA</span>
+                      </div>
+                      {viewingTicket.total - (viewingTicket.amountPaid || 0) > 0 && (
+                        <div className="flex justify-between text-rose-600 font-sans font-black">
+                          <span>Solde dû :</span>
+                          <span>{(viewingTicket.total - (viewingTicket.amountPaid || 0)).toLocaleString()} FCFA</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* 🔔 Module de Suivi & Notifications en Temps Réel */}
@@ -28262,6 +29363,30 @@ interface DetergentSale {
     total: number;
   }[];
   discount: number;
+  discountType?: 'amount' | 'percent';
+  discountValue?: number;
+  subtotal: number;
+  total: number;
+  totalCost?: number;
+}
+
+interface DetergentQuote {
+  id: string;
+  quoteNumber: string;
+  customerName: string;
+  customerPhone: string;
+  date: string;
+  items: {
+    productId: string;
+    productName: string;
+    price: number;
+    costPrice?: number;
+    quantity: number;
+    total: number;
+  }[];
+  discount: number;
+  discountType?: 'amount' | 'percent';
+  discountValue?: number;
   subtotal: number;
   total: number;
   totalCost?: number;
@@ -28325,8 +29450,15 @@ const CATEGORY_LABELS: { [key: string]: string } = {
 };
 
 const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'inventory' | 'history'>('sales');
+  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'inventory' | 'history' | 'quotes'>('sales');
   
+  // Quotes (proforma) state
+  const [quotes, setQuotes] = useState<DetergentQuote[]>(() => {
+    const saved = localStorage.getItem(`pressing_stock_quotes_${merchant.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [viewingQuote, setViewingQuote] = useState<DetergentQuote | null>(null);
+
   const [saleMailFeedback, setSaleMailFeedback] = useState<Record<string, boolean>>({});
   
   // Custom categories state initialized from localStorage
@@ -28360,7 +29492,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   
   // POS Cart State
   const [cart, setCart] = useState<{ product: DetergentProduct; quantity: number }[]>([]);
-  const [discount, setDiscount] = useState<number>(0);
+  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
 
@@ -28368,6 +29501,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<DetergentProduct | null>(null);
   const [selectedSale, setSelectedSale] = useState<DetergentSale | null>(null);
+  const [viewingSale, setViewingSale] = useState<DetergentSale | null>(null);
 
   // Configuration Suivi Gérant (WhatsApp & Email automatique)
   const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
@@ -28584,9 +29718,16 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     return cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
   }, [cart]);
 
+  const discountAmount = useMemo(() => {
+    if (discountType === 'percent') {
+      return Math.floor((cartSubtotal * discountValue) / 100);
+    }
+    return discountValue;
+  }, [cartSubtotal, discountType, discountValue]);
+
   const cartTotal = useMemo(() => {
-    return Math.max(0, cartSubtotal - discount);
-  }, [cartSubtotal, discount]);
+    return Math.max(0, cartSubtotal - discountAmount);
+  }, [cartSubtotal, discountAmount]);
 
   // Alert count (low stock)
   const lowStockCount = useMemo(() => {
@@ -28673,7 +29814,9 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       customerPhone: customerPhone.trim(),
       date: new Date().toISOString(),
       items: newSaleItems,
-      discount,
+      discount: discountAmount,
+      discountType,
+      discountValue,
       subtotal: cartSubtotal,
       total: cartTotal,
       totalCost: newSaleTotalCost
@@ -28729,7 +29872,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
     // Reset checkout fields
     setCart([]);
-    setDiscount(0);
+    setDiscountValue(0);
+    setDiscountType('amount');
     setCustomerName('');
     setCustomerPhone('');
     setSelectedSale(newSale); // show details simulator
@@ -28738,6 +29882,99 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     // Auto-email summary to the manager in the background
     if (autoEmailManager && managerEmail && managerEmail.trim()) {
       sendSilentBackgroundSaleEmailToManager(newSale);
+    }
+  };
+
+  // Generate Proforma Quote Handler
+  const handleGenerateQuote = () => {
+    if (cart.length === 0) {
+      toast.error("Votre panier est vide ! Impossible d'émettre un devis proforma.");
+      return;
+    }
+
+    const quoteNumber = `D-QT-${Date.now().toString().slice(-6)}`;
+    const newQuoteItems = cart.map(item => ({
+      productId: item.product.id,
+      productName: item.product.name,
+      price: item.product.price,
+      costPrice: item.product.costPrice || 0,
+      quantity: item.quantity,
+      total: item.product.price * item.quantity
+    }));
+
+    const newQuoteTotalCost = newQuoteItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+
+    const newQuote: DetergentQuote = {
+      id: `quote_${Date.now()}`,
+      quoteNumber,
+      customerName: customerName.trim() || 'Client de Passage',
+      customerPhone: customerPhone.trim(),
+      date: new Date().toISOString(),
+      items: newQuoteItems,
+      discount: discountAmount,
+      discountType,
+      discountValue,
+      subtotal: cartSubtotal,
+      total: cartTotal,
+      totalCost: newQuoteTotalCost
+    };
+
+    const updatedQuotes = [newQuote, ...quotes];
+    setQuotes(updatedQuotes);
+    localStorage.setItem(`pressing_stock_quotes_${merchant.id}`, JSON.stringify(updatedQuotes));
+
+    // Reset fields & clear cart
+    setCart([]);
+    setDiscountValue(0);
+    setDiscountType('amount');
+    setCustomerName('');
+    setCustomerPhone('');
+    setViewingQuote(newQuote); // Open details modal directly
+    toast.success(`Devis proforma enregistré ! N° ${quoteNumber}`);
+  };
+
+  // Convert Quote To Cart
+  const handleConvertQuoteToCart = (quote: DetergentQuote) => {
+    const loadedCart: { product: DetergentProduct; quantity: number }[] = [];
+    
+    quote.items.forEach(it => {
+      const foundProd = products.find(p => p.id === it.productId);
+      if (foundProd) {
+        loadedCart.push({ product: foundProd, quantity: it.quantity });
+      } else {
+        loadedCart.push({
+          product: {
+            id: it.productId,
+            name: it.productName,
+            price: it.price,
+            stock: 0,
+            minStock: 2,
+            category: 'other',
+            description: 'Produit du Devis'
+          },
+          quantity: it.quantity
+        });
+      }
+    });
+
+    setCart(loadedCart);
+    setDiscountValue(quote.discountValue || quote.discount);
+    setDiscountType(quote.discountType || 'amount');
+    setCustomerName(quote.customerName === 'Client de Passage' ? '' : quote.customerName);
+    setCustomerPhone(quote.customerPhone);
+    setActiveSubTab('sales');
+    toast.success(`Le devis ${quote.quoteNumber} a été chargé avec succès dans votre panier de vente active !`);
+  };
+
+  const handleDeleteQuote = (quoteId: string) => {
+    if (window.confirm('Voulez-vous supprimer définitivement ce devis proforma ?')) {
+      const updated = quotes.filter(q => q.id !== quoteId);
+      setQuotes(updated);
+      localStorage.setItem(`pressing_stock_quotes_${merchant.id}`, JSON.stringify(updated));
+      toast.success('Devis proforma supprimé.');
+      if (viewingQuote?.id === quoteId) {
+        setViewingQuote(null);
+      }
     }
   };
 
@@ -28884,6 +30121,148 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     toast.success('Reçu de vente PDF généré !');
   };
 
+  // Print Sale/Detergent receipt A4 PDF as requested
+  const handleDownloadSaleA4PDF = (sale: DetergentSale) => {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    
+    // Header Style
+    pdf.setFillColor(30, 41, 59); // Dark blue grey matching #1e293b
+    pdf.rect(0, 0, 210, 40, 'F');
+    
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.text(merchant.name || 'ACOM Pressing', 20, 18);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text('Point de Vente Direct & Produits', 20, 25);
+    pdf.text((merchant.address || 'Sénégal') + ' | ' + (merchant.phone || ''), 20, 31);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(14);
+    pdf.text('FACTURE DE VENTE', 190, 18, { align: 'right' });
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text(`N° Réf: ${sale.saleNumber}`, 190, 25, { align: 'right' });
+    pdf.text(`Date: ${new Date(sale.date).toLocaleDateString('fr-FR')}`, 190, 31, { align: 'right' });
+    
+    // Main Content
+    pdf.setTextColor(30, 41, 59);
+    
+    // Bill To
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.text('CLIENT / ACHETEUR', 20, 55);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10);
+    pdf.text(`Nom: ${sale.customerName}`, 20, 62);
+    pdf.text(`Téléphone: ${sale.customerPhone || 'Client de Passage'}`, 20, 68);
+    
+    // Table Header
+    let y = 80;
+    pdf.setFillColor(241, 245, 249); // light blue gray
+    pdf.rect(20, y, 170, 8, 'F');
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(10);
+    pdf.text('Description du Détergent', 25, y + 5.5);
+    pdf.text('Qté', 115, y + 5.5, { align: 'center' });
+    pdf.text('P.U (FCFA)', 145, y + 5.5, { align: 'right' });
+    pdf.text('Total (FCFA)', 185, y + 5.5, { align: 'right' });
+    
+    pdf.setFont('helvetica', 'normal');
+    y += 8;
+    
+    // Table Rows
+    sale.items.forEach((item, index) => {
+      // Row highlighting
+      if (index % 2 === 1) {
+        pdf.setFillColor(248, 250, 252);
+        pdf.rect(20, y, 170, 8, 'F');
+      }
+      pdf.text(item.productName, 25, y + 5.5);
+      pdf.text(item.quantity.toString(), 115, y + 5.5, { align: 'center' });
+      pdf.text(item.price.toLocaleString(), 145, y + 5.5, { align: 'right' });
+      pdf.text(item.total.toLocaleString(), 185, y + 5.5, { align: 'right' });
+      y += 8;
+    });
+    
+    y += 5;
+    pdf.line(20, y, 190, y);
+    y += 8;
+    
+    // Totals
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Sous-total:', 140, y);
+    pdf.text(`${sale.subtotal.toLocaleString()} FCFA`, 185, y, { align: 'right' });
+    y += 6;
+    
+    if (sale.discount > 0) {
+      pdf.setFillColor(225, 29, 72); // rose dark
+      pdf.text('Remise accordée:', 140, y);
+      pdf.text(`-${sale.discount.toLocaleString()} FCFA`, 185, y, { align: 'right' });
+      pdf.setTextColor(30, 41, 59);
+      y += 6;
+    }
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.text('TOTAL PAYÉ CAISSE:', 140, y);
+    pdf.text(`${sale.total.toLocaleString()} FCFA`, 185, y, { align: 'right' });
+    
+    // Footer message
+    y = 260;
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(9);
+    pdf.setTextColor(100, 116, 139);
+    pdf.text('Merci pour votre confiance & votre fidélité !', 105, y, { align: 'center' });
+    y += 5;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.text('Document généré numériquement via Acom Gestion Workspace', 105, y, { align: 'center' });
+    
+    pdf.save(`Facture_A4_Vente_${sale.saleNumber}.pdf`);
+    toast.success('Facture client A4 générée en PDF !');
+  };
+
+  // WhatsApp Client sending for DetergentSale as requested
+  const handleSendSaleClientWhatsApp = (sale: DetergentSale) => {
+    if (!sale.customerPhone) {
+      toast.error("Veuillez renseigner le contact téléphone du client pour envoyer par WhatsApp.");
+      return;
+    }
+    
+    const itemsList = sale.items
+      .map(item => `• ${item.quantity}x ${item.productName} (${item.price} FCFA/u) = ${item.total} FCFA`)
+      .join('\n');
+      
+    const textNotif = `🛒 *REÇU CLIENT - ${merchant.name || 'ACOM Pressing'}* ✅\n` +
+           `--------------------------------\n` +
+           `• N° Facture : *${sale.saleNumber}*\n` +
+           `• Client : *${sale.customerName}*\n` +
+           `• Date : ${new Date(sale.date).toLocaleDateString('fr-FR')}\n` +
+           `--------------------------------\n` +
+           `*DÉTAILS DES ARTICLES :*\n` +
+           `${itemsList}\n` +
+           `--------------------------------\n` +
+           `• Sous-total : ${sale.subtotal} FCFA\n` +
+           (sale.discount > 0 ? `• Remise : ${sale.discount} FCFA\n` : '') +
+           `• *TOTAL PAYÉ : ${sale.total} FCFA* 🎉\n` +
+           `--------------------------------\n` +
+           `Merci pour votre achat chez ${merchant.name || 'notre établissement'} ! À bientôt.`;
+           
+    let cleaned = sale.customerPhone.replace(/[^0-9]/g, '');
+    if (cleaned.length === 9 && cleaned.startsWith('7')) {
+      cleaned = '221' + cleaned;
+    }
+    
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(textNotif)}`;
+    window.open(waUrl, '_blank');
+    toast.success('Message WhatsApp client prêt !');
+  };
+
   const totalStockValue = useMemo(() => {
     return products.reduce((acc, p) => acc + (p.stock * p.price), 0);
   }, [products]);
@@ -28963,10 +30342,18 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           >
             📜 Historique ({sales.length})
           </button>
+          <button
+            onClick={() => setActiveSubTab('quotes')}
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
+              activeSubTab === 'quotes' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            }`}
+          >
+            📋 Devis ({quotes.length})
+          </button>
         </div>
       </div>
 
-      {activeSubTab !== 'history' && (
+      {activeSubTab !== 'history' && activeSubTab !== 'quotes' && (
         <div className="space-y-6">
           {/* Quick Metrics Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -29229,15 +30616,28 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Accordez un rabais (FCFA)</label>
-                    <input
-                      type="number"
-                      placeholder="Remise immédiate"
-                      value={discount || ''}
-                      onChange={e => setDiscount(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-gray-50 rounded-xl font-mono text-xs font-bold ring-offset-white border border-transparent focus:ring-1 focus:ring-primary/20 focus:border-primary/20 outline-none text-right"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Type de remise</label>
+                      <select
+                        value={discountType}
+                        onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
+                        className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold ring-offset-white border border-transparent focus:ring-1 focus:ring-primary/20 outline-none"
+                      >
+                        <option value="amount">Fixe (FCFA)</option>
+                        <option value="percent">Taux (%)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">{discountType === 'percent' ? 'Valeur (%)' : 'Remise immédiate (FCFA)'}</label>
+                      <input
+                        type="number"
+                        placeholder={discountType === 'percent' ? "ex: 10" : "Remise immédiate"}
+                        value={discountValue || ''}
+                        onChange={e => setDiscountValue(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full px-3 py-2 bg-gray-50 rounded-xl font-mono text-xs font-bold ring-offset-white border border-transparent focus:ring-1 focus:ring-primary/20 outline-none text-right"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2 bg-[#fbfbf9] p-4 rounded-2xl border border-gray-100">
@@ -29245,10 +30645,10 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       <span>Total brut articles :</span>
                       <span className="font-mono">{(cartSubtotal).toLocaleString()} FCFA</span>
                     </div>
-                    {discount > 0 && (
+                    {discountAmount > 0 && (
                       <div className="flex justify-between items-center text-[10px] text-rose-500 font-bold">
                         <span>Remise octroyée :</span>
-                        <span className="font-mono">-{discount.toLocaleString()} FCFA</span>
+                        <span className="font-mono">-{discountAmount.toLocaleString()} FCFA</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center text-xs text-ink font-black pt-2 border-t border-gray-100">
@@ -29257,52 +30657,114 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-[#1e293b] hover:bg-black font-bold text-xs uppercase tracking-widest text-white rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
-                  >
-                    🛒 Valider l'Encaissement
-                  </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="submit"
+                      className="py-3.5 bg-[#1e293b] hover:bg-black font-bold text-xs uppercase tracking-widest text-white rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      🛒 Encaisser
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateQuote}
+                      className="py-3.5 bg-indigo-50 hover:bg-slate-200 hover:text-indigo-700 font-extrabold text-xs uppercase tracking-widest text-indigo-600 border border-indigo-100 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      📋 Etablissez DEVIS
+                    </button>
+                  </div>
                 </form>
               )}
 
               {selectedSale && (
-                <div className="flex flex-col gap-2 bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
-                  <p className="text-[10px] font-bold text-emerald-700 text-center">🎉 Enregistrement réussi de la transaction !</p>
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadSalePDF(selectedSale)}
-                    className="w-full bg-primary hover:bg-primary-hover text-white font-bold text-xs py-3 rounded-xl flex items-center justify-center gap-2 transition"
-                  >
-                    <Download className="w-4 h-4" /> Télécharger Reçu (PDF)
-                  </button>
-
-                  <div className="border-t border-emerald-200 mt-2.5 pt-2.5 space-y-2">
-                    <p className="text-[9px] font-mono font-bold text-emerald-800 uppercase tracking-widest text-center flex items-center justify-center gap-1.5">
-                      <span>👑</span> Suivi Temps Réel du Gérant (Divergents & Ventes)
+                <div className="flex flex-col gap-5 bg-slate-50/50 p-6 md:p-8 rounded-[2rem] border border-gray-100 shadow-md">
+                  {/* Centered Popping Message */}
+                  <div className="text-center">
+                    <p className="text-indigo-600 font-extrabold text-[13px] md:text-sm flex items-center justify-center gap-2 tracking-tight">
+                      <span>🎉</span> Nouveau ticket enregistré : {selectedSale.saleNumber}
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
+                  </div>
+
+                  {/* 2x2 Buttons Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Ticket Roll (80mm) */}
+                    <button
+                      type="button"
+                      onClick={() => printDetergentSaleDirect(merchant, selectedSale, '80mm', handleDownloadSalePDF)}
+                      className="py-3.5 px-5 bg-[#1a2333] hover:bg-black text-white text-xs md:text-sm font-black rounded-2xl flex items-center justify-center gap-2.5 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                      <span>Ticket Roll (80mm)</span>
+                    </button>
+
+                    {/* Format A4 Client */}
+                    <button
+                      type="button"
+                      onClick={() => printDetergentSaleDirect(merchant, selectedSale, 'A4', handleDownloadSaleA4PDF)}
+                      className="py-3.5 px-5 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-xs md:text-sm font-black rounded-2xl flex items-center justify-center gap-2.5 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                      <span>Format A4 Client</span>
+                    </button>
+
+                    {/* Télécharger PDF */}
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadSalePDF(selectedSale)}
+                      className="py-3.5 px-5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs md:text-sm font-black rounded-2xl flex items-center justify-center gap-2.5 transition-all border border-zinc-200/60 shadow-xs hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 md:w-5 md:h-5 text-zinc-700" />
+                      <span>Télécharger PDF</span>
+                    </button>
+
+                    {/* WhatsApp Client */}
+                    <button
+                      type="button"
+                      onClick={() => handleSendSaleClientWhatsApp(selectedSale)}
+                      className="py-3.5 px-5 bg-[#0f9f5a] hover:bg-[#0c854b] text-white text-xs md:text-sm font-black rounded-2xl flex items-center justify-center gap-2.5 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    >
+                      <MessageSquare className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                      <span>WhatsApp Client</span>
+                    </button>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-indigo-200/50 my-1 pt-1"></div>
+
+                  {/* real-time manager follow-up section */}
+                  <div className="space-y-3.5">
+                    <p className="text-[9px] md:text-[10px] font-mono font-black text-indigo-700 uppercase tracking-widest text-center flex items-center justify-center gap-1.5">
+                      <span>👑</span> SUIVI TEMPS RÉEL DU GÉRANT (VENTE / STOCK)
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* WhatsApp Gérant */}
                       <button
                         type="button"
                         onClick={() => dispatchManagerSaleNotif(selectedSale, 'whatsapp')}
-                        className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                        className="py-3 px-4 bg-[#e6fbf2] hover:bg-[#d1fae5] text-[#047857] border border-[#a7f3d0] text-[10px] md:text-xs font-black rounded-full flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
                       >
-                        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp Gérant
+                        <MessageSquare className="w-3.5 h-3.5 text-[#047857]" />
+                        <span>WhatsApp Gérant</span>
                       </button>
+
+                      {/* E-mail Gérant */}
                       <button
                         type="button"
                         onClick={() => dispatchManagerSaleNotif(selectedSale, 'email')}
-                        className="py-2 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
+                        className="py-3 px-4 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4338ca] border border-[#c7d2fe] text-[10px] md:text-xs font-black rounded-full flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
                       >
-                        <Mail className="w-3.5 h-3.5" /> E-mail Gérant
+                        <Mail className="w-3.5 h-3.5 text-[#4338ca]" />
+                        <span>E-mail Gérant</span>
                       </button>
                     </div>
+
                     {saleMailFeedback[selectedSale.id] && (
-                      <div className="flex items-center gap-1 text-[9px] text-emerald-600 font-semibold bg-emerald-50 p-1.5 rounded-lg justify-center border border-emerald-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <div className="flex items-center gap-1.5 text-[9px] text-emerald-700 font-semibold bg-emerald-50 p-2 rounded-xl justify-center border border-emerald-100 shadow-3xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         Ce mail envoyé en arrière-plan avec succès !
                       </div>
                     )}
+
                     {autoEmailManager && managerEmail ? (
                       <p className="text-[8px] text-emerald-600 font-bold font-mono text-center">
                         📨 Rapport automatique expédié en arrière-plan à {managerEmail}
@@ -29312,6 +30774,28 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         ⚠️ Mail automatique inactif ou adresse non configurée
                       </p>
                     )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-indigo-200/50 my-1 pt-1"></div>
+
+                  {/* Big Pink/Crimson Start a new client button */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSale(null);
+                        setCart([]);
+                        setDiscountValue(0);
+                        setDiscountType('amount');
+                        setCustomerName('');
+                        setCustomerPhone('');
+                      }}
+                      className="w-full py-4 px-6 bg-[#ff1f59] hover:bg-[#e0144c] text-white font-extrabold text-xs md:text-sm uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2.5 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg cursor-pointer"
+                    >
+                      <RefreshCw className="w-4 h-4 animate-spin" style={{ animationDuration: '6s' }} />
+                      <span>COMMENCER UN NOUVEAU CLIENT</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -29655,7 +31139,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             </div>
           </div>
         </div>
-      ) : (
+      ) : activeSubTab === 'history' ? (
         /* Sales history listings subtab */
         <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm space-y-4">
           <div className="flex justify-between items-center">
@@ -29683,7 +31167,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-xs">
                   {sales.map(s => (
-                    <tr key={s.id} className="hover:bg-gray-50/50 transition">
+                    <tr key={s.id} className="hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setViewingSale(s)}>
                       <td className="px-6 py-4 font-mono font-black text-ink">{s.saleNumber}</td>
                       <td className="px-6 py-4 text-gray-500 font-mono">{format(new Date(s.date), 'dd/MM/yyyy HH:mm')}</td>
                       <td className="px-6 py-4 font-bold">
@@ -29697,20 +31181,31 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       </td>
                       <td className="px-6 py-4 text-right font-mono text-gray-500">{s.discount.toLocaleString()} F</td>
                       <td className="px-6 py-4 text-right font-mono font-black text-primary">{(s.total).toLocaleString()} F</td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5 font-sans">
+                          {/* Split Print Custom Buttons inside Vente & Stock */}
                           <button
                             type="button"
-                            onClick={() => handleDownloadSalePDF(s)}
-                            className="px-3 py-1.5 bg-[#1e293b] hover:bg-black text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition"
+                            onClick={(e) => { e.stopPropagation(); printDetergentSaleDirect(merchant, s, '80mm', handleDownloadSalePDF); }}
+                            className="px-2.5 py-1 bg-[#1a2333] hover:bg-black text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            title="Imprimer direct Caisse (80mm)"
                           >
-                            Reçu PDF
+                            <Printer className="w-3 h-3" /> Roll (80mm)
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); printDetergentSaleDirect(merchant, s, 'A4', handleDownloadSaleA4PDF); }}
+                            className="px-2.5 py-1 bg-[#6366f1] hover:bg-[#4f46e5] text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            title="Imprimer direct Facture (A4)"
+                          >
+                            <FileText className="w-3 h-3" /> A4 Client
                           </button>
                           
                           <button
                             type="button"
-                            onClick={() => dispatchManagerSaleNotif(s, 'whatsapp')}
-                            className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            onClick={(e) => { e.stopPropagation(); dispatchManagerSaleNotif(s, 'whatsapp'); }}
+                            className="px-2 py-1.5 bg-[#e6fbf2] hover:bg-[#d1fae5] text-[#047857] border border-[#a7f3d0] font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
                             title="Relayer au gérant par WhatsApp"
                           >
                             <MessageSquare className="w-3 h-3" /> WA
@@ -29718,8 +31213,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
                           <button
                             type="button"
-                            onClick={() => dispatchManagerSaleNotif(s, 'email')}
-                            className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            onClick={(e) => { e.stopPropagation(); dispatchManagerSaleNotif(s, 'email'); }}
+                            className="px-2 py-1.5 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4338ca] border border-[#c7d2fe] font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
                             title="Relayer au gérant par Mail"
                           >
                             <Mail className="w-3 h-3" /> Mail
@@ -29733,7 +31228,63 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             </div>
           )}
         </div>
-      )}
+      ) : activeSubTab === 'quotes' ? (
+        /* Quotes history listings subtab */
+        <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-black text-ink uppercase tracking-wider">Devis Proforma Émis</h3>
+            <span className="text-xs font-mono text-gray-400 uppercase tracking-widest font-bold">Ventes en attente</span>
+          </div>
+
+          {quotes.length === 0 ? (
+            <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              <p className="text-gray-400 font-bold text-xs">Aucun devis proforma généré pour le moment.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest bg-gray-50/40">
+                    <th className="px-6 py-4">N° Devis</th>
+                    <th className="px-6 py-4">Date Émission</th>
+                    <th className="px-6 py-4">Client</th>
+                    <th className="px-6 py-4">Articles</th>
+                    <th className="px-6 py-4 text-right">Devis Net</th>
+                    <th className="px-6 py-4 text-center">Transfert Vente</th>
+                    <th className="px-6 py-4 text-center">Retirer</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-xs">
+                  {quotes.map(q => (
+                    <tr key={q.id} className="hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setViewingQuote(q)}>
+                      <td className="px-6 py-4 font-mono font-black text-indigo-600">{q.quoteNumber}</td>
+                      <td className="px-6 py-4 text-gray-500 font-mono">{format(new Date(q.date), 'dd/MM/yyyy')}</td>
+                      <td className="px-6 py-4 font-bold">
+                        <div>{q.customerName}</div>
+                        <div className="text-[10px] text-gray-400">{q.customerPhone || 'Sans contact'}</div>
+                      </td>
+                      <td className="px-6 py-4 max-w-[200px]">
+                        <div className="truncate font-bold text-gray-600">
+                          {q.items.map(it => `${it.productName} (x${it.quantity})`).join(', ')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono font-black text-ink">{(q.total).toLocaleString()} F</td>
+                      <td className="px-6 py-4 text-center text-xs" onClick={(e) => { e.stopPropagation(); handleConvertQuoteToCart(q); }}>
+                        <span className="cursor-pointer bg-white border border-gray-200 shadow-sm text-ink px-3 py-1.5 rounded-lg font-bold uppercase tracking-widest text-[9px] min-w-max">Convertir au Panier</span>
+                      </td>
+                      <td className="px-6 py-4 text-center" onClick={(e) => { e.stopPropagation(); handleDeleteQuote(q.id); }}>
+                        <span className="text-red-500 hover:text-red-700 cursor-pointer p-2 inline-flex" title="Supprimer Devis">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Scanner Modals for Pressing */}
       <ScannerModal
@@ -29766,6 +31317,133 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         }}
         title="Rechercher par Code-barres / SKU"
       />
+
+      {viewingSale && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4" onClick={() => setViewingSale(null)}>
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#111827] to-[#1f2937] text-white p-6 relative">
+              <button
+                type="button"
+                onClick={() => setViewingSale(null)}
+                className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-full flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="text-[10px] font-mono tracking-widest text-[#6366f1] font-bold uppercase mb-1">Détails de la vente de boutique</div>
+              <h3 className="text-xl font-black">{viewingSale.saleNumber}</h3>
+              <p className="text-xs text-slate-300 mt-1">Transaction directe - Boutique & Produits</p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Customer info */}
+              <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2 text-left">
+                <div>
+                  <span className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Acheteur</span>
+                  <span className="font-bold text-sm text-ink">{viewingSale.customerName}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-1">
+                  <div>
+                    <span className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Téléphone</span>
+                    <span className="font-bold text-xs text-ink font-mono">{viewingSale.customerPhone || 'Client de Passage'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Date & Heure</span>
+                    <span className="font-mono text-xs text-ink font-bold">{new Date(viewingSale.date).toLocaleString('fr-FR')}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="space-y-2 text-left">
+                <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider">Articles Achetés</span>
+                <div className="divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                  {viewingSale.items.map((it, idx) => (
+                    <div key={idx} className="py-2.5 flex justify-between items-center text-xs">
+                      <div>
+                        <p className="font-black text-ink">{it.productName}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">{it.price.toLocaleString()} F x {it.quantity}</p>
+                      </div>
+                      <span className="font-mono font-black text-ink">{it.total.toLocaleString()} F</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financial Totals */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2 text-left">
+                <div className="flex justify-between text-xs text-gray-500 font-bold">
+                  <span>Sous-total articles :</span>
+                  <span className="font-mono">{viewingSale.subtotal.toLocaleString()} FCFA</span>
+                </div>
+                {viewingSale.discount > 0 && (
+                  <div className="flex justify-between text-xs text-rose-500 font-bold">
+                    <span>Remise accordée :</span>
+                    <span className="font-mono">-{viewingSale.discount.toLocaleString()} FCFA</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm text-ink font-black pt-2 border-t border-slate-200">
+                  <span>TOTAL PAYÉ NET :</span>
+                  <span className="font-mono text-primary font-black">{viewingSale.total.toLocaleString()} FCFA</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Footer */}
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-col gap-2.5">
+              <div className="grid grid-cols-2 gap-2">
+                {/* Roll 80mm */}
+                <button
+                  type="button"
+                  onClick={() => printDetergentSaleDirect(merchant, viewingSale, '80mm', handleDownloadSalePDF)}
+                  className="py-3 px-4 bg-[#1a2333] hover:bg-black text-white text-[11px] font-extrabold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-white" />
+                  <span>Rouleau (80 mm)</span>
+                </button>
+
+                {/* Client A4 */}
+                <button
+                  type="button"
+                  onClick={() => printDetergentSaleDirect(merchant, viewingSale, 'A4', handleDownloadSaleA4PDF)}
+                  className="py-3 px-4 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-[11px] font-extrabold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-white" />
+                  <span>Client A4</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {/* WhatsApp client */}
+                <button
+                  type="button"
+                  onClick={() => handleSendSaleClientWhatsApp(viewingSale)}
+                  className="py-2.5 px-3 bg-[#e6fbf2] hover:bg-[#d1fae5] text-[#047857] border border-[#a7f3d0] text-[10px] font-black rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>WA Client</span>
+                </button>
+
+                {/* Close */}
+                <button
+                  type="button"
+                  onClick={() => setViewingSale(null)}
+                  className="py-2.5 px-3 bg-white hover:bg-gray-100 text-gray-500 border border-gray-200 text-[10px] font-black rounded-lg flex items-center justify-center transition cursor-pointer"
+                >
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 };
