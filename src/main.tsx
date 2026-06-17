@@ -62,6 +62,12 @@ if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
           body: bodyText
         });
 
+        console.log(`[Desktop Fetch Bypasser] Result from ${url}:`, {
+          status: result.status,
+          statusText: result.statusText,
+          text: result.text
+        });
+
         // Convert the IPC result back to a standard Response object
         return new Response(result.text, {
           status: result.status,

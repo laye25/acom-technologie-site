@@ -8854,6 +8854,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               to: managerEmail,
+              from: merchant.managerNotifications?.emailFrom || undefined,
               subject: `[PRO POS - ${merchant.name}] Vente Réussie : ${total.toLocaleString()} ${merchant.currency}`,
               html: emailHtml
             })
@@ -12576,7 +12577,7 @@ const MerchantSettings = ({
               />
             </div>
             <div>
-              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">E-mail Gérant</label>
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">E-mail Gérant (Destinataire)</label>
               <input
                 type="email"
                 value={formData.managerNotifications?.email || ''}
@@ -12587,6 +12588,20 @@ const MerchantSettings = ({
                 placeholder="gerant@boutique.com"
                 className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
               />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">E-mail Expéditeur (From Resend - Optionnel)</label>
+              <input
+                type="text"
+                value={formData.managerNotifications?.emailFrom || ''}
+                onChange={e => setFormData({
+                  ...formData,
+                  managerNotifications: { ...(formData.managerNotifications || {}), emailFrom: e.target.value }
+                })}
+                placeholder="no-reply@votredomaine.com"
+                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              />
+              <p className="text-[9px] text-gray-400 mt-1 font-medium">Doit appartenir à un domaine vérifié sur votre compte Resend (laisser vide pour la valeur par défaut).</p>
             </div>
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">URL Serveur API (Optionnel pour Desktop)</label>
@@ -26216,6 +26231,7 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
           subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
           html: mailHtml
         })
@@ -27245,6 +27261,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
           subject: `⚡ [${flowType.toUpperCase()}] Ticket n°${ticket.ticketNumber} - ${merchant.name || 'Pressing'}`,
           html: mailHtml
         })
@@ -27448,6 +27465,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
           subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
           html: mailHtml
         })
@@ -29660,6 +29678,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
           subject: `🛒 [VENTE PRODUIT] Vente n°${sale.saleNumber} - ${merchant.name || 'Pressing'}`,
           html: mailHtml
         })

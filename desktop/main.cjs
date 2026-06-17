@@ -140,7 +140,17 @@ function createWindow() {
         fetchOptions.body = options.body;
       }
       
-      const response = await net.fetch(url, fetchOptions);
+      // Use standard Node.js global fetch (introduced natively in Node 18+) if present, 
+      // fallback to Electron's Chromium-based net.fetch
+      let response;
+      if (typeof globalThis !== 'undefined' && typeof globalThis.fetch === 'function') {
+        console.log('[IPC API POP] Using standard Node.js native fetch stack');
+        response = await globalThis.fetch(url, fetchOptions);
+      } else {
+        console.log('[IPC API POP] Using Electron chromium-based net.fetch stack');
+        response = await net.fetch(url, fetchOptions);
+      }
+      
       const text = await response.text();
       
       console.log(`[IPC API POP] API Gateway Response: ${response.status} ${response.statusText}`);
