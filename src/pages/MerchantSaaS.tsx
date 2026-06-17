@@ -26237,6 +26237,11 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
         })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error dispatching silent manager background mail:', errorData || response.statusText);
+        showAlert("Erreur d'envoi Email (Clôture)", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
+      }
       return response.ok;
     } catch (error) {
       console.error('Error dispatching silent manager background mail:', error);
@@ -27281,7 +27286,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         setManagerNotifsHistory(prev => [newLog, ...prev]);
         return true;
       } else {
-        console.error('Failed to send background email to manager');
+        const errorData = await response.json().catch(() => null);
+        console.error('Failed to send background email to manager:', errorData || response.statusText);
+        showAlert("Erreur d'envoi", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
         return false;
       }
     } catch (error) {
@@ -27471,6 +27478,11 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error dispatching silent manager background mail:', errorData || response.statusText);
+        showAlert("Erreur d'envoi Email (Clôture)", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
+      }
       return response.ok;
     } catch {
       return false;
@@ -29700,7 +29712,9 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
         return true;
       } else {
-        console.error('Failed to send background email to manager for sale');
+        const errorData = await response.json().catch(() => null);
+        console.error('Failed to send background email to manager for sale:', errorData || response.statusText);
+        showAlert("Erreur d'envoi Email (Vente)", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
         return false;
       }
     } catch (err) {
