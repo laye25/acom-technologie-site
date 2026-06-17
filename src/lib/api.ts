@@ -13,13 +13,18 @@ export const getApiUrl = (path: string): string => {
     return cleanPath;
   }
 
-  // If we are already running via standard Web http/https protocol, we use relative paths
-  if (window.location.protocol.startsWith('http')) {
+  // Check if we are hosted directly on the official web cloud run container endpoints
+  const isCloudRunServer = 
+    window.location.hostname === 'ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app' ||
+    window.location.hostname === 'ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app';
+
+  // If we are hosted directly on the Web container, we use standard relative paths
+  if (isCloudRunServer) {
     return cleanPath;
   }
 
-  // Otherwise we are on Desktop (file: or app: protocol)
-  // Retrieve any custom base API URL saved in local storage
+  // Otherwise, we are running in a client-only environment (Desktop app, local desktop build, capacitor, etc.).
+  // We MUST route all backend API calls to the secure production public Cloud Run server.
   let base = '';
   try {
     base = localStorage.getItem('acom_desktop_api_base_url') || '';
