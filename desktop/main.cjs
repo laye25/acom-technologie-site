@@ -171,6 +171,49 @@ function createWindow() {
     }
   });
 
+  // Secure email sender using hardcoded/environment credentials natively inside Electron
+  ipcMain.handle('send-email-secure', async (event, payload) => {
+    try {
+      console.log(`[IPC Mail] Sending secure native email to: ${payload.to}`);
+      
+      // Mettez à jour ces valeurs ici avec votre vraie clé et votre email de domaine authentifié.
+      // Cette clé sera injectée, compilée ou protégée dans le binaire bureau.
+      const HIDDEN_RESEND_API_KEY = process.env.VITE_RESEND_API_KEY || 're_WHwSbdvU_27B1Duhd5YZsRePHWU1QNTvh';
+      const HIDDEN_SENDER_EMAIL = 'manager-gestion@acomtechnologie.com'; 
+
+      const fetchOptions = {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HIDDEN_RESEND_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: HIDDEN_SENDER_EMAIL,
+          to: Array.isArray(payload.to) ? payload.to : [payload.to],
+          subject: payload.subject,
+          html: payload.html
+        })
+      };
+
+      let response;
+      if (typeof globalThis !== 'undefined' && typeof globalThis.fetch === 'function') {
+        response = await globalThis.fetch('https://api.resend.com/emails', fetchOptions);
+      } else {
+        response = await net.fetch('https://api.resend.com/emails', fetchOptions);
+      }
+
+      const text = await response.text();
+      return {
+        ok: response.ok,
+        status: response.status,
+        text: text
+      };
+    } catch (error) {
+      console.error('[IPC Mail] Native email send failed:', error);
+      return { ok: false, error: error.message };
+    }
+  });
+
   // Register the protocol handler after app.whenReady
   protocol.handle('app', async (request) => {
     try {

@@ -50,14 +50,34 @@ export const getApiUrl = (path: string): string => {
   return `${trimmedBase}${cleanPath}`;
 };
 
+
 export const sendEmailDirectlyOrViaBackend = async (payload: {
   to: string | string[];
   from?: string;
   subject: string;
   html: string;
 }, config?: { resendApiKey?: string; defaultFrom?: string }) => {
+  // If we are in the desktop Electron app, route securely through the native IPC layer
+  if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.sendEmailSecure) {
+    console.log("[Mail Engine] Routing email securely via Desktop IPC bypassing frontend exposure.");
+    const result = await window.electronAPI.sendEmailSecure(payload);
+    return {
+      ...result,
+      statusText: result.ok ? 'OK' : 'Error',
+      text: async () => result.text,
+      json: async () => {
+        try {
+          return JSON.parse(result.text);
+        } catch {
+          return { error: result.text };
+        }
+      }
+    } as any;
+  }
+
+  // Fallback for direct front-end calls if a key is provided directly (e.g. from an admin/SaaS config override)
   if (config?.resendApiKey) {
-    console.log("[Mail Engine] Routing email directly via Resend API.");
+    console.log("[Mail Engine] Routing email directly via Resend API from browser.");
     return fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -71,11 +91,12 @@ export const sendEmailDirectlyOrViaBackend = async (payload: {
         html: payload.html
       })
     });
-  } else {
-    return fetch(getApiUrl('/api/send-email'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  }
+  } 
+  
+  // Default fallback through backend
+  return fetch(getApiUrl('/api/send-email'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 };

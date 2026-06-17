@@ -9,6 +9,7 @@ interface ElectronAPI {
   isElectron: boolean;
   syncPhysicalFile: (buffer: ArrayBuffer) => Promise<any>;
   makeApiRequest: (url: string, options: any) => Promise<any>;
+  sendEmailSecure: (payload: any) => Promise<{ok: boolean, status: number, text: string, json?: () => Promise<any>}>;
 }
 
 declare global {

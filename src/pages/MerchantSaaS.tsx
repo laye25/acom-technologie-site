@@ -12588,34 +12588,6 @@ const MerchantSettings = ({
                 className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
               />
             </div>
-            <div>
-              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">E-mail Expéditeur (From Resend - Optionnel)</label>
-              <input
-                type="text"
-                value={formData.managerNotifications?.emailFrom || ''}
-                onChange={e => setFormData({
-                  ...formData,
-                  managerNotifications: { ...(formData.managerNotifications || {}), emailFrom: e.target.value }
-                })}
-                placeholder="no-reply@votredomaine.com"
-                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-              />
-              <p className="text-[9px] text-gray-400 mt-1 font-medium">Doit appartenir à un domaine vérifié sur votre compte Resend (laisser vide pour la valeur par défaut).</p>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Clé API Resend (Pour Desktop) - Solution directe</label>
-              <input
-                type="password"
-                value={formData.managerNotifications?.resendApiKey || ''}
-                onChange={e => setFormData({
-                  ...formData,
-                  managerNotifications: { ...(formData.managerNotifications || {}), resendApiKey: e.target.value }
-                })}
-                placeholder="re_xxxxxxxxxxxxxxxxxxxxxx"
-                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-              />
-              <p className="text-[9px] text-gray-400 mt-1 font-medium">L'application de bureau utilisera cette clé pour envoyer des e-mails sans dépendre du serveur.</p>
-            </div>
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">URL Serveur API (Optionnel pour Desktop)</label>
               <input

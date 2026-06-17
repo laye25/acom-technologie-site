@@ -15,5 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   makeApiRequest: async (url, options) => {
     return ipcRenderer.invoke('make-api-request', { url, options });
+  },
+  sendEmailSecure: async (payload) => {
+    return ipcRenderer.invoke('send-email-secure', payload);
   }
 });
