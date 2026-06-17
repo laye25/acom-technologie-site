@@ -26,7 +26,14 @@ if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
     const url = typeof input === 'string' ? input : (input instanceof URL ? input.href : input.url);
     
     // Only intercept requests directed to external Cloud Run production/dev server API endpoints
-    if (url.startsWith('http') && !url.includes('localhost') && !url.includes('127.0.0.1')) {
+    // Do NOT intercept Google APIs or Firebase endpoints as they handle CORS natively and use long-polling/streaming
+    if (url.startsWith('http') && 
+        !url.includes('localhost') && 
+        !url.includes('127.0.0.1') &&
+        !url.includes('googleapis.com') &&
+        !url.includes('firebaseio.com') &&
+        !url.includes('google.com')
+    ) {
       try {
         console.log('[Desktop Fetch Bypasser] Routing fetch call natively via Node preflight stack:', url);
         

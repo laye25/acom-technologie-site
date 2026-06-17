@@ -536,6 +536,8 @@ export interface Merchant {
   managerNotifications?: {
     whatsappPhone?: string;
     email?: string;
+    emailFrom?: string;
+    resendApiKey?: string;
     notifyOnCashClosure?: boolean;
     notifyOnPOSSale?: boolean;
     apiBaseUrl?: string;

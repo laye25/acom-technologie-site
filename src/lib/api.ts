@@ -49,3 +49,33 @@ export const getApiUrl = (path: string): string => {
   const trimmedBase = base.endsWith('/') ? base.slice(0, -1) : base;
   return `${trimmedBase}${cleanPath}`;
 };
+
+export const sendEmailDirectlyOrViaBackend = async (payload: {
+  to: string | string[];
+  from?: string;
+  subject: string;
+  html: string;
+}, config?: { resendApiKey?: string; defaultFrom?: string }) => {
+  if (config?.resendApiKey) {
+    console.log("[Mail Engine] Routing email directly via Resend API.");
+    return fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: payload.from || config.defaultFrom || 'ACOM Desktop <onboarding@resend.dev>',
+        to: Array.isArray(payload.to) ? payload.to : [payload.to],
+        subject: payload.subject,
+        html: payload.html
+      })
+    });
+  } else {
+    return fetch(getApiUrl('/api/send-email'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  }
+};

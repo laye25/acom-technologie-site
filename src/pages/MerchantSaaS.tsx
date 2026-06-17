@@ -39,7 +39,7 @@ import {
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { showMailSuccessToast } from '../components/MailSuccessToast';
-import { getApiUrl } from '../lib/api';
+import { getApiUrl, sendEmailDirectlyOrViaBackend } from '../lib/api';
 import { triggerAcomAlert, AcomAlertEventProvider } from '../components/AcomAlertEventProvider';
 import { AcomZoneMerchantPanel } from '../components/AcomZoneMerchantPanel';
 import { jsPDF } from 'jspdf';
@@ -8849,15 +8849,14 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
 
           setEmailSendStatus('sending');
           setEmailSendError(null);
-          fetch(getApiUrl('/api/send-email'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              to: managerEmail,
-              from: merchant.managerNotifications?.emailFrom || undefined,
-              subject: `[PRO POS - ${merchant.name}] Vente Réussie : ${total.toLocaleString()} ${merchant.currency}`,
-              html: emailHtml
-            })
+          sendEmailDirectlyOrViaBackend({
+            to: managerEmail,
+            from: merchant.managerNotifications?.emailFrom || undefined,
+            subject: `[PRO POS - ${merchant.name}] Vente Réussie : ${total.toLocaleString()} ${merchant.currency}`,
+            html: emailHtml
+          }, { 
+            resendApiKey: merchant.managerNotifications?.resendApiKey, 
+            defaultFrom: merchant.managerNotifications?.emailFrom 
           })
           .then(async (res) => {
             let data: any = {};
@@ -12602,6 +12601,20 @@ const MerchantSettings = ({
                 className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
               />
               <p className="text-[9px] text-gray-400 mt-1 font-medium">Doit appartenir à un domaine vérifié sur votre compte Resend (laisser vide pour la valeur par défaut).</p>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Clé API Resend (Pour Desktop) - Solution directe</label>
+              <input
+                type="password"
+                value={formData.managerNotifications?.resendApiKey || ''}
+                onChange={e => setFormData({
+                  ...formData,
+                  managerNotifications: { ...(formData.managerNotifications || {}), resendApiKey: e.target.value }
+                })}
+                placeholder="re_xxxxxxxxxxxxxxxxxxxxxx"
+                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+              />
+              <p className="text-[9px] text-gray-400 mt-1 font-medium">L'application de bureau utilisera cette clé pour envoyer des e-mails sans dépendre du serveur.</p>
             </div>
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">URL Serveur API (Optionnel pour Desktop)</label>
@@ -26226,15 +26239,14 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch(getApiUrl('/api/send-email'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: managerEmail,
-          from: merchant.managerNotifications?.emailFrom || undefined,
-          subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
-          html: mailHtml
-        })
+      const response = await sendEmailDirectlyOrViaBackend({
+        to: managerEmail,
+        from: merchant.managerNotifications?.emailFrom || undefined,
+        subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
+        html: mailHtml
+      }, {
+        resendApiKey: merchant.managerNotifications?.resendApiKey,
+        defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
       if (!response.ok) {
@@ -27261,15 +27273,14 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch(getApiUrl('/api/send-email'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: managerEmail,
-          from: merchant.managerNotifications?.emailFrom || undefined,
-          subject: `⚡ [${flowType.toUpperCase()}] Ticket n°${ticket.ticketNumber} - ${merchant.name || 'Pressing'}`,
-          html: mailHtml
-        })
+      const response = await sendEmailDirectlyOrViaBackend({
+        to: managerEmail,
+        from: merchant.managerNotifications?.emailFrom || undefined,
+        subject: `⚡ [${flowType.toUpperCase()}] Ticket n°${ticket.ticketNumber} - ${merchant.name || 'Pressing'}`,
+        html: mailHtml
+      }, {
+        resendApiKey: merchant.managerNotifications?.resendApiKey,
+        defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
       if (response.ok) {
@@ -27467,15 +27478,14 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch(getApiUrl('/api/send-email'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: managerEmail,
-          from: merchant.managerNotifications?.emailFrom || undefined,
-          subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
-          html: mailHtml
-        })
+      const response = await sendEmailDirectlyOrViaBackend({
+        to: managerEmail,
+        from: merchant.managerNotifications?.emailFrom || undefined,
+        subject: `📊 [CLÔTURE CAISSE] Rapport du ${c.date} - ${merchant.name || 'Pressing'}`,
+        html: mailHtml
+      }, {
+        resendApiKey: merchant.managerNotifications?.resendApiKey,
+        defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
       if (!response.ok) {
@@ -29685,15 +29695,14 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     `;
 
     try {
-      const response = await fetch(getApiUrl('/api/send-email'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: managerEmail,
-          from: merchant.managerNotifications?.emailFrom || undefined,
-          subject: `🛒 [VENTE PRODUIT] Vente n°${sale.saleNumber} - ${merchant.name || 'Pressing'}`,
-          html: mailHtml
-        })
+      const response = await sendEmailDirectlyOrViaBackend({
+        to: managerEmail,
+        from: merchant.managerNotifications?.emailFrom || undefined,
+        subject: `🛒 [VENTE PRODUIT] Vente n°${sale.saleNumber} - ${merchant.name || 'Pressing'}`,
+        html: mailHtml
+      }, {
+        resendApiKey: merchant.managerNotifications?.resendApiKey,
+        defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
       if (response.ok) {
