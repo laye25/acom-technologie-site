@@ -52,6 +52,19 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Enable CORS manually to allow requests from any local or desktop applications
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+    
+    // Handle OPTIONS preflight requests
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+    next();
+  });
+
   // Log all requests
   app.use((req, res, next) => {
     console.log(`${req.method} ${req.url}`);
