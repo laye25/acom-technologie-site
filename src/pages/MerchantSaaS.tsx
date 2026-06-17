@@ -1306,14 +1306,14 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
               }
             }, 800);
             
-            toast.success("Impression Vente boutique lancée...", { position: 'top-center' });
+            triggerAcomAlert("Impression Vente", "Impression Vente boutique lancée... Le ticket est en cours de traitement.", "success", "IMPRESSION");
             return;
           }
         }
 
         printFrame.contentWindow.focus();
         printFrame.contentWindow.print();
-        toast.success("Aperçu d'impression Vente boutique ouvert !", { position: 'top-center' });
+        triggerAcomAlert("Aperçu d'Impression", "Aperçu d'impression Vente boutique ouvert !", "success", "IMPRESSION");
       } catch (err) {
         console.warn("Iframe direct printing failed, triggering PDF fallback...", err);
         handleDownloadPDF(sale);
@@ -12395,7 +12395,16 @@ const MerchantSettings = ({
   onUpdate: (m: Merchant) => void, 
   setActiveTab: (tab: string) => void 
 }) => {
-  const [formData, setFormData] = useState(merchant);
+  const [formData, setFormData] = useState(() => {
+    const data = { ...merchant };
+    if (!data.managerNotifications) {
+      data.managerNotifications = {};
+    }
+    if (!data.managerNotifications.apiBaseUrl) {
+      data.managerNotifications.apiBaseUrl = 'https://ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app';
+    }
+    return data;
+  });
   const [saving, setSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -27064,7 +27073,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     const message = getManagerNotificationMessage(t, flowType);
     if (method === 'whatsapp') {
       if (!managerPhone.trim()) {
-        toast.error('Veuillez configurer le numéro WhatsApp du Gérant dans l\'onglet Réglages.');
+        showAlert('Numéro non configuré', "Veuillez configurer le numéro WhatsApp du Gérant dans l'onglet Réglages.", 'error');
         return;
       }
       let cleaned = managerPhone.replace(/[^0-9]/g, '');
@@ -27073,7 +27082,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       }
       const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
-      toast.success('Rapport de suivi WhatsApp configuré !');
+      showAlert('Rapport Envoyé', "Le rapport de suivi pour WhatsApp a été généré et ouvert !", 'success');
       
       // Add to local history
       const newLog = {
@@ -27086,7 +27095,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       setManagerNotifsHistory(prev => [newLog, ...prev]);
     } else {
       if (!managerEmail.trim()) {
-        toast.error('Veuillez configurer l\'adresse email du Gérant dans l\'onglet Réglages.');
+        showAlert('Email non configuré', "Veuillez configurer l'adresse email du Gérant dans l'onglet Réglages.", 'error');
         return;
       }
       toast.loading('Envoi du rapport par mail...');
@@ -27094,10 +27103,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       toast.dismiss();
       if (ok) {
         setTicketMailFeedback(prev => ({ ...prev, [t.id]: true }));
+        showAlert('Rapport Envoyé', "Le rapport de suivi par e-mail a été envoyé avec succès au Gérant !", 'success');
       } else {
         const subject = `[TEMPS RÉEL] ${flowType.toUpperCase()} - Ticket ${t.ticketNumber} - ${merchant.name || 'Pressing'}`;
         const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
         window.open(mailtoUrl, '_blank');
+        showAlert("Messagerie Ouverte", "Nous avons configuré l'email de suivi. Veuillez appuyer sur Envoyer dans votre boîte mail !", 'success');
         
         // Add to local history
         const newLog = {
@@ -27173,10 +27184,21 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${activeSupps}</td>
             </tr>
             ` : ''}
+            ${ticket.discount > 0 ? `
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Remise :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #ef4444; font-weight: bold;">-${ticket.discount} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Valeur Nette :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #1e293b; font-size: 14px;">${ticket.total} FCFA</td>
+            </tr>
+            ` : `
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Montant Total :</strong></td>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #1e293b; font-size: 14px;">${ticket.total} FCFA</td>
             </tr>
+            `}
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Acompte Payé :</strong></td>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #0d9488; font-weight: bold;">${ticket.amountPaid || 0} FCFA</td>
@@ -27487,12 +27509,12 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     setPaymentMethod('cash');
     setAmountPaid(0);
     setSelectedTicket(null);
-    toast.success('Formulaire réinitialisé.');
+    showAlert('Formulaire Réinitialisé', 'Le formulaire de réception a été vidé.', 'success');
   };
 
   const handleSendClientWhatsApp = (t: PressingTicket) => {
     if (!t.clientPhone || !t.clientPhone.trim()) {
-      toast.error("Veuillez renseigner le téléphone du client.");
+      showAlert('Téléphone Manquant', "Veuillez renseigner le téléphone du client.", 'warning');
       return;
     }
     const message = `Bonjour ${t.clientName}, votre dépôt du ${t.depositDate} au pressing ${merchant.name || 'ACOM'} a bien été enregistré. Ticket N°: ${t.ticketNumber}. Prix : ${t.total} FCFA. Versé: ${t.amountPaid || 0} FCFA. Retrait prévu: ${t.expectedDeliveryDate || 'N/A'}. Merci de votre confiance !`;
@@ -27502,7 +27524,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     }
     const url = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
-    toast.success('Message WhatsApp client prêt !');
+    showAlert('Message Prêt', 'Le message de suivi WhatsApp pour le client a bien été généré.', 'success');
   };
 
   const handleCreateTicket = (e: React.FormEvent) => {
@@ -27586,15 +27608,15 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
 
   const handleGenerateTicketQuote = () => {
     if (!clientName.trim()) {
-      toast.error('Le nom du client est obligatoire pour établir un devis.');
+      showAlert('Nom Client Obligatoire', 'Le nom du client est obligatoire pour établir un devis.', 'warning');
       return;
     }
     if (billingType === 'article' && Object.values(articlesQty).every(qty => qty === 0)) {
-      toast.error('Veuillez ajouter au moins un article pour le devis.');
+      showAlert('Linge Obligatoire', 'Veuillez ajouter au moins un article pour le devis.', 'warning');
       return;
     }
     if (billingType === 'poids' && weightKg <= 0) {
-      toast.error('Le poids doit être supérieur à 0 pour le devis.');
+      showAlert('Poids Non Valide', 'Le poids doit être supérieur à 0 pour le devis.', 'warning');
       return;
     }
 
@@ -27634,7 +27656,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     setTickets(updated);
     localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
     setSelectedTicket(newQuote);
-    toast.success(`Devis ${quoteNumber} généré avec succès !`);
+    showAlert('Devis Généré', `Le devis proforma ${quoteNumber} a été généré avec succès !`, 'success', undefined, false, "D'ACCORD", "COMMERCIAL");
   };
 
   const updateStatus = (ticketId: string, nextStatus: PressingTicket['status']) => {
@@ -27829,7 +27851,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     pdf.text('lors du retrait du linge.', 40, y, { align: 'center' });
 
     pdf.save(`Ticket_Pressing_${ticket.ticketNumber}.pdf`);
-    toast.success('Reçu PDF généré et téléchargé !');
+    showAlert('Reçu Téléchargé', 'Le reçu de dépôt au format ticket 80mm a été généré et téléchargé avec succès !', 'success');
   };
 
   return (
@@ -28589,7 +28611,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                 type="button"
                 onClick={async () => {
                   if (!cashierName.trim()) {
-                    toast.error('Veuillez spécifier votre nom de Caissier.');
+                    showAlert('Nom Opérateur Manquant', 'Veuillez spécifier votre nom de Caissier pour valider la clôture.', 'warning');
                     return;
                   }
                   
@@ -28636,7 +28658,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   setActualCash(0);
                   setClosureNotes('');
                   toast.dismiss();
-                  toast.success(`Clôture du ${closureDate} enregistrée à l'instant avec succès !`);
+                  showAlert('Caisse Clause', `La clôture du ${closureDate} a bien été enregistrée avec succès !`, 'success');
                 }}
                 className="w-full bg-primary hover:bg-[#c93b3b] text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-2xl transition duration-200 flex items-center justify-center gap-2 shadow"
               >
@@ -29165,7 +29187,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       type="button"
                       onClick={() => {
                         if (!editedPhone.trim()) {
-                          toast.error('Veuillez renseigner un numéro de téléphone.');
+                          showAlert('Téléphone Requis', 'Veuillez renseigner un numéro de téléphone.', 'warning');
                           return;
                         }
                         let cleaned = editedPhone.replace(/[^0-9]/g, '');
@@ -29177,7 +29199,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         window.open(waUrl, '_blank');
                         
                         logNotificationSent('whatsapp', selectedNotifTemplate, notifMessage);
-                        toast.success('Lien WhatsApp généré !');
+                        showAlert('Lien Généré', 'Le lien de suivi WhatsApp client a bien été généré !', 'success');
                       }}
                       className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition shadow-sm border border-emerald-500"
                     >
@@ -29189,7 +29211,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       type="button"
                       onClick={() => {
                         if (!editedEmail.trim()) {
-                          toast.error('Veuillez renseigner une adresse e-mail.');
+                          showAlert('E-mail Requis', 'Veuillez renseigner une adresse e-mail valide.', 'warning');
                           return;
                         }
                         const subject = NOTIFICATION_TEMPLATES[selectedNotifTemplate]?.subject || 'Suivi Pressing';
@@ -29197,7 +29219,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         window.open(mailtoUrl, '_blank');
                         
                         logNotificationSent('email', selectedNotifTemplate, notifMessage);
-                        toast.success('Relance par email ouverte !');
+                        showAlert('Messagerie Ouverte', 'Le message de relance client a bien été généré et ouvert dans votre application mail !', 'success');
                       }}
                       className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition shadow-sm border border-indigo-500"
                     >
@@ -29451,6 +29473,48 @@ const CATEGORY_LABELS: { [key: string]: string } = {
 
 const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const [activeSubTab, setActiveSubTab] = useState<'sales' | 'inventory' | 'history' | 'quotes'>('sales');
+
+  // Unified pop-up state for PressingStockManager
+  const [popup, setPopup] = useState<{
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    message: string;
+    type: 'success' | 'warning' | 'error' | 'info';
+    onConfirm?: () => void;
+    confirmText?: string;
+    showCancel?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'warning' | 'error' | 'info' = 'info',
+    onConfirm?: () => void,
+    showCancel?: boolean,
+    confirmText: string = "D'ACCORD",
+    subtitle: string = 'ALERTE SYSTÈME'
+  ) => {
+    setPopup({
+      isOpen: true,
+      title,
+      subtitle,
+      message,
+      type,
+      onConfirm: onConfirm ? () => {
+        onConfirm();
+        setPopup(prev => ({ ...prev, isOpen: false }));
+      } : undefined,
+      showCancel,
+      confirmText
+    });
+  };
   
   // Quotes (proforma) state
   const [quotes, setQuotes] = useState<DetergentQuote[]>(() => {
@@ -29630,7 +29694,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     const message = getManagerSaleNotificationMessage(s);
     if (method === 'whatsapp') {
       if (!managerPhone.trim()) {
-        toast.error('Veuillez configurer le numéro de téléphone WhatsApp du Gérant.');
+        showAlert('Numéro non configuré', "Veuillez configurer le numéro de téléphone WhatsApp du Gérant.", 'error');
         return;
       }
       let cleaned = managerPhone.replace(/[^0-9]/g, '');
@@ -29639,7 +29703,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       }
       const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
       window.open(waUrl, '_blank');
-      toast.success('Lien WhatsApp généré !');
+      showAlert('Suivi WhatsApp', "Le lien de suivi WhatsApp pour le Gérant a été préparé et ouvert !", 'success');
       
       // Add to history
       const newLog = {
@@ -29654,7 +29718,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
     } else {
       if (!managerEmail.trim()) {
-        toast.error('Veuillez configurer l\'adresse email du Gérant.');
+        showAlert('Email non configuré', "Veuillez configurer l'adresse email du Gérant.", 'error');
         return;
       }
       toast.loading('Envoi du rapport par mail...');
@@ -29662,10 +29726,12 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       toast.dismiss();
       if (ok) {
         setSaleMailFeedback(prev => ({ ...prev, [s.id]: true }));
+        showAlert('Rapport Envoyé', "Le rapport de vente de détergent a été transmis avec succès par mail au Gérant !", 'success');
       } else {
         const subject = `🛒 [DÉTERGENTS] Rapport de Vente ${s.saleNumber} - ${merchant.name || 'Pressing'}`;
         const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
         window.open(mailtoUrl, '_blank');
+        showAlert('Messagerie Ouverte', "Le brouillon d'e-mail de suivi de vente de détergent a été ouvert. Veuillez cliquer sur Envoyer !", 'success');
         
         // Add to history
         const newLog = {
@@ -29697,20 +29763,28 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const [newCategoryLabelInput, setNewCategoryLabelInput] = useState('');
 
   const deleteCustomCategory = (keyToDel: string) => {
-    if (window.confirm(`Voulez-vous supprimer la catégorie "${customCategories[keyToDel]}" ? Les produits de cette catégorie resteront mais leur rayon sera à réajuster.`)) {
-      const updated = { ...customCategories };
-      delete updated[keyToDel];
-      setCustomCategories(updated);
-      localStorage.setItem(`pressing_custom_categories_${merchant.id}`, JSON.stringify(updated));
-      
-      if (formCategory === keyToDel) {
-        setFormCategory('liquid');
-      }
-      if (categoryFilter === keyToDel) {
-        setCategoryFilter('all');
-      }
-      toast.success('Rayon de catégorie personnalisé supprimé.');
-    }
+    showAlert(
+      'Supprimer la catégorie ?',
+      `Voulez-vous supprimer la catégorie "${customCategories[keyToDel]}" ? Les produits de cette catégorie resteront mais leur rayon sera à réajuster.`,
+      'warning',
+      () => {
+        const updated = { ...customCategories };
+        delete updated[keyToDel];
+        setCustomCategories(updated);
+        localStorage.setItem(`pressing_custom_categories_${merchant.id}`, JSON.stringify(updated));
+        
+        if (formCategory === keyToDel) {
+          setFormCategory('liquid');
+        }
+        if (categoryFilter === keyToDel) {
+          setCategoryFilter('all');
+        }
+        showAlert('Catégorie Supprimée', 'Le rayon personnalisé a été supprimé avec succès.', 'success');
+      },
+      true,
+      'SUPPRIMER',
+      'RAYONS'
+    );
   };
 
   // Calculate cart total
@@ -29748,20 +29822,20 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   // Add Item to cart
   const addToCart = (product: DetergentProduct) => {
     if (product.stock <= 0) {
-      toast.error('Ce produit est en rupture de stock totale !');
+      showAlert('Rupture de Stock', 'Ce produit est en rupture de stock totale !', 'error');
       return;
     }
     const existing = cart.find(it => it.product.id === product.id);
     if (existing) {
       if (existing.quantity >= product.stock) {
-        toast.error(`Stock disponible insuffisant (${product.stock} max) !`);
+        showAlert('Stock Insuffisant', `Stock disponible insuffisant (${product.stock} max) !`, 'warning');
         return;
       }
       setCart(cart.map(it => it.product.id === product.id ? { ...it, quantity: it.quantity + 1 } : it));
     } else {
       setCart([...cart, { product, quantity: 1 }]);
     }
-    toast.success(`${product.name} ajouté au panier.`);
+    showAlert('Ajouté au Panier', `${product.name} ajouté au panier.`, 'success');
   };
 
   // Update cart item quantity
@@ -29772,7 +29846,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     if (qty <= 0) {
       setCart(cart.filter(it => it.product.id !== productId));
     } else if (qty > item.product.stock) {
-      toast.error(`Maximum de stock disponible : ${item.product.stock}`);
+      showAlert('Maximum Atteint', `Maximum de stock disponible : ${item.product.stock}`, 'warning');
     } else {
       setCart(cart.map(it => it.product.id === productId ? { ...it, quantity: qty } : it));
     }
@@ -29782,7 +29856,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) {
-      toast.error('Votre panier est totalement vide !');
+      showAlert('Panier Vide', 'Votre panier est totalement vide !', 'warning');
       return;
     }
 
@@ -29790,7 +29864,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     for (const item of cart) {
       const realProduct = products.find(p => p.id === item.product.id);
       if (!realProduct || realProduct.stock < item.quantity) {
-        toast.error(`Stock indisponible pour ${item.product.name} !`);
+        showAlert('Stock Indisponible', `Stock indisponible pour ${item.product.name} !`, 'error');
         return;
       }
     }
@@ -29877,7 +29951,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setCustomerName('');
     setCustomerPhone('');
     setSelectedSale(newSale); // show details simulator
-    toast.success(`Encaissement validé ! N° ${saleNumber}`);
+    showAlert('Encaissement Validé', `Encaissement validé ! N° ${saleNumber}`, 'success');
 
     // Auto-email summary to the manager in the background
     if (autoEmailManager && managerEmail && managerEmail.trim()) {
@@ -29888,7 +29962,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   // Generate Proforma Quote Handler
   const handleGenerateQuote = () => {
     if (cart.length === 0) {
-      toast.error("Votre panier est vide ! Impossible d'émettre un devis proforma.");
+      showAlert('Panier Vide', "Votre panier est vide ! Impossible d'émettre un devis proforma.", 'warning');
       return;
     }
 
@@ -29930,7 +30004,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setCustomerName('');
     setCustomerPhone('');
     setViewingQuote(newQuote); // Open details modal directly
-    toast.success(`Devis proforma enregistré ! N° ${quoteNumber}`);
+    showAlert('Devis Enregistré', `Devis proforma enregistré ! N° ${quoteNumber}`, 'success');
   };
 
   // Convert Quote To Cart
@@ -29963,7 +30037,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setCustomerName(quote.customerName === 'Client de Passage' ? '' : quote.customerName);
     setCustomerPhone(quote.customerPhone);
     setActiveSubTab('sales');
-    toast.success(`Le devis ${quote.quoteNumber} a été chargé avec succès dans votre panier de vente active !`);
+    showAlert('Devis Chargé', `Le devis ${quote.quoteNumber} a été chargé avec succès dans votre panier de vente active !`, 'success');
   };
 
   const handleDeleteQuote = (quoteId: string) => {
@@ -29971,7 +30045,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       const updated = quotes.filter(q => q.id !== quoteId);
       setQuotes(updated);
       localStorage.setItem(`pressing_stock_quotes_${merchant.id}`, JSON.stringify(updated));
-      toast.success('Devis proforma supprimé.');
+      showAlert('Devis Supprimé', 'Devis proforma supprimé.', 'success');
       if (viewingQuote?.id === quoteId) {
         setViewingQuote(null);
       }
@@ -29982,7 +30056,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim() || formPrice <= 0) {
-      toast.error('Veuillez renseigner le nom et un prix valide.');
+      showAlert('Formulaire Invalide', 'Veuillez renseigner le nom et un prix valide.', 'warning');
       return;
     }
 
@@ -29999,7 +30073,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         sku: formSku.trim() || undefined
       } : p);
       saveProductsToStorage(updated);
-      toast.success('Caractéristiques du détergent mises à jour !');
+      showAlert('Produit Mis à Jour', 'Caractéristiques du détergent ou produit mises à jour !', 'success');
       setEditingProduct(null);
     } else {
       const newProd: DetergentProduct = {
@@ -30014,7 +30088,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         sku: formSku.trim() || undefined
       };
       saveProductsToStorage([newProd, ...products]);
-      toast.success('Nouveau détergent référencé avec succès !');
+      showAlert('Produit Crée', 'Nouveau détergent référencé avec succès au catalogue !', 'success');
       setShowAddModal(false);
     }
 
@@ -30047,7 +30121,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     if (window.confirm('Voulez-vous supprimer définitivement ce produit du catalogue ?')) {
       const updated = products.filter(p => p.id !== id);
       saveProductsToStorage(updated);
-      toast.success('Produit retiré du catalogue pressing.');
+      showAlert('Produit Supprimé', 'Produit retiré du catalogue pressing.', 'success');
     }
   };
 
@@ -30055,7 +30129,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const quickRestock = (productId: string, units: number) => {
     const updated = products.map(p => p.id === productId ? { ...p, stock: p.stock + units } : p);
     saveProductsToStorage(updated);
-    toast.success(`Stock approvisionné de +${units} unités !`);
+    showAlert('Approvisionnement Réussi', `Stock approvisionné de +${units} unités !`, 'success');
   };
 
   // Print Sale/Detergent receipt PDF
@@ -30118,7 +30192,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     pdf.text('ACOM Technologie Workspace', 40, y, { align: 'center' });
 
     pdf.save(`Recu_Achat_Produit_${sale.saleNumber}.pdf`);
-    toast.success('Reçu de vente PDF généré !');
+    showAlert('Reçu Généré', `Impression lancée... Le reçu PDF pour ${sale.customerName} a bien été généré et téléchargé !`, 'success');
   };
 
   // Print Sale/Detergent receipt A4 PDF as requested
@@ -30223,13 +30297,13 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     pdf.text('Document généré numériquement via Acom Gestion Workspace', 105, y, { align: 'center' });
     
     pdf.save(`Facture_A4_Vente_${sale.saleNumber}.pdf`);
-    toast.success('Facture client A4 générée en PDF !');
+    showAlert('Facture A4 Générée', `Facture client A4 générée en PDF ! N° Réf: ${sale.saleNumber}`, 'success');
   };
 
   // WhatsApp Client sending for DetergentSale as requested
   const handleSendSaleClientWhatsApp = (sale: DetergentSale) => {
     if (!sale.customerPhone) {
-      toast.error("Veuillez renseigner le contact téléphone du client pour envoyer par WhatsApp.");
+      showAlert('Téléphone Manquant', "Veuillez renseigner le contact téléphone du client pour envoyer par WhatsApp.", 'warning');
       return;
     }
     
@@ -30260,7 +30334,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const waUrl = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(textNotif)}`;
     window.open(waUrl, '_blank');
-    toast.success('Message WhatsApp client prêt !');
+    showAlert('Message Prêt', 'Lien Message WhatsApp client prêt !', 'success');
   };
 
   const totalStockValue = useMemo(() => {
@@ -30927,9 +31001,9 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                               localStorage.setItem(`pressing_custom_categories_${merchant.id}`, JSON.stringify(updated));
                               setFormCategory(newCatKey);
                               setIsAddingNewCategory(false);
-                              toast.success(`Catégorie "${trimmed}" ajoutée avec succès !`);
+                              showAlert('Catégorie Créée', `La catégorie de rayon "${trimmed}" a été ajoutée avec succès !`, 'success');
                             } else {
-                              toast.error("Veuillez entrer un nom valide.");
+                              showAlert('Nom Invalide', "Veuillez entrer un nom valide.", 'warning');
                             }
                           }}
                           className="px-2 py-1 text-[9px] font-mono font-bold text-white bg-[#1e293b] hover:bg-black rounded-md uppercase tracking-wider transition"
@@ -31293,7 +31367,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         onScanSuccess={(code) => {
           setFormSku(code);
           setShowFormSkuScanner(false);
-          toast.success(`Code-barres scanné : ${code}`);
+          showAlert('Code Scanné', `Code-barres associé : ${code}`, 'success');
         }}
         title="Scanner le code-barres de l'article"
       />
@@ -31307,7 +31381,6 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           const matched = products.find(p => p.sku && p.sku.trim().toLowerCase() === code.trim().toLowerCase());
           if (matched) {
             triggerAcomAlert('Produit Trouvé', `Produit : ${matched.name} (${matched.stock}u restants)`, 'success', 'SUCCÈS');
-            toast.success(`Produit trouvé : ${matched.name}`);
           } else {
             triggerAcomAlert('Non Référencé', `Aucun détergent ou produit n'est associé au code : ${code}. Le code a été pré-rempli dans le formulaire de création.`, 'info', 'ALERTE');
             // Populate form code to help them create it right away!
@@ -31444,6 +31517,12 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           </motion.div>
         </div>
       )}
+
+      <AcomAlertPopup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
+        {...popup}
+      />
     </motion.div>
   );
 };

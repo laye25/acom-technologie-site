@@ -38,7 +38,7 @@ export const getApiUrl = (path: string): string => {
 
   // Fallback to the current environment's main Cloud Run URL
   if (!base) {
-    base = 'https://ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app';
+    base = 'https://ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app';
   }
 
   const trimmedBase = base.endsWith('/') ? base.slice(0, -1) : base;
