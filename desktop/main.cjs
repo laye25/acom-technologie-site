@@ -123,6 +123,44 @@ function createWindow() {
     }
   });
 
+  // Handle bypassed desktop-to-web API proxy calls using Electron operating-system-level network engine
+  ipcMain.handle('make-api-request', async (event, { url, options }) => {
+    try {
+      console.log(`[IPC API POP] Intercepting fetch on Desktop for secure backend forward: ${options.method || 'GET'} ${url}`);
+      const fetchOptions = {
+        method: options.method || 'GET',
+        headers: {
+          ...options.headers,
+          'User-Agent': 'Acom-Desktop-App',
+          'Origin': 'https://ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app'
+        }
+      };
+      
+      if (options.body) {
+        fetchOptions.body = options.body;
+      }
+      
+      const response = await net.fetch(url, fetchOptions);
+      const text = await response.text();
+      
+      console.log(`[IPC API POP] API Gateway Response: ${response.status} ${response.statusText}`);
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        text: text
+      };
+    } catch (error) {
+      console.error('[IPC API POP] Gateway fetch failed:', error);
+      return {
+        ok: false,
+        status: 500,
+        statusText: error.message || 'CORS Bypass Error',
+        text: JSON.stringify({ error: error.message })
+      };
+    }
+  });
+
   // Register the protocol handler after app.whenReady
   protocol.handle('app', async (request) => {
     try {

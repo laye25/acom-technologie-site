@@ -12,5 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
   syncPhysicalFile: async (arrayBuffer) => {
     return ipcRenderer.invoke('sync-physical-file', arrayBuffer);
+  },
+  makeApiRequest: async (url, options) => {
+    return ipcRenderer.invoke('make-api-request', { url, options });
   }
 });
