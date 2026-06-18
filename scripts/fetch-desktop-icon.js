@@ -27,9 +27,15 @@ https.get(URL, (res) => {
         
         const buffer = Buffer.from(base64, 'base64');
         const iconPath = path.join(process.cwd(), 'public', 'icon.png');
+        const buildDir = path.join(process.cwd(), 'build');
+        if (!fs.existsSync(buildDir)) {
+          fs.mkdirSync(buildDir);
+        }
+        const buildIconPath = path.join(buildDir, 'icon.png');
         
         fs.writeFileSync(iconPath, buffer);
-        console.log('[Build] Downloaded and applied custom desktop logo from settings to public/icon.png');
+        fs.writeFileSync(buildIconPath, buffer);
+        console.log('[Build] Downloaded and applied custom desktop logo from settings to public/icon.png and build/icon.png');
       } else {
         console.log('[Build] No custom desktop logo found in settings. Proceeding with default.');
       }

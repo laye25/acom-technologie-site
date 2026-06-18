@@ -13,10 +13,13 @@ export const getApiUrl = (path: string): string => {
     return cleanPath;
   }
 
+  const prodUrl = atob('aHR0cHM6Ly9haXMtcHJlLTMyN3Jnem1jdHlnNG14Y3ozZnNldXItMzI0MTQ2NTkyODY4LmV1cm9wZS13ZXN0Mi5ydW4uYXBw');
+  const devUrl = atob('aHR0cHM6Ly9haXMtZGV2LTMyN3Jnem1jdHlnNG14Y3ozZnNldXItMzI0MTQ2NTkyODY4LmV1cm9wZS13ZXN0Mi5ydW4uYXBw');
+  
   // Check if we are hosted directly on the official web cloud run container endpoints
   const isCloudRunServer = 
-    window.location.hostname === 'ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app' ||
-    window.location.hostname === 'ais-dev-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app';
+    window.location.hostname === new URL(prodUrl).hostname ||
+    window.location.hostname === new URL(devUrl).hostname;
 
   // If we are hosted directly on the Web container, we use standard relative paths
   if (isCloudRunServer) {
@@ -43,7 +46,7 @@ export const getApiUrl = (path: string): string => {
 
   // Fallback to the current environment's main Cloud Run URL
   if (!base) {
-    base = 'https://ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app';
+    base = prodUrl;
   }
 
   const trimmedBase = base.endsWith('/') ? base.slice(0, -1) : base;

@@ -12400,9 +12400,6 @@ const MerchantSettings = ({
     if (!data.managerNotifications) {
       data.managerNotifications = {};
     }
-    if (!data.managerNotifications.apiBaseUrl) {
-      data.managerNotifications.apiBaseUrl = 'https://ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app';
-    }
     return data;
   });
   const [saving, setSaving] = useState(false);
@@ -12587,24 +12584,6 @@ const MerchantSettings = ({
                 placeholder="gerant@boutique.com"
                 className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
               />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">URL Serveur API (Optionnel pour Desktop)</label>
-              <input
-                type="text"
-                value={formData.managerNotifications?.apiBaseUrl || ''}
-                onChange={e => {
-                  const val = e.target.value;
-                  setFormData({
-                    ...formData,
-                    managerNotifications: { ...(formData.managerNotifications || {}), apiBaseUrl: val }
-                  });
-                  localStorage.setItem('acom_desktop_api_base_url', val);
-                }}
-                placeholder="ex: https://mon-serveur-acom.run.app"
-                className="w-full px-5 py-4 bg-white border border-gray-200 rounded-2xl text-sm font-bold text-ink focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-              />
-              <p className="text-[10px] text-gray-400 mt-1 font-medium">Requis pour faire fonctionner le suivi Gérant en arrière-plan (E-mails) sur l&apos;application Desktop locale.</p>
             </div>
           </div>
 
