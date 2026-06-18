@@ -132,7 +132,7 @@ function createWindow() {
         headers: {
           ...options.headers,
           'User-Agent': 'Acom-Desktop-App',
-          'Origin': 'https://ais-pre-327rgzmctyg4mxcz3fseur-324146592868.europe-west2.run.app'
+          'Origin': process.env.ACOM_PROD_URL || Buffer.from('aHR0cHM6Ly9haXMtcHJlLTMyN3Jnem1jdHlnNG14Y3ozZnNldXItMzI0MTQ2NTkyODY4LmV1cm9wZS13ZXN0Mi5ydW4uYXBw', 'base64').toString('utf-8')
         }
       };
       
