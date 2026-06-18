@@ -32,6 +32,8 @@ export interface FirestoreErrorInfo {
 
 let quotaToastShown = false;
 
+let permissionToastShown = false;
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errorMessage = error instanceof Error ? error.message : String(error);
   
@@ -43,8 +45,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
        quotaToastShown = true;
     }
   } else if (errorMessage.toLowerCase().includes('missing or insufficient permissions')) {
-    if (!quotaToastShown) {
+    console.error(`[Firestore 403] Permissions insuffisantes sur le chemin: ${path} pour l'opération: ${operationType}`);
+    if (!permissionToastShown) {
       toast.error("Permissions insuffisantes pour cette action.", { duration: 4000 });
+      permissionToastShown = true;
+      setTimeout(() => { permissionToastShown = false; }, 10000); // Allow again after 10s
     }
   }
 

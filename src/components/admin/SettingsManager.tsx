@@ -867,7 +867,7 @@ const SettingsManager = () => {
                           onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const base64 = await compressImage(file, 512, 512, 0.8);
+                              const base64 = await compressImage(file, 512, 512, 1, 'image/png');
                               setSettings({ ...settings, desktopLogo: base64 });
                               toast.success('Icône Desktop mise à jour !');
                             }

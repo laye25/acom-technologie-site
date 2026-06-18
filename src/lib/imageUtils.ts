@@ -2,7 +2,7 @@
  * Utility to compress and resize images before uploading to Firestore
  * to stay within the 1MB document limit.
  */
-export const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, quality = 0.8): Promise<string> => {
+export const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, quality = 0.8, mimeType = 'image/jpeg'): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     const timeout = setTimeout(() => reject(new Error('Image reading timeout')), 10000);
@@ -44,9 +44,8 @@ export const compressImage = (file: File, maxWidth = 1600, maxHeight = 1600, qua
         // Draw and compress
         ctx.drawImage(img, 0, 0, width, height);
         
-        // Convert to JPEG with specified quality
-        // JPEG is much more efficient for photos than PNG (default of toDataURL)
-        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        // Convert to specified mimeType (default JPEG is much more efficient for photos)
+        const compressedBase64 = canvas.toDataURL(mimeType, quality);
         resolve(compressedBase64);
       };
       img.onerror = (err) => {
