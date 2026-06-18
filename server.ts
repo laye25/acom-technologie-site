@@ -187,18 +187,21 @@ async function startServer() {
   // Email sending
   app.post("/api/send-email", async (req, res) => {
     try {
-      const { to, subject, html, from, de } = req.body;
+      const { to, subject, html, from, de, overrideApiKey } = req.body;
       
-      if (!process.env.RESEND_API_KEY) {
+      const apiKeyToUse = overrideApiKey || process.env.RESEND_API_KEY;
+
+      if (!apiKeyToUse) {
         return res.json({ success: true, message: "Email simulation (API key missing)" });
       }
 
-      const resend = new Resend(process.env.RESEND_API_KEY);
+      const resend = new Resend(apiKeyToUse);
       
       // Extract from request body if available (both standard 'from' and French 'de'), 
       // then try environment variable, and fallback to default.
       const fromEmailRaw = from || de || process.env.RESEND_FROM;
       let fromEmail = cleanAndValidateFromEmail(fromEmailRaw);
+
       
       let result = await resend.emails.send({
         from: fromEmail,

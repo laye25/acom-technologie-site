@@ -79,27 +79,14 @@ export const sendEmailDirectlyOrViaBackend = async (payload: {
   }
 
   // Fallback for direct front-end calls if a key is provided directly (e.g. from an admin/SaaS config override)
-  if (config?.resendApiKey) {
-    console.log("[Mail Engine] Routing email directly via Resend API from browser.");
-    return fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.resendApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: payload.from || config.defaultFrom || 'ACOM Desktop <onboarding@resend.dev>',
-        to: Array.isArray(payload.to) ? payload.to : [payload.to],
-        subject: payload.subject,
-        html: payload.html
-      })
-    });
-  } 
-  
+  // Instead of calling Resend directly (which blocks CORS), we route through our backend
   // Default fallback through backend
   return fetch(getApiUrl('/api/send-email'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      ...payload,
+      overrideApiKey: config?.resendApiKey || undefined
+    })
   });
 };

@@ -8388,6 +8388,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [cartError, setCartError] = useState<string | null>(null);
   const cartErrorTimeoutRef = useRef<any>(null);
   const [sendToWhatsApp, setSendToWhatsApp] = useState(() => merchant.managerNotifications?.notifyOnPOSSale !== false);
+  const [sendToWhatsAppClient, setSendToWhatsAppClient] = useState(false);
   const [managerPhone, setManagerPhone] = useState(() => merchant.managerNotifications?.whatsappPhone || merchant.phone || '');
   const [sendToEmail, setSendToEmail] = useState(() => merchant.managerNotifications?.notifyOnPOSSale !== false);
   const [managerEmail, setManagerEmail] = useState(() => merchant.managerNotifications?.email || merchant.email || '');
@@ -8399,6 +8400,75 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
     setManagerPhone(merchant.managerNotifications?.whatsappPhone || merchant.phone || '');
     setManagerEmail(merchant.managerNotifications?.email || merchant.email || '');
   }, [merchant.managerNotifications, merchant.phone, merchant.email]);
+
+  const [modalManagerPhone, setModalManagerPhone] = useState('');
+  const [modalCustomerPhone, setModalCustomerPhone] = useState('');
+
+  // Sync modal inputs on modal open
+  useEffect(() => {
+    if (showReceiptModal?.show && showReceiptModal?.saleData) {
+      setModalManagerPhone(managerPhone || '');
+      setModalCustomerPhone(showReceiptModal.saleData.customerPhone || '');
+    }
+  }, [showReceiptModal, managerPhone]);
+
+  // Handle auto-checking WhatsApp client when client phone has content
+  useEffect(() => {
+    if (customerPhone.trim().length >= 8) {
+      setSendToWhatsAppClient(true);
+    } else {
+      setSendToWhatsAppClient(false);
+    }
+  }, [customerPhone]);
+
+  const getSaleWhatsappUrl = (sale: any, phone: string) => {
+    if (!sale || !phone) return '';
+    let cleanPhone = phone.replace(/[^0-9+]/g, '');
+    if (cleanPhone.startsWith('7') && cleanPhone.length === 9) {
+      cleanPhone = '221' + cleanPhone;
+    }
+    const cleanNumber = cleanPhone.replace(/[^0-9]/g, '');
+    if (!cleanNumber) return '';
+
+    const itemsText = (sale.items || []).map((item: any) => {
+      let itemStr = `• *${item.name}* : ${item.quantity} x ${item.price.toLocaleString()} ${merchant.currency}`;
+      const details = [];
+      if (item.sizes) details.push(`T: ${item.sizes}`);
+      if (item.colors) details.push(`C: ${item.colors}`);
+      if (details.length > 0) itemStr += ` (${details.join(', ')})`;
+      return itemStr;
+    }).join('\n');
+
+    const methodLabels: Record<string, string> = {
+      cash: 'Espèces 💵',
+      card: 'Carte Bancaire 💳',
+      mobile_money: 'Mobile Money 📱',
+      split: 'Paiement partiel (Acompte) 💸'
+    };
+    const methodLabel = methodLabels[sale.paymentMethod || 'cash'] || 'Espèces 💵';
+    const isPartial = sale.paymentMethod === 'split' || (sale.balance && sale.balance > 0);
+    const isPartialLabel = isPartial ? `\n*Montant reçu :* ${sale.paidAmount?.toLocaleString()} ${merchant.currency}\n*Reste dû :* ${sale.balance?.toLocaleString()} ${merchant.currency}` : '';
+
+    const receiptText = `🧾 *NOUVELLE VENTE - CAISSE POS* 🧾\n` +
+      `----------------------------------------\n` +
+      `🌐 *Boutique :* ${merchant.name}\n` +
+      `👤 *Opérateur :* ${user?.displayName || user?.email || 'N/A'}\n` +
+      `📅 *Date :* ${new Date(sale.createdAt || new Date()).toLocaleString('fr-FR')}\n` +
+      `----------------------------------------\n` +
+      `📦 *DÉTAILS DES ARTICLES :*\n${itemsText}\n` +
+      `----------------------------------------\n` +
+      `💰 *TOTAL :* *${sale.totalAmount?.toLocaleString()} ${merchant.currency}*\n` +
+      `💳 *Mode de Règlement :* ${methodLabel}${isPartialLabel}\n` +
+      `----------------------------------------\n` +
+      `👥 *CLIENT :*\n` +
+      `• *Nom :* ${sale.customerName || 'Client de passage'}\n` +
+      `• *Téléphone :* ${sale.customerPhone || 'Non renseigné'}\n` +
+      `----------------------------------------\n` +
+      `_Envoyé instantanément depuis l'application de Caisse_`;
+
+    return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(receiptText)}`;
+  };
+
   const [emailSendStatus, setEmailSendStatus] = useState<'idle' | 'sending' | 'success' | 'error' | 'simulated'>('idle');
   const [emailSendError, setEmailSendError] = useState<string | null>(null);
 
@@ -9045,7 +9115,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           </div>
 
           <div className="pt-4 border-t border-black/5 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* WhatsApp follow-up */}
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer group">
@@ -9070,6 +9140,35 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                       value={managerPhone} 
                       onChange={e => setManagerPhone(e.target.value)} 
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-emerald-100/80 rounded-xl text-[11px] outline-none focus:ring-2 focus:ring-emerald-500/10 font-mono font-bold text-gray-700"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* WhatsApp Client follow-up */}
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={sendToWhatsAppClient}
+                    onChange={e => setSendToWhatsAppClient(e.target.checked)}
+                    className="rounded border-gray-300 text-primary focus:ring-primary/20 w-4.5 h-4.5 cursor-pointer"
+                  />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-teal-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse shrink-0 inline-block mr-1"></span>
+                    WhatsApp Client
+                  </span>
+                </label>
+
+                {sendToWhatsAppClient && (
+                  <div className="relative">
+                    <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-500" />
+                    <input 
+                      type="tel" 
+                      placeholder="Téléphone du Client" 
+                      value={customerPhone} 
+                      onChange={e => setCustomerPhone(e.target.value)} 
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-teal-100/80 rounded-xl text-[11px] outline-none focus:ring-2 focus:ring-teal-500/10 font-mono font-bold text-gray-700"
                     />
                   </div>
                 )}
@@ -9770,24 +9869,58 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                       </div>
 
                       <div className="space-y-3">
-                        {/* WhatsApp section */}
+                        {/* WhatsApp Gérant Section */}
                         <div>
-                          <label className="block text-[8px] font-mono font-black uppercase text-emerald-600 tracking-[0.1em] mb-1">Destinataire WhatsApp</label>
+                          <label className="block text-[8px] font-mono font-black uppercase text-emerald-600 tracking-[0.1em] mb-1">Destinataire WhatsApp (Gérant)</label>
                           <div className="flex gap-2">
                             <input 
                               type="text" 
-                              readOnly
-                              value={managerPhone}
-                              className="flex-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-bold text-gray-600 outline-none"
+                              value={modalManagerPhone}
+                              onChange={e => setModalManagerPhone(e.target.value)}
+                              placeholder="Numéro du Gérant"
+                              className="flex-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-bold text-gray-600 outline-none focus:ring-1 focus:ring-emerald-500"
                             />
                             <button 
                               onClick={() => {
-                                window.open(showReceiptModal.whatsappUrl, '_blank');
+                                const url = getSaleWhatsappUrl(showReceiptModal.saleData, modalManagerPhone);
+                                if (url) {
+                                  window.open(url, '_blank');
+                                } else {
+                                  triggerAcomAlert('Erreur', 'Numéro de gérant invalide ou manquant.', 'error', 'ALERTE');
+                                }
                               }}
                               className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
                             >
                               <Smartphone className="w-3.5 h-3.5" />
-                              <span>Ouvrir</span>
+                              <span>Envoyer</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* WhatsApp Client Section */}
+                        <div className="pt-2 border-t border-dashed border-gray-100">
+                          <label className="block text-[8px] font-mono font-black uppercase text-teal-600 tracking-[0.1em] mb-1">WhatsApp Client</label>
+                          <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              value={modalCustomerPhone}
+                              onChange={e => setModalCustomerPhone(e.target.value)}
+                              placeholder="Numéro du Client"
+                              className="flex-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[11px] font-mono font-bold text-gray-600 outline-none focus:ring-1 focus:ring-teal-500"
+                            />
+                            <button 
+                              onClick={() => {
+                                const url = getSaleWhatsappUrl(showReceiptModal.saleData, modalCustomerPhone);
+                                if (url) {
+                                  window.open(url, '_blank');
+                                } else {
+                                  triggerAcomAlert('Erreur', 'Numéro de client invalide ou manquant.', 'error', 'ALERTE');
+                                }
+                              }}
+                              className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
+                            >
+                              <Smartphone className="w-3.5 h-3.5" />
+                              <span>Envoyer</span>
                             </button>
                           </div>
                         </div>
