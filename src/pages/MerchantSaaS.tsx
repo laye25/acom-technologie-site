@@ -617,7 +617,7 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     <div class="header-layout">
       <div>
         ${merchant.logo ? `<img class="company-logo" src="${merchant.logo}" alt="Logo" />` : ''}
-        <div class="company-name">${merchant.name.replace(/"/g, '&quot;')}</div>
+        <div class="company-name">${(merchant.name || 'Sen Laundry').replace(/"/g, '&quot;')}</div>
         <div style="color: #64748b; font-size: 10px; font-weight: 500; line-height: 1.4;">
           ${merchant.address ? `<div>${merchant.address.replace(/"/g, '&quot;')}</div>` : ''}
           ${merchant.phone ? `<div>Tél: ${merchant.phone}</div>` : ''}
@@ -627,12 +627,12 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
       
       <div style="text-align: right;">
         <div class="doc-banner accent-text">
-          ${type === 'quote' ? 'DEVIS PROFORMA' : type === 'unpaid' ? "AVIS D'IMPAYÉ" : 'FACTURE'}
+          ${type === 'quote' ? 'DEVIS PROFORMA PRODUIT' : type === 'unpaid' ? "BON DE RÉCEPTION IMPAYÉ (A4)" : 'BON DE RÉCEPTION PRESSING & STOCK (A4)'}
         </div>
         <div class="doc-ref">
-          N° ${type === 'quote' ? 'QT' : 'INV'}-${(data.id || '').slice(0, 8).toUpperCase()}<br>
-          Date émission : ${formattedDate.split(' ')[0]}<br>
-          ${type === 'quote' ? `Valide jusqu'au : ${getFormattedExpiryDate(data.validUntil)}` : `Statut : ${data.balance === 0 ? 'PAYÉE' : 'CRÉDIT'}`}
+          N° ${type === 'quote' ? 'QT' : type === 'unpaid' ? 'DB' : 'PR'}-${(data.id || '').toUpperCase().slice(0, 8)}<br>
+          Date dépôt : ${formattedDate.split(' ')[0]}<br>
+          ${type === 'quote' ? 'Type Document : DEVIS PROFORMA' : `Retrait prévu : ${data.expectedDeliveryDate || formattedDate.split(' ')[0]}`}
         </div>
       </div>
     </div>
@@ -647,7 +647,7 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
 
     <div class="meta-grid">
       <div>
-        <div class="section-title">Facturé à :</div>
+        <div class="section-title">Client d'établissement :</div>
         <div class="client-card">
           <div class="client-name">${(data.customerName || 'Client de passage').replace(/"/g, '&quot;')}</div>
           ${data.customerPhone ? `<div style="color: #64748b; margin-top: 2px;">Tél: ${data.customerPhone}</div>` : ''}
@@ -656,14 +656,13 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
       </div>
       
       <div>
-        <div class="section-title">Détails Règlement :</div>
+        <div class="section-title">Détails Traitement Linge & Produits :</div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
+          <div><strong>Facturation :</strong> Vente Directe / Par Article</div>
           ${type === 'quote' ? `
-            <div><strong>Durée de validité :</strong> 30 jours calendaires</div>
-            <div><strong>Objet :</strong> Proposition de prix de marchandises</div>
+            <div><strong>Statut Document :</strong> Devis proforma (en attente)</div>
           ` : `
-            <div><strong>Mode d'encaissement :</strong> ${data.paymentMethod || 'Espèces'}</div>
-            <div><strong>Statut de paiement :</strong> ${data.balance === 0 ? '<span style="color: #16a34a; font-weight: bold;">ENTIÈREMENT RÉGLÉ</span>' : `<span style="color: #e11d48; font-weight: bold;">CRÉDIT EN ATTENTE RELANCE</span>`}</div>
+            <div><strong>Statut de Paiement :</strong> ${data.balance === 0 ? 'Entièrement réglé' : data.receivedAmount > 0 ? 'Acompte versé' : 'À régler au retrait'}</div>
           `}
         </div>
       </div>
@@ -672,8 +671,8 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     <table class="modern-table">
       <thead>
         <tr>
-          <th>Désignation Article</th>
-          <th class="text-right" style="width: 20%;">Prix Unitaire</th>
+          <th>Désignation Prestation (Services Pressing, Linge & Produits)</th>
+          <th class="text-right" style="width: 20%;">Tarif Unitaire</th>
           <th class="text-center" style="width: 15%;">Quantité</th>
           <th class="text-right" style="width: 25%;">Montant Total</th>
         </tr>
@@ -681,15 +680,7 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
       <tbody>
         ${(data.items || []).map((it: any) => `
           <tr>
-            <td style="font-weight: 600; color: #0f172a;">
-              <div>${it.name.replace(/"/g, '&quot;')}</div>
-              ${(it.sizes || it.colors) ? `
-                <div style="font-size: 9px; color: #4b5563; font-weight: normal; margin-top: 4px; display: flex; gap: 6px;">
-                  ${it.sizes ? `<span style="background: #eff6ff; color: #1d4ed8; font-weight: bold; padding: 1px 5px; border-radius: 4px; font-family: monospace;">T: ${it.sizes}</span>` : ''}
-                  ${it.colors ? `<span style="background: #ecfdf5; color: #047857; font-weight: bold; padding: 1px 5px; border-radius: 4px; font-family: monospace;">C: ${it.colors}</span>` : ''}
-                </div>
-              ` : ''}
-            </td>
+            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">👕 Prestation : ${it.name.replace(/"/g, '&quot;')}</td>
             <td class="text-right">${fmt(it.price)} ${merchant.currency}</td>
             <td class="text-center">${it.quantity}</td>
             <td class="text-right" style="font-weight: 700;">${fmt(it.price * it.quantity)} ${merchant.currency}</td>
@@ -701,52 +692,58 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     <div class="totals-wrapper">
       <div class="totals-box">
         <div class="totals-row">
-          <span>Sous-total HT</span>
+          <span>Sous-total Prestations</span>
           <span style="font-weight: 600;">${fmt(data.totalAmount)} ${merchant.currency}</span>
         </div>
-        <div class="totals-row">
-          <span>Taxes / TVA (0%)</span>
-          <span>0 ${merchant.currency}</span>
-        </div>
-        <div class="totals-row grand-total">
-          <span>TOTAL TTC</span>
-          <span class="accent-text">${fmt(data.totalAmount)} ${merchant.currency}</span>
-        </div>
-        
-        ${type !== 'quote' && data.receivedAmount !== undefined ? `
-          <div class="totals-row" style="margin-top: 5px; border-top: 1px dashed #e2e8f0; padding-top: 5px;">
-            <span>Acompte Versé :</span>
-            <span>${fmt(data.receivedAmount)} ${merchant.currency}</span>
+        ${data.discount > 0 ? `
+          <div class="totals-row" style="color: red;">
+            <span>Remise de Caisse :</span>
+            <span>-${fmt(data.discount)} ${merchant.currency}</span>
           </div>
         ` : ''}
-        ${type !== 'quote' && data.balance !== undefined ? `
+        <div class="totals-row grand-total">
+          <span>${type === 'quote' ? 'MONTANT DEVIS GLOBAL' : 'TOTAL TTC PAYER'}</span>
+          <span class="accent-text">${fmt(data.totalAmount - (data.discount || 0))} ${merchant.currency}</span>
+        </div>
+        
+        ${type !== 'quote' ? `
+          <div class="totals-row" style="margin-top: 5px; border-top: 1px dashed #e2e8f0; padding-top: 5px;">
+            <span>Règlement / Versé :</span>
+            <span>${fmt(data.receivedAmount || 0)} ${merchant.currency}</span>
+          </div>
           <div class="totals-row">
             <span>Reste à percevoir :</span>
-            <span style="font-weight: bold; color: ${data.balance > 0 ? '#e11d48' : '#16a34a'}">${fmt(data.balance)} ${merchant.currency}</span>
+            <span style="font-weight: bold; color: ${(data.totalAmount - (data.discount || 0) - (data.receivedAmount || 0)) > 0 ? '#e11d48' : '#16a34a'}">${fmt(Math.max(0, (data.totalAmount - (data.discount || 0) - (data.receivedAmount || 0))))} ${merchant.currency}</span>
           </div>
         ` : ''}
       </div>
     </div>
 
+    ${data.notes ? `
+      <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-bottom: 15px; border: 1px dashed #e2e8f0; padding: 10px; border-radius: 8px;">
+        <strong>Instructions de lavage & livraison :</strong> ${data.notes}
+      </div>
+    ` : ''}
+
     <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
-      <strong>Mentions Légales :</strong> Sauf avis contraire, le règlement des factures s'effectue au comptant lors de l'achat. Ce document constitue une pièce justificative officielle de la transaction financière.
+      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
     </div>
 
     <div class="signature-container">
       <div>
-        <div class="section-title">Bon pour accord (Client)</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Mention manuscrite "Lu et approuvé" + Date obligatoire</div>
+        <div class="section-title">Déchargement Client (Dépôt)</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
         <div class="signature-area"></div>
       </div>
       <div style="text-align: right;">
-        <div class="section-title">Cachet et Signature de l'Établissement</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Authorized Stamp</div>
+        <div class="section-title">Visa de Réception Pressing</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
         <div class="signature-area"></div>
       </div>
     </div>
 
     <div class="footer-center">
-      Solution de Facturation Acom Gestion v1.0 - Émise numériquement
+      Solution de Pressing Acom Gestion v1.8 - Émise numériquement
     </div>
   </div>
 </body>
@@ -1168,17 +1165,18 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
         </div>
       </div>
       <div>
-        <div class="doc-banner accent-text">FACTURE DE VENTE</div>
-        <div class="doc-ref">N° : ${sale.saleNumber}</div>
+        <div class="doc-banner accent-text">BON DE RÉCEPTION PRESSING & STOCK (A4)</div>
+        <div class="doc-ref">N° PR-${(sale.saleNumber || '').toUpperCase().slice(-8)}</div>
         <div style="text-align: right; font-size: 10px; color: #64748b; margin-top: 5px;">
-          Date de vente : <strong>${formattedSaleDate}</strong>
+          Date de dépôt : <strong>${formattedSaleDate.split(' ')[0]}</strong><br>
+          Retrait prévu : <strong>Retrait Immédiat (Achat Boutique)</strong>
         </div>
       </div>
     </div>
 
     <div class="info-grid">
       <div class="info-column">
-        <div class="section-title">Acheteur / Client :</div>
+        <div class="section-title">Client d'établissement :</div>
         <div style="font-size: 11px; color: #0f172a; font-weight: bold;">
           ${sale.customerName.replace(/"/g, '&quot;')}
         </div>
@@ -1188,10 +1186,10 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
       </div>
       
       <div>
-        <div class="section-title">Mode de Paiement & Expédition :</div>
+        <div class="section-title">Détails Traitement Linge & Produits :</div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
           <div><strong>Type de transaction :</strong> Comptoir / Vente directe</div>
-          <div><strong>Statut de Paiement :</strong> Entièrement réglé (Caisse)</div>
+          <div><strong>Méthode d'Enretien :</strong> Vente Produit & Prestation Boutique</div>
         </div>
       </div>
     </div>
@@ -1199,8 +1197,8 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
     <table class="modern-table">
       <thead>
         <tr>
-          <th>Désignation Produit (Détergents & boutique)</th>
-          <th class="text-right" style="width: 25%;">Prix Unitaire</th>
+          <th>Désignation Prestation (Services Pressing, Linge & Produits)</th>
+          <th class="text-right" style="width: 25%;">Tarif Unitaire</th>
           <th class="text-center" style="width: 15%;">Quantité</th>
           <th class="text-right" style="width: 25%;">Montant Total</th>
         </tr>
@@ -1208,7 +1206,7 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
       <tbody>
         ${sale.items.map((it: any) => `
           <tr>
-            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 ${it.productName}</td>
+            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 Prestation : ${it.productName}</td>
             <td class="text-right">${fmt(it.price)} FCFA</td>
             <td class="text-center">${it.quantity}</td>
             <td class="text-right" style="font-weight: 700;">${fmt(it.total)} FCFA</td>
@@ -1237,24 +1235,24 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
     </div>
 
     <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
-      <strong>Conditions Générales :</strong> Les marchandises vendues et livrées sont réputées conformes à l'achat immédiat. Les articles ne sont ni repris, ni échangés une fois sortis du dépôt de vente. Merci pour votre aimable confiance.
+      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
     </div>
 
     <div class="signature-container">
       <div>
-        <div class="section-title">Déchargement Client (Réception)</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature de l'acheteur</div>
+        <div class="section-title">Déchargement Client (Dépôt)</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
         <div class="signature-area"></div>
       </div>
       <div style="text-align: right;">
-        <div class="section-title font-bold">Visa de Vente Boutique</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Cashier authorized Stamp</div>
+        <div class="section-title font-bold">Visa de Réception Pressing</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
         <div class="signature-area"></div>
       </div>
     </div>
 
     <div class="footer-center">
-      Solution de Vente & Stock Acom Gestion v1.0 - Émise numériquement
+      Solution de Pressing Acom Gestion v1.8 - Émise numériquement
     </div>
   </div>
 </body>
@@ -1390,22 +1388,22 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
   </style>
 </head>
 <body>
-  \${merchant.logo ? \`<div class="logo-container"><img class="logo" src="\${merchant.logo}" alt="Logo" /></div>\` : ''}
+  ${merchant.logo ? `<div class="logo-container"><img class="logo" src="${merchant.logo}" alt="Logo" /></div>` : ''}
   <div class="text-center">
-    <div class="merchant-name">\${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
-    \${merchant.address ? \`<div>\${merchant.address.replace(/"/g, '&quot;')}</div>\` : ''}
-    \${merchant.phone ? \`<div>Tél: \${merchant.phone}</div>\` : ''}
-    \${merchant.email ? \`<div>Email: \${merchant.email}</div>\` : ''}
+    <div class="merchant-name">${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+    ${merchant.address ? `<div>${merchant.address.replace(/"/g, '&quot;')}</div>` : ''}
+    ${merchant.phone ? `<div>Tél: ${merchant.phone}</div>` : ''}
+    ${merchant.email ? `<div>Email: ${merchant.email}</div>` : ''}
   </div>
   
   <div class="divider"></div>
   
   <div class="flex justify-between">
-    <span>Devis N°: \${quote.quoteNumber}</span>
+    <span>Devis N°: ${quote.quoteNumber}</span>
   </div>
-  <div style="margin-top: 1mm;">Client : <span class="text-bold">\${quote.customerName.replace(/"/g, '&quot;')}</span></div>
-  \${quote.customerPhone ? \`<div>Tél    : \${quote.customerPhone}</div>\` : ''}
-  <div>Date : \${formattedQuoteDate}</div>
+  <div style="margin-top: 1mm;">Client : <span class="text-bold">${quote.customerName.replace(/"/g, '&quot;')}</span></div>
+  ${quote.customerPhone ? `<div>Tél    : ${quote.customerPhone}</div>` : ''}
+  <div>Date : ${formattedQuoteDate}</div>
   
   <div class="divider"></div>
   
@@ -1420,13 +1418,13 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
       </tr>
     </thead>
     <tbody>
-      \${quote.items.map((it: any) => \`
+      ${quote.items.map((it: any) => `
         <tr>
-          <td style="text-transform: capitalize;">\${it.productName}</td>
-          <td class="text-center">\${it.quantity}</td>
-          <td class="text-right">\${fmt(it.total)}</td>
+          <td style="text-transform: capitalize;">${it.productName}</td>
+          <td class="text-center">${it.quantity}</td>
+          <td class="text-right">${fmt(it.total)}</td>
         </tr>
-      \`).join('')}
+      `).join('')}
     </tbody>
   </table>
   
@@ -1435,17 +1433,17 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
   <div class="total-section">
     <div class="flex justify-between">
       <span>Sous-total estimé:</span>
-      <span>\${fmt(quote.subtotal)} FCFA</span>
+      <span>${fmt(quote.subtotal)} FCFA</span>
     </div>
-    \${quote.discount > 0 ? \`
+    ${quote.discount > 0 ? `
       <div class="flex justify-between" style="color: red;">
         <span>Remise déduite:</span>
-        <span>-\${fmt(quote.discount)} FCFA</span>
+        <span>-${fmt(quote.discount)} FCFA</span>
       </div>
-    \` : ''}
+    ` : ''}
     <div class="flex justify-between text-bold" style="font-size: 13px; margin-top: 1.5mm; margin-bottom: 2mm;">
       <span>TOTAL ESTIMÉ</span>
-      <span>\${fmt(quote.total)} FCFA</span>
+      <span>${fmt(quote.total)} FCFA</span>
     </div>
   </div>
   
@@ -1453,7 +1451,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
   
   <div class="footer">
     <p class="text-bold">Valable pour une durée de 15 jours.</p>
-    <p>Merci de votre visite chez \${merchant.name || 'notre pressing'}.</p>
+    <p>Merci de votre visite chez ${merchant.name || 'notre pressing'}.</p>
     <p style="font-size: 8px; font-family: monospace; color: #777; margin-top: 4mm;">Généré par Acom Technologie Desktop</p>
   </div>
 </body>
@@ -1466,7 +1464,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Devis Proforma A4 - \${quote.quoteNumber}</title>
+  <title>Devis Proforma A4 - ${quote.quoteNumber}</title>
   <style>
     @media print {
       @page {
@@ -1507,10 +1505,10 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
     }
     
     .accent-bg {
-      background-color: #312e81;
+      background-color: #3b82f6;
     }
     .accent-text {
-      color: #4f46e5;
+      color: #3b82f6;
     }
     
     .header-layout {
@@ -1541,33 +1539,48 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
     }
     .doc-ref {
       font-family: monospace;
-      font-size: 12px;
-      font-weight: bold;
-      color: #312e81;
-      text-align: right;
+      font-size: 11px;
+      color: #64748b;
       margin-top: 5px;
+      line-height: 1.4;
     }
     
-    .info-grid {
+    .meta-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 30px;
-      margin-bottom: 30px;
-      padding: 15px 0;
+      margin-bottom: 25px;
       border-top: 1px solid #e2e8f0;
-      border-bottom: 1px solid #e2e8f0;
+      padding-top: 15px;
     }
-    .info-column {
-      display: flex;
-      flex-direction: column;
+    .client-card {
+      background-color: #f8fafc;
+      padding: 15px;
+      border-radius: 12px;
+      border: 1px solid #f1f5f9;
+    }
+    .client-name {
+      font-size: 13px;
+      font-weight: 750;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+    
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 25px;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 15px;
     }
     .section-title {
-      font-size: 9px;
+      font-size: 10px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 1.2px;
       color: #94a3b8;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
     
     .modern-table {
@@ -1576,22 +1589,24 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
       margin-bottom: 25px;
     }
     .modern-table th {
-      background-color: #f1f5f9;
-      color: #475569;
-      font-size: 9px;
-      font-weight: bold;
+      background-color: #f8fafc;
+      font-size: 10px;
+      font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      padding: 10px 14px;
+      letter-spacing: 0.5px;
+      color: #475569;
       text-align: left;
+      padding: 10px 14px;
+      border-bottom: 2px solid #e2e8f0;
     }
     .modern-table td {
-      padding: 12px 14px;
+      padding: 11px 14px;
       border-bottom: 1px solid #f1f5f9;
       color: #334155;
+      font-size: 11px;
     }
-    .modern-table tr:hover td {
-      background-color: #f8fafc;
+    .modern-table tr:nth-child(even) {
+      background-color: #fcfdfe;
     }
     
     .totals-wrapper {
@@ -1600,46 +1615,47 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
       margin-bottom: 30px;
     }
     .totals-box {
-      width: 320px;
+      width: 280px;
       background-color: #f8fafc;
       border-radius: 12px;
-      padding: 18px;
+      border: 1px solid #e2e8f0;
+      padding: 14px;
     }
     .totals-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 6px 0;
+      padding: 5px 0;
       font-size: 11px;
       color: #475569;
     }
-    .grand-total {
-      font-size: 14px;
-      font-weight: 800;
-      color: #1e1b4b;
+    .totals-row.grand-total {
       border-top: 1px solid #e2e8f0;
       margin-top: 8px;
-      padding-top: 12px;
+      padding-top: 10px;
+      font-size: 14px;
+      font-weight: 850;
+      color: #0f172a;
     }
     
     .signature-container {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 50px;
-      margin-top: 50px;
-      margin-bottom: 35px;
+      margin-top: 40px;
+      padding-top: 25px;
+      border-top: 1px dashed #e2e8f0;
     }
     .signature-area {
-      height: 70px;
-      border-bottom: 1px dashed #cbd5e1;
-      margin-top: 10px;
+      height: 60px;
+      border-bottom: 1px solid #cbd5e1;
+      margin-bottom: 8px;
     }
     .footer-center {
       text-align: center;
-      font-size: 9px;
+      font-size: 8px;
       color: #94a3b8;
-      border-top: 1px solid #f1f5f9;
-      padding-top: 20px;
+      margin-top: 60px;
+      font-family: monospace;
     }
     .text-right { text-align: right; }
     .text-center { text-align: center; }
@@ -1649,39 +1665,39 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
   <div class="print-container">
     <div class="header-layout">
       <div>
-        \${merchant.logo ? \`<img class="company-logo" src="\${merchant.logo}" alt="Logo" />\` : ''}
-        <div class="company-name">\${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
+        ${merchant.logo ? `<img class="company-logo" src="${merchant.logo}" alt="Logo" />` : ''}
+        <div class="company-name">${(merchant.name || 'ACOM Pressing').replace(/"/g, '&quot;')}</div>
         <div style="font-size: 10px; color: #64748b;">
-          \${merchant.address ? \`<div>\${merchant.address.replace(/"/g, '&quot;')}</div>\` : ''}
-          \${merchant.phone ? \`<div>Tél : \${merchant.phone}</div>\` : ''}
-          \${merchant.email ? \`<div>E-mail : \${merchant.email}</div>\` : ''}
+          ${merchant.address ? `<div>${merchant.address.replace(/"/g, '&quot;')}</div>` : ''}
+          ${merchant.phone ? `<div>Tél : ${merchant.phone}</div>` : ''}
+          ${merchant.email ? `<div>E-mail : ${merchant.email}</div>` : ''}
         </div>
       </div>
-      <div>
-        <div class="doc-banner accent-text">DEVIS DE VENTE BOUTIQUE</div>
-        <div class="doc-ref">Ref: \${quote.quoteNumber}</div>
-        <div style="text-align: right; font-size: 10px; color: #64748b; margin-top: 5px;">
-          Date d'émission : <strong>\${formattedQuoteDate}</strong>
+      <div style="text-align: right;">
+        <div class="doc-banner accent-text">DEVIS PROFORMA PRODUIT</div>
+        <div class="doc-ref">
+          N° QT-${(quote.quoteNumber || '').toUpperCase().slice(-8)}<br>
+          Date dépôt : ${formattedQuoteDate.split(' ')[0]}<br>
+          Type Document : DEVIS PROFORMA
         </div>
       </div>
     </div>
 
-    <div class="info-grid">
-      <div class="info-column">
-        <div class="section-title">Destinataire (Client proposé) :</div>
-        <div style="font-size: 11px; color: #0f172a; font-weight: bold;">
-          \${quote.customerName.replace(/"/g, '&quot;')}
-        </div>
-        <div style="font-size: 11px; color: #475569; margin-top: 2px;">
-          Tél : \${quote.customerPhone || 'Sans numéro'}
+    <div class="meta-grid">
+      <div>
+        <div class="section-title">Client d'établissement :</div>
+        <div class="client-card">
+          <div class="client-name">${quote.customerName.replace(/"/g, '&quot;')}</div>
+          ${quote.customerPhone ? `<div style="color: #64748b; margin-top: 2px;">Tél: ${quote.customerPhone}</div>` : ''}
+          ${quote.customerEmail ? `<div style="color: #64748b; margin-top: 2px;">Email: ${quote.customerEmail}</div>` : ''}
         </div>
       </div>
       
       <div>
-        <div class="section-title">Informations de Validité :</div>
+        <div class="section-title">Détails Traitement Linge & Produits :</div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
-          <div><strong>Type :</strong> Devis Proforma non-contraignant</div>
-          <div><strong>Durée de validité :</strong> 15 Jours à compter de la date d'émission</div>
+          <div><strong>Facturation :</strong> Vente directe / Boutique</div>
+          <div><strong>Statut Document :</strong> Devis proforma (en attente)</div>
         </div>
       </div>
     </div>
@@ -1689,62 +1705,62 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
     <table class="modern-table">
       <thead>
         <tr>
-          <th>Désignation Produit (Détergents & boutique)</th>
-          <th class="text-right" style="width: 25%;">Prix Unitaire</th>
+          <th>Désignation Prestation (Services Pressing, Linge & Produits)</th>
+          <th class="text-right" style="width: 25%;">Tarif Unitaire</th>
           <th class="text-center" style="width: 15%;">Quantité</th>
           <th class="text-right" style="width: 25%;">Montant Total</th>
         </tr>
       </thead>
       <tbody>
-        \${quote.items.map((it: any) => \`
+        ${quote.items.map((it: any) => `
           <tr>
-            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 \${it.productName}</td>
-            <td class="text-right">\${fmt(it.price)} FCFA</td>
-            <td class="text-center">\${it.quantity}</td>
-            <td class="text-right" style="font-weight: 700;">\${fmt(it.total)} FCFA</td>
+            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 Prestation : ${it.productName}</td>
+            <td class="text-right">${fmt(it.price)} FCFA</td>
+            <td class="text-center">${it.quantity}</td>
+            <td class="text-right" style="font-weight: 700;">${fmt(it.total)} FCFA</td>
           </tr>
-        \`).join('')}
+        `).join('')}
       </tbody>
     </table>
 
     <div class="totals-wrapper">
       <div class="totals-box">
         <div class="totals-row">
-          <span>Sous-total articles estimé</span>
-          <span style="font-weight: 600;">\${fmt(quote.subtotal)} FCFA</span>
+          <span>Sous-total Prestations</span>
+          <span style="font-weight: 600;">${fmt(quote.subtotal)} FCFA</span>
         </div>
-        \${quote.discount > 0 ? \`
+        ${quote.discount > 0 ? `
           <div class="totals-row" style="color: red;">
-            <span>Remise déduite :</span>
-            <span>-\${fmt(quote.discount)} FCFA</span>
+            <span>Remise de Caisse :</span>
+            <span>-${fmt(quote.discount)} FCFA</span>
           </div>
-        \` : ''}
+        ` : ''}
         <div class="totals-row grand-total">
-          <span>TOTAL ESTIMÉ NET</span>
-          <span class="accent-text" style="color: #4f46e5;">\${fmt(quote.total)} FCFA</span>
+          <span>MONTANT DEVIS GLOBAL</span>
+          <span class="accent-text">${fmt(quote.total)} FCFA</span>
         </div>
       </div>
     </div>
 
     <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
-      <strong>Note de validité :</strong> Ce document est un devis proforma à titre d'estimation provisoire. Il ne constitue pas une facture définitive et ne réserve pas le stock physique de marchandises jusqu'à règlement définitif en caisse.
+      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
     </div>
 
     <div class="signature-container">
       <div>
-        <div class="section-title">Bon pour accord (Client)</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature précédée de la mention "Bon pour Accord"</div>
+        <div class="section-title">DÉCHARGEMENT CLIENT (DÉPÔT)</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
         <div class="signature-area"></div>
       </div>
       <div style="text-align: right;">
-        <div class="section-title font-bold">Visa de l'Établissement</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Authorized Signature Stamp</div>
+        <div class="section-title">VISA DE RÉCEPTION PRESSING</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
         <div class="signature-area"></div>
       </div>
     </div>
 
     <div class="footer-center">
-      Devis Proforma Acom Gestion v1.0 - Émis numériquement
+      Solution de Pressing Acom Gestion v1.8 - Émis numériquement
     </div>
   </div>
 </body>
@@ -1901,7 +1917,7 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
   
   <div class="divider"></div>
   
-  <div class="text-center text-bold doc-title">\${ticket.status === 'quotation' ? 'DEVIS PROFORMA' : 'TICKET REÇU DE CAISSE'}</div>
+  <div class="text-center text-bold doc-title">${ticket.status === 'quotation' ? 'DEVIS PROFORMA' : 'TICKET REÇU DE CAISSE'}</div>
   
   <table class="item-table">
     <thead>
@@ -1967,20 +1983,20 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
     
     <div class="divider"></div>
     
-    \${ticket.status !== 'quotation' ? \`
+    ${ticket.status !== 'quotation' ? `
       <div class="flex justify-between">
         <span>Mode de Paiement:</span>
-        <span class="text-bold" style="text-transform: uppercase;">\${ticket.paymentMethod || 'cash'}</span>
+        <span class="text-bold" style="text-transform: uppercase;">${ticket.paymentMethod || 'cash'}</span>
       </div>
       <div class="flex justify-between">
         <span>Montant versé:</span>
-        <span>\${fmt(ticket.amountPaid || 0)} FCFA</span>
+        <span>${fmt(ticket.amountPaid || 0)} FCFA</span>
       </div>
       <div class="flex justify-between text-bold">
         <span>Reste à payer:</span>
-        <span>\${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
+        <span>${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
       </div>
-    \` : ''}
+    ` : ''}
   </div>
   
   <div class="divider"></div>
@@ -2210,12 +2226,12 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
       
       <div style="text-align: right;">
         <div class="doc-banner accent-text">
-          BON DE RÉCEPTION PRESSING (A4)
+          ${ticket.status === 'quotation' ? 'DEVIS PROFORMA PRESSING' : 'BON DE RÉCEPTION PRESSING (A4)'}
         </div>
         <div class="doc-ref">
           N° ${ticket.ticketNumber}<br>
           Date dépôt : ${formattedDepositDate}<br>
-          Retrait prévu : ${formattedDeliveryDate}
+          ${ticket.status === 'quotation' ? 'Type Document : DEVIS PROFORMA' : `Retrait prévu : ${formattedDeliveryDate}`}
         </div>
       </div>
     </div>
@@ -2234,7 +2250,11 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
         <div class="section-title">Détails Traitement Linge :</div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
           <div><strong>Facturation :</strong> ${ticket.billingType === 'article' ? 'Par Article' : 'Au Poids (Kg)'}</div>
-          <div><strong>Statut de Paiement :</strong> ${ticket.paymentStatus === 'paid' ? 'Entièrement réglé' : ticket.paymentStatus === 'partial' ? 'Acompte versé' : 'À régler au retrait'}</div>
+          ${ticket.status !== 'quotation' ? `
+            <div><strong>Statut de Paiement :</strong> ${ticket.paymentStatus === 'paid' ? 'Entièrement réglé' : ticket.paymentStatus === 'partial' ? 'Acompte versé' : 'À régler au retrait'}</div>
+          ` : `
+            <div><strong>Statut Document :</strong> Devis proforma (en attente)</div>
+          `}
         </div>
       </div>
     </div>
@@ -2300,18 +2320,20 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
           </div>
         ` : ''}
         <div class="totals-row grand-total">
-          <span>TOTAL TTC PAYER</span>
+          <span>${ticket.status === 'quotation' ? 'MONTANT DEVIS GLOBAL' : 'TOTAL TTC PAYER'}</span>
           <span class="accent-text">${fmt(ticket.total)} FCFA</span>
         </div>
         
-        <div class="totals-row" style="margin-top: 5px; border-top: 1px dashed #e2e8f0; padding-top: 5px;">
-          <span>Règlement / Versé :</span>
-          <span>${fmt(ticket.amountPaid || 0)} FCFA</span>
-        </div>
-        <div class="totals-row">
-          <span>Reste à percevoir :</span>
-          <span style="font-weight: bold; color: ${ticket.total - (ticket.amountPaid || 0) > 0 ? '#e11d48' : '#16a34a'}">${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
-        </div>
+        ${ticket.status !== 'quotation' ? `
+          <div class="totals-row" style="margin-top: 5px; border-top: 1px dashed #e2e8f0; padding-top: 5px;">
+            <span>Règlement / Versé :</span>
+            <span>${fmt(ticket.amountPaid || 0)} FCFA</span>
+          </div>
+          <div class="totals-row">
+            <span>Reste à percevoir :</span>
+            <span style="font-weight: bold; color: ${ticket.total - (ticket.amountPaid || 0) > 0 ? '#e11d48' : '#16a34a'}">${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
+          </div>
+        ` : ''}
       </div>
     </div>
 
@@ -2559,7 +2581,7 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 41, 59); // Slate-800
-  doc.text(merchant.name, margin, leftY);
+  doc.text(merchant.name || 'Sen Laundry', margin, leftY);
   leftY += 7;
   
   doc.setFontSize(9);
@@ -2569,29 +2591,27 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   if (merchant.phone) { doc.text(`Tél: ${merchant.phone}`, margin, leftY); leftY += 4.5; }
   if (merchant.email) { doc.text(`Email: ${merchant.email}`, margin, leftY); leftY += 4.5; }
 
-  // Right Side Header - Invoice title and unique references
+  // Right Side Header - Invoice title and unique references in pressing style
   let rightY = 20;
-  doc.setFontSize(22);
+  doc.setFontSize(15);
   doc.setFont('helvetica', 'bold');
-  if (customType === 'unpaid') {
-    doc.setTextColor(185, 28, 28); // Crimson Red for Unpaid
-    doc.text("AVIS D'IMPAYÉ", 190, rightY, { align: 'right' });
-  } else {
-    doc.setTextColor(220, 38, 38); // Professional warm Red
-    doc.text('FACTURE', 190, rightY, { align: 'right' });
-  }
-  rightY += 10;
+  doc.setTextColor(59, 130, 246); // Blue accent color for Pressing template
+  doc.text(customType === 'unpaid' ? "BON DE RÉCEPTION IMPAYÉ (A4)" : "BON DE RÉCEPTION PRESSING & STOCK (A4)", 190, rightY, { align: 'right' });
+  rightY += 8;
   
   doc.setFontSize(9.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105); // Slate-600
-  doc.text(`N° Facture : INV-${sale.id.slice(0, 8).toUpperCase()}`, 190, rightY, { align: 'right' });
+  const refCode = `PR-${sale.id.slice(0, 8).toUpperCase()}`;
+  doc.text(`N° ${refCode}`, 190, rightY, { align: 'right' });
   rightY += 5.5;
   
   const dateStr = sale.createdAt?.seconds 
     ? format(new Date(sale.createdAt.seconds * 1000), 'dd/MM/yyyy') 
     : format(new Date(sale.createdAt || Date.now()), 'dd/MM/yyyy');
-  doc.text(`Date : ${dateStr}`, 190, rightY, { align: 'right' });
+  doc.text(`Date dépôt : ${dateStr}`, 190, rightY, { align: 'right' });
+  rightY += 5.5;
+  doc.text(`Retrait prévu : ${sale.expectedDeliveryDate || dateStr}`, 190, rightY, { align: 'right' });
   rightY += 5.5;
 
   // Use the exact maximum height of left/right sections to start client block. Overlap impossible!
@@ -2601,7 +2621,7 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(100, 116, 139); // Slate-500
-  doc.text('FACTURÉ À :', margin, y);
+  doc.text("CLIENT D'ÉTABLISSEMENT :", margin, y);
   y += 6;
   
   doc.setFont('helvetica', 'bold');
@@ -2638,7 +2658,7 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(71, 85, 105); // Slate-600
-  doc.text('Description', margin + 3, y + 6.5);
+  doc.text('Désignation Prestation (Services Pressing, Linge & Produits)', margin + 3, y + 6.5);
   doc.text('Qté', 135, y + 6.5, { align: 'center' });
   doc.text('PU', 160, y + 6.5, { align: 'right' });
   doc.text('Total', 186, y + 6.5, { align: 'right' });
@@ -2664,10 +2684,10 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
     doc.line(margin, y + rowHeight, margin + 170, y + rowHeight);
     
     // Grid values mapping
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
-    doc.setTextColor(51, 65, 85); // Slate-700
-    doc.text(item.name, margin + 3, y + 5.5);
+    doc.setTextColor(15, 23, 42); 
+    doc.text(`👕 Prestation : ${item.name}`, margin + 3, y + 5.5);
 
     if (hasDetails) {
       doc.setFont('helvetica', 'italic');
@@ -2684,6 +2704,7 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
       doc.setTextColor(51, 65, 85); // Slate-700
     }
 
+    doc.setFont('helvetica', 'normal');
     doc.text(item.quantity.toString(), 135, y + 5.5, { align: 'center' });
     doc.text(pdfFormatNum(item.price), 160, y + 5.5, { align: 'right' });
     doc.text(pdfFormatNum(item.price * item.quantity), 186, y + 5.5, { align: 'right' });
@@ -2701,7 +2722,7 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   doc.setFontSize(9.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(100, 116, 139); // Slate-500
-  doc.text('TOTAL DE LA COMMANDE', 145, y, { align: 'right' });
+  doc.text('Sous-total Prestations', 145, y, { align: 'right' });
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(30, 41, 59); // Slate-800
   doc.text(`${pdfFormatNum(sale.totalAmount)} ${merchant.currency}`, 186, y, { align: 'right' });
@@ -2748,45 +2769,55 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   // Outstanding/Remaining Debt Highlight Info
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 41, 59); // Slate-800
+  doc.setTextColor(59, 130, 246); // Pressing accent color
   
   const isPending = sale.balance !== undefined && sale.balance > 0;
-  doc.text(isPending ? 'RESTE À PAYER' : 'TOTAL PAYÉ (SOLDE)', 145, y, { align: 'right' });
+  doc.text('TOTAL TTC PAYER', 145, y, { align: 'right' });
+  doc.text(`${pdfFormatNum(sale.totalAmount)} ${merchant.currency}`, 186, y, { align: 'right' });
   
+  y += 7;
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100, 116, 139);
+  doc.text('Règlement / Versé :', 145, y, { align: 'right' });
+  doc.text(`${pdfFormatNum(sale.receivedAmount || 0)} ${merchant.currency}`, 186, y, { align: 'right' });
+
+  y += 5.5;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Reste à percevoir :', 145, y, { align: 'right' });
   if (isPending) {
     doc.setTextColor(220, 38, 38); // Red-600 (Outstanding)
   } else {
     doc.setTextColor(22, 163, 74); // Green-600 (Fully cleared)
   }
-  
-  const displayAmount = sale.balance !== undefined ? (sale.balance > 0 ? sale.balance : sale.paidAmount) : sale.totalAmount;
-  doc.text(`${pdfFormatNum(displayAmount || 0)} ${merchant.currency}`, 186, y, { align: 'right' });
+  doc.text(`${pdfFormatNum(sale.balance || 0)} ${merchant.currency}`, 186, y, { align: 'right' });
 
-  // Signature Block
+  // Signature Block matching pressing A4 layout
   y = Math.max(y + 15, 222);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(71, 85, 105); // Slate-600
-  doc.text("Signature Client", margin + 15, y);
-  doc.text("Cachet & Signature Vendeur", 190 - 15, y, { align: 'right' });
+  doc.text("Déchargement Client (Dépôt)", margin + 10, y);
+  doc.text("Visa de Réception Pressing", 190 - 10, y, { align: 'right' });
 
   y += 4;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184); // Slate-400
-  doc.text("(Précédée de la mention \"Lu et approuvé\")", margin + 15, y);
+  doc.text("Signature du déposant", margin + 10, y);
+  doc.text("Acom Technologie Pressing authorized Stamp", 190 - 10, y, { align: 'right' });
 
   y += 18;
   doc.setDrawColor(226, 232, 240); // Slate-200
   doc.setLineWidth(0.4);
-  doc.line(margin + 10, y, margin + 65, y);
-  doc.line(190 - 65, y, 190 - 10, y);
+  doc.line(margin + 5, y, margin + 65, y);
+  doc.line(190 - 65, y, 190 - 5, y);
 
   // Centered Universal Page Footer
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(148, 163, 184); // Slate-400
-  doc.text('Généré via Acom Technologie - Studio Acom POS', 105, 280, { align: 'center' });
+  doc.text('Solution de Pressing Acom Gestion v1.8 - Émise numériquement', 105, 280, { align: 'center' });
 
   if (action === 'print') {
     printPDF(doc, `facture_A4_${sale.id.slice(0, 8)}.pdf`);
@@ -25557,16 +25588,21 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-        <div>
-          <h2 className="text-2xl font-black text-ink tracking-tight flex items-center gap-2">
-            <WashingMachine className="w-7 h-7 text-cyan-500 animate-pulse" /> Paramétrage des Tarifs
-          </h2>
-          <p className="text-gray-500 text-xs mt-1">Définissez vos grilles tarifaires par article ou par kilo (Kg).</p>
+        <div className="flex items-center gap-3">
+          <span className="p-3 bg-[#faf5ff] text-[#5c2197] rounded-2xl border border-purple-100 flex items-center justify-center">
+            <WashingMachine className="w-7 h-7 animate-pulse" />
+          </span>
+          <div>
+            <h2 className="text-2xl font-black text-ink tracking-tight">
+              Paramétrage des Tarifs
+            </h2>
+            <p className="text-gray-500 text-xs mt-1">Définissez vos grilles tarifaires par article ou par kilo (Kg).</p>
+          </div>
         </div>
         <button
           onClick={handleSave}
           disabled={syncing}
-          className="px-6 py-3 bg-primary hover:bg-primary-hover text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
+          className="px-6 py-3 bg-[#5c2197] hover:bg-[#481977] text-white rounded-full font-bold text-xs uppercase tracking-widest shadow-lg shadow-purple-900/10 transition-all flex items-center gap-2 disabled:opacity-50"
         >
           <Save className="w-4 h-4" /> Enregistrer les Tarifs
         </button>
@@ -25579,7 +25615,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             <div className="border-b border-gray-100 pb-4 flex justify-between items-center bg-white">
               <div>
                 <h3 className="text-lg font-black text-ink flex items-center gap-2">
-                  <Calculator className="w-5 h-5 text-indigo-500" /> Tarifs par Article (Vêtements)
+                  <Calculator className="w-5 h-5 text-[#5c2197]" /> Tarifs par Article (Vêtements)
                 </h3>
                 <p className="text-gray-400 text-xs mt-0.5">Tarifs unitaires et coûts intrants appliqués lors du dépôt de vêtements individuels.</p>
               </div>
@@ -25614,7 +25650,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                             articles: { ...tarifs.articles, [key]: val }
                           });
                         }}
-                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-[#5c2197]/20"
                       />
                       <span className="absolute right-4 text-[9px] font-mono font-bold text-gray-400">Prix</span>
                     </div>
@@ -25631,9 +25667,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                             articles_costs: { ...(tarifs.articles_costs || {}), [key]: val }
                           });
                         }}
-                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-indigo-500 outline-none focus:ring-1 focus:ring-indigo-300 shadow-inner"
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-[#5c2197] outline-none focus:ring-1 focus:ring-purple-300 shadow-inner"
                       />
-                      <span className="absolute right-4 text-[9px] font-mono font-bold text-indigo-400">Intrant</span>
+                      <span className="absolute right-4 text-[9px] font-mono font-bold text-purple-400">Intrant</span>
                     </div>
                   </div>
                 );
@@ -25644,7 +25680,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
           <div className="pt-4 border-t border-dashed border-gray-100 mt-6">
             {showAddArticle ? (
               <form onSubmit={handleAddArticle} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
-                <span className="text-[10px] uppercase tracking-widest text-indigo-500 font-bold block">➕ Nouvel Article de Vêtements</span>
+                <span className="text-[10px] uppercase tracking-widest text-[#5c2197] font-bold block">➕ Nouvel Article de Vêtements</span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du vêtement</label>
@@ -25675,7 +25711,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                       placeholder="ex: 200"
                       value={newArticleCost}
                       onChange={e => setNewArticleCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-indigo-200 font-mono text-xs text-indigo-500 text-right pr-4 outline-none"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-purple-200 font-mono text-xs text-[#5c2197] text-right pr-4 outline-none"
                     />
                   </div>
                 </div>
@@ -25689,7 +25725,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-[10px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg flex items-center gap-1.5 shadow-sm"
+                    className="px-4 py-2 text-[10px] font-bold text-white bg-[#5c2197] hover:bg-[#481977] rounded-lg flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ajouter
                   </button>
@@ -25699,9 +25735,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
               <button
                 type="button"
                 onClick={() => setShowAddArticle(true)}
-                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-indigo-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-indigo-600 transition-all bg-gray-50/10 hover:bg-indigo-500/5"
+                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-purple-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-[#5c2197] transition-all bg-gray-50/10 hover:bg-purple-500/5 pb-4"
               >
-                <Plus className="w-4 h-4 text-indigo-500" /> AJOUTER UN NOUVEL ARTICLE
+                <Plus className="w-4 h-4 text-[#5c2197]" /> AJOUTER UN NOUVEL ARTICLE
               </button>
             )}
           </div>
@@ -25712,7 +25748,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
           <div className="space-y-6">
             <div className="border-b border-gray-100 pb-4">
               <h3 className="text-lg font-black text-ink flex items-center gap-2">
-                <WashingMachine className="w-5 h-5 text-cyan-500" /> Tarifs au Kilogramme (Kg)
+                <WashingMachine className="w-5 h-5 text-purple-600" /> Tarifs au Kilogramme (Kg)
               </h3>
               <p className="text-gray-400 text-xs mt-0.5">Recommandé pour les sacs de linge en vrac, laverie standard et blanchisseries.</p>
             </div>
@@ -25754,7 +25790,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                               poids: { ...tarifs.poids, [key]: val }
                             });
                           }}
-                          className="w-full pl-4 pr-20 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full pl-4 pr-20 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-[#5c2197]/20"
                         />
                         <span className="absolute right-4 text-[9px] font-mono font-bold text-gray-400">FCFA/Kg</span>
                       </div>
@@ -25771,9 +25807,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                               poids_costs: { ...(tarifs.poids_costs || {}), [key]: val }
                             });
                           }}
-                          className="w-full pl-4 pr-20 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-cyan-600 outline-none focus:ring-1 focus:ring-cyan-300 shadow-inner"
+                          className="w-full pl-4 pr-20 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-[#5c2197] outline-none focus:ring-1 focus:ring-purple-300 shadow-inner"
                         />
-                        <span className="absolute right-4 text-[9px] font-mono font-bold text-cyan-500">Intrant</span>
+                        <span className="absolute right-4 text-[9px] font-mono font-bold text-purple-400">Intrant</span>
                       </div>
                     </div>
                   </div>
@@ -25785,7 +25821,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
           <div className="pt-4 border-t border-dashed border-gray-100 mt-6">
             {showAddPoids ? (
               <form onSubmit={handleAddPoids} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
-                <span className="text-[10px] uppercase tracking-widest text-cyan-600 font-bold block">➕ Nouveau Forfait / Formule Kilogramme</span>
+                <span className="text-[10px] uppercase tracking-widest text-[#5c2197] font-bold block">➕ Nouveau Forfait / Formule Kilogramme</span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Désignation (ex: Express 12h)</label>
@@ -25816,7 +25852,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                       placeholder="ex: 300"
                       value={newPoidsCost}
                       onChange={e => setNewPoidsCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-cyan-200 font-mono text-xs text-cyan-600 text-right pr-4 outline-none"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-purple-200 font-mono text-xs text-[#5c2197] text-right pr-4 outline-none"
                     />
                   </div>
                 </div>
@@ -25830,7 +25866,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-[10px] font-bold text-white bg-cyan-500 hover:bg-cyan-600 rounded-lg flex items-center gap-1.5 shadow-sm"
+                    className="px-4 py-2 text-[10px] font-bold text-white bg-[#5c2197] hover:bg-[#481977] rounded-lg flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ajouter
                   </button>
@@ -25840,9 +25876,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
               <button
                 type="button"
                 onClick={() => setShowAddPoids(true)}
-                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-cyan-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-cyan-600 transition-all bg-gray-50/10 hover:bg-cyan-500/5"
+                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-purple-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-[#5c2197] transition-all bg-gray-50/10 hover:bg-purple-500/5 pb-4"
               >
-                <Plus className="w-4 h-4 text-cyan-500" /> AJOUTER UN FORFAIT KG
+                <Plus className="w-4 h-4 text-[#5c2197]" /> AJOUTER UN FORFAIT KG
               </button>
             )}
           </div>
@@ -25907,7 +25943,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                             }
                           });
                         }}
-                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-gray-200 text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-[#5c2197]/20"
                       />
                       <span className="absolute right-4 text-[9px] font-mono font-bold text-gray-400">Prix</span>
                     </div>
@@ -25927,9 +25963,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                             }
                           });
                         }}
-                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-amber-600 outline-none focus:ring-1 focus:ring-amber-300 shadow-inner"
+                        className="w-full pl-4 pr-16 py-2 bg-white rounded-xl border border-dashed border-gray-200 text-right font-mono font-medium text-xs text-[#5c2197] outline-none focus:ring-1 focus:ring-purple-300 shadow-inner"
                       />
-                      <span className="absolute right-4 text-[9px] font-mono font-bold text-amber-500">Intrant</span>
+                      <span className="absolute right-4 text-[9px] font-mono font-bold text-purple-400">Intrant</span>
                     </div>
                   </div>
                 </div>
@@ -25940,8 +25976,8 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
           <div className="pt-4 border-t border-dashed border-gray-100 mt-6">
             {showAddSupplement ? (
               <form onSubmit={handleAddSupplement} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
-                <span className="text-[10px] uppercase tracking-widest text-amber-500 font-bold block flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 animate-spin-slow" /> Nouvelle Prestation Optionnelle (Supplément)
+                <span className="text-[10px] uppercase tracking-widest text-[#5c2197] font-bold block flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 animate-spin-slow text-[#5c2197]" /> Nouvelle Prestation Optionnelle (Supplément)
                 </span>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
@@ -25983,7 +26019,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                       placeholder="ex: 100"
                       value={newSupplementCost}
                       onChange={e => setNewSupplementCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-amber-200 font-mono text-xs text-amber-500 text-right pr-4 outline-none"
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-purple-200 font-mono text-xs text-[#5c2197] text-right pr-4 outline-none"
                     />
                   </div>
                 </div>
@@ -25997,7 +26033,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-[10px] font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-lg flex items-center gap-1.5 shadow-sm"
+                    className="px-4 py-2 text-[10px] font-bold text-white bg-[#5c2197] hover:bg-[#481977] rounded-lg flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ajouter
                   </button>
@@ -26007,9 +26043,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
               <button
                 type="button"
                 onClick={() => setShowAddSupplement(true)}
-                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-amber-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-amber-600 transition-all bg-gray-50/10 hover:bg-amber-500/5"
+                className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-purple-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-[#5c2197] transition-all bg-gray-50/10 hover:bg-[#5c2197]/5 pb-4"
               >
-                <Plus className="w-4 h-4 text-amber-500" /> AJOUTER UNE PRESTATION OPTIONNELLE
+                <Plus className="w-4 h-4 text-[#5c2197]" /> AJOUTER UNE PRESTATION OPTIONNELLE
               </button>
             )}
           </div>
@@ -26387,16 +26423,16 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                 type="date"
                 value={closureDate}
                 onChange={e => setClosureDate(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50"
+                className="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50"
               />
             </div>
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100/40 text-center">
-                  <span className="block text-[8px] font-mono text-indigo-400 uppercase tracking-wider">Recettes Pressing (+)</span>
-                  <strong className="block text-base font-black text-indigo-900 mt-1">{dailyPressingRevenue.toLocaleString()} F</strong>
-                  <span className="text-[8px] text-indigo-500 font-mono mt-0.5 block">{dailyPressingTickets.length} dépôts du jour</span>
+                <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-100/40 text-center">
+                  <span className="block text-[8px] font-mono text-[#5c2197] uppercase tracking-wider">Recettes Pressing (+)</span>
+                  <strong className="block text-base font-black text-[#481977] mt-1">{dailyPressingRevenue.toLocaleString()} F</strong>
+                  <span className="text-[8px] text-[#5c2197] font-mono mt-0.5 block">{dailyPressingTickets.length} dépôts du jour</span>
                 </div>
                 <div className="p-4 bg-cyan-50/60 rounded-2xl border border-cyan-100/40 text-center">
                   <span className="block text-[8px] font-mono text-cyan-400 uppercase tracking-wider">Ventes Produits (+)</span>
@@ -26428,7 +26464,7 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                     placeholder="Ex: Kouamé Marc"
                     value={cashierName}
                     onChange={e => setCashierName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 text-xs font-bold bg-gray-50/50"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 text-xs font-bold bg-gray-50/50"
                   />
                 </div>
                 <div>
@@ -26438,7 +26474,7 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                     required
                     value={actualCash || ''}
                     onChange={e => setActualCash(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 text-xs font-mono font-black bg-gray-50/50"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 text-xs font-mono font-black bg-gray-50/50"
                   />
                 </div>
               </div>
@@ -27820,6 +27856,47 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     );
   };
 
+  const handleCollectBalance = (ticketId: string, method: PressingTicket['paymentMethod'] = 'cash') => {
+    const targetTicket = tickets.find(t => t.id === ticketId);
+    if (!targetTicket) return;
+    const due = targetTicket.total - (targetTicket.amountPaid || 0);
+    if (due <= 0) return;
+
+    let methodLabel = method === 'cash' ? 'Espèces 💵' : method === 'mobile_money' ? 'Mobile Money 📱' : 'Carte 💳';
+
+    showAlert(
+      'Encaisser le solde dû',
+      `Voulez-vous encaisser le solde restant de ${due.toLocaleString()} FCFA par ${methodLabel} pour le ticket ${targetTicket.ticketNumber} ?`,
+      'info',
+      () => {
+        const updated = tickets.map(t => {
+          if (t.id === ticketId) {
+            return {
+              ...t,
+              paymentStatus: 'paid' as const,
+              paymentMethod: method,
+              amountPaid: t.total,
+            };
+          }
+          return t;
+        });
+        setTickets(updated);
+        localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
+        if (viewingTicket && viewingTicket.id === ticketId) {
+          setViewingTicket({
+            ...viewingTicket,
+            paymentStatus: 'paid',
+            paymentMethod: method,
+            amountPaid: viewingTicket.total,
+          });
+        }
+        showAlert('Paiement Enregistré', `Le solde de ${due.toLocaleString()} FCFA a été encaissé avec succès via ${methodLabel} !`, 'success', undefined, false, "D'ACCORD", "RÈGLEMENT");
+      },
+      true,
+      'ENCAISSER'
+    );
+  };
+
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => {
       const matchSearch = t.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -27982,47 +28059,52 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Header bar */}
       <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-ink tracking-tight">🧾 Fiche de Réception Client</h2>
-          <p className="text-gray-500 text-xs mt-1">Enregistrement et suivi des dépôts, factures unitaires et par kg.</p>
+        <div className="flex items-center gap-3">
+          <span className="p-3 bg-[#faf5ff] text-[#5c2197] rounded-2xl border border-purple-100 flex items-center justify-center">
+            <ClipboardList className="w-7 h-7" />
+          </span>
+          <div>
+            <h2 className="text-2xl font-black text-ink tracking-tight">Fiche de Réception Client</h2>
+            <p className="text-gray-500 text-xs mt-1">Enregistrement et suivi des dépôts, factures unitaires et par kg.</p>
+          </div>
         </div>
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl w-fit border border-black/5 shrink-0">
+        <div className="flex bg-gray-100 p-1.5 rounded-2xl w-fit border border-black/5 shrink-0 overflow-x-auto max-w-full">
           <button
             onClick={() => { setActiveSubTab('create'); setSelectedTicket(null); }}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'create' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 whitespace-nowrap ${
+              activeSubTab === 'create' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             🧾 Nouveau Ticket
           </button>
           <button
             onClick={() => setActiveSubTab('active')}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'active' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 whitespace-nowrap ${
+              activeSubTab === 'active' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             ⏳ En Cours ({tickets.filter(t => t.status !== 'delivered').length})
           </button>
           <button
             onClick={() => setActiveSubTab('history')}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'history' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 whitespace-nowrap ${
+              activeSubTab === 'history' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             ✅ Historique ({tickets.filter(t => t.status === 'delivered').length})
           </button>
           <button
             onClick={() => setActiveSubTab('quotes')}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'quotes' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 whitespace-nowrap ${
+              activeSubTab === 'quotes' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             📋 Devis ({tickets.filter(t => t.status === 'quotation').length})
           </button>
           <button
             onClick={() => setActiveSubTab('closures')}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'closures' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 whitespace-nowrap ${
+              activeSubTab === 'closures' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             👑 Clôtures ({closures.length})
@@ -28032,32 +28114,32 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
 
       {/* KPI Stats Bar Widget */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">⏳ Dépôts Actifs</span>
-          <span className="text-base font-black text-ink mt-1">{pressingStats.activeCount}</span>
+        <div className="bg-[#faf5ff] p-5 rounded-2xl border border-purple-100/60 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-[#5c2197]/70 uppercase tracking-widest">⏳ Dépôts Actifs</span>
+          <span className="text-2xl font-black text-[#5c2197] mt-1">{pressingStats.activeCount}</span>
         </div>
-        <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 flex flex-col justify-between">
-          <span className="text-[10px] font-mono font-bold text-rose-500 uppercase tracking-widest font-bold">💰 À Récupérer</span>
-          <span className="text-base font-black text-rose-600 mt-1">{pressingStats.totalDue.toLocaleString()} F</span>
+        <div className="bg-rose-50/50 p-5 rounded-2xl border border-rose-100 flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-rose-500 uppercase tracking-widest">💰 À Récupérer</span>
+          <span className="text-2xl font-black text-rose-600 mt-1">{pressingStats.totalDue.toLocaleString()} F</span>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">🟢 Payés</span>
-          <span className="text-base font-black text-emerald-600 mt-1">{pressingStats.activePaid}</span>
+        <div className="bg-[#f0fdf4] p-5 rounded-2xl border border-emerald-100 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-emerald-600/80 uppercase tracking-widest">🟢 Payés</span>
+          <span className="text-2xl font-black text-emerald-600 mt-1">{pressingStats.activePaid}</span>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">🟡 Acomptes</span>
-          <span className="text-base font-black text-amber-500 mt-1">{pressingStats.activePartial}</span>
+        <div className="bg-[#fffbeb] p-5 rounded-2xl border border-amber-100 shadow-sm flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-amber-600/80 uppercase tracking-widest">🟡 Acomptes</span>
+          <span className="text-2xl font-black text-amber-500 mt-1">{pressingStats.activePartial}</span>
         </div>
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">🔴 Impayés</span>
-          <span className="text-base font-black text-rose-600 mt-1">{pressingStats.activeUnpaid}</span>
+        <div className="bg-rose-50/50 p-5 rounded-2xl border border-rose-100 flex flex-col justify-between">
+          <span className="text-[10px] font-mono font-bold text-rose-500 uppercase tracking-widest">🔴 Impayés</span>
+          <span className="text-2xl font-black text-rose-600 mt-1">{pressingStats.activeUnpaid}</span>
         </div>
       </div>
 
       {activeSubTab === 'create' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Form Panel */}
-          <form onSubmit={handleCreateTicket} className="lg:col-span-7 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
+          <form onSubmit={handleCreateTicket} className="lg:col-span-12 xl:col-span-7 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm space-y-6">
             <div className="flex justify-between items-center border-b border-gray-50 pb-3">
               <h3 className="text-lg font-black text-ink">Informations de la Commande</h3>
               <button
@@ -28078,7 +28160,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="Nom complet"
                   value={clientName}
                   onChange={e => setClientName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-bold text-sm text-ink"
                 />
               </div>
               <div>
@@ -28088,7 +28170,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="ex: +221771234567"
                   value={clientPhone}
                   onChange={e => setClientPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink font-mono"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-bold text-sm text-ink font-mono"
                 />
               </div>
               <div>
@@ -28098,7 +28180,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="client@mail.com"
                   value={clientEmail}
                   onChange={e => setClientEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-sm text-ink"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-bold text-sm text-ink"
                 />
               </div>
             </div>
@@ -28119,7 +28201,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       setExpectedDeliveryDate(format(d, 'yyyy-MM-dd'));
                     }
                   }}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono text-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-mono text-sm"
                 />
               </div>
               <div>
@@ -28129,7 +28211,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   required
                   value={expectedDeliveryDate}
                   onChange={e => setExpectedDeliveryDate(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono text-sm"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-mono text-sm"
                 />
               </div>
             </div>
@@ -28142,7 +28224,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="ex: Col sale, bouton manquant, linge délicat..."
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-bold text-xs"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-bold text-xs"
                 />
               </div>
               <div>
@@ -28152,7 +28234,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     type="button"
                     onClick={() => setBillingType('article')}
                     className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                      billingType === 'article' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                      billingType === 'article' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-800'
                     }`}
                   >
                     ◉ Par Article
@@ -28161,7 +28243,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     type="button"
                     onClick={() => setBillingType('poids')}
                     className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                      billingType === 'poids' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-800'
+                      billingType === 'poids' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-800'
                     }`}
                   >
                     ◉ Par Poids (Kg)
@@ -28175,7 +28257,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               <div className="space-y-4 pt-4 border-t border-dashed border-gray-100">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider">Quantité d'articles à laver</h4>
-                  <span className="text-[10px] font-bold px-2 py-1 rounded bg-indigo-50 text-indigo-600">Tarification unitaire</span>
+                  <span className="text-[10px] font-bold px-2 py-1 rounded bg-[#faf5ff] text-[#5c2197]">Tarification unitaire</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {Object.keys(articlesQty).map((key) => {
@@ -28203,7 +28285,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                             onClick={() => {
                               setArticlesQty({ ...articlesQty, [key]: articlesQty[key] + 1 });
                             }}
-                            className="w-8 h-8 rounded-lg bg-primary/10 hover:bg-primary/20 font-bold text-primary flex items-center justify-center transition-all"
+                            className="w-8 h-8 rounded-lg bg-[#5c2197]/10 hover:bg-[#5c2197]/20 font-bold text-[#5c2197] flex items-center justify-center transition-all"
                           >
                             +
                           </button>
@@ -28214,20 +28296,18 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                 </div>
               </div>
             )}
-
-            {/* Mode: Kg / Poids */}
             {billingType === 'poids' && (
               <div className="space-y-4 pt-4 border-t border-dashed border-gray-100">
                 <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider">Poids total du linge</h4>
                 
-                <div className="p-6 bg-cyan-50/30 rounded-3xl border border-cyan-100/50 space-y-4">
+                <div className="p-6 bg-[#faf5ff]/50 rounded-3xl border border-purple-100/60 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Forfait de Lavage</label>
                       <select
                         value={weightService}
                         onChange={(e) => setWeightService(e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-bold text-xs text-ink outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white font-bold text-xs text-ink outline-none focus:ring-2 focus:ring-[#5c2197]/20"
                       >
                         {Object.keys(tarifs.poids).map(key => {
                           const labels: { [key: string]: string } = {
@@ -28252,13 +28332,13 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         placeholder="ex: 6.5"
                         value={weightKg || ''}
                         onChange={(e) => setWeightKg(Math.max(0, parseFloat(e.target.value) || 0))}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-right font-mono font-bold text-xs outline-none focus:ring-2 focus:ring-[#5c2197]/20"
                       />
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-xs font-bold text-gray-700 pt-2 border-t border-cyan-100">
+                  <div className="flex justify-between items-center text-xs font-bold text-gray-700 pt-2 border-t border-purple-100">
                     <span>Base de facturation :</span>
-                    <span className="font-mono text-cyan-600">{subtotal.toLocaleString()} FCFA</span>
+                    <span className="font-mono text-[#5c2197]">{subtotal.toLocaleString()} FCFA</span>
                   </div>
                 </div>
               </div>
@@ -28287,7 +28367,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       onClick={() => setSupplements({ ...supplements, [key]: !active })}
                       className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between h-20 text-[10px] ${
                         active 
-                          ? 'bg-primary/5 border-primary text-primary font-bold' 
+                          ? 'bg-[#5c2197]/5 border-[#5c2197] text-[#5c2197] font-bold' 
                           : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'
                       }`}
                     >
@@ -28306,7 +28386,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                 <select
                   value={discountType}
                   onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 text-xs font-bold text-ink"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 text-xs font-bold text-ink"
                 >
                   <option value="amount">Montant Fixe (FCFA)</option>
                   <option value="percent">Pourcentage (%)</option>
@@ -28319,7 +28399,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder={discountType === 'percent' ? "ex: 10" : "ex: 500"}
                   value={discountValue || ''}
                   onChange={e => setDiscountValue(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono font-bold text-xs text-ink"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-mono font-bold text-xs text-ink"
                 />
               </div>
             </div>
@@ -28361,7 +28441,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
                       setAmountPaid(Math.min(total, val));
                     }}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/50 font-mono font-bold text-xs text-ink"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-mono font-bold text-xs text-ink"
                   />
                 </div>
 
@@ -28392,14 +28472,14 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
             <div className="pt-4 border-t border-dashed border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary-hover text-white py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                className="w-full bg-[#5c2197] hover:bg-[#481977] text-white py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" /> Enregistrer le Ticket
               </button>
               <button
                 type="button"
                 onClick={handleGenerateTicketQuote}
-                className="w-full bg-indigo-50 hover:bg-slate-200 hover:text-indigo-700 font-extrabold text-xs uppercase tracking-widest text-indigo-600 border border-indigo-100 py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full bg-[#faf5ff] hover:bg-purple-100 hover:text-[#481977] font-extrabold text-xs uppercase tracking-widest text-[#5c2197] border border-purple-100 py-3.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 📋 Etablissez DEVIS
               </button>
@@ -28411,7 +28491,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-400">Aperçu Réel du Ticket de Caisse</h4>
             
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 relative overflow-hidden">
-              <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-primary to-cyan-500" />
+              <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-[#5c2197] to-[#8a33ed]" />
               
               <div className="space-y-4 font-mono text-[11px] text-gray-700 leading-relaxed bg-[#fbfbf9] p-5 rounded-2xl border border-dashed border-gray-200 shadow-inner">
                 <div className="text-center pb-3 border-b border-dashed border-gray-200">
@@ -28426,7 +28506,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   <p>Client : <span className="text-ink font-bold">{clientName || '________________'}</span></p>
                   <p>Contact : <span className="text-ink font-bold">{clientPhone || '________________'}</span></p>
                   <p>Dépôt : <span className="font-bold">{depositDate}</span></p>
-                  <p className="text-indigo-600 font-bold">Retrait prévu : <span>{expectedDeliveryDate}</span></p>
+                  <p className="text-[#5c2197] font-bold">Retrait prévu : <span>{expectedDeliveryDate}</span></p>
                   {notes.trim() && (
                     <p className="text-amber-600 italic text-[10px]">Notes : {notes}</p>
                   )}
@@ -28466,7 +28546,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     <p className="font-bold uppercase text-ink mb-1">Suppléments actifs :</p>
                     <div className="space-y-1">
                       {Object.keys(supplements).filter(k => supplements[k]).map(k => (
-                        <div key={k} className="flex justify-between text-indigo-500">
+                        <div key={k} className="flex justify-between text-[#5c2197]">
                           <span>+ {getSupplementDisplayName(k)}</span>
                           <span>+{supplementTarifs[k] || 0} FCFA</span>
                         </div>
@@ -28491,29 +28571,31 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     </div>
                   )}
                   <div className="flex justify-between text-ink font-black pt-1 border-t border-gray-200 text-sm">
-                    <span>Net à Payer :</span>
-                    <span className="text-primary">{total.toLocaleString()} FCFA</span>
+                    <span>{selectedTicket?.status === 'quotation' ? 'Montant Devis :' : 'Net à Payer :'}</span>
+                    <span className="text-[#5c2197]">{total.toLocaleString()} FCFA</span>
                   </div>
                   
                   {/* Enhanced settlement rows on ticket preview */}
-                  <div className="border-t border-dotted border-gray-200 pt-1.5 space-y-0.5 mt-1">
-                    <div className="flex justify-between text-gray-500 text-[9px] font-bold">
-                      <span>Règlement :</span>
-                      <span>
-                        {paymentStatus === 'paid' ? 'PAYÉ D\'AVANCE' : paymentStatus === 'partial' ? 'ACOMPTE VERSÉ' : 'À LA LIVRAISON'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-emerald-600 text-[9px] font-bold">
-                      <span>Montant Versé :</span>
-                      <span>{(paymentStatus === 'unpaid' ? 0 : amountPaid).toLocaleString()} FCFA</span>
-                    </div>
-                    {total - (paymentStatus === 'unpaid' ? 0 : amountPaid) > 0 && (
-                      <div className="flex justify-between text-rose-500 text-[9px] font-extrabold animate-pulse">
-                        <span>Reste dû :</span>
-                        <span>{(total - (paymentStatus === 'unpaid' ? 0 : amountPaid)).toLocaleString()} FCFA</span>
+                  {selectedTicket?.status !== 'quotation' && (
+                    <div className="border-t border-dotted border-gray-200 pt-1.5 space-y-0.5 mt-1">
+                      <div className="flex justify-between text-gray-500 text-[9px] font-bold">
+                        <span>Règlement :</span>
+                        <span>
+                          {paymentStatus === 'paid' ? 'PAYÉ D\'AVANCE' : paymentStatus === 'partial' ? 'ACOMPTE VERSÉ' : 'À LA LIVRAISON'}
+                        </span>
                       </div>
-                    )}
-                  </div>
+                      <div className="flex justify-between text-emerald-600 text-[9px] font-bold">
+                        <span>Montant Versé :</span>
+                        <span>{(paymentStatus === 'unpaid' ? 0 : amountPaid).toLocaleString()} FCFA</span>
+                      </div>
+                      {total - (paymentStatus === 'unpaid' ? 0 : amountPaid) > 0 && (
+                        <div className="flex justify-between text-rose-500 text-[9px] font-extrabold animate-pulse">
+                          <span>Reste dû :</span>
+                          <span>{(total - (paymentStatus === 'unpaid' ? 0 : amountPaid)).toLocaleString()} FCFA</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="text-center pt-3 border-t border-dashed border-gray-200 text-[9px] text-gray-400 space-y-1">
@@ -28523,8 +28605,8 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               </div>
 
               {selectedTicket && (
-                <div className="flex flex-col gap-2.5 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100/60 shadow-inner">
-                  <p className="text-xs font-black text-indigo-700 text-center animate-pulse">🎉 Nouveau ticket enregistré : {selectedTicket.ticketNumber}</p>
+                <div className="flex flex-col gap-2.5 bg-[#faf5ff] p-5 rounded-2xl border border-purple-100 shadow-inner">
+                  <p className="text-xs font-black text-[#5c2197] text-center animate-pulse">🎉 Nouveau ticket enregistré : {selectedTicket.ticketNumber}</p>
                   
                   {/* Print & PDF Buttons */}
                   <div className="grid grid-cols-2 gap-2 mt-1">
@@ -29054,6 +29136,15 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right space-x-1 shrink-0">
+                        {ticket.total - (ticket.amountPaid || 0) > 0 && ticket.status !== 'quotation' && (
+                          <button
+                            onClick={() => handleCollectBalance(ticket.id, 'cash')}
+                            className="p-1 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-250 rounded-lg font-black text-[9px] transition inline-flex items-center gap-1 cursor-pointer"
+                            title="Encaisser le solde restant (Espèces por défaut)"
+                          >
+                            💸 Encaisser ({(ticket.total - (ticket.amountPaid || 0)).toLocaleString()} F)
+                          </button>
+                        )}
                         <button
                           onClick={() => setViewingTicket(ticket)}
                           className="p-1 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg font-bold text-[9px] transition inline-flex items-center gap-1"
@@ -29221,10 +29312,40 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         <span>{(viewingTicket.amountPaid || 0).toLocaleString()} FCFA</span>
                       </div>
                       {viewingTicket.total - (viewingTicket.amountPaid || 0) > 0 && (
-                        <div className="flex justify-between text-rose-600 font-sans font-black">
-                          <span>Solde dû :</span>
-                          <span>{(viewingTicket.total - (viewingTicket.amountPaid || 0)).toLocaleString()} FCFA</span>
-                        </div>
+                        <>
+                          <div className="flex justify-between text-rose-600 font-sans font-black">
+                            <span>Solde dû :</span>
+                            <span>{(viewingTicket.total - (viewingTicket.amountPaid || 0)).toLocaleString()} FCFA</span>
+                          </div>
+                          <div className="mt-2.5 pt-2.5 border-t border-dashed border-gray-200">
+                            <span className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5 text-center">
+                              💸 ENCAISSER LE SOLDE DÛ
+                            </span>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleCollectBalance(viewingTicket.id, 'cash')}
+                                className="py-1.5 px-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] rounded-lg transition text-center shadow-xs cursor-pointer uppercase tracking-wider"
+                              >
+                                Espèces
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCollectBalance(viewingTicket.id, 'mobile_money')}
+                                className="py-1.5 px-1 bg-sky-600 hover:bg-sky-700 text-white font-black text-[9px] rounded-lg transition text-center shadow-xs cursor-pointer uppercase tracking-wider"
+                              >
+                                Mobile
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCollectBalance(viewingTicket.id, 'card')}
+                                className="py-1.5 px-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[9px] rounded-lg transition text-center shadow-xs cursor-pointer uppercase tracking-wider"
+                              >
+                                Carte
+                              </button>
+                            </div>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -30123,13 +30244,35 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setQuotes(updatedQuotes);
     localStorage.setItem(`pressing_stock_quotes_${merchant.id}`, JSON.stringify(updatedQuotes));
 
+    const mockSaleFromQuote: DetergentSale = {
+      id: newQuote.id,
+      saleNumber: newQuote.quoteNumber,
+      customerName: newQuote.customerName,
+      customerPhone: newQuote.customerPhone,
+      date: newQuote.date,
+      items: newQuote.items.map(it => ({
+        productId: it.productId,
+        productName: it.productName,
+        price: it.price,
+        costPrice: it.costPrice,
+        quantity: it.quantity,
+        total: it.total
+      })),
+      discount: newQuote.discount,
+      discountType: newQuote.discountType,
+      discountValue: newQuote.discountValue,
+      subtotal: newQuote.subtotal,
+      total: newQuote.total,
+      totalCost: newQuote.totalCost
+    };
+
     // Reset fields & clear cart
     setCart([]);
     setDiscountValue(0);
     setDiscountType('amount');
     setCustomerName('');
     setCustomerPhone('');
-    setViewingQuote(newQuote); // Open details modal directly
+    setSelectedSale(mockSaleFromQuote); // Render as a mock sale inside the sidebar ticket simulator!
     showAlert('Devis Enregistré', `Devis proforma enregistré ! N° ${quoteNumber}`, 'success');
   };
 
@@ -30260,6 +30403,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
   // Print Sale/Detergent receipt PDF
   const handleDownloadSalePDF = (sale: DetergentSale) => {
+    const isQuote = sale.saleNumber.startsWith('D-QT') || sale.saleNumber.startsWith('DEV') || sale.saleNumber.includes('QT');
     const pdf = new jsPDF('p', 'mm', [80, 140]);
     pdf.setFont('courier', 'normal');
     pdf.setFontSize(10);
@@ -30274,7 +30418,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     y += 6;
     
     pdf.setFont('courier', 'bold');
-    pdf.text(`RECU CLIENT : ${sale.saleNumber}`, 5, y);
+    pdf.text(`${isQuote ? 'DEVIS CLIENT' : 'RECU CLIENT'} : ${sale.saleNumber}`, 5, y);
     y += 5;
     pdf.setFont('courier', 'normal');
     pdf.text(`Client  : ${sale.customerName}`, 5, y);
@@ -30287,7 +30431,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     y += 5;
 
     pdf.setFont('courier', 'bold');
-    pdf.text('Detergents & Produits', 5, y);
+    pdf.text(isQuote ? 'Services & Produits' : 'Detergents & Produits', 5, y);
     y += 5;
     pdf.setFont('courier', 'normal');
 
@@ -30309,20 +30453,21 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     
     pdf.setFont('courier', 'bold');
     pdf.setFontSize(10);
-    pdf.text(`TOTAL PAYE  : ${sale.total} FCFA`, 5, y);
+    pdf.text(`${isQuote ? 'TOTAL ESTIME' : 'TOTAL PAYE'}  : ${sale.total} FCFA`, 5, y);
     y += 7;
     pdf.setFont('courier', 'normal');
     pdf.setFontSize(8);
-    pdf.text('Merci de votre achat !', 40, y, { align: 'center' });
+    pdf.text(isQuote ? 'Valable 15 jours.' : 'Merci de votre achat !', 40, y, { align: 'center' });
     y += 4;
     pdf.text('ACOM Technologie Workspace', 40, y, { align: 'center' });
 
-    pdf.save(`Recu_Achat_Produit_${sale.saleNumber}.pdf`);
-    showAlert('Reçu Généré', `Impression lancée... Le reçu PDF pour ${sale.customerName} a bien été généré et téléchargé !`, 'success');
+    pdf.save(`${isQuote ? 'Devis' : 'Recu_Achat'}_Produit_${sale.saleNumber}.pdf`);
+    showAlert(isQuote ? 'Devis Généré' : 'Reçu Généré', `Impression lancée... Le document PDF pour ${sale.customerName} a bien été généré et téléchargé !`, 'success');
   };
 
   // Print Sale/Detergent receipt A4 PDF as requested
   const handleDownloadSaleA4PDF = (sale: DetergentSale) => {
+    const isQuote = sale.saleNumber.startsWith('D-QT') || sale.saleNumber.startsWith('DEV') || sale.saleNumber.includes('QT');
     const pdf = new jsPDF('p', 'mm', 'a4');
     
     // Header Style
@@ -30341,7 +30486,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(14);
-    pdf.text('FACTURE DE VENTE', 190, 18, { align: 'right' });
+    pdf.text(isQuote ? 'DEVIS PROFORMA' : 'FACTURE DE VENTE', 190, 18, { align: 'right' });
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
     pdf.text(`N° Réf: ${sale.saleNumber}`, 190, 25, { align: 'right' });
@@ -30408,7 +30553,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(11);
-    pdf.text('TOTAL PAYÉ CAISSE:', 140, y);
+    pdf.text(isQuote ? 'TOTAL ESTIMÉ NET:' : 'TOTAL PAYÉ CAISSE:', 140, y);
     pdf.text(`${sale.total.toLocaleString()} FCFA`, 185, y, { align: 'right' });
     
     // Footer message
@@ -30416,14 +30561,14 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(9);
     pdf.setTextColor(100, 116, 139);
-    pdf.text('Merci pour votre confiance & votre fidélité !', 105, y, { align: 'center' });
+    pdf.text(isQuote ? 'Ce devis est valable pendant 15 jours.' : 'Merci pour votre confiance & votre fidélité !', 105, y, { align: 'center' });
     y += 5;
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8);
     pdf.text('Document généré numériquement via Acom Gestion Workspace', 105, y, { align: 'center' });
     
-    pdf.save(`Facture_A4_Vente_${sale.saleNumber}.pdf`);
-    showAlert('Facture A4 Générée', `Facture client A4 générée en PDF ! N° Réf: ${sale.saleNumber}`, 'success');
+    pdf.save(`${isQuote ? 'Devis' : 'Facture_A4'}_Produit_${sale.saleNumber}.pdf`);
+    showAlert(isQuote ? 'Devis A4 Généré' : 'Facture A4 Générée', `Le document A4 pour ${sale.customerName} a bien été généré en PDF ! N° Réf: ${sale.saleNumber}`, 'success');
   };
 
   // WhatsApp Client sending for DetergentSale as requested
@@ -30491,6 +30636,18 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     });
   }, [products, searchQuery, categoryFilter, stockFilter]);
 
+  // Filters search quotes
+  const filteredQuotes = useMemo(() => {
+    return quotes.filter(q => {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return true;
+      return q.quoteNumber.toLowerCase().includes(query) ||
+             q.customerName.toLowerCase().includes(query) ||
+             (q.customerPhone && q.customerPhone.includes(query)) ||
+             q.items.some(it => it.productName.toLowerCase().includes(query));
+    });
+  }, [quotes, searchQuery]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
       {/* Header section with low stock metrics */}
@@ -30520,8 +30677,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         <div className="flex bg-gray-100 p-1.5 rounded-2xl w-fit border border-black/5 shrink-0 self-end lg:self-auto">
           <button
             onClick={() => { setActiveSubTab('sales'); setSelectedSale(null); }}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'sales' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+            className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider tracking-wider transition-all duration-200 ${
+              activeSubTab === 'sales' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             💸 Encaisser Vente
@@ -30529,7 +30686,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           <button
             onClick={() => { setActiveSubTab('inventory'); setEditingProduct(null); }}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'inventory' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              activeSubTab === 'inventory' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             🧪 Stock Produits
@@ -30537,7 +30694,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           <button
             onClick={() => setActiveSubTab('history')}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'history' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              activeSubTab === 'history' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             📜 Historique ({sales.length})
@@ -30545,7 +30702,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           <button
             onClick={() => setActiveSubTab('quotes')}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
-              activeSubTab === 'quotes' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              activeSubTab === 'quotes' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
             📋 Devis ({quotes.length})
@@ -30562,7 +30719,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Valeur Marchande Stock</span>
                 <span className="text-sm font-mono font-black text-ink">{(totalStockValue).toLocaleString()} F</span>
               </div>
-              <div className="p-2 bg-white rounded-lg border border-gray-100 text-primary">
+              <div className="p-2 bg-white rounded-lg border border-gray-100 text-[#5c2197]">
                 <DollarSign className="w-4 h-4" />
               </div>
             </div>
@@ -30570,9 +30727,9 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             <div className="bg-[#fcfcf9] p-4 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block">Unités en Stock</span>
-                <span className="text-sm font-mono font-black text-indigo-600">{totalStockQty} u</span>
+                <span className="text-sm font-mono font-black text-[#5c2197]">{totalStockQty} u</span>
               </div>
-              <div className="p-2 bg-white rounded-lg border border-gray-100 text-indigo-600">
+              <div className="p-2 bg-white rounded-lg border border-gray-100 text-[#5c2197]">
                 <Package className="w-4 h-4" />
               </div>
             </div>
@@ -30612,7 +30769,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                   placeholder="Rechercher par nom, usage, code-barres..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 bg-gray-50 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-primary/20 profile-search-input"
+                  className="w-full pl-10 pr-10 py-2 bg-gray-50 rounded-2xl text-xs font-bold outline-none border border-transparent focus:border-[#5c2197]/20 profile-search-input"
                 />
                 {searchQuery ? (
                   <button
@@ -30626,7 +30783,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                   <button
                     type="button"
                     onClick={() => setShowSearchScanner(true)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-primary hover:text-primary-hover transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#5c2197] hover:text-[#481977] transition-colors"
                     title="Scanner code-barres"
                   >
                     <ScanLine className="w-4 h-4" />
@@ -30876,12 +31033,63 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
               )}
 
               {selectedSale && (
-                <div className="flex flex-col gap-5 bg-slate-50/50 p-6 md:p-8 rounded-[2rem] border border-gray-100 shadow-md">
+                <div className="flex flex-col gap-5">
                   {/* Centered Popping Message */}
                   <div className="text-center">
                     <p className="text-indigo-600 font-extrabold text-[13px] md:text-sm flex items-center justify-center gap-2 tracking-tight">
                       <span>🎉</span> Nouveau ticket enregistré : {selectedSale.saleNumber}
                     </p>
+                  </div>
+
+                  {/* Real Paper Receipt Simulator style ticket */}
+                  <div className="space-y-4 font-mono text-[11px] text-gray-700 leading-relaxed bg-[#fbfbf9] p-5 rounded-2xl border border-dashed border-gray-200 shadow-inner">
+                    <div className="text-center pb-3 border-b border-dashed border-gray-200">
+                      <p className="font-black text-xs uppercase tracking-wider text-ink block">{merchant.name || 'ACOM Pressing'}</p>
+                      <p className="text-[9px] text-gray-400 mt-0.5">{merchant.address || 'Service de Lavage Professionnel'}</p>
+                    </div>
+
+                    <div className="space-y-1 text-gray-500">
+                      <p className="text-gray-900 font-bold">
+                        {selectedSale.saleNumber.startsWith('DEV') ? `DEVIS N° : ${selectedSale.saleNumber}` : `N° ENREGISTREMENT : ${selectedSale.saleNumber}`}
+                      </p>
+                      <p>Client : <span className="text-ink font-bold">{selectedSale.customerName || 'Client de Passage'}</span></p>
+                      <p>Contact : <span className="text-ink font-bold">{selectedSale.customerPhone || 'N/A'}</span></p>
+                      <p>Date : <span className="font-bold">{selectedSale.date || new Date().toISOString().split('T')[0]}</span></p>
+                    </div>
+
+                    <div className="border-t border-dashed border-gray-200 pt-3">
+                      <p className="font-bold uppercase text-ink mb-1.5 text-xs">Articles achetés :</p>
+                      <div className="space-y-1">
+                        {selectedSale.items.map(item => (
+                          <div key={item.productId} className="flex justify-between">
+                            <span>- {item.productName} x{item.quantity}</span>
+                            <span className="font-bold">{(item.price * item.quantity).toLocaleString()} FCFA</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-dashed border-gray-200 pt-3 space-y-1 text-xs">
+                      <div className="flex justify-between text-gray-500 text-[10px]">
+                        <span>Total brut articles :</span>
+                        <span className="font-bold">{(selectedSale.subtotal || selectedSale.total).toLocaleString()} FCFA</span>
+                      </div>
+                      {selectedSale.discount > 0 && (
+                        <div className="flex justify-between text-red-500 text-[10px]">
+                          <span>Remise octroyée :</span>
+                          <span>-{selectedSale.discount.toLocaleString()} FCFA</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-ink font-black pt-1 border-t border-gray-200 text-sm">
+                        <span>{selectedSale.saleNumber.startsWith('DEV') ? 'Montant Devis :' : 'Total Net Encaissé :'}</span>
+                        <span className="text-indigo-600 font-black">{(selectedSale.total).toLocaleString()} FCFA</span>
+                      </div>
+                    </div>
+
+                    <div className="text-center pt-3 border-t border-dashed border-gray-200 text-[9px] text-gray-400 space-y-1">
+                      <p className="font-black text-gray-500">Merci de votre confiance !</p>
+                      <p>Ticket requis pour toute réclamation.</p>
+                    </div>
                   </div>
 
                   {/* 2x2 Buttons Grid */}
@@ -30936,7 +31144,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       <span>👑</span> SUIVI TEMPS RÉEL DU GÉRANT (VENTE / STOCK)
                     </p>
                     
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* WhatsApp Gérant */}
                       <button
                         type="button"
@@ -30944,7 +31152,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         className="py-3 px-4 bg-[#e6fbf2] hover:bg-[#d1fae5] text-[#047857] border border-[#a7f3d0] text-[10px] md:text-xs font-black rounded-full flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
                       >
                         <MessageSquare className="w-3.5 h-3.5 text-[#047857]" />
-                        <span>WhatsApp Gérant</span>
+                        <span>ENVOYER Gérant (WA)</span>
                       </button>
 
                       {/* E-mail Gérant */}
@@ -30954,7 +31162,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         className="py-3 px-4 bg-[#eef2ff] hover:bg-[#e0e7ff] text-[#4338ca] border border-[#c7d2fe] text-[10px] md:text-xs font-black rounded-full flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
                       >
                         <Mail className="w-3.5 h-3.5 text-[#4338ca]" />
-                        <span>E-mail Gérant</span>
+                        <span>ENVOYER Gérant (Mail)</span>
                       </button>
                     </div>
 
@@ -31430,15 +31638,26 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         </div>
       ) : activeSubTab === 'quotes' ? (
         /* Quotes history listings subtab */
-        <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-black text-ink uppercase tracking-wider">Devis Proforma Émis</h3>
-            <span className="text-xs font-mono text-gray-400 uppercase tracking-widest font-bold">Ventes en attente</span>
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden p-8 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h3 className="text-lg font-black text-ink uppercase tracking-wider flex items-center gap-2">
+              📋 Devis Proforma Vente Directe
+            </h3>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Chercher N° Ticket, Client..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50/50 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
           </div>
 
-          {quotes.length === 0 ? (
+          {filteredQuotes.length === 0 ? (
             <div className="p-12 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-              <p className="text-gray-400 font-bold text-xs">Aucun devis proforma généré pour le moment.</p>
+              <p className="text-gray-400 font-bold text-sm">Aucun devis proforma correspondant.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -31446,36 +31665,78 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 <thead>
                   <tr className="border-b border-gray-100 text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest bg-gray-50/40">
                     <th className="px-6 py-4">N° Devis</th>
-                    <th className="px-6 py-4">Date Émission</th>
                     <th className="px-6 py-4">Client</th>
-                    <th className="px-6 py-4">Articles</th>
-                    <th className="px-6 py-4 text-right">Devis Net</th>
-                    <th className="px-6 py-4 text-center">Transfert Vente</th>
-                    <th className="px-6 py-4 text-center">Retirer</th>
+                    <th className="px-6 py-4">Émission</th>
+                    <th className="px-6 py-4">Facturation</th>
+                    <th className="px-6 py-4">Total</th>
+                    <th className="px-6 py-4">Action Statut</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 text-xs">
-                  {quotes.map(q => (
-                    <tr key={q.id} className="hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setViewingQuote(q)}>
-                      <td className="px-6 py-4 font-mono font-black text-indigo-600">{q.quoteNumber}</td>
-                      <td className="px-6 py-4 text-gray-500 font-mono">{format(new Date(q.date), 'dd/MM/yyyy')}</td>
+                  {filteredQuotes.map(q => (
+                    <tr key={q.id} className="hover:bg-gray-50/80 transition group">
+                      <td className="px-6 py-4 font-mono font-black text-ink">{q.quoteNumber}</td>
                       <td className="px-6 py-4 font-bold">
                         <div>{q.customerName}</div>
-                        <div className="text-[10px] text-gray-400">{q.customerPhone || 'Sans contact'}</div>
+                        <div className="text-[10px] text-gray-400 font-mono">{q.customerPhone || 'Aucun contact'}</div>
                       </td>
-                      <td className="px-6 py-4 max-w-[200px]">
-                        <div className="truncate font-bold text-gray-600">
-                          {q.items.map(it => `${it.productName} (x${it.quantity})`).join(', ')}
+                      <td className="px-6 py-4 text-gray-500 font-mono">
+                        <div>{format(new Date(q.date), 'yyyy-MM-dd')}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 bg-indigo-50 border border-indigo-100/40 text-indigo-600 font-bold text-[9px] rounded-lg">
+                          Articles ({q.items.reduce((acc, item) => acc + item.quantity, 0)})
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-mono">
+                        <div className="font-bold text-ink">{(q.total).toLocaleString()} FCFA</div>
+                        <div className="mt-1">
+                          <span className="text-[9px] bg-indigo-50 text-indigo-600 font-extrabold px-1.5 py-0.5 rounded border border-indigo-100/40">DEVIS</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right font-mono font-black text-ink">{(q.total).toLocaleString()} F</td>
-                      <td className="px-6 py-4 text-center text-xs" onClick={(e) => { e.stopPropagation(); handleConvertQuoteToCart(q); }}>
-                        <span className="cursor-pointer bg-white border border-gray-200 shadow-sm text-ink px-3 py-1.5 rounded-lg font-bold uppercase tracking-widest text-[9px] min-w-max">Convertir au Panier</span>
+                      <td className="px-6 py-4">
+                        <button
+                          type="button"
+                          onClick={() => handleConvertQuoteToCart(q)}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase text-[9px] tracking-wider rounded-lg px-3 py-1.5 shadow-sm inline-flex items-center cursor-pointer"
+                        >
+                          Convertir Panier
+                        </button>
                       </td>
-                      <td className="px-6 py-4 text-center" onClick={(e) => { e.stopPropagation(); handleDeleteQuote(q.id); }}>
-                        <span className="text-red-500 hover:text-red-700 cursor-pointer p-2 inline-flex" title="Supprimer Devis">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </span>
+                      <td className="px-6 py-4 text-right space-x-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setViewingQuote(q)}
+                          className="p-1 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg font-bold text-[9px] transition inline-flex items-center gap-1 cursor-pointer"
+                          title="Détails"
+                        >
+                          <Eye className="w-3 h-3" /> Détails
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => printDetergentQuoteDirect(merchant, q, '80mm')}
+                          className="p-1 px-2.5 bg-gray-950 text-white rounded-lg hover:bg-black font-bold text-[9px] transition inline-flex items-center gap-1 cursor-pointer"
+                          title="Imprimer Devis (80mm)"
+                        >
+                          <Printer className="w-3 h-3" /> Roll (80mm)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => printDetergentQuoteDirect(merchant, q, 'A4')}
+                          className="p-1 px-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold text-[9px] transition inline-flex items-center gap-1 cursor-pointer"
+                          title="Imprimer Format A4"
+                        >
+                          <FileText className="w-3 h-3" /> A4
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQuote(q.id)}
+                          className="p-1.5 hover:bg-red-50 text-red-500 rounded-lg group-hover:opacity-100 transition inline-flex items-center cursor-pointer"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
