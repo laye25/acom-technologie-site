@@ -656,7 +656,7 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
       </div>
       
       <div>
-        <div class="section-title">Détails Traitement Linge & Produits :</div>
+        <div class="section-title">${type === 'quote' ? 'DÉTAILS DES PRODUITS :' : 'Détails Traitement Linge & Produits :'}</div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
           <div><strong>Facturation :</strong> Vente Directe / Par Article</div>
           ${type === 'quote' ? `
@@ -671,7 +671,7 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     <table class="modern-table">
       <thead>
         <tr>
-          <th>Désignation Prestation (Services Pressing, Linge & Produits)</th>
+          <th>${type === 'quote' ? 'DÉSIGNATION PRODUIT' : 'Désignation Prestation (Services Pressing, Linge & Produits)'}</th>
           <th class="text-right" style="width: 20%;">Tarif Unitaire</th>
           <th class="text-center" style="width: 15%;">Quantité</th>
           <th class="text-right" style="width: 25%;">Montant Total</th>
@@ -726,18 +726,52 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
     ` : ''}
 
     <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
-      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
+      ${type === 'quote' ? `
+        <strong>Conditions Générales du Devis</strong><br/><br/>
+        Les produits figurant sur ce devis sont proposés sous réserve de disponibilité au moment de la confirmation de la commande.<br/><br/>
+        Ce devis est valable pendant une durée de 15 jours à compter de sa date d'émission. Passé ce délai, les prix et conditions de vente pourront être modifiés.<br/><br/>
+        Toute commande devient définitive après validation du présent devis par le client.<br/><br/>
+        Ce devis devra être présenté lors de la confirmation de la commande afin de permettre l'établissement de la facture définitive.
+      ` : `
+        <strong>Conditions Générales de Dépôt</strong><br/><br/>
+        Nous apportons le plus grand soin au traitement de votre linge. Toutefois, les articles délicats ou ne comportant pas d’étiquette d’entretien claire sont pris en charge sous l’entière responsabilité de leur propriétaire.<br/><br/>
+        Le linge est à retirer à la date prévue et mentionnée sur la facture. Tout retrait effectué au-delà de cette date pourra entraîner l'application de frais de garde.<br/><br/>
+        ${data.status === 'in_progress'
+          ? "Votre linge est actuellement en cours de traitement. Ce document devra être présenté lors du retrait de votre commande."
+          : data.status === 'ready'
+          ? "Votre linge est prêt à être retiré. Veuillez présenter ce document lors de la remise de vos articles."
+          : data.status === 'delivered'
+          ? "Le linge a été retiré et la prestation est considérée comme terminée. Merci d'avoir fait confiance à notre service de pressing."
+          : data.status === 'cancelled'
+          ? "Cette commande a été annulée. Ce document est conservé à titre d'archive."
+          : "Ce bon de réception / facture devra être présenté obligatoirement lors du retrait de votre linge. Veuillez le conserver soigneusement jusqu'à la restitution complète de vos articles."
+        }
+      `}
     </div>
 
     <div class="signature-container">
       <div>
-        <div class="section-title">Déchargement Client (Dépôt)</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
+        <div class="section-title">
+          ${type === 'quote' 
+            ? 'VALIDATION DU CLIENT' 
+            : data.status === 'delivered' || (data.status && data.amountPaid >= data.total)
+              ? 'SIGNATURE DU CLIENT'
+              : 'DÉPÔT CONFIRMÉ PAR LE CLIENT'
+          }
+        </div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">
+          ${type === 'quote' ? 'Signature précédée de la mention « Bon pour accord »' : 'Signature du client'}
+        </div>
         <div class="signature-area"></div>
       </div>
       <div style="text-align: right;">
-        <div class="section-title">Visa de Réception Pressing</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
+        <div class="section-title">
+          ${type === 'quote' 
+            ? 'VISA COMMERCIAL' 
+            : 'CACHET DE L\'ÉTABLISSEMENT'
+          }
+        </div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">${merchant.name || 'Acom Technologie Pressing'}</div>
         <div class="signature-area"></div>
       </div>
     </div>
@@ -828,7 +862,7 @@ const printDirectHTML = (merchant: Merchant, type: 'receipt' | 'invoice' | 'unpa
   }
 };
 
-const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80mm' | 'A4', handleDownloadPDF: any) => {
+const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80mm' | '58mm' | 'A4', handleDownloadPDF: any) => {
   const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
   const isDesktop = typeof window !== 'undefined' && 
     (window.hasOwnProperty('process') || navigator.userAgent.toLowerCase().indexOf('electron') > -1);
@@ -850,7 +884,14 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
 
   let htmlContent = "";
 
-  if (formatType === '80mm') {
+  if (formatType === '80mm' || formatType === '58mm') {
+    const rollWidth = formatType === '58mm' ? '58mm' : '80mm';
+    const contentWidth = formatType === '58mm' ? '50mm' : '72mm';
+    const paddingPrint = formatType === '58mm' ? '2mm' : '4mm';
+    const paddingScreen = formatType === '58mm' ? '4mm' : '6mm';
+    const fontSize = formatType === '58mm' ? '9.5px' : '11px';
+    const logoWidth = formatType === '58mm' ? '24mm' : '32mm';
+
     htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -860,24 +901,24 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
   <style>
     @media print {
       @page {
-        size: 80mm auto;
+        size: ${rollWidth} auto;
         margin: 0;
       }
       body {
         margin: 0;
-        padding: 4mm;
-        width: 72mm;
+        padding: ${paddingPrint};
+        width: ${contentWidth};
       }
     }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
+      font-size: ${fontSize};
       line-height: 1.4;
       color: #000;
       background-color: #fff;
       margin: 0 auto;
-      padding: 6mm;
-      width: 72mm;
+      padding: ${paddingScreen};
+      width: ${contentWidth};
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -885,7 +926,7 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
     .flex { display: flex; }
     .justify-between { justify-content: space-between; }
     .logo-container { text-align: center; margin-bottom: 3mm; }
-    .logo { max-width: 32mm; max-height: 16mm; object-fit: contain; }
+    .logo { max-width: ${logoWidth}; max-height: 16mm; object-fit: contain; }
     .divider { border-top: 1px dashed #000; margin: 3mm 0; }
     .merchant-name { font-size: 13px; font-weight: bold; margin-bottom: 1mm; text-transform: uppercase; }
     .doc-title { font-size: 11px; font-weight: bold; margin: 2mm 0; letter-spacing: 1px; text-transform: uppercase; }
@@ -1165,11 +1206,11 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
         </div>
       </div>
       <div>
-        <div class="doc-banner accent-text">BON DE RÉCEPTION PRESSING & STOCK (A4)</div>
-        <div class="doc-ref">N° PR-${(sale.saleNumber || '').toUpperCase().slice(-8)}</div>
+        <div class="doc-banner accent-text">FACTURE DE VENTE PRODUIT</div>
+        <div class="doc-ref">N° FP-${(sale.saleNumber || '').toUpperCase().slice(-8)}</div>
         <div style="text-align: right; font-size: 10px; color: #64748b; margin-top: 5px;">
-          Date de dépôt : <strong>${formattedSaleDate.split(' ')[0]}</strong><br>
-          Retrait prévu : <strong>Retrait Immédiat (Achat Boutique)</strong>
+          Date de vente : <strong>${formattedSaleDate.split(' ')[0]}</strong><br>
+          Mode de livraison : <strong>Retrait Immédiat (Boutique)</strong>
         </div>
       </div>
     </div>
@@ -1186,10 +1227,10 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
       </div>
       
       <div>
-        <div class="section-title">Détails Traitement Linge & Produits :</div>
+        <div class="section-title">DÉTAILS DES ARTICLES :</div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
           <div><strong>Type de transaction :</strong> Comptoir / Vente directe</div>
-          <div><strong>Méthode d'Enretien :</strong> Vente Produit & Prestation Boutique</div>
+          <div><strong>Mode de vente :</strong> Vente directe en boutique</div>
         </div>
       </div>
     </div>
@@ -1197,7 +1238,7 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
     <table class="modern-table">
       <thead>
         <tr>
-          <th>Désignation Prestation (Services Pressing, Linge & Produits)</th>
+          <th>DÉSIGNATION ARTICLE</th>
           <th class="text-right" style="width: 25%;">Tarif Unitaire</th>
           <th class="text-center" style="width: 15%;">Quantité</th>
           <th class="text-right" style="width: 25%;">Montant Total</th>
@@ -1206,7 +1247,7 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
       <tbody>
         ${sale.items.map((it: any) => `
           <tr>
-            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 Prestation : ${it.productName}</td>
+            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 Article : ${it.productName}</td>
             <td class="text-right">${fmt(it.price)} FCFA</td>
             <td class="text-center">${it.quantity}</td>
             <td class="text-right" style="font-weight: 700;">${fmt(it.total)} FCFA</td>
@@ -1228,25 +1269,27 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
           </div>
         ` : ''}
         <div class="totals-row grand-total">
-          <span>TOTAL PAYÉ NET</span>
+          <span>TOTAL PAYÉ</span>
           <span class="accent-text">${fmt(sale.total)} FCFA</span>
         </div>
       </div>
     </div>
 
     <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
-      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
+      <strong>Conditions Générales de Vente</strong><br/><br/>
+      Les produits vendus ne sont ni repris ni échangés après validation de l'achat, sauf en cas de défaut constaté conformément à la réglementation en vigueur.<br/><br/>
+      Merci de conserver ce document comme preuve d'achat.
     </div>
 
     <div class="signature-container">
       <div>
-        <div class="section-title">Déchargement Client (Dépôt)</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
+        <div class="section-title">SIGNATURE DU CLIENT</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du client pour réception</div>
         <div class="signature-area"></div>
       </div>
       <div style="text-align: right;">
-        <div class="section-title font-bold">Visa de Réception Pressing</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
+        <div class="section-title">CACHET DE L'ÉTABLISSEMENT</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">${merchant.name || 'Acom Technologie Pressing'}</div>
         <div class="signature-area"></div>
       </div>
     </div>
@@ -1320,7 +1363,7 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
   }
 };
 
-const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '80mm' | 'A4') => {
+const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '80mm' | '58mm' | 'A4') => {
   const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
   const isDesktop = typeof window !== 'undefined' && 
     (window.hasOwnProperty('process') || navigator.userAgent.toLowerCase().indexOf('electron') > -1);
@@ -1341,7 +1384,14 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
 
   let htmlContent = "";
 
-  if (formatType === '80mm') {
+  if (formatType === '80mm' || formatType === '58mm') {
+    const rollWidth = formatType === '58mm' ? '58mm' : '80mm';
+    const contentWidth = formatType === '58mm' ? '50mm' : '72mm';
+    const paddingPrint = formatType === '58mm' ? '2mm' : '4mm';
+    const paddingScreen = formatType === '58mm' ? '4mm' : '6mm';
+    const fontSize = formatType === '58mm' ? '9.5px' : '11px';
+    const logoWidth = formatType === '58mm' ? '24mm' : '32mm';
+
     htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1351,24 +1401,24 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
   <style>
     @media print {
       @page {
-        size: 80mm auto;
+        size: ${rollWidth} auto;
         margin: 0;
       }
       body {
         margin: 0;
-        padding: 4mm;
-        width: 72mm;
+        padding: ${paddingPrint};
+        width: ${contentWidth};
       }
     }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
+      font-size: ${fontSize};
       line-height: 1.4;
       color: #000;
       background-color: #fff;
       margin: 0 auto;
-      padding: 6mm;
-      width: 72mm;
+      padding: ${paddingScreen};
+      width: ${contentWidth};
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -1376,7 +1426,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
     .flex { display: flex; }
     .justify-between { justify-content: space-between; }
     .logo-container { text-align: center; margin-bottom: 3mm; }
-    .logo { max-width: 32mm; max-height: 16mm; object-fit: contain; }
+    .logo { max-width: ${logoWidth}; max-height: 16mm; object-fit: contain; }
     .divider { border-top: 1px dashed #000; margin: 3mm 0; }
     .merchant-name { font-size: 13px; font-weight: bold; margin-bottom: 1mm; text-transform: uppercase; }
     .doc-title { font-size: 11px; font-weight: bold; margin: 2mm 0; letter-spacing: 1px; text-transform: uppercase; }
@@ -1694,7 +1744,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
       </div>
       
       <div>
-        <div class="section-title">Détails Traitement Linge & Produits :</div>
+        <div class="section-title">DÉTAILS DES PRODUITS :</div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
           <div><strong>Facturation :</strong> Vente directe / Boutique</div>
           <div><strong>Statut Document :</strong> Devis proforma (en attente)</div>
@@ -1705,7 +1755,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
     <table class="modern-table">
       <thead>
         <tr>
-          <th>Désignation Prestation (Services Pressing, Linge & Produits)</th>
+          <th>DÉSIGNATION PRODUIT</th>
           <th class="text-right" style="width: 25%;">Tarif Unitaire</th>
           <th class="text-center" style="width: 15%;">Quantité</th>
           <th class="text-right" style="width: 25%;">Montant Total</th>
@@ -1714,7 +1764,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
       <tbody>
         ${quote.items.map((it: any) => `
           <tr>
-            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 Prestation : ${it.productName}</td>
+            <td style="font-weight: 600; color: #0f172a; text-transform: capitalize;">🧴 Article : ${it.productName}</td>
             <td class="text-right">${fmt(it.price)} FCFA</td>
             <td class="text-center">${it.quantity}</td>
             <td class="text-right" style="font-weight: 700;">${fmt(it.total)} FCFA</td>
@@ -1726,7 +1776,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
     <div class="totals-wrapper">
       <div class="totals-box">
         <div class="totals-row">
-          <span>Sous-total Prestations</span>
+          <span>Sous-total Produits</span>
           <span style="font-weight: 600;">${fmt(quote.subtotal)} FCFA</span>
         </div>
         ${quote.discount > 0 ? `
@@ -1743,18 +1793,22 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
     </div>
 
     <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
-      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
+      <strong>Conditions Générales du Devis</strong><br/><br/>
+      Les produits figurant sur ce devis sont proposés sous réserve de disponibilité au moment de la confirmation de la commande.<br/><br/>
+      Ce devis est valable pendant une durée de 15 jours à compter de sa date d'émission. Passé ce délai, les prix et conditions de vente pourront être modifiés.<br/><br/>
+      Toute commande devient définitive après validation du présent devis par le client.<br/><br/>
+      Ce devis devra être présenté lors de la confirmation de la commande afin de permettre l'établissement de la facture définitive.
     </div>
 
     <div class="signature-container">
       <div>
-        <div class="section-title">DÉCHARGEMENT CLIENT (DÉPÔT)</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
+        <div class="section-title">VALIDATION DU CLIENT</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature précédée de la mention « Bon pour accord »</div>
         <div class="signature-area"></div>
       </div>
       <div style="text-align: right;">
-        <div class="section-title">VISA DE RÉCEPTION PRESSING</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
+        <div class="section-title">CACHET ET SIGNATURE</div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">${merchant.name || 'Acom Technologie Pressing'} authorized Stamp</div>
         <div class="signature-area"></div>
       </div>
     </div>
@@ -1827,7 +1881,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
   }
 };
 
-const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: '80mm' | 'A4', tarifs: any, handleDownloadPDF: any) => {
+const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: '80mm' | '58mm' | 'A4', tarifs: any, handleDownloadPDF: any) => {
   const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent || '');
   const isDesktop = typeof window !== 'undefined' && 
     (window.hasOwnProperty('process') || navigator.userAgent.toLowerCase().indexOf('electron') > -1);
@@ -1850,7 +1904,14 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
 
   let htmlContent = "";
 
-  if (formatType === '80mm') {
+  if (formatType === '80mm' || formatType === '58mm') {
+    const rollWidth = formatType === '58mm' ? '58mm' : '80mm';
+    const contentWidth = formatType === '58mm' ? '50mm' : '72mm';
+    const paddingPrint = formatType === '58mm' ? '2mm' : '4mm';
+    const paddingScreen = formatType === '58mm' ? '4mm' : '6mm';
+    const fontSize = formatType === '58mm' ? '9.5px' : '11px';
+    const logoWidth = formatType === '58mm' ? '24mm' : '32mm';
+
     htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1860,24 +1921,24 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
   <style>
     @media print {
       @page {
-        size: 80mm auto;
+        size: ${rollWidth} auto;
         margin: 0;
       }
       body {
         margin: 0;
-        padding: 4mm;
-        width: 72mm;
+        padding: ${paddingPrint};
+        width: ${contentWidth};
       }
     }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
+      font-size: ${fontSize};
       line-height: 1.4;
       color: #000;
       background-color: #fff;
       margin: 0 auto;
-      padding: 6mm;
-      width: 72mm;
+      padding: ${paddingScreen};
+      width: ${contentWidth};
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -1885,7 +1946,7 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
     .flex { display: flex; }
     .justify-between { justify-content: space-between; }
     .logo-container { text-align: center; margin-bottom: 3mm; }
-    .logo { max-width: 32mm; max-height: 16mm; object-fit: contain; }
+    .logo { max-width: ${logoWidth}; max-height: 16mm; object-fit: contain; }
     .divider { border-top: 1px dashed #000; margin: 3mm 0; }
     .merchant-name { font-size: 13px; font-weight: bold; margin-bottom: 1mm; text-transform: uppercase; }
     .doc-title { font-size: 11px; font-weight: bold; margin: 2mm 0; letter-spacing: 1px; text-transform: uppercase; }
@@ -2009,8 +2070,27 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
   ` : ''}
   
   <div class="footer">
-    <p class="text-bold">Merci de votre confiance !</p>
-    <p>Veuillez présenter ce ticket lors du retrait du linge.</p>
+    ${ticket.status === 'quotation' ? `
+      <p class="text-bold" style="margin-bottom: 2mm; font-size: 10px; text-transform: uppercase;">Conditions Générales de Dépôt</p>
+      <p style="text-align: justify; font-size: 8.5px; margin-bottom: 2mm; text-align-last: center; line-height: 1.3;">Nous apportons le plus grand soin au traitement de votre linge. Toutefois, les articles délicats ou ne comportant pas d’étiquette d’entretien claire sont pris en charge sous l’entière responsabilité de leur propriétaire.</p>
+      <p style="text-align: justify; font-size: 8.5px; margin-bottom: 2mm; text-align-last: center; line-height: 1.3;">Le linge est à retirer à la date prévue et mentionnée sur la facture. Tout retrait effectué au-delà de cette date pourra entraîner l'application de frais de garde.</p>
+      <p class="text-bold" style="font-size: 9px; margin-top: 2.5mm; line-height: 1.4; color: #000;">Ce devis devra être présenté lors de la confirmation du dépôt afin de valider les prestations demandées.</p>
+    ` : `
+      <p class="text-bold">Merci de votre confiance !</p>
+      <p style="text-align: justify; font-size: 8.5px; margin-bottom: 2mm; text-align-last: center; line-height: 1.3;">Le linge est à retirer à la date prévue et mentionnée sur la facture. Tout retrait effectué au-delà de cette date pourra entraîner l'application de frais de garde.</p>
+      <p>
+        ${ticket.status === 'in_progress'
+          ? "Votre linge est actuellement en cours de traitement. Ce document devra être présenté lors du retrait de votre commande."
+          : ticket.status === 'ready'
+          ? "Votre linge est prêt à être retiré. Veuillez présenter ce document lors de la remise de vos articles."
+          : ticket.status === 'delivered'
+          ? "Le linge a été retiré et la prestation est considérée comme terminée. Merci d'avoir fait confiance à notre service de pressing."
+          : (ticket.status as string) === 'cancelled'
+          ? "Cette commande a été annulée. Ce document est conservé à titre d'archive et ne peut plus être utilisé pour un retrait."
+          : "Ce bon de réception / facture devra être présenté obligatoirement lors du retrait de votre linge. Veuillez le conserver soigneusement jusqu'à la restitution complète de vos articles."
+        }
+      </p>
+    `}
     <p style="font-size: 8px; font-family: monospace; color: #777; margin-top: 4mm;">Généré par Acom Technologie Desktop</p>
   </div>
 </body>
@@ -2226,7 +2306,9 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
       
       <div style="text-align: right;">
         <div class="doc-banner accent-text">
-          ${ticket.status === 'quotation' ? 'DEVIS PROFORMA PRESSING' : 'BON DE RÉCEPTION PRESSING (A4)'}
+          ${ticket.status === 'quotation' 
+            ? 'DEVIS PROFORMA PRESSING' 
+            : (ticket.amountPaid >= ticket.total ? 'FACTURE ACQUITTÉE PRESSING' : 'BON DE RÉCEPTION PRESSING')}
         </div>
         <div class="doc-ref">
           N° ${ticket.ticketNumber}<br>
@@ -2247,11 +2329,15 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
       </div>
       
       <div>
-        <div class="section-title">Détails Traitement Linge :</div>
+        <div class="section-title">
+          ${ticket.status === 'quotation' 
+            ? 'DÉTAILS TRAITEMENT LINGE :' 
+            : (ticket.amountPaid >= ticket.total ? 'DÉTAILS DES PRESTATIONS :' : 'DÉTAILS DU DÉPÔT :')}
+        </div>
         <div style="font-size: 11px; color: #475569; padding: 4px 0; line-height: 1.6;">
-          <div><strong>Facturation :</strong> ${ticket.billingType === 'article' ? 'Par Article' : 'Au Poids (Kg)'}</div>
+          <div><strong>Mode de facturation :</strong> ${ticket.billingType === 'article' ? 'Par Article' : 'Au Poids (Kg)'}</div>
           ${ticket.status !== 'quotation' ? `
-            <div><strong>Statut de Paiement :</strong> ${ticket.paymentStatus === 'paid' ? 'Entièrement réglé' : ticket.paymentStatus === 'partial' ? 'Acompte versé' : 'À régler au retrait'}</div>
+            <div><strong>Statut du paiement :</strong> ${ticket.paymentStatus === 'paid' ? 'Réglé intégralement' : ticket.paymentStatus === 'partial' ? 'Acompte versé' : 'À régler au retrait'}</div>
           ` : `
             <div><strong>Statut Document :</strong> Devis proforma (en attente)</div>
           `}
@@ -2262,7 +2348,7 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
     <table class="modern-table">
       <thead>
         <tr>
-          <th>Désignation Prestation (Services Pressing & Linge)</th>
+          <th>DÉSIGNATION PRESTATION (SERVICES PRESSING & LINGE)</th>
           <th class="text-right" style="width: 20%;">Tarif Unitaire</th>
           <th class="text-center" style="width: 15%;">Quantité</th>
           <th class="text-right" style="width: 25%;">Montant Total</th>
@@ -2320,17 +2406,17 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
           </div>
         ` : ''}
         <div class="totals-row grand-total">
-          <span>${ticket.status === 'quotation' ? 'MONTANT DEVIS GLOBAL' : 'TOTAL TTC PAYER'}</span>
+          <span>${ticket.status === 'quotation' ? 'MONTANT DEVIS' : 'TOTAL TTC'}</span>
           <span class="accent-text">${fmt(ticket.total)} FCFA</span>
         </div>
         
         ${ticket.status !== 'quotation' ? `
           <div class="totals-row" style="margin-top: 5px; border-top: 1px dashed #e2e8f0; padding-top: 5px;">
-            <span>Règlement / Versé :</span>
+            <span>Montant versé :</span>
             <span>${fmt(ticket.amountPaid || 0)} FCFA</span>
           </div>
           <div class="totals-row">
-            <span>Reste à percevoir :</span>
+            <span>Solde restant dû :</span>
             <span style="font-weight: bold; color: ${ticket.total - (ticket.amountPaid || 0) > 0 ? '#e11d48' : '#16a34a'}">${fmt(Math.max(0, ticket.total - (ticket.amountPaid || 0)))} FCFA</span>
           </div>
         ` : ''}
@@ -2344,18 +2430,38 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
     ` : ''}
 
     <div style="font-size: 8.5px; color: #64748b; line-height: 1.5; margin-top: 15px;">
-      <strong>Conditions Générales de Dépôt :</strong> Le linge est traité avec le plus grand soin. Cependant, les articles fragiles n'ayant pas d'étiquette de consignes claires sont lavés sous la seule responsabilité du propriétaire. Veuillez retirer votre linge sous 30 jours, faute de quoi des frais de garde pourront être appliqués. VEUILLEZ PRÉSENTER CE BON POUR LE RETRAIT.
+      <strong>Conditions Générales de Dépôt</strong><br/><br/>
+      Nous apportons le plus grand soin au traitement de votre linge. Toutefois, les articles délicats ou ne comportant pas d’étiquette d’entretien claire sont pris en charge sous l’entière responsabilité de leur propriétaire.<br/><br/>
+      Le linge est à retirer à la date prévue et mentionnée sur la facture. Tout retrait effectué au-delà de cette date pourra entraîner l'application de frais de garde.<br/><br/>
+      ${ticket.status === 'quotation' 
+        ? "Ce devis devra être présenté lors de la confirmation du dépôt afin de valider les prestations demandées." 
+        : ticket.status === 'in_progress'
+        ? "Votre linge est actuellement en cours de traitement. Ce document devra être présenté lors du retrait de votre commande."
+        : ticket.status === 'ready'
+        ? "Votre linge est prêt à être retiré. Veuillez présenter ce document lors de la remise de vos articles."
+        : ticket.status === 'delivered'
+        ? "Le linge a été retiré et la prestation est considérée comme terminée. Merci d'avoir fait confiance à notre service de pressing."
+        : ticket.status === 'cancelled'
+        ? "Cette commande a été annulée. Ce document est conservé à titre d'archive."
+        : "Ce bon de réception / facture devra être présenté obligatoirement lors du retrait de votre linge. Veuillez le conserver soigneusement jusqu'à la restitution complète de vos articles."
+      }
     </div>
 
     <div class="signature-container">
       <div>
-        <div class="section-title">Déchargement Client (Dépôt)</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Signature du déposant</div>
+        <div class="section-title">
+          ${ticket.status === 'quotation' ? 'ACCORD DU CLIENT' : 'SIGNATURE DU CLIENT'}
+        </div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">
+          ${ticket.status === 'quotation' ? 'Signature précédée de la mention « Bon pour accord »' : 'Signature du déposant'}
+        </div>
         <div class="signature-area"></div>
       </div>
       <div style="text-align: right;">
-        <div class="section-title">Visa de Réception Pressing</div>
-        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">Acom Technologie Pressing authorized Stamp</div>
+        <div class="section-title">
+          ${ticket.status === 'quotation' ? 'VISA COMMERCIAL' : 'CACHET DE L\'ÉTABLISSEMENT'}
+        </div>
+        <div style="font-size: 8px; color: #94a3b8; font-style: italic; margin-bottom: 5px;">${merchant.name || 'Acom Technologie Pressing'}</div>
         <div class="signature-area"></div>
       </div>
     </div>
@@ -2805,7 +2911,7 @@ const generateA4InvoicePDF = (merchant: Merchant, sale: any, action: 'print' | '
   doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184); // Slate-400
   doc.text("Signature du déposant", margin + 10, y);
-  doc.text("Acom Technologie Pressing authorized Stamp", 190 - 10, y, { align: 'right' });
+  doc.text(`${merchant.name || 'Acom Technologie Pressing'} authorized Stamp`, 190 - 10, y, { align: 'right' });
 
   y += 18;
   doc.setDrawColor(226, 232, 240); // Slate-200
@@ -27916,53 +28022,65 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     });
   }, [tickets, searchQuery, activeSubTab, washStatusFilter]);
 
-  const handleDownloadPDF = (ticket: PressingTicket) => {
-    const pdf = new jsPDF('p', 'mm', [80, 185]);
+  const handleDownloadPDF = (ticket: PressingTicket, formatType: '80mm' | '58mm' = '80mm') => {
+    const widthMm = formatType === '58mm' ? 58 : 80;
+    const heightMm = formatType === '58mm' ? (ticket.status === 'quotation' ? 240 : 225) : (ticket.status === 'quotation' ? 220 : 205);
+    const pdf = new jsPDF('p', 'mm', [widthMm, heightMm]);
     pdf.setFont('courier', 'normal');
-    pdf.setFontSize(10);
+    pdf.setFontSize(formatType === '58mm' ? 8.5 : 10);
     
     let y = 10;
-    pdf.text(merchant.name || 'ACOM Pressing', 40, y, { align: 'center' });
+    const centerX = formatType === '58mm' ? 29 : 40;
+    const lineStartX = formatType === '58mm' ? 3 : 5;
+    const lineEndX = formatType === '58mm' ? 55 : 75;
+    const paddingLeft = formatType === '58mm' ? 3 : 5;
+    const splitWidth = formatType === '58mm' ? 52 : 70;
+    const maxCharName = formatType === '58mm' ? 18 : 25;
+    const maxCharItem = formatType === '58mm' ? 8 : 10;
+    const smallFontSize = formatType === '58mm' ? 7 : 8;
+    const extraSmallFontSize = formatType === '58mm' ? 6 : 7;
+    
+    pdf.text(merchant.name || 'ACOM Pressing', centerX, y, { align: 'center' });
     y += 5;
-    pdf.setFontSize(8);
-    pdf.text(merchant.address || 'Service de Pressing', 40, y, { align: 'center' });
+    pdf.setFontSize(smallFontSize);
+    pdf.text(merchant.address || 'Service de Pressing', centerX, y, { align: 'center' });
     y += 7;
-    pdf.line(5, y, 75, y);
+    pdf.line(lineStartX, y, lineEndX, y);
     y += 6;
     
     pdf.setFont('courier', 'bold');
     const docTitle = ticket.status === 'quotation' ? 'DEVIS PROFORMA' : 'TICKET RÉCEPTION';
-    pdf.text(docTitle, 40, y, { align: 'center' });
+    pdf.text(docTitle, centerX, y, { align: 'center' });
     y += 5;
-    pdf.text(`NUMÉRO : ${ticket.ticketNumber}`, 5, y);
+    pdf.text(`NUMÉRO : ${ticket.ticketNumber}`, paddingLeft, y);
     y += 5;
     pdf.setFont('courier', 'normal');
-    pdf.text(`Client  : ${ticket.clientName}`, 5, y);
+    pdf.text(`Client  : ${ticket.clientName.slice(0, maxCharName)}`, paddingLeft, y);
     y += 4;
-    pdf.text(`Contact : ${ticket.clientPhone || 'N/A'}`, 5, y);
+    pdf.text(`Contact : ${ticket.clientPhone || 'N/A'}`, paddingLeft, y);
     y += 4;
     if (ticket.clientEmail) {
-      const emailTrunc = ticket.clientEmail.length > 25 ? ticket.clientEmail.slice(0, 23) + '..' : ticket.clientEmail;
-      pdf.text(`E-mail  : ${emailTrunc}`, 5, y);
+      const emailTrunc = ticket.clientEmail.length > maxCharName ? ticket.clientEmail.slice(0, maxCharName - 2) + '..' : ticket.clientEmail;
+      pdf.text(`E-mail  : ${emailTrunc}`, paddingLeft, y);
       y += 4;
     }
-    pdf.text(`Dépôt   : ${ticket.depositDate}`, 5, y);
+    pdf.text(`Dépôt   : ${ticket.depositDate}`, paddingLeft, y);
     y += 4;
     if (ticket.expectedDeliveryDate) {
-      pdf.text(`Retrait : ${ticket.expectedDeliveryDate} (Prévu)`, 5, y);
+      pdf.text(`Retrait : ${ticket.expectedDeliveryDate} (Prévu)`, paddingLeft, y);
       y += 4;
     }
     if (ticket.notes) {
-      const trimmedNotes = ticket.notes.length > 28 ? ticket.notes.slice(0, 26) + '..' : ticket.notes;
-      pdf.text(`Note    : ${trimmedNotes}`, 5, y);
+      const trimmedNotes = ticket.notes.length > maxCharName ? ticket.notes.slice(0, maxCharName - 2) + '..' : ticket.notes;
+      pdf.text(`Note    : ${trimmedNotes}`, paddingLeft, y);
       y += 4;
     }
     y += 1;
-    pdf.line(5, y, 75, y);
+    pdf.line(lineStartX, y, lineEndX, y);
     y += 5;
 
     pdf.setFont('courier', 'bold');
-    pdf.text('Détails Prestation', 5, y);
+    pdf.text('Détails Prestation', paddingLeft, y);
     y += 5;
     pdf.setFont('courier', 'normal');
 
@@ -27972,22 +28090,22 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         if (qty > 0) {
           const price = tarifs.articles[key as keyof typeof tarifs.articles] || 0;
           const totalItem = qty * price;
-          pdf.text(`- ${key.slice(0, 10).padEnd(10, ' ')} x${qty} : ${totalItem} FCFA`, 5, y);
+          pdf.text(`- ${key.slice(0, maxCharItem).padEnd(maxCharItem, ' ')} x${qty} : ${totalItem} FCFA`, paddingLeft, y);
           y += 4;
         }
       });
     } else {
       const serviceName = ticket.weightService === 'standard' ? 'Stnd.' : ticket.weightService === 'premium' ? 'Prem.' : 'Exp.';
       const pricePerKg = tarifs.poids[ticket.weightService] || 0;
-      pdf.text(`- Poids : ${ticket.weightKg} Kg (${serviceName})`, 5, y);
+      pdf.text(`- Poids : ${ticket.weightKg} Kg (${serviceName})`, paddingLeft, y);
       y += 4;
-      pdf.text(`  Tarif : ${pricePerKg} FCFA/Kg`, 5, y);
+      pdf.text(`  Tarif : ${pricePerKg} FCFA/Kg`, paddingLeft, y);
       y += 4;
     }
 
     const activeSupps = Object.keys(ticket.supplements).filter(k => ticket.supplements[k as keyof typeof ticket.supplements]);
     if (activeSupps.length > 0) {
-      pdf.text('Suppléments :', 5, y);
+      pdf.text('Suppléments :', paddingLeft, y);
       y += 4;
       activeSupps.forEach(k => {
         const cost = ticket.supplementTarifs[k] || 0;
@@ -28003,56 +28121,117 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
           };
           displayName = fallbackLabels[k] || k;
         }
-        pdf.text(`  + ${displayName.slice(0, 13).padEnd(13, ' ')} : ${cost} FCFA`, 5, y);
+        pdf.text(`  + ${displayName.slice(0, maxCharItem + 3).padEnd(maxCharItem + 3, ' ')} : ${cost} FCFA`, paddingLeft, y);
         y += 4;
       });
     }
 
     y += 2;
-    pdf.line(5, y, 75, y);
+    pdf.line(lineStartX, y, lineEndX, y);
     y += 5;
 
-    pdf.text(`Sous-total: ${ticket.subtotal + ticket.supplementTotal} FCFA`, 5, y);
+    pdf.text(`Sous-total: ${ticket.subtotal + ticket.supplementTotal} FCFA`, paddingLeft, y);
     y += 4;
     if (ticket.discount > 0) {
-      pdf.text(`Remise: -${ticket.discount} FCFA`, 5, y);
+      pdf.text(`Remise: -${ticket.discount} FCFA`, paddingLeft, y);
       y += 4;
     }
     
     pdf.setFont('courier', 'bold');
-    pdf.setFontSize(10);
-    pdf.text(ticket.status === 'quotation' ? `MONTANT DEVIS : ${ticket.total} FCFA` : `TOTAL NET : ${ticket.total} FCFA`, 5, y);
+    pdf.setFontSize(formatType === '58mm' ? 8.5 : 10);
+    pdf.text(ticket.status === 'quotation' ? `MONTANT DEVIS : ${ticket.total} FCFA` : `TOTAL NET : ${ticket.total} FCFA`, paddingLeft, y);
     y += 5;
 
     pdf.setFont('courier', 'normal');
-    pdf.setFontSize(8);
+    pdf.setFontSize(smallFontSize);
     
     if (ticket.status !== 'quotation') {
       const pStatusLabel = ticket.paymentStatus === 'paid' ? 'PAYE D\'AVANCE' : ticket.paymentStatus === 'partial' ? 'ACOMPTE PAYE' : 'IMPAYE AT RETRAIT';
-      pdf.text(`Règlement : ${pStatusLabel}`, 5, y);
+      pdf.text(`Règlement : ${pStatusLabel}`, paddingLeft, y);
       y += 4;
 
       const paidVal = ticket.amountPaid || 0;
       const remainingVal = Math.max(0, ticket.total - paidVal);
-      pdf.text(`Versé     : ${paidVal} FCFA`, 5, y);
+      pdf.text(`Versé     : ${paidVal} FCFA`, paddingLeft, y);
       y += 4;
       pdf.setFont('courier', 'bold');
-      pdf.text(`Reste dû  : ${remainingVal} FCFA`, 5, y);
+      pdf.text(`Reste dû  : ${remainingVal} FCFA`, paddingLeft, y);
       y += 5;
     }
 
-    pdf.line(5, y, 75, y);
+    pdf.line(lineStartX, y, lineEndX, y);
     y += 5;
     pdf.setFont('courier', 'normal');
-    pdf.setFontSize(8);
-    pdf.text('Merci de votre confiance !', 40, y, { align: 'center' });
-    y += 4;
-    pdf.text('Veuillez présenter ce ticket', 40, y, { align: 'center' });
-    y += 4;
-    pdf.text('lors du retrait du linge.', 40, y, { align: 'center' });
+    pdf.setFontSize(smallFontSize);
 
-    pdf.save(`Ticket_Pressing_${ticket.ticketNumber}.pdf`);
-    showAlert('Reçu Téléchargé', 'Le reçu de dépôt au format ticket 80mm a été généré et téléchargé avec succès !', 'success');
+    if (ticket.status === 'quotation') {
+      pdf.setFont('courier', 'bold');
+      pdf.text('Conditions Générales de Dépôt', centerX, y, { align: 'center' });
+      y += 5;
+      pdf.setFont('courier', 'normal');
+      pdf.setFontSize(extraSmallFontSize);
+      
+      const p1 = "Nous apportons le plus grand soin au traitement de votre linge. Toutefois, les articles délicats ou ne comportant pas d’étiquette d’entretien claire sont pris en charge sous l’entière responsabilité de leur propriétaire.";
+      const p2 = "Le linge est à retirer à la date prévue et mentionnée sur la facture. Tout retrait effectué au-delà de cette date pourra entraîner l'application de frais de garde.";
+      const p3 = "Ce devis devra être présenté lors de la confirmation du dépôt afin de valider les prestations demandées.";
+      
+      const lines1 = pdf.splitTextToSize(p1, splitWidth);
+      lines1.forEach((line: string) => {
+        pdf.text(line, centerX, y, { align: 'center' });
+        y += 4;
+      });
+      y += 2.5;
+      
+      const lines2 = pdf.splitTextToSize(p2, splitWidth);
+      lines2.forEach((line: string) => {
+        pdf.text(line, centerX, y, { align: 'center' });
+        y += 4;
+      });
+      y += 3;
+
+      pdf.setFont('courier', 'bold');
+      pdf.setFontSize(extraSmallFontSize + 0.5);
+      const lines3 = pdf.splitTextToSize(p3, splitWidth);
+      lines3.forEach((line: string) => {
+        pdf.text(line, centerX, y, { align: 'center' });
+        y += 4;
+      });
+    } else {
+      pdf.text('Merci de votre confiance !', centerX, y, { align: 'center' });
+      y += 5;
+
+      pdf.setFontSize(extraSmallFontSize);
+      const noticeMsg = "Le linge est à retirer à la date prévue et mentionnée sur la facture. Tout retrait effectué au-delà de cette date pourra entraîner l'application de frais de garde.";
+      const noticeLines = pdf.splitTextToSize(noticeMsg, splitWidth);
+      noticeLines.forEach((line: string) => {
+        pdf.text(line, centerX, y, { align: 'center' });
+        y += 4;
+      });
+      y += 2.5;
+
+      pdf.setFontSize(smallFontSize);
+      let statusMsg = "";
+      if (ticket.status === 'in_progress') {
+        statusMsg = "Votre linge est actuellement en cours de traitement. Ce document devra être présenté lors du retrait de votre commande.";
+      } else if (ticket.status === 'ready') {
+        statusMsg = "Votre linge est prêt à être retiré. Veuillez présenter ce document lors de la remise de vos articles.";
+      } else if (ticket.status === 'delivered') {
+        statusMsg = "Le linge a été retiré et la prestation est considérée comme terminée. Merci d'avoir fait confiance à notre service de pressing.";
+      } else if ((ticket.status as string) === 'cancelled') {
+        statusMsg = "Cette commande a été annulée. Ce document est conservé à titre d'archive et ne peut plus être utilisé pour un retrait.";
+      } else {
+        statusMsg = "Ce bon de réception / facture devra être présenté obligatoirement lors du retrait de votre linge. Veuillez le conserver soigneusement jusqu'à la restitution complète de vos articles.";
+      }
+
+      const lines = pdf.splitTextToSize(statusMsg, splitWidth);
+      lines.forEach((line: string) => {
+        pdf.text(line, centerX, y, { align: 'center' });
+        y += 4;
+      });
+    }
+
+    pdf.save(`Ticket_Pressing_${ticket.ticketNumber}_${formatType}.pdf`);
+    showAlert('Reçu Téléchargé', `Le reçu au format ticket ${formatType} a été généré et téléchargé avec succès !`, 'success');
   };
 
   return (
@@ -28609,22 +28788,30 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   <p className="text-xs font-black text-[#5c2197] text-center animate-pulse">🎉 Nouveau ticket enregistré : {selectedTicket.ticketNumber}</p>
                   
                   {/* Print & PDF Buttons */}
-                  <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div className="grid grid-cols-3 gap-1.5 mt-1">
                     <button
                       type="button"
                       onClick={() => printPressingTicketDirect(merchant, selectedTicket, '80mm', tarifs, handleDownloadPDF)}
-                      className="bg-[#1e293b] hover:bg-black text-white font-bold text-[10px] sm:text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition text-center shadow-sm"
+                      className="bg-[#1e293b] hover:bg-black text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm"
                       title="Imprimer direct Roll 80mm"
                     >
-                      <Printer className="w-4 h-4" /> Ticket Roll (80mm)
+                      <Printer className="w-3.5 h-3.5" /> Roll (80)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => printPressingTicketDirect(merchant, selectedTicket, '58mm', tarifs, handleDownloadPDF)}
+                      className="bg-[#4b5563] hover:bg-gray-800 text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm"
+                      title="Imprimer direct Roll 58mm"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Roll (58)
                     </button>
                     <button
                       type="button"
                       onClick={() => printPressingTicketDirect(merchant, selectedTicket, 'A4', tarifs, handleDownloadPDF)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] sm:text-xs py-3 rounded-xl flex items-center justify-center gap-1.5 transition text-center shadow-sm"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm"
                       title="Imprimer direct A4"
                     >
-                      <FileText className="w-4 h-4" /> Format A4 Client
+                      <FileText className="w-3.5 h-3.5" /> Format A4
                     </button>
                   </div>
 
@@ -29154,10 +29341,17 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                         </button>
                         <button
                           onClick={() => printPressingTicketDirect(merchant, ticket, '80mm', tarifs, handleDownloadPDF)}
-                          className="p-1 px-2.5 bg-gray-950 text-white rounded-lg hover:bg-black font-bold text-[9px] transition inline-flex items-center gap-1"
+                          className="p-1 px-2 bg-[#5c2197] text-white rounded-lg hover:bg-[#481977] font-bold text-[9px] transition inline-flex items-center gap-1"
                           title="Imprimer Ticket (80mm)"
                         >
                           <Printer className="w-3 h-3" /> Roll (80mm)
+                        </button>
+                        <button
+                          onClick={() => printPressingTicketDirect(merchant, ticket, '58mm', tarifs, handleDownloadPDF)}
+                          className="p-1 px-2 bg-[#7b2cbe] text-white rounded-lg hover:bg-[#6a24aa] font-bold text-[9px] transition inline-flex items-center gap-1"
+                          title="Imprimer Ticket (58mm)"
+                        >
+                          <Printer className="w-3 h-3" /> Roll (58mm)
                         </button>
                         <button
                           onClick={() => printPressingTicketDirect(merchant, ticket, 'A4', tarifs, handleDownloadPDF)}
@@ -29194,7 +29388,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100"
             >
               {/* Header */}
-              <div className="bg-gradient-to-r from-[#1e293b] to-[#0f172a] text-white p-6 relative">
+              <div className="bg-gradient-to-r from-[#5c2197] to-[#481977] text-white p-6 relative">
                 <button
                   type="button"
                   onClick={() => setViewingTicket(null)}
@@ -29566,14 +29760,21 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                 <button
                   type="button"
                   onClick={() => printPressingTicketDirect(merchant, viewingTicket, '80mm', tarifs, handleDownloadPDF)}
-                  className="flex-1 bg-gray-950 hover:bg-black text-white font-bold text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition"
+                  className="flex-1 bg-[#5c2197] hover:bg-[#481977] text-white font-bold text-[10px] sm:text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition"
                 >
                   <Printer className="w-3.5 h-3.5" /> Roll (80mm)
                 </button>
                 <button
                   type="button"
+                  onClick={() => printPressingTicketDirect(merchant, viewingTicket, '58mm', tarifs, handleDownloadPDF)}
+                  className="flex-1 bg-[#7b2cbe] hover:bg-[#6a24aa] text-white font-bold text-[10px] sm:text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Roll (58mm)
+                </button>
+                <button
+                  type="button"
                   onClick={() => printPressingTicketDirect(merchant, viewingTicket, 'A4', tarifs, handleDownloadPDF)}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] sm:text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition"
                 >
                   <FileText className="w-3.5 h-3.5" /> Client A4
                 </button>
@@ -29642,6 +29843,7 @@ interface DetergentQuote {
   quoteNumber: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   date: string;
   items: {
     productId: string;
@@ -29657,6 +29859,8 @@ interface DetergentQuote {
   subtotal: number;
   total: number;
   totalCost?: number;
+  notes?: string;
+  sentNotifications?: any[];
 }
 
 const DEFAULT_DETERGENTS: DetergentProduct[] = [
@@ -29767,6 +29971,162 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     return saved ? JSON.parse(saved) : [];
   });
   const [viewingQuote, setViewingQuote] = useState<DetergentQuote | null>(null);
+
+  // Suivi Gérant Temps Réel à Distance local history
+  const [managerNotifsHistory, setManagerNotifsHistory] = useState<{ id: string; ticketNumber: string; type: 'entrée' | 'sortie'; method: 'whatsapp' | 'email'; timestamp: string }[]>(() => {
+    const saved = localStorage.getItem(`pressing_manager_notifs_${merchant.id}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify(managerNotifsHistory));
+  }, [managerNotifsHistory, merchant.id]);
+
+  // Relance & Notification Temps Réel Client pour les Devis Boutiques/Directes
+  const [selectedQuoteNotifTemplate, setSelectedQuoteNotifTemplate] = useState<string>('deposit');
+  const [quoteNotifMessage, setQuoteNotifMessage] = useState('');
+  const [editedQuotePhone, setEditedQuotePhone] = useState('');
+  const [editedQuoteEmail, setEditedQuoteEmail] = useState('');
+  const [quoteMailFeedback, setQuoteMailFeedback] = useState<Record<string, boolean>>({});
+
+  const QUOTE_NOTIFICATION_TEMPLATES = useMemo<{ [key: string]: { label: string; subject: string; body: (q: DetergentQuote) => string } }>(() => ({
+    deposit: {
+      label: '📥 Réception / Dépôt enregistré',
+      subject: `Confirmation de dépôt - ${merchant.name || 'Pressing'}`,
+      body: (q: DetergentQuote) => `Bonjour ${q.customerName}, votre dépôt du ${new Date(q.date).toISOString().split('T')[0]} au pressing ${merchant.name || 'ACOM'} a bien été enregistré. Ticket N°: ${q.quoteNumber}. Prix : ${q.total} FCFA. Versé: 0 FCFA. Retrait prévu: N/A. Merci de votre fidélité !`
+    },
+    in_progress: {
+      label: '🧼 Lavage en cours',
+      subject: `Traitement de votre linge - ${merchant.name || 'Pressing'}`,
+      body: (q: DetergentQuote) => `Bonjour ${q.customerName}, votre linge du ticket N°: ${q.quoteNumber} est actuellement en cours de traitement et de lavage par notre équipe.`
+    },
+    ready: {
+      label: '👔 Linge Prêt pour Retrait',
+      subject: `Votre commande est prête ! - ${merchant.name || 'Pressing'}`,
+      body: (q: DetergentQuote) => `Bonjour ${q.customerName}, bonne nouvelle ! Votre linge est lavé, repassé et disponible (Ticket N°: ${q.quoteNumber}). Montant total: ${q.total} FCFA, reste à payer: ${q.total} FCFA. À très bientôt !`
+    },
+    delivered: {
+      label: '✅ Commande Livrée',
+      subject: `Merci pour votre visite ! - ${merchant.name || 'Pressing'}`,
+      body: (q: DetergentQuote) => `Bonjour ${q.customerName}, votre commande ticket N°: ${q.quoteNumber} vous a été délivrée. Merci pour votre confiance !`
+    },
+    payment_reminder: {
+      label: '💰 Solde dû (Rappel de paiement)',
+      subject: `Rappel de règlement - ${merchant.name || 'Pressing'}`,
+      body: (q: DetergentQuote) => `Bonjour ${q.customerName}, nous vous rappelons qu'un solde de ${q.total} FCFA reste à régler pour votre commande N°: ${q.quoteNumber}. Merci de régler lors du retrait.`
+    }
+  }), [merchant]);
+
+  useEffect(() => {
+    if (viewingQuote) {
+      setEditedQuotePhone(viewingQuote.customerPhone || '');
+      setEditedQuoteEmail(viewingQuote.customerEmail || '');
+    }
+  }, [viewingQuote]);
+
+  useEffect(() => {
+    if (viewingQuote) {
+      const tmpl = QUOTE_NOTIFICATION_TEMPLATES[selectedQuoteNotifTemplate];
+      if (tmpl) {
+        setQuoteNotifMessage(tmpl.body(viewingQuote));
+      }
+    }
+  }, [viewingQuote, selectedQuoteNotifTemplate, QUOTE_NOTIFICATION_TEMPLATES]);
+
+  const logQuoteNotificationSent = (method: 'whatsapp' | 'email', templateKey: string, msg: string) => {
+    if (!viewingQuote) return;
+    const newLog = {
+      id: `qlog_${Date.now()}`,
+      type: method,
+      templateName: QUOTE_NOTIFICATION_TEMPLATES[templateKey]?.label || templateKey,
+      message: msg,
+      timestamp: new Date().toISOString()
+    };
+    const updatedQuote: DetergentQuote = {
+      ...viewingQuote,
+      sentNotifications: [...(viewingQuote.sentNotifications || []), newLog]
+    };
+    const updatedQuotes = quotes.map(q => q.id === viewingQuote.id ? updatedQuote : q);
+    setQuotes(updatedQuotes);
+    localStorage.setItem(`pressing_stock_quotes_${merchant.id}`, JSON.stringify(updatedQuotes));
+    setViewingQuote(updatedQuote);
+  };
+
+  const getManagerQuoteNotificationMessage = useCallback((q: DetergentQuote, type: 'entrée' | 'sortie') => {
+    const isEntry = type === 'entrée';
+    const itemsDesc = q.items
+      .map(item => `${item.quantity}x ${item.productName}`)
+      .join(', ');
+
+    if (isEntry) {
+      return `📢 [SUIVI GÉRANT - ENTRÉE DEVIS] 📥\n` +
+             `--------------------------------\n` +
+             `• Devis N° : ${q.quoteNumber}\n` +
+             `• Client : ${q.customerName} (${q.customerPhone || 'Aucun contact'})\n` +
+             `• Articles : ${itemsDesc || '0 article'}\n` +
+             `• Sous-total : ${q.subtotal} FCFA\n` +
+             (q.discount > 0 ? `• Remise : ${q.discount} FCFA\n` : '') +
+             `• Valeur Nette : ${q.total} FCFA\n` +
+             `• Date d'émission : ${new Date(q.date).toLocaleDateString('fr-FR')}\n` +
+             `--------------------------------\n` +
+             `Rapport de devis temps réel généré sur l'application SaaS ${merchant.name || 'ACOM'}.`;
+    } else {
+      return `📢 [SUIVI GÉRANT - SORTIE DEVIS] 👔\n` +
+             `--------------------------------\n` +
+             `• Devis N° : ${q.quoteNumber}\n` +
+             `• Client : ${q.customerName}\n` +
+             `• Statut : Devis Converti / Livré ✅\n` +
+             `• Valeur Nette : ${q.total} FCFA\n` +
+             `--------------------------------\n` +
+             `Rapport de devis temps réel généré sur l'application SaaS ${merchant.name || 'ACOM'}.`;
+    }
+  }, [merchant]);
+
+  const dispatchManagerQuoteNotif = async (q: DetergentQuote, flowType: 'entrée' | 'sortie', method: 'whatsapp' | 'email') => {
+    const message = getManagerQuoteNotificationMessage(q, flowType);
+    if (method === 'whatsapp') {
+      if (!managerPhone.trim()) {
+        showAlert('Numéro non configuré', "Veuillez configurer le numéro WhatsApp du Gérant dans l'onglet Réglages.", 'error');
+        return;
+      }
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '221' + cleaned;
+      }
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+      showAlert('Rapport Envoyé', "Le rapport de suivi pour WhatsApp a été généré et ouvert !", 'success');
+      
+      // Add to local history
+      const newLog = {
+        id: `mnotif_${Date.now()}`,
+        ticketNumber: q.quoteNumber,
+        type: flowType,
+        method,
+        timestamp: new Date().toISOString()
+      };
+      setManagerNotifsHistory(prev => [newLog, ...prev]);
+    } else {
+      if (!managerEmail.trim()) {
+        showAlert('Email non configuré', "Veuillez configurer l'adresse email du Gérant dans l'onglet Réglages.", 'error');
+        return;
+      }
+      const subject = `⚡ [${flowType.toUpperCase()}] Devis n°${q.quoteNumber} - ${merchant.name || 'Pressing'}`;
+      const mailtoUrl = `mailto:${managerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+      window.open(mailtoUrl, '_blank');
+      showAlert("Messagerie Ouverte", "Nous avons configuré l'email de suivi. Veuillez appuyer sur Envoyer dans votre boîte mail !", 'success');
+      
+      // Add to local history
+      const newLog = {
+        id: `mnotif_${Date.now()}`,
+        ticketNumber: q.quoteNumber,
+        type: flowType,
+        method,
+        timestamp: new Date().toISOString()
+      };
+      setManagerNotifsHistory(prev => [newLog, ...prev]);
+    }
+  };
 
   const [saleMailFeedback, setSaleMailFeedback] = useState<Record<string, boolean>>({});
   
@@ -30402,67 +30762,74 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   };
 
   // Print Sale/Detergent receipt PDF
-  const handleDownloadSalePDF = (sale: DetergentSale) => {
+  const handleDownloadSalePDF = (sale: DetergentSale, formatType: '80mm' | '58mm' = '80mm') => {
     const isQuote = sale.saleNumber.startsWith('D-QT') || sale.saleNumber.startsWith('DEV') || sale.saleNumber.includes('QT');
-    const pdf = new jsPDF('p', 'mm', [80, 140]);
+    const widthMm = formatType === '58mm' ? 58 : 80;
+    const heightMm = formatType === '58mm' ? 145 : 140;
+    const pdf = new jsPDF('p', 'mm', [widthMm, heightMm]);
     pdf.setFont('courier', 'normal');
-    pdf.setFontSize(10);
+    pdf.setFontSize(formatType === '58mm' ? 8.5 : 10);
     
     let y = 10;
-    pdf.text(merchant.name || 'ACOM Pressing', 40, y, { align: 'center' });
+    const centerX = formatType === '58mm' ? 29 : 40;
+    const lineStartX = formatType === '58mm' ? 3 : 5;
+    const lineEndX = formatType === '58mm' ? 55 : 75;
+    const linePadding = formatType === '58mm' ? 3 : 4;
+    
+    pdf.text(merchant.name || 'ACOM Pressing', centerX, y, { align: 'center' });
     y += 5;
-    pdf.setFontSize(8);
-    pdf.text(merchant.address || 'Service de Lavage Professionnel', 40, y, { align: 'center' });
+    pdf.setFontSize(formatType === '58mm' ? 7 : 8);
+    pdf.text(merchant.address || 'Service de Lavage Professionnel', centerX, y, { align: 'center' });
     y += 7;
-    pdf.line(5, y, 75, y);
+    pdf.line(lineStartX, y, lineEndX, y);
     y += 6;
     
     pdf.setFont('courier', 'bold');
-    pdf.text(`${isQuote ? 'DEVIS CLIENT' : 'RECU CLIENT'} : ${sale.saleNumber}`, 5, y);
+    pdf.text(`${isQuote ? 'DEVIS CLIENT' : 'RECU CLIENT'} : ${sale.saleNumber}`, lineStartX, y);
     y += 5;
     pdf.setFont('courier', 'normal');
-    pdf.text(`Client  : ${sale.customerName}`, 5, y);
+    pdf.text(`Client  : ${sale.customerName}`, lineStartX, y);
     y += 4;
-    pdf.text(`Contact : ${sale.customerPhone || 'N/A'}`, 5, y);
+    pdf.text(`Contact : ${sale.customerPhone || 'N/A'}`, lineStartX, y);
     y += 4;
-    pdf.text(`Date    : ${format(new Date(sale.date), 'dd/MM/yyyy HH:mm')}`, 5, y);
+    pdf.text(`Date    : ${format(new Date(sale.date), 'dd/MM/yyyy HH:mm')}`, lineStartX, y);
     y += 5;
-    pdf.line(5, y, 75, y);
+    pdf.line(lineStartX, y, lineEndX, y);
     y += 5;
 
     pdf.setFont('courier', 'bold');
-    pdf.text(isQuote ? 'Services & Produits' : 'Detergents & Produits', 5, y);
+    pdf.text(isQuote ? 'Services & Produits' : 'Detergents & Produits', lineStartX, y);
     y += 5;
     pdf.setFont('courier', 'normal');
 
     sale.items.forEach(item => {
-      pdf.text(`- ${item.productName.slice(0, 14).padEnd(14, ' ')} ${item.quantity}x : ${item.total} F`, 5, y);
+      pdf.text(`- ${item.productName.slice(0, formatType === '58mm' ? 10 : 14).padEnd(formatType === '58mm' ? 10 : 14, ' ')} ${item.quantity}x : ${item.total} F`, lineStartX, y);
       y += 4;
     });
 
     y += 2;
-    pdf.line(5, y, 75, y);
+    pdf.line(lineStartX, y, lineEndX, y);
     y += 5;
 
-    pdf.text(`Sous-total  : ${sale.subtotal} FCFA`, 5, y);
+    pdf.text(`Sous-total  : ${sale.subtotal} FCFA`, lineStartX, y);
     y += 4;
     if (sale.discount > 0) {
-      pdf.text(`Remise accordé: -${sale.discount} FCFA`, 5, y);
+      pdf.text(`Remise accordé: -${sale.discount} FCFA`, lineStartX, y);
       y += 4;
     }
     
     pdf.setFont('courier', 'bold');
-    pdf.setFontSize(10);
-    pdf.text(`${isQuote ? 'TOTAL ESTIME' : 'TOTAL PAYE'}  : ${sale.total} FCFA`, 5, y);
+    pdf.setFontSize(formatType === '58mm' ? 8.5 : 10);
+    pdf.text(`${isQuote ? 'TOTAL ESTIME' : 'TOTAL PAYE'}  : ${sale.total} FCFA`, lineStartX, y);
     y += 7;
     pdf.setFont('courier', 'normal');
-    pdf.setFontSize(8);
-    pdf.text(isQuote ? 'Valable 15 jours.' : 'Merci de votre achat !', 40, y, { align: 'center' });
+    pdf.setFontSize(formatType === '58mm' ? 7 : 8);
+    pdf.text(isQuote ? 'Valable 15 jours.' : 'Merci de votre achat !', centerX, y, { align: 'center' });
     y += 4;
-    pdf.text('ACOM Technologie Workspace', 40, y, { align: 'center' });
+    pdf.text('ACOM Technologie Workspace', centerX, y, { align: 'center' });
 
-    pdf.save(`${isQuote ? 'Devis' : 'Recu_Achat'}_Produit_${sale.saleNumber}.pdf`);
-    showAlert(isQuote ? 'Devis Généré' : 'Reçu Généré', `Impression lancée... Le document PDF pour ${sale.customerName} a bien été généré et téléchargé !`, 'success');
+    pdf.save(`${isQuote ? 'Devis' : 'Recu_Achat'}_Produit_${sale.saleNumber}_${formatType}.pdf`);
+    showAlert(isQuote ? 'Devis Généré' : 'Reçu Généré', `Impression lancée... Le document PDF pour ${sale.customerName} au format ${formatType} a bien été généré et téléchargé !`, 'success');
   };
 
   // Print Sale/Detergent receipt A4 PDF as requested
@@ -30569,6 +30936,43 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     
     pdf.save(`${isQuote ? 'Devis' : 'Facture_A4'}_Produit_${sale.saleNumber}.pdf`);
     showAlert(isQuote ? 'Devis A4 Généré' : 'Facture A4 Générée', `Le document A4 pour ${sale.customerName} a bien été généré en PDF ! N° Réf: ${sale.saleNumber}`, 'success');
+  };
+
+  // WhatsApp Client sending for DetergentQuote as requested
+  const handleSendQuoteClientWhatsApp = (quote: DetergentQuote) => {
+    if (!quote.customerPhone) {
+      showAlert('Téléphone Manquant', "Veuillez renseigner le contact téléphone du client pour envoyer par WhatsApp.", 'warning');
+      return;
+    }
+    
+    const itemsList = quote.items
+      .map(item => `• ${item.quantity}x ${item.productName} (${item.price} FCFA/u) = ${item.total} FCFA`)
+      .join('\n');
+      
+    const textNotif = `🛒 *DEVIS PROFORMA BOUTIQUE - ${merchant.name || 'ACOM Pressing'}* ✅\n` +
+           `--------------------------------\n` +
+           `• N° Devis : *${quote.quoteNumber}*\n` +
+           `• Client : *${quote.customerName}*\n` +
+           `• Date : ${new Date(quote.date).toLocaleDateString('fr-FR')}\n` +
+           `--------------------------------\n` +
+           `*DÉTAILS DES ARTICLES :*\n` +
+           `${itemsList}\n` +
+           `--------------------------------\n` +
+           `• Sous-total : ${quote.subtotal} FCFA\n` +
+           (quote.discount > 0 ? `• Remise : ${quote.discount} FCFA\n` : '') +
+           `• *TOTAL ESTIMÉ : ${quote.total} FCFA* 📋\n` +
+           `--------------------------------\n` +
+           `Ce devis est valable pendant 15 jours. Merci de votre confiance !`;
+           
+    let cleaned = quote.customerPhone.replace(/[^0-9]/g, '');
+    if (cleaned.length === 9 && cleaned.startsWith('7')) {
+      cleaned = '221' + cleaned;
+    }
+    
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(textNotif)}`;
+    window.open(waUrl, '_blank');
+    showAlert('Message Prêt', 'Lien Message WhatsApp client prêt !', 'success');
   };
 
   // WhatsApp Client sending for DetergentSale as requested
@@ -31104,6 +31508,16 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       <span>Ticket Roll (80mm)</span>
                     </button>
 
+                    {/* Ticket Roll (58mm) */}
+                    <button
+                      type="button"
+                      onClick={() => printDetergentSaleDirect(merchant, selectedSale, '58mm', handleDownloadSalePDF)}
+                      className="py-3.5 px-5 bg-[#4b5563] hover:bg-gray-800 text-white text-xs md:text-sm font-black rounded-2xl flex items-center justify-center gap-2.5 transition-all shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                      <span>Ticket Roll (58mm)</span>
+                    </button>
+
                     {/* Format A4 Client */}
                     <button
                       type="button"
@@ -31595,10 +32009,19 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); printDetergentSaleDirect(merchant, s, '80mm', handleDownloadSalePDF); }}
-                            className="px-2.5 py-1 bg-[#1a2333] hover:bg-black text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            className="px-2 py-1 bg-[#1a2333] hover:bg-black text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
                             title="Imprimer direct Caisse (80mm)"
                           >
-                            <Printer className="w-3 h-3" /> Roll (80mm)
+                            <Printer className="w-3 h-3" /> Roll (80)
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); printDetergentSaleDirect(merchant, s, '58mm', handleDownloadSalePDF); }}
+                            className="px-2 py-1 bg-[#4b5563] hover:bg-gray-800 text-white font-bold text-[9px] uppercase tracking-widest rounded-lg transition flex items-center gap-1"
+                            title="Imprimer direct Caisse (58mm)"
+                          >
+                            <Printer className="w-3 h-3" /> Roll (58)
                           </button>
 
                           <button
@@ -31716,7 +32139,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         <button
                           type="button"
                           onClick={() => printDetergentQuoteDirect(merchant, q, '80mm')}
-                          className="p-1 px-2.5 bg-gray-950 text-white rounded-lg hover:bg-black font-bold text-[9px] transition inline-flex items-center gap-1 cursor-pointer"
+                          className="p-1 px-2.5 bg-[#5c2197] text-white rounded-lg hover:bg-[#481977] font-bold text-[9px] transition inline-flex items-center gap-1 cursor-pointer"
                           title="Imprimer Devis (80mm)"
                         >
                           <Printer className="w-3 h-3" /> Roll (80mm)
@@ -31858,22 +32281,34 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
             {/* Action Footer */}
             <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-col gap-2.5">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {/* Roll 80mm */}
                 <button
                   type="button"
                   onClick={() => printDetergentSaleDirect(merchant, viewingSale, '80mm', handleDownloadSalePDF)}
-                  className="py-3 px-4 bg-[#1a2333] hover:bg-black text-white text-[11px] font-extrabold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
+                  className="py-3 px-1.5 bg-[#1a2333] hover:bg-black text-white text-[9.5px] font-extrabold rounded-xl flex items-center justify-center gap-1 transition cursor-pointer"
+                  title="Rouleau 80mm"
                 >
                   <Printer className="w-3.5 h-3.5 text-white" />
-                  <span>Rouleau (80 mm)</span>
+                  <span>Roll (80)</span>
+                </button>
+
+                {/* Roll 58mm */}
+                <button
+                  type="button"
+                  onClick={() => printDetergentSaleDirect(merchant, viewingSale, '58mm', handleDownloadSalePDF)}
+                  className="py-3 px-1.5 bg-[#4b5563] hover:bg-gray-800 text-white text-[9.5px] font-extrabold rounded-xl flex items-center justify-center gap-1 transition cursor-pointer"
+                  title="Rouleau 58mm"
+                >
+                  <Printer className="w-3.5 h-3.5 text-white" />
+                  <span>Roll (58)</span>
                 </button>
 
                 {/* Client A4 */}
                 <button
                   type="button"
                   onClick={() => printDetergentSaleDirect(merchant, viewingSale, 'A4', handleDownloadSaleA4PDF)}
-                  className="py-3 px-4 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-[11px] font-extrabold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
+                  className="py-3 px-1.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white text-[9.5px] font-extrabold rounded-xl flex items-center justify-center gap-1 transition cursor-pointer"
                 >
                   <FileText className="w-3.5 h-3.5 text-white" />
                   <span>Client A4</span>
@@ -31900,6 +32335,333 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                   Fermer
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {viewingQuote && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl border border-gray-100"
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#5c2197] to-[#481977] text-white p-6 relative text-left">
+              <button
+                type="button"
+                onClick={() => setViewingQuote(null)}
+                className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white w-8 h-8 rounded-full flex items-center justify-center transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="text-[10px] font-mono tracking-widest text-cyan-400 font-bold uppercase mb-1">Devis Proforma Vente Directe</div>
+              <h3 className="text-xl font-black">{viewingQuote.quoteNumber}</h3>
+              <p className="text-xs text-slate-300 mt-1">Géré par la boutique professionnelle ACOM</p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+              {/* Client info */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 text-left">
+                <div>
+                  <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Client</span>
+                  <span className="font-bold text-sm text-ink">{viewingQuote.customerName}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Téléphone / Contact</span>
+                  <span className="font-bold text-sm text-ink font-mono">{viewingQuote.customerPhone || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-0.5">Email</span>
+                  <span className="font-bold text-xs text-ink break-all font-mono">{viewingQuote.customerEmail || 'Non spécifié'}</span>
+                </div>
+              </div>
+
+              {/* Dates & Notes */}
+              <div className="grid grid-cols-2 gap-4 text-left">
+                <div>
+                  <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Date de dépôt</span>
+                  <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                    {new Date(viewingQuote.date).toISOString().split('T')[0]}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Retrait prévu ⚠️</span>
+                  <span className="font-mono text-xs text-indigo-700 bg-indigo-50 font-bold px-2 py-1 rounded">
+                    Non spécifié
+                  </span>
+                </div>
+              </div>
+
+              {viewingQuote.notes && (
+                <div className="p-3.5 bg-amber-50 border border-amber-100 rounded-xl text-left">
+                  <span className="block text-[9px] font-bold uppercase tracking-wider text-amber-500 mb-1">Observations / Remarques :</span>
+                  <p className="text-xs text-amber-900 font-medium">{viewingQuote.notes}</p>
+                </div>
+              )}
+
+              {/* Prestations */}
+              <div className="space-y-2 text-left">
+                <span className="block text-[9px] font-mono font-bold text-gray-400 uppercase tracking-wider">Détail des Prestations</span>
+                <div className="divide-y divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-white">
+                  {viewingQuote.items.map((it, idx) => (
+                    <div key={idx} className="flex justify-between p-3 text-xs">
+                      <span className="capitalize font-medium text-ink">- {it.productName} <span className="text-gray-400 font-mono">x{it.quantity}</span></span>
+                      <span className="font-mono font-bold text-ink">{(it.total).toLocaleString()} FCFA</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financial Summary */}
+              <div className="pt-3 border-t border-dashed border-gray-200 space-y-1.5 font-mono text-xs text-left">
+                <div className="flex justify-between text-gray-500 font-bold">
+                  <span>Sous-total prest. :</span>
+                  <span>{viewingQuote.subtotal.toLocaleString()} FCFA</span>
+                </div>
+                {viewingQuote.discount > 0 && (
+                  <div className="flex justify-between text-rose-500">
+                    <span>Remise accordée :</span>
+                    <span>-{viewingQuote.discount.toLocaleString()} FCFA</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-slate-900 font-black text-sm pt-1 border-t border-slate-100">
+                  <span>Montant Devis :</span>
+                  <span>{viewingQuote.total.toLocaleString()} FCFA</span>
+                </div>
+              </div>
+
+              {/* 🔔 Module de Suivi & Notifications en Temps Réel */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                  <h4 className="text-[11px] font-mono font-bold text-slate-700 uppercase tracking-widest flex items-center gap-1.5 text-left">
+                    <span>🔔</span> Suivi & Relance Client (Temps Réel)
+                  </h4>
+                  <span className="text-[9px] font-mono font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full uppercase">
+                    WhatsApp & Mail
+                  </span>
+                </div>
+
+                {/* Destinataires variables */}
+                <div className="grid grid-cols-2 gap-3 text-left">
+                  <div>
+                    <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Téléphone/WhatsApp</label>
+                    <input
+                      type="text"
+                      placeholder="N° de téléphone"
+                      value={editedQuotePhone}
+                      onChange={e => setEditedQuotePhone(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs font-mono font-semibold rounded-lg border border-gray-200 focus:ring-1 focus:ring-indigo-500 bg-white text-ink"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1">Adresse E-mail</label>
+                    <input
+                      type="email"
+                      placeholder="Adresse email client"
+                      value={editedQuoteEmail}
+                      onChange={e => setEditedQuoteEmail(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs font-mono font-semibold rounded-lg border border-gray-200 focus:ring-1 focus:ring-indigo-500 bg-white text-ink"
+                    />
+                  </div>
+                </div>
+
+                {/* Template quick selects */}
+                <div className="text-left">
+                  <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider mb-1.5">Sélectionner un modèle :</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {Object.keys(QUOTE_NOTIFICATION_TEMPLATES).map(key => {
+                      const template = QUOTE_NOTIFICATION_TEMPLATES[key as keyof typeof QUOTE_NOTIFICATION_TEMPLATES];
+                      const isSelected = selectedQuoteNotifTemplate === key;
+                      return (
+                        <button
+                          type="button"
+                          key={key}
+                          onClick={() => setSelectedQuoteNotifTemplate(key as any)}
+                          className={`p-2 text-left rounded-xl border text-[10px] font-bold transition-all relative ${
+                            isSelected 
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white hover:bg-gray-100 text-slate-700 border-gray-200'
+                          }`}
+                        >
+                          <span className="block truncate">{template.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Preview Editor */}
+                <div className="text-left">
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-wider">Aperçu du message à envoyer :</label>
+                    <span className="text-[8px] font-mono text-gray-400 font-semibold">({quoteNotifMessage.length} caract.)</span>
+                  </div>
+                  <textarea
+                    value={quoteNotifMessage}
+                    onChange={e => setQuoteNotifMessage(e.target.value)}
+                    rows={3}
+                    className="w-full p-2.5 text-xs rounded-xl border border-gray-200 bg-white focus:ring-1 focus:ring-indigo-500 font-semibold text-slate-700 outline-none leading-relaxed text-ink"
+                  />
+                </div>
+
+                {/* Action Dispatchers */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Send WhatsApp Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editedQuotePhone.trim()) {
+                        showAlert('Téléphone Requis', 'Veuillez renseigner un numéro de téléphone.', 'warning');
+                        return;
+                      }
+                      let cleaned = editedQuotePhone.replace(/[^0-9]/g, '');
+                      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+                        cleaned = '221' + cleaned;
+                      }
+                      
+                      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(quoteNotifMessage)}`;
+                      window.open(waUrl, '_blank');
+                      
+                      logQuoteNotificationSent('whatsapp', selectedQuoteNotifTemplate, quoteNotifMessage);
+                      showAlert('Lien Généré', 'Le lien de suivi WhatsApp client a bien été généré !', 'success');
+                    }}
+                    className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition shadow-sm border border-emerald-500 cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> Suivi par WhatsApp
+                  </button>
+
+                  {/* Send Email Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!editedQuoteEmail.trim()) {
+                        showAlert('E-mail Requis', 'Veuillez renseigner une adresse e-mail valide.', 'warning');
+                        return;
+                      }
+                      const subject = QUOTE_NOTIFICATION_TEMPLATES[selectedQuoteNotifTemplate]?.subject || 'Suivi Pressing';
+                      const mailtoUrl = `mailto:${editedQuoteEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(quoteNotifMessage)}`;
+                      window.open(mailtoUrl, '_blank');
+                      
+                      logQuoteNotificationSent('email', selectedQuoteNotifTemplate, quoteNotifMessage);
+                      showAlert('Messagerie Ouverte', 'Le message de relance client a bien été généré et ouvert dans votre application mail !', 'success');
+                    }}
+                    className="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition shadow-sm border border-indigo-500 cursor-pointer"
+                  >
+                    <Mail className="w-3.5 h-3.5" /> Suivi par Email
+                  </button>
+                </div>
+
+                {/* Timeline Logs inside the modal */}
+                {viewingQuote.sentNotifications && viewingQuote.sentNotifications.length > 0 && (
+                  <div className="pt-2 border-t border-slate-200 text-left">
+                    <span className="block text-[8px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">Historique des envois :</span>
+                    <div className="space-y-1 max-h-[100px] overflow-y-auto pr-1">
+                      {viewingQuote.sentNotifications.map((l, idx) => (
+                        <div key={l.id || idx} className="flex items-start justify-between bg-white px-2 py-1.5 rounded-lg border border-slate-100 text-[10px] font-medium text-slate-600">
+                          <span className="flex items-center gap-1 shrink-0 truncate max-w-[210px]">
+                            {l.type === 'whatsapp' ? '🟢 WhatsApp :' : '🔵 Email :'} <strong className="font-bold text-slate-800">{l.templateName}</strong>
+                          </span>
+                          <span className="text-[8px] font-mono text-gray-400 shrink-0">
+                            {new Date(l.timestamp).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 👑 Relais en Temps Réel au Gérant */}
+              <div className="p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100/60 space-y-3">
+                <div className="flex items-center justify-between border-b border-indigo-200/40 pb-2">
+                  <h4 className="text-[11px] font-mono font-bold text-indigo-800 uppercase tracking-widest flex items-center gap-1.5">
+                    <span>👑</span> Relais Temps Réel Gérant
+                  </h4>
+                  <span className="text-[8px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white font-mono uppercase">
+                    Manager Alert
+                  </span>
+                </div>
+
+                <p className="text-[10px] text-gray-500 leading-relaxed font-semibold text-left">
+                  Notification formatée envoyée au Gérant pour le suivi des <strong className="text-indigo-600 font-bold">entrées et les sorties (depuis la distance)</strong>.
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 pb-1 bg-white p-2.5 rounded-xl border border-indigo-100/50">
+                  <div className="col-span-2 text-[9px] font-mono font-black text-indigo-700 uppercase tracking-wider mb-0.5 text-center">
+                    📥 ENTRÉE (Dépôt Enregistré)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dispatchManagerQuoteNotif(viewingQuote, 'entrée', 'whatsapp')}
+                    className="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm cursor-pointer"
+                  >
+                    <MessageSquare className="w-3 h-3" /> WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatchManagerQuoteNotif(viewingQuote, 'entrée', 'email')}
+                    className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm cursor-pointer"
+                  >
+                    <Mail className="w-3 h-3" /> E-mail
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-xl border border-indigo-100/50">
+                  <div className="col-span-2 text-[9px] font-mono font-black text-indigo-700 uppercase tracking-wider mb-0.5 text-center">
+                    👔 SORTIE (Prêt / Livré)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dispatchManagerQuoteNotif(viewingQuote, 'sortie', 'whatsapp')}
+                    className="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm cursor-pointer"
+                  >
+                    <MessageSquare className="w-3 h-3" /> WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dispatchManagerQuoteNotif(viewingQuote, 'sortie', 'email')}
+                    className="py-1.5 px-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-1 transition shadow-sm cursor-pointer"
+                  >
+                    <Mail className="w-3 h-3" /> E-mail
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions footer */}
+            <div className="bg-gray-50 p-4 border-t border-gray-100 flex gap-2">
+              <button
+                type="button"
+                onClick={() => printDetergentQuoteDirect(merchant, viewingQuote, '80mm')}
+                className="flex-1 bg-[#5c2197] hover:bg-[#481977] text-white font-bold text-[10px] sm:text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5" /> Roll (80)
+              </button>
+              <button
+                type="button"
+                onClick={() => printDetergentQuoteDirect(merchant, viewingQuote, '58mm')}
+                className="flex-1 bg-[#7b2cbe] hover:bg-[#6a24aa] text-white font-bold text-[10px] sm:text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition cursor-pointer"
+              >
+                <Printer className="w-3.5 h-3.5" /> Roll (58)
+              </button>
+              <button
+                type="button"
+                onClick={() => printDetergentQuoteDirect(merchant, viewingQuote, 'A4')}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] sm:text-[11px] py-3 rounded-xl flex items-center justify-center gap-1 transition cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5" /> Client A4
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingQuote(null)}
+                className="px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-xs py-3 rounded-xl transition cursor-pointer"
+              >
+                Fermer
+              </button>
             </div>
           </motion.div>
         </div>
