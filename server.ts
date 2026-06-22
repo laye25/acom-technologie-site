@@ -7,11 +7,31 @@ import { Resend } from "resend";
 import admin from "firebase-admin";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import fs from "fs";
 
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp();
+}
+
+let customDbId: string | undefined;
+try {
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    customDbId = config.firestoreDatabaseId;
+    console.log(`[Firebase Admin] Detected custom firestoreDatabaseId: ${customDbId}`);
+  }
+} catch (e) {
+  console.error("[Firebase Admin] Failed to parse firebase-applet-config.json:", e);
+}
+
+function getFirestoreDb() {
+  if (customDbId) {
+    return admin.firestore(customDbId);
+  }
+  return admin.firestore();
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -107,7 +127,7 @@ async function startServer() {
 
           if (tenantId) {
             // Update Firestore: Stripe is the source of truth
-            await admin.firestore().collection('merchants').doc(tenantId).set({
+            await getFirestoreDb().collection('merchants').doc(tenantId).set({
               billing: {
                 status: 'active',
                 stripeCustomerId: customerId,
@@ -126,7 +146,7 @@ async function startServer() {
           const status = subscription.status;
 
           // Find the tenant by customer ID
-          const merchantsSnapshot = await admin.firestore().collection('merchants')
+          const merchantsSnapshot = await getFirestoreDb().collection('merchants')
             .where('billing.stripeCustomerId', '==', customerId)
             .limit(1)
             .get();
@@ -154,6 +174,31 @@ async function startServer() {
   });
 
   app.use(express.json({ limit: "50mb" }));
+
+  // Dynamic icon serving based on custom desktopLogo from Firebase Firestore
+  app.get("/icon.png", async (req, res, next) => {
+    try {
+      const snap = await getFirestoreDb().collection("settings").doc("global").get();
+      if (snap.exists) {
+        const data = snap.data();
+        const base64Data = data?.desktopLogo || data?.data?.desktopLogo;
+        if (base64Data && typeof base64Data === 'string' && base64Data.startsWith('data:image/')) {
+          const matches = base64Data.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            const buffer = Buffer.from(matches[2], 'base64');
+            const contentType = base64Data.split(';')[0].split(':')[1];
+            res.setHeader("Content-Type", contentType);
+            res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+            return res.send(buffer);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Error serving dynamic /icon.png:", e);
+    }
+    // Fallback to static icon.png
+    next();
+  });
 
   // API routes
   app.get("/api/health", (req, res) => {
@@ -436,7 +481,7 @@ async function startServer() {
         console.log(`Updating order ${orderId} as paid via webhook`);
         
         try {
-          const db = admin.firestore();
+          const db = getFirestoreDb();
           // Update order status and payment fields
           await db.collection('orders').doc(orderId).set({
             paid: true,
@@ -516,7 +561,7 @@ async function startServer() {
 
       // 1. Save to Firestore for persistence
       try {
-        await admin.firestore().collection('messages').add(message);
+        await getFirestoreDb().collection('messages').add(message);
       } catch (error) {
         console.error("Error saving message:", error);
       }
