@@ -886,8 +886,8 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
 
   if (formatType === '80mm' || formatType === '58mm') {
     const rollWidth = formatType === '58mm' ? '58mm' : '80mm';
-    const contentWidth = formatType === '58mm' ? '50mm' : '72mm';
-    const paddingPrint = formatType === '58mm' ? '2mm' : '4mm';
+    const contentWidth = formatType === '58mm' ? '43mm' : '68mm';
+    const paddingPrint = formatType === '58mm' ? '1mm 3.5mm 1mm 1mm' : '3mm';
     const paddingScreen = formatType === '58mm' ? '4mm' : '6mm';
     const fontSize = formatType === '58mm' ? '9.5px' : '11px';
     const logoWidth = formatType === '58mm' ? '24mm' : '32mm';
@@ -899,6 +899,7 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
   <meta charset="utf-8">
   <title>Ticket Vente - ${sale.saleNumber}</title>
   <style>
+    * { box-sizing: border-box; }
     @media print {
       @page {
         size: ${rollWidth} auto;
@@ -911,7 +912,7 @@ const printDetergentSaleDirect = (merchant: Merchant, sale: any, formatType: '80
       }
     }
     body {
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
       font-size: ${fontSize};
       line-height: 1.4;
       color: #000;
@@ -1386,8 +1387,8 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
 
   if (formatType === '80mm' || formatType === '58mm') {
     const rollWidth = formatType === '58mm' ? '58mm' : '80mm';
-    const contentWidth = formatType === '58mm' ? '50mm' : '72mm';
-    const paddingPrint = formatType === '58mm' ? '2mm' : '4mm';
+    const contentWidth = formatType === '58mm' ? '43mm' : '68mm';
+    const paddingPrint = formatType === '58mm' ? '1mm 3.5mm 1mm 1mm' : '3mm';
     const paddingScreen = formatType === '58mm' ? '4mm' : '6mm';
     const fontSize = formatType === '58mm' ? '9.5px' : '11px';
     const logoWidth = formatType === '58mm' ? '24mm' : '32mm';
@@ -1399,6 +1400,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
   <meta charset="utf-8">
   <title>Ticket Devis - ${quote.quoteNumber}</title>
   <style>
+    * { box-sizing: border-box; }
     @media print {
       @page {
         size: ${rollWidth} auto;
@@ -1411,7 +1413,7 @@ const printDetergentQuoteDirect = (merchant: Merchant, quote: any, formatType: '
       }
     }
     body {
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
       font-size: ${fontSize};
       line-height: 1.4;
       color: #000;
@@ -1906,8 +1908,8 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
 
   if (formatType === '80mm' || formatType === '58mm') {
     const rollWidth = formatType === '58mm' ? '58mm' : '80mm';
-    const contentWidth = formatType === '58mm' ? '50mm' : '72mm';
-    const paddingPrint = formatType === '58mm' ? '2mm' : '4mm';
+    const contentWidth = formatType === '58mm' ? '43mm' : '68mm';
+    const paddingPrint = formatType === '58mm' ? '1mm 3.5mm 1mm 1mm' : '3mm';
     const paddingScreen = formatType === '58mm' ? '4mm' : '6mm';
     const fontSize = formatType === '58mm' ? '9.5px' : '11px';
     const logoWidth = formatType === '58mm' ? '24mm' : '32mm';
@@ -1919,6 +1921,7 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
   <meta charset="utf-8">
   <title>Ticket Pressing - ${ticket.ticketNumber}</title>
   <style>
+    * { box-sizing: border-box; }
     @media print {
       @page {
         size: ${rollWidth} auto;
@@ -1931,7 +1934,7 @@ const printPressingTicketDirect = (merchant: Merchant, ticket: any, formatType: 
       }
     }
     body {
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
       font-size: ${fontSize};
       line-height: 1.4;
       color: #000;
@@ -5512,9 +5515,9 @@ const MerchantDashboard = ({
   const pressingDashboardStats = useMemo(() => {
     if (merchant.type !== 'pressing') return null;
 
-    const filteredTickets = dashboardSelectedMonth 
+    const filteredTickets = (dashboardSelectedMonth 
       ? pressingTickets.filter(t => t.depositDate && t.depositDate.startsWith(dashboardSelectedMonth))
-      : pressingTickets;
+      : pressingTickets).filter(t => t.status !== 'quotation');
       
     const filteredProductSales = dashboardSelectedMonth
       ? pressingProductSales.filter(s => s.date && s.date.startsWith(dashboardSelectedMonth))
@@ -6793,11 +6796,11 @@ const MerchantDashboard = ({
                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
                           ticket.paymentStatus === 'paid' 
                             ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
-                            : ticket.paymentStatus === 'partial'
+                            : (ticket.paymentStatus === 'partial' && (ticket.amountPaid || 0) > 0)
                               ? 'bg-amber-50 text-amber-600 border border-amber-100'
                               : 'bg-rose-50 text-rose-600 border border-rose-100'
                         }`}>
-                          {ticket.paymentStatus === 'paid' ? 'Payé' : ticket.paymentStatus === 'partial' ? 'Acompte' : 'Impayé'}
+                          {ticket.paymentStatus === 'paid' ? 'Payé' : (ticket.paymentStatus === 'partial' && (ticket.amountPaid || 0) > 0) ? 'Acompte' : 'Impayé'}
                         </span>
                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${
                           ticket.status === 'delivered' 
@@ -11681,9 +11684,9 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
     let totalCOGS = 0;
 
     if (merchant.type === 'pressing') {
-      const filteredTickets = reportSelectedMonth
+      const filteredTickets = (reportSelectedMonth
         ? pressingTickets.filter(t => t.depositDate && t.depositDate.startsWith(reportSelectedMonth))
-        : pressingTickets;
+        : pressingTickets).filter(t => t.status !== 'quotation');
         
       const filteredProducts = reportSelectedMonth
         ? pressingProductSales.filter(s => s.date && s.date.startsWith(reportSelectedMonth))
@@ -25180,7 +25183,64 @@ interface PressingTarifs {
   supplements_costs?: {
     [key: string]: number;
   };
+  articles_images?: {
+    [key: string]: string;
+  };
 }
+
+const compressAndSetImage = (file: File, onCompressed: (base64: string) => void) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 300;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        onCompressed(compressedBase64);
+      } else {
+        onCompressed(e.target?.result as string);
+      }
+    };
+    img.src = e.target?.result as string;
+  };
+  reader.readAsDataURL(file);
+};
+
+const ARTICLE_IMAGES: Record<string, string> = {
+  chemise: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=150&q=80",
+  pantalon: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?auto=format&fit=crop&w=150&q=80",
+  costume: "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?auto=format&fit=crop&w=150&q=80",
+  robe: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=150&q=80",
+  drap: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=150&q=80",
+  couverture: "https://images.unsplash.com/photo-1543294001-f7cbfe92237e?auto=format&fit=crop&w=150&q=80",
+  rideau: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=150&q=80",
+  autre: "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?auto=format&fit=crop&w=150&q=80"
+};
+
+const DETERGENT_CATEGORY_IMAGES: Record<string, string> = {
+  liquid: "https://images.unsplash.com/photo-1610555356070-d0efb6505f81?auto=format&fit=crop&w=250&q=80",
+  softener: "https://images.unsplash.com/photo-1551462147-3a90ced63b95?auto=format&fit=crop&w=250&q=80",
+  stain_remover: "https://images.unsplash.com/photo-1610555355600-47b85002ba5a?auto=format&fit=crop&w=250&q=80",
+  bleach: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=250&q=80",
+  powder: "https://images.unsplash.com/photo-1607613009820-a29f7bb81c04?auto=format&fit=crop&w=250&q=80",
+  other: "https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=250&q=80"
+};
 
 const DEFAULT_TARIFS: PressingTarifs = {
   articles: {
@@ -25258,6 +25318,10 @@ interface PressingTicket {
   paymentStatus?: 'unpaid' | 'partial' | 'paid';
   paymentMethod?: 'cash' | 'mobile_money' | 'card' | 'other';
   amountPaid?: number;
+  amountPaidAtDeposit?: number;
+  balanceCollectedAmount?: number;
+  balanceCollectedDate?: string;
+  balanceCollectedMethod?: 'cash' | 'mobile_money' | 'card' | 'other';
   notes?: string;
   sentNotifications?: { id: string; type: 'whatsapp' | 'email'; templateName: string; msg: string; timestamp: string }[];
   selectedStockProducts?: { id: string; name: string; qty: number; price: number; costPrice: number }[];
@@ -25387,6 +25451,9 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
     if (!parsed.supplements_costs) {
       parsed.supplements_costs = { ...DEFAULT_TARIFS.supplements_costs };
     }
+    if (!parsed.articles_images) {
+      parsed.articles_images = {};
+    }
     return parsed;
   });
 
@@ -25439,6 +25506,7 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
   const [newArticleName, setNewArticleName] = useState('');
   const [newArticlePrice, setNewArticlePrice] = useState<number | ''>('');
   const [newArticleCost, setNewArticleCost] = useState<number | ''>('');
+  const [newArticleImage, setNewArticleImage] = useState('');
   const [showAddArticle, setShowAddArticle] = useState(false);
 
   const [newPoidsName, setNewPoidsName] = useState('');
@@ -25476,12 +25544,17 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
       articles_costs: {
         ...(prev.articles_costs || {}),
         [nameKey]: cost
+      },
+      articles_images: {
+        ...(prev.articles_images || {}),
+        [nameKey]: newArticleImage
       }
     }));
 
     setNewArticleName('');
     setNewArticlePrice('');
     setNewArticleCost('');
+    setNewArticleImage('');
     setShowAddArticle(false);
     showAlert('Félicitations !', 'Nouvel article ajouté financièrement ! Cliquez sur Enregistrer pour confirmer.', 'success', undefined, false, "D'ACCORD", "AJOUT CAPTURE");
   };
@@ -25732,12 +25805,60 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                 const typedKey = key as keyof typeof tarifs.articles;
                 return (
                   <div key={key} className="p-4 bg-gray-50 rounded-2xl border border-gray-100/50 flex flex-col gap-2 relative group transition-all hover:shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-xs text-ink uppercase tracking-wider capitalize truncate pr-4">{key}</span>
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex items-center gap-2 max-w-[75%]">
+                        <div className="relative group/img flex-shrink-0">
+                          <img 
+                            src={tarifs.articles_images?.[key] || tarifs.articles_images?.[key.toLowerCase()] || ARTICLE_IMAGES[key.toLowerCase()] || ARTICLE_IMAGES['autre']} 
+                            alt={key}
+                            referrerPolicy="no-referrer"
+                            className="w-10 h-10 rounded-xl object-cover border border-purple-100/60 shadow-3xs bg-slate-100"
+                          />
+                          <label className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl opacity-0 group-hover/img:opacity-100 cursor-pointer transition-opacity">
+                            <span className="text-[7.5px] text-white font-bold uppercase tracking-wider">Joindre</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  compressAndSetImage(file, (base64) => {
+                                    setTarifs(prev => ({
+                                      ...prev,
+                                      articles_images: {
+                                        ...(prev.articles_images || {}),
+                                        [key]: base64
+                                      }
+                                    }));
+                                  });
+                                }
+                              }}
+                            />
+                          </label>
+                          {tarifs.articles_images?.[key] && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTarifs(prev => {
+                                  const updated = { ...(prev.articles_images || {}) };
+                                  delete updated[key];
+                                  return { ...prev, articles_images: updated };
+                                });
+                              }}
+                              className="absolute -top-1 -right-1 bg-rose-500 hover:bg-rose-600 text-white rounded-full p-0.5 shadow-md active:scale-95 transition-all border border-white"
+                              title="Restaurer l'image par défaut"
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </div>
+                        <span className="font-bold text-xs text-ink uppercase tracking-wider capitalize truncate">{key}</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveArticle(key)}
-                        className="text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg p-1.5 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        className="text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg p-1.5 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 flex-shrink-0"
                         title="Détruire cette ligne d'article"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -25787,44 +25908,82 @@ const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             {showAddArticle ? (
               <form onSubmit={handleAddArticle} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
                 <span className="text-[10px] uppercase tracking-widest text-[#5c2197] font-bold block">➕ Nouvel Article de Vêtements</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du vêtement</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="ex: Sac"
-                      value={newArticleName}
-                      onChange={e => setNewArticleName(e.target.value)}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
-                    />
+                
+                <div className="flex flex-col sm:flex-row gap-4 items-center bg-white p-4 rounded-2xl border border-gray-100">
+                  <div className="relative w-16 h-16 rounded-2xl bg-gray-50 border border-dashed border-gray-200 flex flex-col items-center justify-center overflow-hidden group/newimg flex-shrink-0">
+                    {newArticleImage ? (
+                      <>
+                        <img src={newArticleImage} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setNewArticleImage('')}
+                          className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-0.5 shadow-sm hover:scale-105 transition"
+                          title="Supprimer"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center text-center p-1 cursor-pointer w-full h-full justify-center">
+                        <Upload className="w-4 h-4 text-gray-400 group-hover/newimg:text-primary transition" />
+                        <span className="text-[7px] font-bold text-gray-400 mt-1 uppercase tracking-wider">Joindre</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              compressAndSetImage(file, (base64) => {
+                                setNewArticleImage(base64);
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix Client (FCFA)</label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="ex: 1500"
-                      value={newArticlePrice}
-                      onChange={e => setNewArticlePrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût Intrant (FCFA)</label>
-                    <input
-                      type="number"
-                      placeholder="ex: 200"
-                      value={newArticleCost}
-                      onChange={e => setNewArticleCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-purple-200 font-mono text-xs text-[#5c2197] text-right pr-4 outline-none"
-                    />
+                  
+                  <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du vêtement</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ex: Sac"
+                        value={newArticleName}
+                        onChange={e => setNewArticleName(e.target.value)}
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix Client (FCFA)</label>
+                      <input
+                        type="number"
+                        required
+                        placeholder="ex: 1500"
+                        value={newArticlePrice}
+                        onChange={e => setNewArticlePrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût Intrant (FCFA)</label>
+                      <input
+                        type="number"
+                        placeholder="ex: 200"
+                        value={newArticleCost}
+                        onChange={e => setNewArticleCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-dashed border-purple-200 font-mono text-xs text-[#5c2197] text-right pr-4 outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
+
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
-                    onClick={() => { setShowAddArticle(false); setNewArticleName(''); setNewArticlePrice(''); setNewArticleCost(''); }}
+                    onClick={() => { setShowAddArticle(false); setNewArticleName(''); setNewArticlePrice(''); setNewArticleCost(''); setNewArticleImage(''); }}
                     className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
                   >
                     Annuler
@@ -26286,12 +26445,27 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
 
   // Memos for daily stats
   const dailyPressingTickets = useMemo(() => {
-    return tickets.filter(t => t.depositDate === closureDate);
+    return tickets.filter(t => t.depositDate === closureDate && t.status !== 'quotation');
   }, [tickets, closureDate]);
 
-  const dailyPressingRevenue = useMemo(() => {
-    return dailyPressingTickets.reduce((sum, t) => sum + (t.amountPaid || 0), 0);
+  const dailyDepositsRevenue = useMemo(() => {
+    return dailyPressingTickets.reduce((sum, t) => {
+      const atDeposit = t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0);
+      return sum + atDeposit;
+    }, 0);
   }, [dailyPressingTickets]);
+
+  const dailyBalancesCollected = useMemo(() => {
+    return tickets.filter(t => t.balanceCollectedDate === closureDate);
+  }, [tickets, closureDate]);
+
+  const dailyBalancesRevenue = useMemo(() => {
+    return dailyBalancesCollected.reduce((sum, t) => sum + (t.balanceCollectedAmount || 0), 0);
+  }, [dailyBalancesCollected]);
+
+  const dailyPressingRevenue = useMemo(() => {
+    return dailyDepositsRevenue + dailyBalancesRevenue;
+  }, [dailyDepositsRevenue, dailyBalancesRevenue]);
 
   const dailyDetergentSales = useMemo(() => {
     return detergentSales.filter(s => s.date && s.date.startsWith(closureDate));
@@ -26538,7 +26712,9 @@ const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => {
                 <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-100/40 text-center">
                   <span className="block text-[8px] font-mono text-[#5c2197] uppercase tracking-wider">Recettes Pressing (+)</span>
                   <strong className="block text-base font-black text-[#481977] mt-1">{dailyPressingRevenue.toLocaleString()} F</strong>
-                  <span className="text-[8px] text-[#5c2197] font-mono mt-0.5 block">{dailyPressingTickets.length} dépôts du jour</span>
+                  <span className="text-[8px] text-[#5c2197] font-mono mt-0.5 block">
+                    {dailyDepositsRevenue.toLocaleString()} F ({dailyPressingTickets.length} dép) + {dailyBalancesRevenue.toLocaleString()} F ({dailyBalancesCollected.length} soldes)
+                  </span>
                 </div>
                 <div className="p-4 bg-cyan-50/60 rounded-2xl border border-cyan-100/40 text-center">
                   <span className="block text-[8px] font-mono text-cyan-400 uppercase tracking-wider">Ventes Produits (+)</span>
@@ -26884,6 +27060,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     if (!parsed.supplements_costs) {
       parsed.supplements_costs = { ...DEFAULT_TARIFS.supplements_costs };
     }
+    if (!parsed.articles_images) {
+      parsed.articles_images = {};
+    }
     return parsed;
   });
 
@@ -26904,6 +27083,9 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
         }
         if (!parsed.supplements_costs) {
           parsed.supplements_costs = { ...DEFAULT_TARIFS.supplements_costs };
+        }
+        if (!parsed.articles_images) {
+          parsed.articles_images = {};
         }
         setTarifs(parsed);
       } catch (err) {
@@ -27077,7 +27259,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
 
   // Enhanced additional state fields
   const [notes, setNotes] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<'unpaid' | 'partial' | 'paid'>('paid');
+  const [paymentStatus, setPaymentStatus] = useState<'unpaid' | 'partial' | 'paid'>('unpaid');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'mobile_money' | 'card' | 'other'>('cash');
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [viewingTicket, setViewingTicket] = useState<PressingTicket | null>(null);
@@ -27187,7 +27369,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
 
   // Calculate high-fidelity stats for subheader
   const pressingStats = useMemo(() => {
-    const activeOnes = tickets.filter(t => t.status !== 'delivered');
+    const activeOnes = tickets.filter(t => t.status !== 'delivered' && t.status !== 'quotation');
     const totalDue = activeOnes.reduce((acc, t) => {
       const paid = t.amountPaid || 0;
       return acc + Math.max(0, t.total - paid);
@@ -27295,7 +27477,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
           .join(', ')
       : `${t.weightKg} Kg (${t.weightService})`;
 
-    const paidText = t.paymentStatus === 'paid' ? 'ENTIÈREMENT PAYÉ 👍' : t.paymentStatus === 'partial' ? `ACOMPTE PAYÉ DE ${t.amountPaid} FCFA 🟡` : 'NON REGLE (À payer au retrait) 🔴';
+    const paidText = t.paymentStatus === 'paid' ? 'ENTIÈREMENT PAYÉ 👍' : (t.paymentStatus === 'partial' && (t.amountPaid || 0) > 0) ? `ACOMPTE PAYÉ DE ${t.amountPaid} FCFA 🟡` : 'NON REGLE (À payer au retrait) 🔴';
 
     if (isEntry) {
       return `📢 [SUIVI GÉRANT - ENTRÉE REÇUE] 📥\n` +
@@ -27406,7 +27588,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       .join(' ');
 
     const statusLabel = ticket.status === 'delivered' ? 'LIVRÉ ✅' : ticket.status === 'ready' ? 'PRÊT 👔' : ticket.status === 'in_progress' ? 'EN LAVAGE 🧼' : 'REÇU COMPTÉ 🧺';
-    const paymentLabel = ticket.paymentStatus === 'paid' ? 'ENTIÈREMENT PAYÉ 👍' : ticket.paymentStatus === 'partial' ? `ACOMPTE DE ${ticket.amountPaid} FCFA 🟡` : 'NON RÉGLÉ 🔴';
+    const paymentLabel = ticket.paymentStatus === 'paid' ? 'ENTIÈREMENT PAYÉ 👍' : (ticket.paymentStatus === 'partial' && (ticket.amountPaid || 0) > 0) ? `ACOMPTE DE ${ticket.amountPaid} FCFA 🟡` : 'NON RÉGLÉ 🔴';
 
     const mailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
@@ -27534,6 +27716,123 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     }
   };
 
+  const sendSilentBackgroundBalanceCollectionEmailToManager = async (ticket: PressingTicket, dueAmount: number, method: PressingTicket['paymentMethod']) => {
+    if (!managerEmail || !managerEmail.trim()) {
+      return;
+    }
+
+    const title = `💸 Encaissement de Solde (Règlement Restant)`;
+    const themeColor = '#16a34a'; // Beautiful Green for revenue/payment success
+    const methodLabel = method === 'cash' ? 'Espèces 💵' : method === 'mobile_money' ? 'Mobile Money 📱' : method === 'card' ? 'Carte Bancaire 💳' : 'Autre Moyen 🔄';
+    const previousPaid = (ticket.total - dueAmount);
+
+    const articlesDesc = ticket.billingType === 'article'
+      ? Object.entries(ticket.articles || {})
+          .filter(([_, qty]) => (qty as number) > 0)
+          .map(([name, qty]) => `<li style="margin: 4px 0;"><strong>${qty}x</strong> ${name}</li>`)
+          .join('')
+      : `<li style="margin: 4px 0;"><strong>${ticket.weightKg} Kg</strong> (${ticket.weightService})</li>`;
+
+    const statusLabel = ticket.status === 'delivered' ? 'LIVRÉ ✅' : ticket.status === 'ready' ? 'PRÊT 👔' : ticket.status === 'in_progress' ? 'EN LAVAGE 🧼' : 'REÇU COMPTÉ 🧺';
+
+    const mailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+        <div style="background-color: ${themeColor}; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+          <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Pressing'}</h2>
+          <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Alerte de Règlement de Solde — Gérant</p>
+        </div>
+
+        <div style="margin-top: 20px;">
+          <h3 style="color: ${themeColor}; border-bottom: 2px solid ${themeColor}; padding-bottom: 5px; margin-bottom: 15px;">${title}</h3>
+          
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 150px;"><strong>N° Ticket :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${ticket.ticketNumber}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Client :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;"><strong>${ticket.clientName}</strong> (${ticket.clientPhone || 'Aucun contact'})</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;" valign="top"><strong>Articles / Poids :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                <ul style="margin: 0; padding-left: 20px;">${articlesDesc || 'Aucun article'}</ul>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Montant Total Fiche :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #1e293b; font-size: 14px;">${ticket.total.toLocaleString()} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Acompte Déposé Précédemment :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #0d9488; font-weight: bold;">${previousPaid.toLocaleString()} FCFA</td>
+            </tr>
+            <tr style="background-color: #f0fdf4;">
+              <td style="padding: 10px 6px; border-bottom: 1px solid #bbf7d0; color: #14532d;"><strong>SOLDE ENCAISSÉ DU JOUR :</strong></td>
+              <td style="padding: 10px 6px; border-bottom: 1px solid #bbf7d0; color: #15803d; font-weight: bold; font-size: 15px;">+${dueAmount.toLocaleString()} FCFA</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Moyen de Règlement :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #1e293b;">${methodLabel}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Reste à Payer :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #16a34a; font-weight: bold; font-size: 14px;">0 FCFA (RÈGLEMENT DE SOLDE TERMINÉ ✅)</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Date Encaissement :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${new Date().toLocaleDateString('fr-FR')} &agrave; ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;"><strong>Statut Actuel Linge :</strong></td>
+              <td style="padding: 8px 0; font-weight: bold; color: #4f46e5;">${statusLabel}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+          Ce message d'alerte à l'encaissement de solde s'est exécuté automatiquement en tâche de fond.<br/>
+          <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
+        </div>
+      </div>
+    `;
+
+    try {
+      const response = await sendEmailDirectlyOrViaBackend({
+        to: managerEmail,
+        from: merchant.managerNotifications?.emailFrom || undefined,
+        subject: `💸 [SOLDE PAYÉ] Ticket n°${ticket.ticketNumber} - ${merchant.name || 'Pressing'}`,
+        html: mailHtml
+      }, {
+        resendApiKey: merchant.managerNotifications?.resendApiKey,
+        defaultFrom: merchant.managerNotifications?.emailFrom
+      });
+
+      if (response.ok) {
+        showMailSuccessToast("Mail d'encaissement de solde envoyé au gérant avec succès !");
+        
+        // Add to local history
+        const newLog = {
+          id: `mnotif_${Date.now()}`,
+          ticketNumber: ticket.ticketNumber,
+          type: 'sortie' as const,
+          method: 'email' as const,
+          timestamp: new Date().toISOString()
+        };
+        setManagerNotifsHistory(prev => [newLog, ...prev]);
+        return true;
+      } else {
+        const errorData = await response.json().catch(() => null);
+        console.error('Failed to send background balance email to manager:', errorData || response.statusText);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error dispatching silent manager background balance mail:', error);
+      return false;
+    }
+  };
+
   const products = useMemo(() => {
     try {
       const saved = localStorage.getItem(`pressing_stock_products_${merchant.id}`);
@@ -27547,12 +27846,27 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
   const outOfStockItems = useMemo(() => products.filter((p: any) => Number(p.stock || 0) <= 0), [products]);
 
   const dailyPressingTickets = useMemo(() => {
-    return tickets.filter(t => t.depositDate === closureDate);
+    return tickets.filter(t => t.depositDate === closureDate && t.status !== 'quotation');
   }, [tickets, closureDate]);
 
-  const dailyPressingRevenue = useMemo(() => {
-    return dailyPressingTickets.reduce((sum, t) => sum + (t.amountPaid || 0), 0);
+  const dailyDepositsRevenue = useMemo(() => {
+    return dailyPressingTickets.reduce((sum, t) => {
+      const atDeposit = t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0);
+      return sum + atDeposit;
+    }, 0);
   }, [dailyPressingTickets]);
+
+  const dailyBalancesCollected = useMemo(() => {
+    return tickets.filter(t => t.balanceCollectedDate === closureDate);
+  }, [tickets, closureDate]);
+
+  const dailyBalancesRevenue = useMemo(() => {
+    return dailyBalancesCollected.reduce((sum, t) => sum + (t.balanceCollectedAmount || 0), 0);
+  }, [dailyBalancesCollected]);
+
+  const dailyPressingRevenue = useMemo(() => {
+    return dailyDepositsRevenue + dailyBalancesRevenue;
+  }, [dailyDepositsRevenue, dailyBalancesRevenue]);
 
   const dailyDetergentSales = useMemo(() => {
     try {
@@ -27589,6 +27903,23 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
            `• ÉCART DE CAISSE : ${diffText} (${c.discrepancy < 0 ? '⚠️ MANQUANT' : c.discrepancy > 0 ? '🟢 SURPLUS' : '✅ EQUILIBRE'})\n` +
            `--------------------------------\n`;
 
+    if (dailyPressingTickets.length > 0) {
+      message += `📥 DETAIL ENREGISTREMENTS ACOMPTES (${dailyPressingTickets.length}) :\n`;
+      dailyPressingTickets.forEach(t => {
+        const depositPaid = t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0);
+        message += `• ${t.ticketNumber} - ${t.clientName} : ${depositPaid.toLocaleString()} FCFA\n`;
+      });
+      message += `--------------------------------\n`;
+    }
+
+    if (dailyBalancesCollected.length > 0) {
+      message += `💸 DETAIL SOLDES PERCUS AU RETRAIT (${dailyBalancesCollected.length}) :\n`;
+      dailyBalancesCollected.forEach(t => {
+        message += `• ${t.ticketNumber} - ${t.clientName} : ${(t.balanceCollectedAmount || 0).toLocaleString()} FCFA\n`;
+      });
+      message += `--------------------------------\n`;
+    }
+
     if (lowStockItems.length > 0 || outOfStockItems.length > 0) {
       message += `🚨 ALERTES STOCK :\n`;
       if (outOfStockItems.length > 0) {
@@ -27606,7 +27937,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
            `Rapport de clôture journalier transmis en Temps Réel via l'application SaaS ${merchant.name || 'ACOM'}.`;
 
     return message;
-  }, [merchant, lowStockItems, outOfStockItems]);
+  }, [merchant, lowStockItems, outOfStockItems, dailyPressingTickets, dailyBalancesCollected]);
 
   const sendSilentBackgroundClosureEmailToManager = useCallback(async (c: PressingClosure) => {
     if (!managerEmail || !managerEmail.trim()) return false;
@@ -27696,6 +28027,47 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
           </table>
         </div>
 
+        <div style="margin-top: 25px; border-top: 2px solid #e2e8f0; padding-top: 15px;">
+          <h3 style="color: ${themeColor}; font-size: 14px; text-transform: uppercase; margin-bottom: 12px; font-weight: bold; letter-spacing: 0.5px;">🔍 Traces des Encaisses du Jour</h3>
+          
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            ${dailyPressingTickets.length > 0 ? `
+            <tr>
+              <td colspan="3" style="padding: 8px 0; font-weight: bold; color: ${themeColor}; border-bottom: 1px font-weight: bold;">📥 Acomptes reçus le jour du dépôt :</td>
+            </tr>
+            ${dailyPressingTickets.map(t => {
+              const depositPaid = t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0);
+              return `
+              <tr>
+                <td style="padding: 6px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-weight: bold;">${t.ticketNumber}</td>
+                <td style="padding: 6px; border-bottom: 1px solid #f1f5f9; color: #64748b;">${t.clientName}</td>
+                <td style="padding: 6px; border-bottom: 1px solid #f1f5f9; font-weight: bold; text-align: right; color: #16a34a;">+${depositPaid.toLocaleString()} F</td>
+              </tr>`;
+            }).join('')}
+            ` : ''}
+
+            ${dailyBalancesCollected.length > 0 ? `
+            <tr>
+              <td colspan="3" style="padding: 15px 0 8px 0; font-weight: bold; color: ${themeColor};">💸 Règlements de soldes reçus au retrait :</td>
+            </tr>
+            ${dailyBalancesCollected.map(t => {
+              return `
+              <tr>
+                <td style="padding: 6px; border-bottom: 1px solid #f1f5f9; color: #1e293b; font-weight: bold;">${t.ticketNumber}</td>
+                <td style="padding: 6px; border-bottom: 1px solid #f1f5f9; color: #64748b;">${t.clientName}</td>
+                <td style="padding: 6px; border-bottom: 1px solid #f1f5f9; font-weight: bold; text-align: right; color: #2563eb;">+${(t.balanceCollectedAmount || 0).toLocaleString()} F</td>
+              </tr>`;
+            }).join('')}
+            ` : ''}
+
+            ${(dailyPressingTickets.length === 0 && dailyBalancesCollected.length === 0) ? `
+            <tr>
+              <td colspan="3" style="padding: 10px; text-align: center; color: #94a3b8; font-style: italic;">Aucun encaissement pressing aujourd'hui.</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+
         <div style="margin-top: 35px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
           Ce rapport de clôture a été expédié automatiquement en temps réel au gérant.<br/>
           <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
@@ -27771,7 +28143,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     setDiscountValue(0);
     setDiscountType('amount');
     setNotes('');
-    setPaymentStatus('paid');
+    setPaymentStatus('unpaid');
     setPaymentMethod('cash');
     setAmountPaid(0);
     setSelectedTicket(null);
@@ -27828,6 +28200,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       paymentStatus,
       paymentMethod,
       amountPaid: paymentStatus === 'unpaid' ? 0 : amountPaid,
+      amountPaidAtDeposit: paymentStatus === 'unpaid' ? 0 : amountPaid,
       notes,
       sentNotifications: []
     };
@@ -27926,7 +28299,61 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
   };
 
   const updateStatus = (ticketId: string, nextStatus: PressingTicket['status']) => {
-    const updated = tickets.map(t => t.id === ticketId ? { ...t, status: nextStatus } : t);
+    const targetTicketBefore = tickets.find(t => t.id === ticketId);
+    if (nextStatus === 'delivered' && targetTicketBefore) {
+      const due = targetTicketBefore.total - (targetTicketBefore.amountPaid || 0);
+      if (due > 0) {
+        showAlert(
+          'Paiement requis 💸',
+          `Impossible de passer le linge en statut "Livré" ! Il reste un solde de ${due.toLocaleString()} FCFA à régler. Veuillez d'abord encaisser le solde restant ou l'acompte avant de livrer.`,
+          'warning',
+          undefined,
+          false,
+          "COMPRIS",
+          "CONTRÔLE DE LIVRAISON"
+        );
+        return;
+      }
+    }
+
+    const updated = tickets.map(t => {
+      if (t.id === ticketId) {
+        const isConvertingFromQuote = t.status === 'quotation' && nextStatus === 'deposed';
+        
+        if (isConvertingFromQuote) {
+          try {
+            db.sales.add({
+              id: t.id,
+              merchantId: merchant.id,
+              items: [],
+              totalAmount: t.total,
+              paidAmount: t.amountPaid || 0,
+              balance: Math.max(0, t.total - (t.amountPaid || 0)),
+              payments: [{
+                id: `p_${Date.now()}`,
+                amount: t.amountPaid || 0,
+                method: t.paymentMethod === 'other' ? 'transfer' : t.paymentMethod,
+                date: new Date().toISOString()
+              }],
+              paymentMethod: t.paymentMethod === 'other' ? 'mobile_money' : t.paymentMethod,
+              customerName: t.clientName,
+              customerPhone: t.clientPhone,
+              processedBy: 'system',
+              createdAt: new Date().toISOString()
+            });
+          } catch (err) {
+            console.error("Error adding converted quote to sales DB:", err);
+          }
+        }
+
+        return {
+          ...t,
+          status: nextStatus,
+          amountPaidAtDeposit: isConvertingFromQuote ? (t.amountPaid || 0) : (t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0))
+        };
+      }
+      return t;
+    });
     setTickets(updated);
     localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
     
@@ -27975,28 +28402,76 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
       `Voulez-vous encaisser le solde restant de ${due.toLocaleString()} FCFA par ${methodLabel} pour le ticket ${targetTicket.ticketNumber} ?`,
       'info',
       () => {
+        const todayStr = format(new Date(), 'yyyy-MM-dd');
         const updated = tickets.map(t => {
           if (t.id === ticketId) {
+            const initialPaidAtDeposit = t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0);
             return {
               ...t,
               paymentStatus: 'paid' as const,
               paymentMethod: method,
               amountPaid: t.total,
+              amountPaidAtDeposit: initialPaidAtDeposit,
+              balanceCollectedAmount: due,
+              balanceCollectedDate: todayStr,
+              balanceCollectedMethod: method,
             };
           }
           return t;
         });
         setTickets(updated);
         localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
+
+        // Track payment update in deep local db.sales
+        try {
+          db.sales.get(ticketId).then(existingSale => {
+            if (existingSale) {
+              const currentPayments = existingSale.payments || [];
+              const newPaymentRecord = {
+                id: `p_${Date.now()}`,
+                amount: due,
+                method: (method === 'other' ? 'transfer' : method) as 'cash' | 'card' | 'mobile_money' | 'transfer',
+                date: new Date().toISOString()
+              };
+              db.sales.update(ticketId, {
+                paidAmount: targetTicket.total,
+                balance: 0,
+                payments: [...currentPayments, newPaymentRecord]
+              });
+            }
+          });
+        } catch (err) {
+          console.error("Erreur de traçabilité de vente :", err);
+        }
+
+        const ticketUpdateData = {
+          paymentStatus: 'paid' as const,
+          paymentMethod: method,
+          amountPaid: targetTicket.total,
+          amountPaidAtDeposit: targetTicket.amountPaidAtDeposit !== undefined ? targetTicket.amountPaidAtDeposit : (targetTicket.amountPaid || 0),
+          balanceCollectedAmount: due,
+          balanceCollectedDate: todayStr,
+          balanceCollectedMethod: method,
+        };
+
         if (viewingTicket && viewingTicket.id === ticketId) {
           setViewingTicket({
             ...viewingTicket,
-            paymentStatus: 'paid',
-            paymentMethod: method,
-            amountPaid: viewingTicket.total,
+            ...ticketUpdateData
+          });
+        }
+        if (selectedTicket && selectedTicket.id === ticketId) {
+          setSelectedTicket({
+            ...selectedTicket,
+            ...ticketUpdateData
           });
         }
         showAlert('Paiement Enregistré', `Le solde de ${due.toLocaleString()} FCFA a été encaissé avec succès via ${methodLabel} !`, 'success', undefined, false, "D'ACCORD", "RÈGLEMENT");
+        
+        // Auto-email summary to the manager in background on balance payment collection
+        if (autoEmailManager && managerEmail && managerEmail.trim()) {
+          sendSilentBackgroundBalanceCollectionEmailToManager(targetTicket, due, method);
+        }
       },
       true,
       'ENCAISSER'
@@ -28146,7 +28621,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
     pdf.setFontSize(smallFontSize);
     
     if (ticket.status !== 'quotation') {
-      const pStatusLabel = ticket.paymentStatus === 'paid' ? 'PAYE D\'AVANCE' : ticket.paymentStatus === 'partial' ? 'ACOMPTE PAYE' : 'IMPAYE AT RETRAIT';
+      const pStatusLabel = ticket.paymentStatus === 'paid' ? 'PAYE D\'AVANCE' : (ticket.paymentStatus === 'partial' && (ticket.amountPaid || 0) > 0) ? 'ACOMPTE PAYE' : 'IMPAYE AT RETRAIT';
       pdf.text(`Règlement : ${pStatusLabel}`, paddingLeft, y);
       y += 4;
 
@@ -28262,7 +28737,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               activeSubTab === 'active' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            ⏳ En Cours ({tickets.filter(t => t.status !== 'delivered').length})
+            ⏳ En Cours ({tickets.filter(t => t.status !== 'delivered' && t.status !== 'quotation').length})
           </button>
           <button
             onClick={() => setActiveSubTab('history')}
@@ -28442,10 +28917,18 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   {Object.keys(articlesQty).map((key) => {
                     const price = tarifs.articles[key as keyof typeof tarifs.articles] || 0;
                     return (
-                      <div key={key} className="p-3 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-xs text-ink uppercase tracking-wider block capitalize">{key}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">{price} FCFA/u</span>
+                      <div key={key} className="p-2.5 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between gap-3 hover:border-purple-200 hover:bg-white transition-all shadow-3xs">
+                        <div className="flex items-center gap-2.5">
+                          <img 
+                            src={tarifs.articles_images?.[key] || tarifs.articles_images?.[key.toLowerCase()] || ARTICLE_IMAGES[key.toLowerCase()] || ARTICLE_IMAGES['autre']} 
+                            alt={key}
+                            referrerPolicy="no-referrer"
+                            className="w-11 h-11 rounded-xl object-cover border border-slate-200/60 bg-slate-100 flex-shrink-0"
+                          />
+                          <div>
+                            <span className="font-bold text-xs text-ink uppercase tracking-wider block capitalize">{key}</span>
+                            <span className="text-[10px] text-gray-400 font-mono">{price} FCFA/u</span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -28921,9 +29404,15 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
               <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest block">📊 Chiffre d'Affaires Théorique ({closureDate})</span>
               
               <div className="space-y-2.5">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600 flex items-center gap-1.5 font-medium">🧺 Recettes Pressing ({dailyPressingTickets.length} dépôts) :</span>
-                  <span className="font-mono font-bold text-ink">{dailyPressingRevenue.toLocaleString()} FCFA</span>
+                <div className="flex flex-col space-y-1 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 flex items-center gap-1.5 font-medium">🧺 Recettes Pressing (Total) :</span>
+                    <span className="font-mono font-bold text-ink">{dailyPressingRevenue.toLocaleString()} FCFA</span>
+                  </div>
+                  <div className="pl-5 text-[10px] text-gray-400 flex flex-col space-y-0.5">
+                    <span>• {dailyDepositsRevenue.toLocaleString()} FCFA (Acomptes sur {dailyPressingTickets.length} dépôts)</span>
+                    <span>• {dailyBalancesRevenue.toLocaleString()} FCFA (Soldes sur {dailyBalancesCollected.length} retraits)</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-gray-600 flex items-center gap-1.5 font-medium">🛒 Ventes Détergents ({dailyDetergentSales.length} ventes) :</span>
@@ -28933,6 +29422,52 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                   <span className="font-black text-xs text-ink uppercase tracking-wider">💰 Total Théorique :</span>
                   <span className="font-mono font-black text-sm text-primary">{totalTheoreticalRevenue.toLocaleString()} FCFA</span>
                 </div>
+              </div>
+            </div>
+
+            {/* Traces and Detailed Receipts Ledger */}
+            <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100/60 space-y-4">
+              <span className="text-[9px] font-mono font-black text-indigo-400 uppercase tracking-widest block">📜 Traces des Encaisses de la Journée ({closureDate})</span>
+              
+              {/* Deposits / Acomptes */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">📥 Acomptes reçus au Dépôt ({dailyPressingTickets.length}) :</span>
+                {dailyPressingTickets.length === 0 ? (
+                  <p className="text-[10px] text-gray-400 italic font-mono pl-3">Aucun acompte encaissé aujourd'hui.</p>
+                ) : (
+                  <div className="max-h-24 overflow-y-auto space-y-1 border border-indigo-100/50 rounded-xl p-2.5 bg-white">
+                    {dailyPressingTickets.map(t => {
+                      const depositPaid = t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0);
+                      const methodLabel = t.paymentMethod === 'cash' ? '💵' : t.paymentMethod === 'mobile_money' ? '📱' : '💳';
+                      return (
+                        <div key={t.id} className="flex justify-between items-center text-[10px] py-0.5 border-b border-slate-50 last:border-0">
+                          <span className="font-semibold text-gray-700">{t.ticketNumber} • {t.clientName}</span>
+                          <span className="font-mono font-black text-emerald-600">{methodLabel} +{depositPaid.toLocaleString()} F</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Balances / Soldes */}
+              <div className="space-y-2 pt-2 border-t border-indigo-100/30">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">💸 Règlements de Soldes au Retrait ({dailyBalancesCollected.length}) :</span>
+                {dailyBalancesCollected.length === 0 ? (
+                  <p className="text-[10px] text-gray-400 italic font-mono pl-3">Aucun solde collecté aujourd'hui.</p>
+                ) : (
+                  <div className="max-h-24 overflow-y-auto space-y-1 border border-indigo-100/50 rounded-xl p-2.5 bg-white">
+                    {dailyBalancesCollected.map(t => {
+                      const methodLabel = t.balanceCollectedMethod === 'cash' ? '💵' : t.balanceCollectedMethod === 'mobile_money' ? '📱' : '💳';
+                      return (
+                        <div key={t.id} className="flex justify-between items-center text-[10px] py-0.5 border-b border-slate-50 last:border-0">
+                          <span className="font-semibold text-gray-700">{t.ticketNumber} • {t.clientName}</span>
+                          <span className="font-mono font-black text-[#1e1b4b]">{methodLabel} +{(t.balanceCollectedAmount || 0).toLocaleString()} F</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -29196,7 +29731,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-900'
                 }`}
               >
-                Tous ({tickets.filter(t => t.status !== 'delivered').length})
+                Tous ({tickets.filter(t => t.status !== 'delivered' && t.status !== 'quotation').length})
               </button>
               <button
                 type="button"
@@ -29285,7 +29820,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                             <span className="text-[9px] bg-indigo-50 text-indigo-600 font-extrabold px-1.5 py-0.5 rounded border border-indigo-100/40">DEVIS</span>
                           ) : ticket.paymentStatus === 'paid' ? (
                             <span className="text-[9px] bg-emerald-50 text-emerald-600 font-extrabold px-1.5 py-0.5 rounded border border-emerald-100/40">Payé 👍</span>
-                          ) : ticket.paymentStatus === 'partial' ? (
+                          ) : (ticket.paymentStatus === 'partial' && (ticket.amountPaid || 0) > 0) ? (
                             <span className="text-[9px] bg-amber-50 text-amber-600 font-extrabold px-1.5 py-0.5 rounded border border-amber-100/40">Acompte: {ticket.amountPaid?.toLocaleString()} F</span>
                           ) : (
                             <span className="text-[9px] bg-rose-50 text-rose-600 font-extrabold px-1.5 py-0.5 rounded border border-rose-100/40">Reste: {ticket.total.toLocaleString()} F</span>
@@ -29498,7 +30033,7 @@ const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => {
                       <div className="flex justify-between text-[10px] text-gray-500 font-sans">
                         <span>Statut de paiement :</span>
                         <span className="font-bold uppercase tracking-wider">
-                          {viewingTicket.paymentStatus === 'paid' ? "Payé d'avance 🟢" : viewingTicket.paymentStatus === 'partial' ? 'Acompte versé 🟡' : 'Impayé au retrait 🔴'}
+                          {viewingTicket.paymentStatus === 'paid' ? "Payé d'avance 🟢" : (viewingTicket.paymentStatus === 'partial' && (viewingTicket.amountPaid || 0) > 0) ? 'Acompte versé 🟡' : 'Impayé au retrait 🔴'}
                         </span>
                       </div>
                       <div className="flex justify-between text-indigo-600 font-sans font-bold">
@@ -29814,6 +30349,7 @@ interface DetergentProduct {
   category: string;
   description: string;
   sku?: string;
+  imageUrl?: string;
 }
 
 interface DetergentSale {
@@ -30364,6 +30900,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
   const [formCategory, setFormCategory] = useState<string>('liquid');
   const [formDescription, setFormDescription] = useState('');
   const [formSku, setFormSku] = useState('');
+  const [formImageUrl, setFormImageUrl] = useState('');
   const [showFormSkuScanner, setShowFormSkuScanner] = useState(false);
   const [showSearchScanner, setShowSearchScanner] = useState(false);
   const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
@@ -30699,7 +31236,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         minStock: formMinStock,
         category: formCategory,
         description: formDescription,
-        sku: formSku.trim() || undefined
+        sku: formSku.trim() || undefined,
+        imageUrl: formImageUrl.trim() || undefined
       } : p);
       saveProductsToStorage(updated);
       showAlert('Produit Mis à Jour', 'Caractéristiques du détergent ou produit mises à jour !', 'success');
@@ -30714,7 +31252,8 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         minStock: formMinStock,
         category: formCategory,
         description: formDescription,
-        sku: formSku.trim() || undefined
+        sku: formSku.trim() || undefined,
+        imageUrl: formImageUrl.trim() || undefined
       };
       saveProductsToStorage([newProd, ...products]);
       showAlert('Produit Crée', 'Nouveau détergent référencé avec succès au catalogue !', 'success');
@@ -30730,6 +31269,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setFormCategory('liquid');
     setFormDescription('');
     setFormSku('');
+    setFormImageUrl('');
   };
 
   // Load form for editing
@@ -30743,6 +31283,7 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setFormCategory(prod.category);
     setFormDescription(prod.description);
     setFormSku(prod.sku || '');
+    setFormImageUrl(prod.imageUrl || '');
   };
 
   // Delete product
@@ -31247,22 +31788,34 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 return (
                   <div 
                     key={p.id} 
-                    className={`bg-white rounded-3xl p-5 border shadow-sm transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group hover:shadow-md ${
-                      isOutOfStock ? 'opacity-75 border-rose-100' : isUnderStock ? 'border-amber-200 bg-amber-50/10' : 'border-gray-100'
+                    className={`bg-white rounded-3xl p-4 border shadow-sm transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group hover:shadow-md ${
+                      isOutOfStock ? 'opacity-75 border-rose-100 bg-gray-50/50' : isUnderStock ? 'border-amber-200 bg-amber-50/5' : 'border-gray-100'
                     }`}
                   >
                     <div>
-                      <div className="flex justify-between items-center mb-2">
+                      {/* Beautiful product image banner */}
+                      <div className="relative h-32 w-full mb-3 rounded-2xl overflow-hidden bg-white border border-slate-100 p-2">
+                        <img 
+                          src={p.imageUrl || DETERGENT_CATEGORY_IMAGES[p.category] || DETERGENT_CATEGORY_IMAGES['other']} 
+                          alt={p.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute top-2 right-2">
+                          {isOutOfStock ? (
+                            <span className="px-2 py-0.5 bg-rose-500 text-white font-bold text-[8px] rounded uppercase shadow-sm">Rupture 🔴</span>
+                          ) : isUnderStock ? (
+                            <span className="px-2 py-0.5 bg-amber-500 text-white font-bold text-[8px] rounded uppercase shadow-sm">Stock Bas ⚠️</span>
+                          ) : (
+                            <span className="px-2 py-0.5 bg-emerald-500 text-white font-bold text-[8px] rounded uppercase shadow-sm">Disponible</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center mb-1">
                         <span className="px-2 py-0.5 bg-gray-100 text-gray-500 font-bold text-[9px] rounded uppercase tracking-wider">
                           {allCategories[p.category] || p.category}
                         </span>
-                        {isOutOfStock ? (
-                          <span className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-600 font-bold text-[8px] rounded uppercase font-black">Rupture 🔴</span>
-                        ) : isUnderStock ? (
-                          <span className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-600 font-bold text-[8px] rounded uppercase font-black">Stock Bas ⚠️</span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-100 text-emerald-600 font-bold text-[8px] rounded uppercase font-black">Disponible</span>
-                        )}
                       </div>
                       <h4 className="text-sm font-black text-ink group-hover:text-primary transition-colors leading-snug">{p.name}</h4>
                       <p className="text-[10px] text-gray-400 mt-1 line-clamp-2 leading-relaxed">{p.description}</p>
@@ -31823,6 +32376,60 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 />
               </div>
 
+              <div>
+                <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1">Illustration / Image du Produit (Optionnel)</label>
+                <div className="flex flex-col sm:flex-row gap-3 items-center bg-gray-50/50 p-3.5 rounded-2xl border border-gray-100">
+                  <div className="relative w-16 h-16 rounded-2xl bg-white border border-gray-200/60 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-3xs group/pimg">
+                    {formImageUrl ? (
+                      <>
+                        <img 
+                          src={formImageUrl} 
+                          alt="Aperçu" 
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setFormImageUrl('')}
+                          className="absolute top-1 right-1 bg-rose-500 text-white rounded-full p-0.5 shadow-md hover:scale-105 active:scale-95 transition"
+                          title="Supprimer"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-center p-1 w-full h-full cursor-pointer relative bg-slate-50">
+                        <Upload className="w-4 h-4 text-gray-400 group-hover/pimg:text-primary transition" />
+                        <span className="text-[7px] font-bold text-gray-400 mt-1 uppercase tracking-wider">Joindre</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              compressAndSetImage(file, (base64) => {
+                                setFormImageUrl(base64);
+                              });
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 w-full space-y-1.5 text-left">
+                    <input
+                      type="url"
+                      placeholder="Collez un lien d'image direct..."
+                      value={formImageUrl}
+                      onChange={e => setFormImageUrl(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 outline-none focus:ring-1 focus:ring-primary/25 bg-white text-[10px] font-mono"
+                    />
+                    <span className="block text-[7px] text-gray-400 font-bold">Sélectionnez un fichier image local OU collez un lien Unsplash/Web.</span>
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-2 border-t border-gray-50 flex gap-2">
                 {editingProduct && (
                   <button
@@ -31831,10 +32438,13 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       setEditingProduct(null);
                       setFormName('');
                       setFormPrice(0);
+                      setFormCostPrice(0);
                       setFormStock(0);
                       setFormMinStock(3);
                       setFormCategory('liquid');
                       setFormDescription('');
+                      setFormSku('');
+                      setFormImageUrl('');
                     }}
                     className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-bold text-xs uppercase text-gray-600 transition"
                   >
@@ -31876,13 +32486,23 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                     return (
                       <tr key={p.id} className={`hover:bg-gray-50/30 transition-all ${isEditingThis ? 'bg-primary/5 border-l-2 border-l-primary font-bold' : ''}`}>
                         <td className="px-6 py-3 font-bold">
-                          <div className="font-bold text-ink text-xs">{p.name}</div>
-                          <div className="text-[10px] text-gray-400 font-medium limit-1 max-w-[200px] truncate">{p.description}</div>
-                          {p.sku && (
-                            <div className="text-[9px] font-mono font-bold text-primary mt-1 flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-md w-fit">
-                              <ScanLine className="w-2.5 h-2.5" /> {p.sku}
+                          <div className="flex items-center gap-3">
+                            <img 
+                              src={p.imageUrl || DETERGENT_CATEGORY_IMAGES[p.category] || DETERGENT_CATEGORY_IMAGES['other']} 
+                              alt={p.name}
+                              referrerPolicy="no-referrer"
+                              className="w-10 h-10 rounded-lg object-contain border border-slate-200/60 bg-white p-0.5 flex-shrink-0 shadow-3xs"
+                            />
+                            <div>
+                              <div className="font-bold text-ink text-xs">{p.name}</div>
+                              <div className="text-[10px] text-gray-400 font-medium limit-1 max-w-[200px] truncate">{p.description}</div>
+                              {p.sku && (
+                                <div className="text-[9px] font-mono font-bold text-primary mt-1 flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-md w-fit">
+                                  <ScanLine className="w-2.5 h-2.5" /> {p.sku}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </td>
                         <td className="px-6 py-3">
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-black text-[9px] uppercase tracking-wider">
