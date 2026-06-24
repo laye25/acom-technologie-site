@@ -32,6 +32,7 @@ import POS from './pages/POS';
 const TeacherPortal = React.lazy(() => import('./pages/TeacherPortal'));
 const StudentPortal = React.lazy(() => import('./pages/StudentPortal'));
 const ParentPortal = React.lazy(() => import('./pages/ParentPortal'));
+const OrderTracking = React.lazy(() => import('./pages/OrderTracking'));
 // Removed direct imports for lazy loading
 
 import Pricing from './pages/Pricing';
@@ -137,6 +138,8 @@ function AppContent() {
             <Route path="/order-details/:orderId" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
             <Route path="/quote/:orderId" element={<ProtectedRoute><OrderQuote /></ProtectedRoute>} />
             <Route path="/invoice/:orderId" element={<ProtectedRoute><OrderInvoice /></ProtectedRoute>} />
+            <Route path="/suivi-commande/:orderId" element={<OrderTracking />} />
+            <Route path="/suivi/:orderId" element={<OrderTracking />} />
             <Route path="/messages" element={<Navigate to="/dashboard" />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

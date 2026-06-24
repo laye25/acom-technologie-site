@@ -10,7 +10,7 @@ import {
   Store, ShoppingCart, ShieldCheck, Clock, CheckCircle2, XCircle, ArrowRight, Wrench, 
   HardHat, Car, Users, GraduationCap, Stethoscope, Briefcase, Shirt, Sparkles, Filter, 
   Trash2, Phone, Mail, MapPin, DollarSign, Calendar, RefreshCw, Send, Plus, Search, Info, Check,
-  Eye
+  Eye, Scissors, Palette
 } from 'lucide-react';
 
 interface AcomZoneMerchantPanelProps {
@@ -152,6 +152,21 @@ export const AcomZoneMerchantPanel: React.FC<AcomZoneMerchantPanelProps> = ({ me
             { name: "Poste : Comptable Senior", price: 0, details: { candidate: "Moussa Sagna", diploma: "Master 2 CCA", experience: "5 ans d'expérience", ratingGrade: "Excellent profil analytique" } },
             { name: "Poste : Agent Service Client Pressing", price: 0, details: { candidate: "Aida Diallo", diploma: "DESS Secrétariat", experience: "2 ans dans le commerce", ratingGrade: "Excellente élocution Wolof/Français" } },
             { name: "Poste : Conducteur Routier Poids Lourds", price: 0, details: { candidate: "Oumar Thiam", diploma: "Permis C/D à jour", experience: "10 ans d'expérience", ratingGrade: "Casier judiciaire néant, rigoureux" } }
+          ]
+        };
+      case 'tailleur':
+        return {
+          title: "Commandes Mesures & Créations Couture",
+          icon: Scissors,
+          bgColor: "bg-violet-50 text-violet-600 border-violet-200",
+          itemLabel: "Modèle / Client",
+          statusPending: "Mesures Prises",
+          statusConfirmed: "En Coupe / Couture",
+          statusCompleted: "Terminé / Livré",
+          simulatedServices: [
+            { name: "Couture Grand Boubou Brodé", price: 75000, details: { items: "1x Boubou 3 pièces, Broderie dorée", mode: "Bazin Riche blanc de première qualité" } },
+            { name: "Robe de Soirée Chic sur Mesure", price: 45000, details: { items: "1x Robe Sirène avec fente, Col Bardot", mode: "Wax Hollandais authentique (3 pagnes)" } },
+            { name: "Costume Homme Slim Fit", price: 120000, details: { items: "1x Veste doublée, 2x Pantalon ajusté", mode: "Tissu Super 120 Laine & Soie" } }
           ]
         };
       default: // boutique / commerce

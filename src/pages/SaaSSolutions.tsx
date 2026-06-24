@@ -70,6 +70,14 @@ const defaultSolutions = [
     color: "bg-cyan-500",
     image: "https://picsum.photos/seed/laundry/800/600",
     link: "/merchant/saas?type=pressing"
+  },
+  {
+    title: "Gestion d'ateliers de couture (professionnels de la mode)",
+    description: "Gérez l'ensemble des activités de votre atelier de couture ou maison de mode : mesures, commandes sur mesure, prêt-à-porter et suivi en temps réel.",
+    iconName: "Scissors",
+    color: "bg-pink-500",
+    image: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&q=80&w=800&h=600",
+    link: "/merchant/saas?type=tailleur"
   }
 ];
 
@@ -93,7 +101,16 @@ const SaaSSolutions = () => {
     fetchSettings();
   }, []);
 
-  const solutions = saasContent?.solutions && saasContent.solutions.length > 0 ? saasContent.solutions : defaultSolutions;
+  let solutions = saasContent?.solutions && saasContent.solutions.length > 0 ? [...saasContent.solutions] : [...defaultSolutions];
+
+  // Force add Tailleur solution if missing (e.g. if loaded from older database config)
+  const hasTailleur = solutions.some((s: any) => s.link && s.link.includes('type=tailleur'));
+  if (!hasTailleur) {
+    const tailleurSol = defaultSolutions.find((s: any) => s.link && s.link.includes('type=tailleur'));
+    if (tailleurSol) {
+      solutions.push(tailleurSol);
+    }
+  }
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;

@@ -80,6 +80,14 @@ export const AcomSaaSSettings = () => {
         color: "bg-cyan-500",
         image: "https://picsum.photos/seed/laundry/800/600",
         link: "/merchant/saas?type=pressing"
+      },
+      {
+        title: "Gestion d'ateliers de couture (professionnels de la mode)",
+        description: "Gérez l'ensemble des activités de votre atelier de couture ou maison de mode : mesures, commandes sur mesure, prêt-à-porter et suivi en temps réel.",
+        iconName: "Scissors",
+        color: "bg-pink-500",
+        image: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&q=80&w=800&h=600",
+        link: "/merchant/saas?type=tailleur"
       }
     ]
   };
@@ -93,7 +101,17 @@ export const AcomSaaSSettings = () => {
       // @ts-ignore
       const data = await dbService.settings.get('default');
       if (data && data.saasContent) {
-        setSettings(data.saasContent);
+        let content = { ...data.saasContent };
+        if (content.solutions) {
+          const hasTailleur = content.solutions.some((s: any) => s.link && s.link.includes('type=tailleur'));
+          if (!hasTailleur) {
+            const tailleurSol = defaultSettings.solutions.find((s: any) => s.link && s.link.includes('type=tailleur'));
+            if (tailleurSol) {
+              content.solutions = [...content.solutions, tailleurSol];
+            }
+          }
+        }
+        setSettings(content);
       } else {
         setSettings(defaultSettings);
       }

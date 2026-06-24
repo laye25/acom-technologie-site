@@ -15,6 +15,17 @@
     <script>
       // Global error handler to catch "page blanche" rendering errors in Desktop execution
       window.addEventListener('error', function(e) {
+        // Ignore external script errors and benign extension/cross-origin errors
+        if (!e.filename || e.message === "Script error." || (
+          !e.filename.includes(window.location.host) && 
+          !e.filename.includes('localhost') && 
+          !e.filename.includes('run.app') && 
+          !e.filename.startsWith('/') && 
+          !e.filename.startsWith('file:')
+        )) {
+          console.warn("Ignored cross-origin error:", e);
+          return;
+        }
         if (!document.getElementById('debug-error-box')) {
           const div = document.createElement('div');
           div.id = 'debug-error-box';

@@ -1132,4 +1132,113 @@ export const syncService = {
       sessionStorage.removeItem(globalSyncLockKey);
     }
   },
+
+  async syncTailoringCollection(merchantId: string, type: 'clients' | 'orders' | 'tissus', force: boolean = false) {
+    const collectionName = type === 'clients' ? 'tailleur_clients' : type === 'orders' ? 'tailleur_orders' : 'tailleur_fabrics';
+    const lastSyncKey = `last_sync_${collectionName}_${merchantId}`;
+    const lastSyncStr = localStorage.getItem(lastSyncKey);
+
+    if (!(await this.isOnline(merchantId, force))) return;
+    try {
+      // Throttling: 15 seconds unless forced
+      if (!force && lastSyncStr && Date.now() - parseInt(lastSyncStr, 10) < 15000) {
+        return;
+      }
+
+      const { db: firestore } = await import('../firebase');
+      const { collection, doc, writeBatch, query, where, getDocs } = await import('firebase/firestore');
+
+      // 1. Load local items from localStorage
+      const localKey = `tailleur_${type}_${merchantId}`;
+      let localItems: any[] = [];
+      try {
+        const saved = localStorage.getItem(localKey);
+        if (saved) localItems = JSON.parse(saved);
+      } catch (e) {
+        console.error(`Error loading local ${type}:`, e);
+      }
+
+      // 2. Upload Phase: Push modified or deleted items to Firestore
+      const pendingItems = localItems.filter(item => item.syncStatus === 'pending' || !item.syncStatus);
+      if (pendingItems.length > 0) {
+        console.log(`[DeltaSync] Pushing ${pendingItems.length} pending items for ${collectionName}...`);
+        const batch = writeBatch(firestore);
+        const colRef = collection(firestore, collectionName);
+
+        for (const item of pendingItems) {
+          const docRef = doc(colRef, item.id);
+          if (item.isDeleted) {
+            batch.delete(docRef);
+          } else {
+            const { syncStatus, ...cleanData } = item;
+            batch.set(docRef, {
+              ...cleanData,
+              merchantId,
+              updatedAt: item.updatedAt || new Date().toISOString()
+            });
+          }
+        }
+        await batch.commit();
+
+        // Mark pushed items as synced (or remove if deleted)
+        localItems = localItems
+          .map(item => (item.syncStatus === 'pending' || !item.syncStatus) && !item.isDeleted ? { ...item, syncStatus: 'synced' } : item)
+          .filter(item => !item.isDeleted);
+      }
+
+      // 3. Download Phase: Fetch modified items from Firestore
+      const constraints: any[] = [where('merchantId', '==', merchantId)];
+      if (lastSyncStr && !force) {
+        const lastSyncDate = new Date(parseInt(lastSyncStr, 10));
+        // Recule de 1 minute pour le décalage d'horloge
+        const safeDate = new Date(lastSyncDate.getTime() - 60000);
+        constraints.push(where('updatedAt', '>=', safeDate.toISOString()));
+      }
+
+      console.log(`[DeltaSync] Pulling updates for ${collectionName}...`);
+      const q = query(collection(firestore, collectionName), ...constraints);
+      const querySnapshot = await getDocs(q);
+      const remoteItems: any[] = [];
+
+      querySnapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        remoteItems.push({
+          ...data,
+          id: docSnap.id
+        });
+      });
+
+      console.log(`[DeltaSync] Received ${remoteItems.length} updates from Firestore for ${collectionName}.`);
+
+      // 4. Merge Phase: Integrate remote updates into local items
+      if (remoteItems.length > 0) {
+        for (const remote of remoteItems) {
+          const localIndex = localItems.findIndex(item => item.id === remote.id);
+          if (localIndex >= 0) {
+            const local = localItems[localIndex];
+            // Only overwrite if local item is not pending OR if remote is newer
+            if (local.syncStatus !== 'pending' || (remote.updatedAt && local.updatedAt && new Date(remote.updatedAt) > new Date(local.updatedAt))) {
+              localItems[localIndex] = { ...remote, syncStatus: 'synced' };
+            }
+          } else {
+            // New remote item
+            localItems.push({ ...remote, syncStatus: 'synced' });
+          }
+        }
+      }
+
+      // Save back to localStorage
+      localStorage.setItem(localKey, JSON.stringify(localItems));
+      localStorage.setItem(lastSyncKey, Date.now().toString());
+      console.log(`[DeltaSync] Sync completed successfully for ${collectionName}.`);
+    } catch (error) {
+      console.error(`[DeltaSync] Sync ${collectionName} failed:`, error);
+    }
+  },
+
+  async syncAllTailoringData(merchantId: string, force: boolean = false) {
+    await this.syncTailoringCollection(merchantId, 'clients', force);
+    await this.syncTailoringCollection(merchantId, 'orders', force);
+    await this.syncTailoringCollection(merchantId, 'tissus', force);
+  },
 };

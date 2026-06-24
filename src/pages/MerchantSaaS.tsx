@@ -42,6 +42,9 @@ import { showMailSuccessToast } from '../components/MailSuccessToast';
 import { getApiUrl, sendEmailDirectlyOrViaBackend } from '../lib/api';
 import { triggerAcomAlert, AcomAlertEventProvider } from '../components/AcomAlertEventProvider';
 import { AcomZoneMerchantPanel } from '../components/AcomZoneMerchantPanel';
+import { TailleurGalleryManager } from '../components/TailleurGalleryManager';
+import { TailleurArtisansManager } from '../components/TailleurArtisansManager';
+import { TailleurMercerieCostManager } from '../components/TailleurMercerieCostManager';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { billingService } from '../services/billingService';
@@ -3239,7 +3242,26 @@ export const TeacherDashboardWrapper = ({ teacher, merchant }: { teacher: any, m
 
 const MerchantSaaS = () => {
   const { user, signOut } = useAuth();
-  const [merchant, setMerchant] = useState<Merchant | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isSpecialManager = user?.email === 'contact.abdoulayendiaye@gmail.com' || user?.email === 'contact.acomtechnologie@gmail.com' || user?.email === 'gestionnaire.acomtechnologie@gmail.com';
+  const [overrideType, setOverrideType] = useState<string | null>(() => searchParams.get('type') || null);
+  const [dbMerchant, setMerchant] = useState<Merchant | null>(null);
+  
+  const displayMerchant = useMemo(() => {
+    if (!dbMerchant) return null;
+    const activeSaaSType = (isSpecialManager && overrideType) ? overrideType : (dbMerchant.type || 'boutique');
+    return { ...dbMerchant, type: activeSaaSType };
+  }, [dbMerchant, isSpecialManager, overrideType]);
+
+  const merchant = displayMerchant || dbMerchant;
+
+  useEffect(() => {
+    const urlType = searchParams.get('type');
+    if (urlType && isSpecialManager) {
+      setOverrideType(urlType);
+    }
+  }, [searchParams, isSpecialManager]);
+
   const [loadingMerchant, setLoadingMerchant] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -3361,8 +3383,6 @@ const MerchantSaaS = () => {
       setLoggedParentProfile(liveParentProfile);
     }
   }, [liveParentProfile]);
-  
-  const [searchParams, setSearchParams] = useSearchParams();
   
   // Handle payment success from PayDunya
   useEffect(() => {
@@ -3742,6 +3762,20 @@ const MerchantSaaS = () => {
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
         break;
+      case 'tailleur':
+        tabs = [
+          { id: 'dashboard', label: 'Aperçu', icon: PieChart },
+          { id: 'tailleur_clients', label: 'Clients Couture', icon: Users },
+          { id: 'tailleur_orders', label: 'Commandes Mesures', icon: Scissors },
+          { id: 'tailleur_tissus', label: 'Tissus & Wax', icon: Palette },
+          { id: 'tailleur_gallery', label: 'Inspirations & Moodboards', icon: Sparkles },
+          { id: 'tailleur_artisans', label: 'Artisans & Équipe', icon: Users },
+          { id: 'tailleur_mercerie', label: 'Mercerie & Coût de Revient', icon: Calculator },
+          { id: 'accounting', label: 'Compta', icon: BarChart3 },
+          { id: 'reports', label: 'Rapports', icon: FileText },
+          { id: 'settings', label: 'Réglages', icon: Settings },
+        ];
+        break;
       default: // boutique
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
@@ -3849,53 +3883,87 @@ const MerchantSaaS = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 pt-6 md:pt-12 lg:pt-24 pb-12">
-      <AcomAlertEventProvider />
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
-        <div className="flex flex-col mb-6 md:mb-12 gap-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center space-x-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner overflow-hidden shrink-0">
-                {merchant.logo ? (
-                  <img src={merchant.logo} alt="Logo" className="w-full h-full object-contain bg-white p-1" />
-                ) : (
-                  <Store className="w-8 h-8 text-primary" />
-                )}
-              </div>
-              <div>
-                <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
-                <div className="flex flex-wrap items-center mt-1.5 gap-y-2">
-                  <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">
-                    {merchant.type === 'entreprise' ? 'Management Entreprise' :
-                     merchant.type === 'chantier' ? 'Management BTP / Chantier' :
-                     merchant.type === 'transport' ? 'Management Flotte' :
-                     merchant.type === 'rh' ? 'Management RH' :
-                     merchant.type === 'scolaire' ? 'Management Scolaire' :
-                     merchant.type === 'medical' ? 'Management Médical' :
-                     'Management Commerce'}
-                  </span>
-                  <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
-                  <span className="text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em]">
-                    Plan {merchant.plan}
-                  </span>
-                  {merchant.licenseType && (
-                    <>
-                      <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
-                      <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${
-                        merchant.licenseType === 'cloud' 
-                          ? 'bg-blue-50 border-blue-100 text-blue-600' 
-                          : 'bg-emerald-50 border-emerald-100 text-emerald-600'
-                      }`}>
-                        {merchant.licenseType === 'cloud' ? <Database className="w-3 h-3" /> : <HardDrive className="w-3 h-3" />}
-                        <span className="text-[9px] font-black uppercase tracking-widest leading-none">
-                          {merchant.licenseType === 'cloud' ? 'Licence Cloud' : 'Licence Locale'}
-                        </span>
-                      </div>
-                    </>
+        <AcomAlertEventProvider />
+        <div className="max-w-7xl mx-auto px-4">
+          {/* Header */}
+          <div className="flex flex-col mb-6 md:mb-12 gap-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center space-x-6">
+                <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner overflow-hidden shrink-0">
+                  {merchant.logo ? (
+                    <img src={merchant.logo} alt="Logo" className="w-full h-full object-contain bg-white p-1" />
+                  ) : (
+                    <Store className="w-8 h-8 text-primary" />
                   )}
                 </div>
+                <div>
+                  <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
+                  <div className="flex flex-wrap items-center mt-1.5 gap-y-2">
+                    <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">
+                      {merchant.type === 'entreprise' ? 'Management Entreprise' :
+                       merchant.type === 'chantier' ? 'Management BTP / Chantier' :
+                       merchant.type === 'transport' ? 'Management Flotte' :
+                       merchant.type === 'rh' ? 'Management RH' :
+                       merchant.type === 'scolaire' ? 'Management Scolaire' :
+                       merchant.type === 'medical' ? 'Management Médical' :
+                       merchant.type === 'pressing' ? 'Management Pressing' :
+                       merchant.type === 'tailleur' ? 'Ateliers de Couture' :
+                       'Management Commerce'}
+                    </span>
+                    <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
+                    <span className="text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em]">
+                      Plan {merchant.plan}
+                    </span>
+                    {merchant.licenseType && (
+                      <>
+                        <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
+                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${
+                          merchant.licenseType === 'cloud' 
+                            ? 'bg-blue-50 border-blue-100 text-blue-600' 
+                            : 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                        }`}>
+                          {merchant.licenseType === 'cloud' ? <Database className="w-3 h-3" /> : <HardDrive className="w-3 h-3" />}
+                          <span className="text-[9px] font-black uppercase tracking-widest leading-none">
+                            {merchant.licenseType === 'cloud' ? 'Licence Cloud' : 'Licence Locale'}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {isSpecialManager && (
+                      <>
+                        <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-100/60 shadow-sm">
+                          <SlidersHorizontal className="w-3 h-3 text-indigo-500 shrink-0" />
+                          <select
+                            value={merchant.type || 'boutique'}
+                            onChange={(e) => {
+                              const selected = e.target.value;
+                              setOverrideType(selected);
+                              setActiveTab('dashboard');
+                              const newParams = new URLSearchParams(searchParams);
+                              newParams.set('type', selected);
+                              setSearchParams(newParams, { replace: true });
+                              toast.success(`Logiciel SaaS activé : ${selected.toUpperCase()}`);
+                            }}
+                            className="bg-transparent border-none text-[9px] font-black font-mono text-indigo-700 uppercase tracking-widest focus:outline-none cursor-pointer outline-none p-0 pr-6"
+                            title="Changer de logiciel de gestion SaaS"
+                          >
+                            <option value="boutique">🛒 Commerce / Boutique</option>
+                            <option value="entreprise">🛠️ Service & Intervention</option>
+                            <option value="chantier">🚧 BTP & Chantier</option>
+                            <option value="transport">🚚 Flotte & Transport</option>
+                            <option value="rh">👥 Ressources Humaines</option>
+                            <option value="scolaire">🎓 Gestion Scolaire</option>
+                            <option value="medical">🏥 Clinique & Médical</option>
+                            <option value="pressing">🧺 Pressing & Laverie</option>
+                            <option value="tailleur">🪡 Ateliers de Couture</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
             
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <NetworkStatusIndicator position="inline" plan={merchant.plan} />
@@ -3996,6 +4064,12 @@ const MerchantSaaS = () => {
           {activeTab === 'ai' && <AIEducationManager key="ai" merchant={merchant} />}
           {activeTab === 'patients' && <MedicalManager key="patients" merchant={merchant} />}
           {activeTab === 'appointments' && <AppointmentManager key="appointments" merchant={merchant} />}
+          {activeTab === 'tailleur_clients' && <TailleurClientsManager key="tailleur_clients" merchant={merchant} />}
+          {activeTab === 'tailleur_orders' && <TailleurOrdersManager key="tailleur_orders" merchant={merchant} />}
+          {activeTab === 'tailleur_tissus' && <TailleurTissusManager key="tailleur_tissus" merchant={merchant} />}
+          {activeTab === 'tailleur_gallery' && <TailleurGalleryManager key="tailleur_gallery" merchant={merchant} />}
+          {activeTab === 'tailleur_artisans' && <TailleurArtisansManager key="tailleur_artisans" merchant={merchant} />}
+          {activeTab === 'tailleur_mercerie' && <TailleurMercerieCostManager key="tailleur_mercerie" merchant={merchant} />}
           {activeTab === 'pressing_receipt' && <PressingReceiptManager key="pressing_receipt" merchant={merchant} />}
           {activeTab === 'pressing_stock' && <PressingStockManager key="pressing_stock" merchant={merchant} />}
           {activeTab === 'pressing_tarifs' && <PressingTarifsManager key="pressing_tarifs" merchant={merchant} />}
@@ -4198,6 +4272,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     { id: 'scolaire', label: 'Établissement Scolaire', icon: GraduationCap, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
     { id: 'medical', label: 'Établissement Médical', icon: Stethoscope, color: 'text-red-500', bgColor: 'bg-red-50' },
     { id: 'pressing', label: 'Gestion de Pressing', icon: WashingMachine, color: 'text-cyan-500', bgColor: 'bg-cyan-50' },
+    { id: 'tailleur', label: 'Ateliers de Couture', icon: Scissors, color: 'text-violet-500', bgColor: 'bg-violet-50' },
   ];
 
   const plans = PAYMENT_PLANS;
@@ -4218,6 +4293,8 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         return { label: "l'établissement médical", placeholder: "ex: Clinique du Parc" };
       case 'pressing':
         return { label: "le pressing / laverie", placeholder: "ex: Pressing Prestige" };
+      case 'tailleur':
+        return { label: "l'atelier de couture", placeholder: "ex: Atelier de Couture Élégance" };
       default:
         return { label: "votre organisation", placeholder: "ex: Mon Entreprise / Établissement" };
     }
@@ -4490,7 +4567,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
                 <h3 className="text-sm font-black uppercase tracking-widest text-ink">Type de Gestion</h3>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {managementTypes.map((mType) => {
                   const Icon = mType.icon;
                   const isSelected = type === mType.id;
@@ -5481,6 +5558,61 @@ const MerchantDashboard = ({
   const [fileToRestore, setFileToRestore] = useState<File | null>(null);
   const [dashboardSelectedMonth, setDashboardSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
 
+  // Load tailleur-specific data if merchant type is tailleur
+  const tailleurClients = useMemo<any[]>(() => {
+    if (merchant.type !== 'tailleur') return [];
+    try {
+      const saved = localStorage.getItem(`tailleur_clients_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, merchant.type]);
+
+  const tailleurOrders = useMemo<any[]>(() => {
+    if (merchant.type !== 'tailleur') return [];
+    try {
+      const saved = localStorage.getItem(`tailleur_orders_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, merchant.type]);
+
+  const tailleurTissus = useMemo<any[]>(() => {
+    if (merchant.type !== 'tailleur') return [];
+    try {
+      const saved = localStorage.getItem(`tailleur_tissus_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  }, [merchant.id, merchant.type]);
+
+  const tailleurDashboardStats = useMemo(() => {
+    if (merchant.type !== 'tailleur') return null;
+
+    const filteredOrders = dashboardSelectedMonth
+      ? tailleurOrders.filter(o => o.createdAt && o.createdAt.startsWith(dashboardSelectedMonth))
+      : tailleurOrders;
+
+    const ordersCount = filteredOrders.length;
+    const totalOrdersAmount = filteredOrders.reduce((sum, o) => sum + (Number(o.price) || 0), 0);
+    const totalAdvances = filteredOrders.reduce((sum, o) => sum + (Number(o.advance) || 0), 0);
+    const totalPaid = filteredOrders.filter(o => o.status === 'livre').length;
+    const activeOrders = filteredOrders.filter(o => o.status !== 'livre').length;
+
+    return {
+      ordersCount,
+      totalOrdersAmount,
+      totalAdvances,
+      totalPaid,
+      activeOrders,
+      clientsCount: tailleurClients.length,
+      tissusCount: tailleurTissus.length
+    };
+  }, [tailleurClients, tailleurOrders, tailleurTissus, merchant.type, dashboardSelectedMonth]);
+
   // Load pressing-specific data if merchant type is pressing
   const pressingTickets = useMemo<PressingTicket[]>(() => {
     if (merchant.type !== 'pressing') return [];
@@ -6437,6 +6569,28 @@ const MerchantDashboard = ({
                 />
               </>
             )}
+            {merchant.type === 'tailleur' && (
+              <>
+                <StatCard 
+                  title="Commandes Couture" 
+                  value={tailleurDashboardStats?.totalOrdersAmount || 0} 
+                  currency={merchant.currency} 
+                  icon={Scissors} 
+                  color="text-violet-600" 
+                  bgColor="bg-violet-50" 
+                  description={`${tailleurDashboardStats?.ordersCount || 0} fiches de mesures`} 
+                />
+                <StatCard 
+                  title="Total Acomptes" 
+                  value={tailleurDashboardStats?.totalAdvances || 0} 
+                  currency={merchant.currency} 
+                  icon={CreditCard} 
+                  color="text-emerald-600" 
+                  bgColor="bg-emerald-50" 
+                  description={`${tailleurDashboardStats?.totalPaid || 0} commandes livrées`} 
+                />
+              </>
+            )}
             <StatCard title="Dépenses" value={stats.expenses.total} currency={merchant.currency} icon={BarChart3} color="text-red-600" bgColor="bg-red-50" description="Total cumulé" />
             <StatCard title="Bénéfice Net" value={stats.netProfit} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description="Total cumulé" />
           </>
@@ -7170,6 +7324,55 @@ const MerchantDashboard = ({
                           inter.status === 'completed' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
                         }`}>
                           {inter.status === 'completed' ? 'TERMINÉ' : 'EN COURS'}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : merchant.type === 'tailleur' ? (
+              <>
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-black text-ink">Dernières Commandes Couture</h3>
+                    <p className="text-[10px] font-mono text-gray-400 uppercase tracking-[0.2em] mt-1">Avancement des conceptions en atelier</p>
+                  </div>
+                  <span className="px-4 py-1.5 bg-violet-150 text-violet-600 text-[10px] font-black rounded-full border border-violet-100 shadow-sm">
+                    {tailleurOrders.length.toString().padStart(2, '0')} FICHES
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {tailleurOrders.length === 0 ? (
+                    <div className="py-16 flex flex-col items-center justify-center text-center bg-gray-50/30 rounded-[2rem] border border-dashed border-gray-200">
+                      <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-sm border border-black/5">
+                        <Scissors className="w-10 h-10 text-gray-200" />
+                      </div>
+                      <p className="text-gray-400 text-sm font-black uppercase tracking-widest">Aucune commande en attente</p>
+                    </div>
+                  ) : (
+                    tailleurOrders.slice(0, 5).map((order: any) => (
+                      <div key={order.id} className="flex items-center justify-between p-5 bg-white rounded-[2rem] border border-black/5 hover:shadow-xl transition-all group relative overflow-hidden">
+                        <div className="flex items-center space-x-5">
+                          <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center border border-violet-150 group-hover:scale-110 transition-transform">
+                            <Scissors className="w-7 h-7 text-violet-600" />
+                          </div>
+                          <div>
+                            <p className="font-black text-base text-ink leading-tight">{order.clientName}</p>
+                            <p className="text-[10px] font-mono text-gray-450 mt-0.5">{order.description || order.model} — {Number(order.price).toLocaleString()} {merchant.currency}</p>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border ${
+                          order.status === 'livre' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                          order.status === 'pret' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                          order.status === 'retouche' ? 'bg-pink-50 text-pink-600 border-pink-100' :
+                          order.status === 'coupe' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                          'bg-amber-50 text-amber-600 border-amber-100'
+                        }`}>
+                          {order.status === 'livre' ? 'LIVRÉ' :
+                           order.status === 'pret' ? 'PRÊT / ESSAYAGE' :
+                           order.status === 'retouche' ? 'RETOUCHE' :
+                           order.status === 'coupe' ? 'COUPE & COUTURE' :
+                           'PRISE MESURES'}
                         </span>
                       </div>
                     ))
@@ -33292,6 +33495,2347 @@ const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         onClose={() => setPopup(prev => ({ ...prev, isOpen: false }))}
         {...popup}
       />
+    </motion.div>
+  );
+};
+
+// ==========================================
+// SAAS ATELIERS DE COUTURE COMPONENTS
+// ==========================================
+
+const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => {
+  const [clients, setClients] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [currentClient, setCurrentClient] = useState<any>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Trigger sync and reload
+  const triggerSync = async (force: boolean = false) => {
+    setIsSyncing(true);
+    try {
+      await syncService.syncTailoringCollection(merchant.id, 'clients', force);
+      const saved = localStorage.getItem(`tailleur_clients_${merchant.id}`);
+      if (saved) setClients(JSON.parse(saved));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Load clients
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`tailleur_clients_${merchant.id}`);
+      if (saved) setClients(JSON.parse(saved));
+    } catch (e) {
+      console.error(e);
+    }
+    triggerSync();
+  }, [merchant.id]);
+
+  const saveClients = (newClients: any[]) => {
+    setClients(newClients);
+    localStorage.setItem(`tailleur_clients_${merchant.id}`, JSON.stringify(newClients));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentClient.firstName || !currentClient.lastName) {
+      toast.error('Veuillez saisir le prénom et le nom');
+      return;
+    }
+
+    let updated;
+    if (currentClient.id) {
+      updated = clients.map(c => c.id === currentClient.id ? { ...currentClient, syncStatus: 'pending', updatedAt: new Date().toISOString() } : c);
+      toast.success('Fiche client mise à jour');
+    } else {
+      const newCl = {
+        ...currentClient,
+        id: crypto.randomUUID(),
+        syncStatus: 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      updated = [newCl, ...clients];
+      toast.success('Nouveau client enregistré');
+    }
+    saveClients(updated);
+    setIsFormOpen(false);
+    setCurrentClient(null);
+    triggerSync();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Voulez-vous vraiment supprimer ce client ? Toutes ses mesures seront perdues.')) {
+      const target = clients.find(c => c.id === id);
+      let updated;
+      if (target) {
+        if (target.syncStatus === 'synced') {
+          updated = clients.map(c => c.id === id ? { ...c, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() } : c);
+        } else {
+          updated = clients.filter(c => c.id !== id);
+        }
+        saveClients(updated);
+        toast.success('Fiche client supprimée');
+        triggerSync();
+      }
+    }
+  };
+
+  const exportClientsToCSV = () => {
+    try {
+      const activeClients = clients.filter(c => !c.isDeleted);
+      if (activeClients.length === 0) {
+        toast.error("Aucun client à exporter");
+        return;
+      }
+
+      let csvContent = "\uFEFF";
+      csvContent += "Prénom,Nom,Téléphone,Email,Genre,Adresse,Tour de Cou (cm),Tour de Poitrine (cm),Épaule à Épaule (cm),Longueur Manche (cm),Tour de Bras (cm),Tour de Taille (cm),Tour de Hanches (cm),Longueur Pantalon (cm),Tour de Cuisse (cm),Longueur Grand Boubou (cm),Notes,Date de Création\n";
+
+      activeClients.forEach(c => {
+        const m = c.measurements || {};
+        const row = [
+          c.firstName || '',
+          c.lastName || '',
+          c.phone || '',
+          c.email || '',
+          c.gender || '',
+          (c.address || '').replace(/"/g, '""'),
+          m.cou || '',
+          m.poitrine || '',
+          m.epaule || '',
+          m.manche || '',
+          m.tourBras || '',
+          m.taille || '',
+          m.hanches || '',
+          m.pantalon || '',
+          m.cuisse || '',
+          m.boubou || '',
+          (c.notes || '').replace(/"/g, '""'),
+          c.createdAt || ''
+        ].map(val => `"${String(val).replace(/\n/g, ' ')}"`).join(",");
+        csvContent += row + "\n";
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Mesures_Clients_Couture_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Listing des mesures exporté avec succès (Excel CSV)");
+    } catch (error) {
+      console.error(error);
+      toast.error("Échec de l'export Excel CSV");
+    }
+  };
+
+  const exportClientsToPDF = () => {
+    const activeClients = clients.filter(c => !c.isDeleted);
+    if (activeClients.length === 0) {
+      toast.error("Aucun client à exporter");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error("Veuillez autoriser les fenêtres pop-up pour générer le PDF");
+      return;
+    }
+
+    const html = `
+      <html>
+        <head>
+          <title>Fiches de Mesures Clients - ${merchant.name}</title>
+          <style>
+            body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; padding: 40px; }
+            h1 { font-size: 24px; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: -0.5px; }
+            .header-info { font-size: 11px; font-family: monospace; color: #64748b; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
+            .client-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; page-break-inside: avoid; }
+            .client-header { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 10px; }
+            .client-name { font-size: 16px; font-weight: bold; color: #7c3aed; }
+            .client-contact { font-size: 12px; color: #64748b; font-family: monospace; }
+            .measures-grid { display: grid; grid-template-cols: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
+            .measure-item { background: #f8fafc; border: 1px solid #f1f5f9; padding: 8px; border-radius: 8px; text-align: center; }
+            .measure-label { font-size: 8px; font-weight: bold; color: #94a3b8; text-transform: uppercase; display: block; }
+            .measure-value { font-size: 12px; font-weight: 900; font-family: monospace; color: #0f172a; margin-top: 2px; display: block; }
+            .notes { font-size: 11px; color: #475569; background: #fafafa; padding: 10px; border-radius: 8px; border-left: 3px solid #7c3aed; margin-top: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>Listing des Mesures Clients</h1>
+          <div class="header-info">Atelier : ${merchant.name} | Date : ${new Date().toLocaleDateString('fr-FR')} | Clients Couture : ${activeClients.length}</div>
+          
+          ${activeClients.map(c => {
+            const m = c.measurements || {};
+            return `
+              <div class="client-card">
+                <div class="client-header">
+                  <div class="client-name">${c.firstName} ${c.lastName} (${c.gender === 'F' ? 'Femme' : 'Homme'})</div>
+                  <div class="client-contact">${c.phone || 'Pas de numéro'} ${c.email ? `| ${c.email}` : ''}</div>
+                </div>
+                <div class="measures-grid">
+                  <div class="measure-item"><span class="measure-label">Cou</span><span class="measure-value">${m.cou ? `${m.cou} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Poitrine</span><span class="measure-value">${m.poitrine ? `${m.poitrine} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Épaule</span><span class="measure-value">${m.epaule ? `${m.epaule} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Manche</span><span class="measure-value">${m.manche ? `${m.manche} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Tour de Bras</span><span class="measure-value">${m.tourBras ? `${m.tourBras} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Taille</span><span class="measure-value">${m.taille ? `${m.taille} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Hanches</span><span class="measure-value">${m.hanches ? `${m.hanches} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Longueur Pantalon</span><span class="measure-value">${m.pantalon ? `${m.pantalon} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Cuisse</span><span class="measure-value">${m.cuisse ? `${m.cuisse} cm` : '—'}</span></div>
+                  <div class="measure-item"><span class="measure-label">Grand Boubou</span><span class="measure-value">${m.boubou ? `${m.boubou} cm` : '—'}</span></div>
+                </div>
+                ${c.notes ? `<div class="notes"><strong>Notes de l'atelier :</strong> ${c.notes}</div>` : ''}
+              </div>
+            `;
+          }).join('')}
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(() => { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const filteredClients = clients
+    .filter(c => !c.isDeleted)
+    .filter(c => 
+      `${c.firstName} ${c.lastName}`.toLowerCase().includes(search.toLowerCase()) || 
+      (c.phone && c.phone.includes(search))
+    );
+
+  const MEASUREMENT_LABELS: Record<string, string> = {
+    cou: 'Tour de Cou (cm)',
+    poitrine: 'Tour de Poitrine (cm)',
+    epaule: 'Épaule à Épaule (cm)',
+    manche: 'Longueur Manche (cm)',
+    tourBras: 'Tour de Bras (cm)',
+    taille: 'Tour de Taille (cm)',
+    hanches: 'Tour de Hanches (cm)',
+    pantalon: 'Longueur Pantalon / Jupe (cm)',
+    cuisse: 'Tour de Cuisse (cm)',
+    boubou: 'Longueur Grand Boubou (cm)'
+  };
+
+  const initialClientState = {
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
+    address: '',
+    gender: 'M',
+    measurements: {
+      cou: '',
+      poitrine: '',
+      epaule: '',
+      manche: '',
+      tourBras: '',
+      taille: '',
+      hanches: '',
+      pantalon: '',
+      cuisse: '',
+      boubou: ''
+    },
+    notes: ''
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 text-left">
+        <div>
+          <h2 className="text-2xl font-black text-ink">Fichier Clients Couture</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Clients actifs : {filteredClients.length.toString().padStart(3, '0')}</p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <button
+            onClick={() => triggerSync(true)}
+            disabled={isSyncing}
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Sinc...' : 'Sync 🔄'}</span>
+          </button>
+
+          <button
+            onClick={exportClientsToCSV}
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Excel / CSV 📊</span>
+          </button>
+
+          <button
+            onClick={exportClientsToPDF}
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>PDF / Imprimer 🖨️</span>
+          </button>
+
+          <button 
+            onClick={() => {
+              setCurrentClient(initialClientState);
+              setIsFormOpen(true);
+            }}
+            className="flex-1 lg:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-600/20 hover:scale-[1.02] transition"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ajouter un Client</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-left">
+        <Search className="w-5 h-5 text-gray-400 shrink-0 ml-1" />
+        <input 
+          type="text" 
+          placeholder="Rechercher par nom, prénom ou téléphone..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full text-sm text-slate-700 bg-transparent outline-none font-medium placeholder-gray-400"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="p-1 hover:bg-gray-100 rounded-lg text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {isFormOpen && currentClient && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-violet-50/55 shrink-0">
+              <div className="text-left">
+                <h3 className="text-xl font-black text-ink">{currentClient.id ? 'Modifier la Fiche Client' : 'Nouvelle Fiche Client'}</h3>
+                <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Enregistrement des détails et mesures</p>
+              </div>
+              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto flex-1 text-left">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Column des inputs */}
+                <div className="lg:col-span-8 space-y-6">
+                  {/* Informations Générales */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-violet-600 uppercase tracking-wider border-b border-violet-100 pb-1">1. Informations Générales</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Prénom *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={currentClient.firstName}
+                      onChange={e => setCurrentClient({ ...currentClient, firstName: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Nom de Famille *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={currentClient.lastName}
+                      onChange={e => setCurrentClient({ ...currentClient, lastName: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Genre</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => setCurrentClient({ ...currentClient, gender: 'M' })}
+                        className={`py-2 px-3 border rounded-xl text-center text-xs font-bold transition-all ${currentClient.gender === 'M' ? 'bg-violet-600 border-violet-600 text-white' : 'border-gray-200 text-gray-600'}`}
+                      >
+                        Homme
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setCurrentClient({ ...currentClient, gender: 'F' })}
+                        className={`py-2 px-3 border rounded-xl text-center text-xs font-bold transition-all ${currentClient.gender === 'F' ? 'bg-violet-600 border-violet-600 text-white' : 'border-gray-200 text-gray-600'}`}
+                      >
+                        Femme
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Téléphone</label>
+                    <input 
+                      type="tel" 
+                      value={currentClient.phone || ''}
+                      onChange={e => setCurrentClient({ ...currentClient, phone: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Adresse E-mail</label>
+                    <input 
+                      type="email" 
+                      value={currentClient.email || ''}
+                      onChange={e => setCurrentClient({ ...currentClient, email: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Adresse Physique</label>
+                    <input 
+                      type="text" 
+                      value={currentClient.address || ''}
+                      onChange={e => setCurrentClient({ ...currentClient, address: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Mesures Couture */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-black text-violet-600 uppercase tracking-wider border-b border-violet-100 pb-1">2. Mesures d'Atelier (en cm)</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                  {Object.keys(MEASUREMENT_LABELS).map((key) => {
+                    const isFocused = focusedField === key;
+                    return (
+                      <div key={key} className="transition-all">
+                        <label className={`block text-[11px] font-bold mb-1 truncate text-ellipsis transition-colors ${isFocused ? 'text-violet-600 font-black scale-105' : 'text-gray-500'}`}>{MEASUREMENT_LABELS[key]}</label>
+                        <input 
+                          type="number" 
+                          step="0.5"
+                          placeholder="Néant"
+                          value={currentClient.measurements?.[key] || ''}
+                          onFocus={() => setFocusedField(key)}
+                          onBlur={() => setFocusedField(null)}
+                          onChange={e => setCurrentClient({
+                            ...currentClient,
+                            measurements: {
+                              ...currentClient.measurements,
+                              [key]: e.target.value
+                            }
+                          })}
+                          className={`w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-mono font-bold text-center text-sm transition-all ${isFocused ? 'border-violet-500 ring-2 ring-violet-500/20 bg-violet-50/50 scale-105' : 'border-slate-200 bg-white'}`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Notes complémentaires */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-600">Notes & Exigences Particulières (Styles préférés, allergies de tissu, etc.)</label>
+                <textarea 
+                  rows={3}
+                  value={currentClient.notes || ''}
+                  onChange={e => setCurrentClient({ ...currentClient, notes: e.target.value })}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                  placeholder="Ex : Préfère des ourlets invisibles, aime les coupes cintrées, etc."
+                />
+              </div>
+            </div>
+
+            {/* Mannequin Interactif et Visualisation de Mesure */}
+            <div className="lg:col-span-4 bg-slate-50/70 border border-slate-100 rounded-3xl p-6 flex flex-col justify-between space-y-6">
+              <div className="space-y-4">
+                <div className="border-b border-violet-100 pb-2">
+                  <h4 className="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-1.5">
+                    <Scissors className="w-3.5 h-3.5" /> Guide des Mesures
+                  </h4>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Silhouette d'atelier dynamique ({currentClient.gender === 'F' ? 'Femme' : 'Homme'})</p>
+                </div>
+
+                <div className="relative w-full h-[280px] bg-white rounded-2xl border border-slate-100 flex items-center justify-center p-4 overflow-hidden shadow-sm">
+                  {/* SVG Silhouette */}
+                  <svg viewBox="0 0 200 300" className="w-full h-full max-w-[160px] text-slate-300 transition-all duration-300">
+                    {/* Head & Neck */}
+                    <circle cx="100" cy="30" r="14" fill="none" stroke="currentColor" strokeWidth="2" />
+                    <path d="M96 44 L96 52 M104 44 L104 52" stroke="currentColor" strokeWidth="2" />
+                    
+                    {/* Body Silhouette */}
+                    {currentClient.gender === 'F' ? (
+                      <path d="M80 55 C80 55, 65 65, 65 80 C65 95, 75 110, 75 125 C75 135, 70 145, 70 160 L78 260 L92 260 L96 170 L104 170 L108 260 L122 260 L130 160 C130 145, 125 135, 125 125 C125 110, 135 95, 135 80 C135 65, 120 55, 120 55 Z" fill="none" stroke="currentColor" strokeWidth="2" />
+                    ) : (
+                      <path d="M72 55 C72 55, 60 62, 60 80 C60 100, 70 120, 70 135 C70 145, 68 155, 68 175 L76 260 L92 260 L96 170 L104 170 L108 260 L124 260 L132 175 C132 155, 130 145, 130 135 C130 120, 140 100, 140 80 C140 62, 128 55, 128 55 Z" fill="none" stroke="currentColor" strokeWidth="2" />
+                    )}
+
+                    {/* Arms */}
+                    <path d="M65 80 L52 140" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <path d="M135 80 L148 140" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+
+                    {/* Highlighted lines or hotspots */}
+                    {/* Tour de Cou */}
+                    <ellipse cx="100" cy="49" rx="8" ry="3" fill="none" stroke={focusedField === 'cou' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
+                    {focusedField === 'cou' && <circle cx="100" cy="49" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Épaule à Épaule */}
+                    <path d="M72 56 L128 56" stroke={focusedField === 'epaule' ? '#7c3aed' : 'transparent'} strokeWidth="3" className="transition-all" strokeLinecap="round" />
+                    {focusedField === 'epaule' && <circle cx="100" cy="56" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Tour de Poitrine */}
+                    <ellipse cx="100" cy="80" rx="28" ry="6" fill="none" stroke={focusedField === 'poitrine' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
+                    {focusedField === 'poitrine' && <circle cx="100" cy="80" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Longueur Manche */}
+                    <path d="M135 80 L148 140" stroke={focusedField === 'manche' ? '#7c3aed' : 'transparent'} strokeWidth="3.5" className="transition-all" strokeLinecap="round" />
+                    {focusedField === 'manche' && <circle cx="141" cy="110" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Tour de Bras */}
+                    <ellipse cx="140" cy="98" rx="8" ry="4" fill="none" stroke={focusedField === 'tourBras' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" transform="rotate(-15 140 98)" />
+                    {focusedField === 'tourBras' && <circle cx="140" cy="98" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Tour de Taille */}
+                    <ellipse cx="100" cy="120" rx="24" ry="5" fill="none" stroke={focusedField === 'taille' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
+                    {focusedField === 'taille' && <circle cx="100" cy="120" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Tour de Hanches */}
+                    <ellipse cx="100" cy="142" rx="27" ry="5.5" fill="none" stroke={focusedField === 'hanches' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
+                    {focusedField === 'hanches' && <circle cx="100" cy="142" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Longueur Pantalon */}
+                    <path d="M115 145 L115 250" stroke={focusedField === 'pantalon' ? '#7c3aed' : 'transparent'} strokeWidth="3" className="transition-all" strokeLinecap="round" />
+                    {focusedField === 'pantalon' && <circle cx="115" cy="195" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Tour de Cuisse */}
+                    <ellipse cx="85" cy="170" rx="11" ry="4" fill="none" stroke={focusedField === 'cuisse' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
+                    {focusedField === 'cuisse' && <circle cx="85" cy="170" r="4" className="fill-violet-600 animate-ping" />}
+
+                    {/* Longueur Grand Boubou */}
+                    <path d="M100 55 L100 255" stroke={focusedField === 'boubou' ? '#7c3aed' : 'transparent'} strokeWidth="3" className="transition-all" strokeLinecap="round" strokeDasharray="3 3" />
+                    {focusedField === 'boubou' && <circle cx="100" cy="155" r="4" className="fill-violet-600 animate-ping" />}
+                  </svg>
+                </div>
+
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 min-h-[90px] flex flex-col justify-center text-left">
+                  <span className="text-[10px] font-mono font-bold text-violet-600 uppercase tracking-widest mb-1">
+                    {focusedField ? MEASUREMENT_LABELS[focusedField] : "Sélectionnez une mesure"}
+                  </span>
+                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                    {focusedField === 'cou' && "Mesurez la circonférence de la base du cou sans trop serrer."}
+                    {focusedField === 'poitrine' && "Mesurez horizontalement au niveau le plus large du torse ou de la poitrine."}
+                    {focusedField === 'epaule' && "Mesurez dans le dos, d'un os saillant de l'épaule à l'autre."}
+                    {focusedField === 'manche' && "Longueur du haut de l'épaule jusqu'à la limite souhaitée de la manche."}
+                    {focusedField === 'tourBras' && "Circonférence du biceps au point le plus volumineux."}
+                    {focusedField === 'taille' && "Mesurez la circonférence de la taille naturelle (environ 2 cm au-dessus du nombril)."}
+                    {focusedField === 'hanches' && "Mesurez la circonférence au niveau le plus large du fessier."}
+                    {focusedField === 'pantalon' && "Longueur de la taille jusqu'à l'ourlet du bas de la cheville."}
+                    {focusedField === 'cuisse' && "Tour de la cuisse à l'endroit le plus fort, sous l'entrejambe."}
+                    {focusedField === 'boubou' && "Longueur totale pour un grand boubou, mesurée du haut de l'épaule jusqu'au sol."}
+                    {!focusedField && "Cliquez sur l'un des champs de mesure pour voir l'aide d'atelier s'afficher ici."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-violet-50/50 p-4 rounded-2xl border border-violet-100/50 text-left">
+                <span className="text-[9px] font-black text-violet-600 uppercase tracking-widest block mb-1">Rappel de Coupe</span>
+                <p className="text-[10px] text-violet-700/80 leading-normal font-medium">Pour les tissus non extensibles (Bazin, Wax), prévoyez une marge d'aisance standard de 4 à 6 cm pour les vêtements amples.</p>
+              </div>
+            </div>
+          </div>
+
+              {/* Footer Actions */}
+              <div className="border-t border-gray-100 pt-6 flex justify-end gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsFormOpen(false)}
+                  className="px-5 py-2.5 bg-gray-150 hover:bg-gray-200 text-ink rounded-xl font-bold text-sm transition-colors cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md cursor-pointer"
+                >
+                  <Save className="w-4 h-4" /> Enregistrer le Client
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Liste des Clients */}
+      {filteredClients.length === 0 ? (
+        <div className="bg-white py-16 text-center rounded-[2rem] border border-gray-150 shadow-sm flex flex-col items-center justify-center text-left">
+          <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mb-4 border border-violet-100">
+            <Users className="w-8 h-8 text-violet-400" />
+          </div>
+          <p className="text-gray-500 font-bold mb-1">Aucun client trouvé</p>
+          <p className="text-xs text-gray-400">Ajoutez des clients pour stocker leurs mesures de couture métriques.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+          {filteredClients.map((client) => (
+            <div key={client.id} className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black ${client.gender === 'F' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600'}`}>
+                      {client.gender === 'F' ? '🚺' : '🚹'}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-ink text-lg leading-tight">{client.firstName} {client.lastName}</h3>
+                      <p className="text-xs text-gray-400 font-medium">Modifié le {format(new Date(client.updatedAt), 'dd/MM/yyyy HH:mm')}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1.5 bg-slate-50 p-1 rounded-xl">
+                    <button 
+                      onClick={() => {
+                        setCurrentClient(client);
+                        setIsFormOpen(true);
+                      }}
+                      className="p-1.5 hover:bg-white hover:text-violet-600 hover:shadow-sm text-gray-500 rounded-lg transition-transform"
+                      title="Modifier"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(client.id)}
+                      className="p-1.5 hover:bg-white hover:text-red-600 hover:shadow-sm text-gray-500 rounded-lg transition-transform"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs text-gray-500 border-t border-gray-100 pt-3">
+                  {client.phone && (
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <Phone className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{client.phone}</span>
+                    </div>
+                  )}
+                  {client.address && (
+                    <div className="flex items-center gap-1.5 font-medium col-span-2">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="truncate">{client.address}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                    <Scissors className="w-3 h-3 text-violet-500" /> Principales Mesures
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {Object.keys(MEASUREMENT_LABELS).slice(0, 6).map((key) => (
+                      <div key={key} className="bg-white p-2 rounded-xl text-center border border-black/[0.02]">
+                        <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest">{key}</span>
+                        <span className="font-mono text-xs font-black text-ink">{client.measurements?.[key] ? `${client.measurements[key]} cm` : '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [tissus, setTissus] = useState<any[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [currentOrder, setCurrentOrder] = useState<any>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'timeline' | 'campaigns'>('list');
+  const [isWhatsappModalOpen, setIsWhatsappModalOpen] = useState(false);
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [whatsappClientPhone, setWhatsappClientPhone] = useState('');
+  const [whatsappOrder, setWhatsappOrder] = useState<any>(null);
+  const [whatsappTemplateType, setWhatsappTemplateType] = useState<'status' | 'balance' | 'promo'>('status');
+
+  // Campagnes de Fidélisation & Fêtes
+  const [selectedCampaignHoliday, setSelectedCampaignHoliday] = useState<string>('tabaski');
+  const [campaignCustomText, setCampaignCustomText] = useState<string>('');
+  const [selectedCampaignClients, setSelectedCampaignClients] = useState<string[]>([]);
+
+  // Update dynamic template in the WhatsApp modal
+  const updateWhatsappMessageTemplate = (orderObj: any, type: 'status' | 'balance' | 'promo') => {
+    if (!orderObj) return;
+    const price = Number(orderObj.price || 0);
+    const advance = Number(orderObj.advance || 0);
+    const rest = Math.max(0, price - advance);
+    const trackingUrl = `${window.location.origin}/suivi-commande/${orderObj.id}`;
+    
+    let statusText = 'Enregistrée';
+    if (orderObj.status === 'mesures') statusText = 'Prise de mesures validée 📏';
+    else if (orderObj.status === 'coupe') statusText = 'En cours de découpe et couture ✂️';
+    else if (orderObj.status === 'retouche') statusText = 'Ajustements & finitions de broderie 🧵';
+    else if (orderObj.status === 'pret') statusText = 'Prête pour essayage / retrait ! 👗';
+    else if (orderObj.status === 'livre') statusText = 'Livrée au client 🤝';
+
+    let msg = '';
+    if (type === 'status') {
+      msg = `Bonjour ${orderObj.clientName}, des nouvelles de votre création chez ${merchant.name} ! Votre modèle "${orderObj.model}" est actuellement au statut : *${statusText}*. Vous pouvez suivre la progression en temps réel sur votre lien de suivi sécurisé en 1 clic : ${trackingUrl}. Merci pour votre confiance ! 🧵`;
+    } else if (type === 'balance') {
+      msg = `Bonjour ${orderObj.clientName}, votre modèle "${orderObj.model}" est prêt chez ${merchant.name} ! 🎉 Pour rappel de l'acompte :\n- Prix total convenu : ${price.toLocaleString()} ${merchant.currency}\n- Acompte versé : ${advance.toLocaleString()} ${merchant.currency}\n- *Reste à régler à la livraison : ${rest.toLocaleString()} ${merchant.currency}*\nConsultez le statut de votre commande et votre fiche de mesures en direct ici : ${trackingUrl}. À très vite ! 👋`;
+    } else {
+      msg = `Bonjour ${orderObj.clientName}, votre atelier ${merchant.name} vous remercie pour votre fidélité ! ✨ Nous espérons que votre modèle "${orderObj.model}" vous plaît toujours autant. Découvrez nos créations de fête et de saison en nous rendant visite ! Suivez votre fiche ici : ${trackingUrl} 👗`;
+    }
+    setWhatsappMessage(msg);
+    setWhatsappTemplateType(type);
+  };
+
+  const handleOpenWhatsapp = (order: any) => {
+    setWhatsappOrder(order);
+    setWhatsappClientPhone(order.clientPhone || '');
+    updateWhatsappMessageTemplate(order, 'status');
+    setIsWhatsappModalOpen(true);
+  };
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Trigger sync and reload
+  const triggerSync = async (force: boolean = false) => {
+    setIsSyncing(true);
+    try {
+      await syncService.syncTailoringCollection(merchant.id, 'orders', force);
+      const savedOrders = localStorage.getItem(`tailleur_orders_${merchant.id}`);
+      if (savedOrders) setOrders(JSON.parse(savedOrders));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Load clients, orders and fabrics
+  useEffect(() => {
+    try {
+      const savedClients = localStorage.getItem(`tailleur_clients_${merchant.id}`);
+      if (savedClients) setClients(JSON.parse(savedClients));
+
+      const savedOrders = localStorage.getItem(`tailleur_orders_${merchant.id}`);
+      if (savedOrders) setOrders(JSON.parse(savedOrders));
+
+      const savedTissus = localStorage.getItem(`tailleur_tissus_${merchant.id}`);
+      if (savedTissus) setTissus(JSON.parse(savedTissus));
+    } catch (e) {
+      console.error(e);
+    }
+    triggerSync();
+  }, [merchant.id]);
+
+  const saveOrders = (newOrders: any[]) => {
+    setOrders(newOrders);
+    localStorage.setItem(`tailleur_orders_${merchant.id}`, JSON.stringify(newOrders));
+  };
+
+  const handleCreateOrder = () => {
+    if (clients.filter(c => !c.isDeleted).length === 0) {
+      toast.error("Veuillez d'abord ajouter des clients dans l'onglet 'Clients Couture'");
+      return;
+    }
+    const initialOrder = {
+      clientId: '',
+      clientName: '',
+      model: '',
+      tissuUsed: '',
+      price: '',
+      advance: '',
+      status: 'mesures',
+      deliveryDate: '',
+      notes: ''
+    };
+    setCurrentOrder(initialOrder);
+    setIsFormOpen(true);
+  };
+
+  const handleSelectClient = (clientId: string) => {
+    const selected = clients.find(c => c.id === clientId);
+    if (selected) {
+      setCurrentOrder({
+        ...currentOrder,
+        clientId,
+        clientName: `${selected.firstName} ${selected.lastName}`,
+        clientPhone: selected.phone || '',
+        clientMeasurements: selected.measurements || {}
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentOrder.clientId) {
+      toast.error('Veuillez sélectionner un client associé');
+      return;
+    }
+    if (!currentOrder.model) {
+      toast.error('Veuillez spécifier le modèle ou description');
+      return;
+    }
+
+    let finalOrder = { ...currentOrder };
+
+    // Déduction automatique du tissu du stock si sélectionné
+    if (currentOrder.selectedTissuId && currentOrder.tissuLengthUsed) {
+      const lengthUsed = Number(currentOrder.tissuLengthUsed);
+      if (lengthUsed > 0) {
+        const targetTissu = tissus.find(t => t.id === currentOrder.selectedTissuId);
+        if (targetTissu) {
+          const currentQty = Number(targetTissu.quantity || 0);
+          if (currentQty < lengthUsed) {
+            toast.error(`Stock insuffisant pour ${targetTissu.name}. Disponible : ${currentQty}m, Requis : ${lengthUsed}m`);
+          }
+          const newQty = Math.max(0, currentQty - lengthUsed);
+          const updatedTissus = tissus.map(t => t.id === targetTissu.id ? { ...t, quantity: newQty, syncStatus: 'pending', updatedAt: new Date().toISOString() } : t);
+          setTissus(updatedTissus);
+          localStorage.setItem(`tailleur_tissus_${merchant.id}`, JSON.stringify(updatedTissus));
+          
+          // Mettre à jour le tissu utilisé
+          finalOrder.tissuUsed = `${targetTissu.name} (${lengthUsed}m)`;
+          
+          // Optionnel: Déclencher aussi la synchronisation des tissus
+          syncService.syncTailoringCollection(merchant.id, 'tissus');
+        }
+      }
+    }
+
+    let updated;
+    if (finalOrder.id) {
+      updated = orders.map(o => o.id === finalOrder.id ? { ...finalOrder, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
+      toast.success('Commande modifiée avec succès');
+    } else {
+      const newOrd = {
+        ...finalOrder,
+        id: crypto.randomUUID(),
+        syncStatus: 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      updated = [newOrd, ...orders];
+      toast.success('Nouvelle commande enregistrée');
+    }
+    saveOrders(updated);
+    setIsFormOpen(false);
+    setCurrentOrder(null);
+    triggerSync();
+  };
+
+  const handleStatusChange = async (id: string, nextStatus: string) => {
+    const updated = orders.map(o => o.id === id ? { ...o, status: nextStatus, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
+    saveOrders(updated);
+    toast.success('Statut de la commande modifié');
+    triggerSync();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Voulez-vous supprimer cette commande ?')) {
+      const target = orders.find(o => o.id === id);
+      let updated;
+      if (target) {
+        if (target.syncStatus === 'synced') {
+          updated = orders.map(o => o.id === id ? { ...o, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
+        } else {
+          updated = orders.filter(o => o.id !== id);
+        }
+        saveOrders(updated);
+        toast.success('Commande supprimée');
+        triggerSync();
+      }
+    }
+  };
+
+  const exportOrdersToCSV = () => {
+    try {
+      const activeOrders = orders.filter(o => !o.isDeleted);
+      if (activeOrders.length === 0) {
+        toast.error("Aucune commande à exporter");
+        return;
+      }
+
+      let csvContent = "\uFEFF";
+      csvContent += "Client,Téléphone,Modèle,Tissu Utilisé,Prix,Acompte,Reste à Payer,Statut,Livraison Prévue,Date de Commande\n";
+
+      activeOrders.forEach(o => {
+        const price = Number(o.price || 0);
+        const advance = Number(o.advance || 0);
+        const rest = Math.max(0, price - advance);
+        const row = [
+          o.clientName || '',
+          o.clientPhone || '',
+          o.model || '',
+          o.tissuUsed || '',
+          price,
+          advance,
+          rest,
+          o.status || '',
+          o.deliveryDate || '',
+          o.createdAt || ''
+        ].map(val => `"${String(val).replace(/\n/g, ' ')}"`).join(",");
+        csvContent += row + "\n";
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Registre_Commandes_Couture_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Registre des commandes exporté avec succès (Excel CSV)");
+    } catch (error) {
+      console.error(error);
+      toast.error("Échec de l'export Excel CSV");
+    }
+  };
+
+  const exportOrdersToPDF = () => {
+    const activeOrders = orders.filter(o => !o.isDeleted);
+    if (activeOrders.length === 0) {
+      toast.error("Aucune commande à exporter");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error("Veuillez autoriser les fenêtres pop-up pour générer le PDF");
+      return;
+    }
+
+    const totalRevenue = activeOrders.reduce((acc, o) => acc + (Number(o.price) || 0), 0);
+    const totalAdvances = activeOrders.reduce((acc, o) => acc + (Number(o.advance) || 0), 0);
+    const totalRemaining = Math.max(0, totalRevenue - totalAdvances);
+
+    const html = `
+      <html>
+        <head>
+          <title>Registre des Commandes Couture - ${merchant.name}</title>
+          <style>
+            body { font-family: 'Inter', system-ui, sans-serif; color: #1e293b; padding: 40px; }
+            h1 { font-size: 24px; font-weight: 900; margin-bottom: 5px; text-transform: uppercase; letter-spacing: -0.5px; }
+            .header-info { font-size: 11px; font-family: monospace; color: #64748b; text-transform: uppercase; margin-bottom: 30px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; }
+            
+            .stats-grid { display: grid; grid-template-cols: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+            .stat-card { border: 1px solid #e2e8f0; padding: 15px; border-radius: 12px; background: #f8fafc; }
+            .stat-label { font-size: 10px; font-weight: bold; color: #64748b; text-transform: uppercase; }
+            .stat-value { font-size: 18px; font-weight: 900; color: #0f172a; margin-top: 5px; font-family: monospace; }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th { text-align: left; padding: 12px 10px; font-size: 11px; font-weight: bold; text-transform: uppercase; color: #475569; border-bottom: 2px solid #cbd5e1; background: #f1f5f9; }
+            td { padding: 12px 10px; font-size: 12px; border-bottom: 1px solid #e2e8f0; color: #334155; }
+            tr:hover { background: #fafafa; }
+            .status-badge { display: inline-block; padding: 3px 8px; font-size: 10px; font-weight: bold; border-radius: 6px; text-transform: uppercase; }
+            .status-mesures { background: #fee2e2; color: #ef4444; }
+            .status-coupe { background: #fef3c7; color: #d97706; }
+            .status-retouche { background: #e0e7ff; color: #4f46e5; }
+            .status-pret { background: #dcfce7; color: #16a34a; }
+            .status-livre { background: #f1f5f9; color: #475569; }
+          </style>
+        </head>
+        <body>
+          <h1>Registre Mensuel des Commandes Couture</h1>
+          <div class="header-info">Atelier : ${merchant.name} | Date d'Édition : ${new Date().toLocaleDateString('fr-FR')} | Total Commandes : ${activeOrders.length}</div>
+          
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-label">Chiffre d'Affaires</span>
+              <div class="stat-value">${totalRevenue.toLocaleString()} ${merchant.currency}</div>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Acomptes Perçus</span>
+              <div class="stat-value">${totalAdvances.toLocaleString()} ${merchant.currency}</div>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Restant dû global</span>
+              <div class="stat-value" style="color: #ef4444;">${totalRemaining.toLocaleString()} ${merchant.currency}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Client / Contact</th>
+                <th>Modèle / Description</th>
+                <th>Prix</th>
+                <th>Acompte</th>
+                <th>Reste</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${activeOrders.map(o => {
+                const price = Number(o.price || 0);
+                const advance = Number(o.advance || 0);
+                const rest = Math.max(0, price - advance);
+                let statusClass = 'status-mesures';
+                let statusLabel = 'Mesures';
+                if (o.status === 'coupe') { statusClass = 'status-coupe'; statusLabel = 'Coupe'; }
+                else if (o.status === 'retouche') { statusClass = 'status-retouche'; statusLabel = 'Retouches'; }
+                else if (o.status === 'pret') { statusClass = 'status-pret'; statusLabel = 'Prêt'; }
+                else if (o.status === 'livre') { statusClass = 'status-livre'; statusLabel = 'Livré'; }
+
+                return `
+                  <tr>
+                    <td>${o.createdAt ? new Date(o.createdAt).toLocaleDateString('fr-FR') : '—'}</td>
+                    <td>
+                      <strong>${o.clientName}</strong><br/>
+                      <span style="font-size: 10px; color: #64748b; font-family: monospace;">${o.clientPhone || '—'}</span>
+                    </td>
+                    <td>
+                      <strong>${o.model}</strong><br/>
+                      <span style="font-size: 10px; color: #64748b;">${o.tissuUsed || 'Aucun tissu stock'}</span>
+                    </td>
+                    <td style="font-family: monospace; font-weight: bold;">${price.toLocaleString()} ${merchant.currency}</td>
+                    <td style="font-family: monospace; color: #16a34a;">${advance.toLocaleString()} ${merchant.currency}</td>
+                    <td style="font-family: monospace; color: #ef4444; font-weight: bold;">${rest.toLocaleString()} ${merchant.currency}</td>
+                    <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(() => { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const printOrderForm = (order: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const formattedPrice = Number(order.price || 0).toLocaleString();
+    const formattedAdvance = Number(order.advance || 0).toLocaleString();
+    const formattedRest = Math.max(0, (Number(order.price) || 0) - (Number(order.advance) || 0)).toLocaleString();
+
+    const MEASUREMENT_NAMES: Record<string, string> = {
+      cou: 'Cou (Col)',
+      poitrine: 'Tour de Poitrine',
+      epaule: 'Dos (Épaule à Épaule)',
+      manche: 'Longueur Manche',
+      tourBras: 'Tour de Bras',
+      taille: 'Tour de Taille',
+      hanches: 'Tour de Hanches',
+      pantalon: 'Longueur Pantalon / Jupe',
+      cuisse: 'Tour de Cuisse',
+      boubou: 'Longueur Grand Boubou'
+    };
+
+    let measurementsHtml = '';
+    if (order.clientMeasurements) {
+      Object.entries(order.clientMeasurements).forEach(([key, val]) => {
+        if (val) {
+          measurementsHtml += `
+            <div style="padding: 8px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between;">
+              <span style="font-weight: 600; color: #475569;">${MEASUREMENT_NAMES[key] || key}</span>
+              <span style="font-family: monospace; font-weight: 800; color: #1e293b;">${val} cm</span>
+            </div>
+          `;
+        }
+      });
+    }
+
+    if (!measurementsHtml) {
+      measurementsHtml = '<p style="color: #64748b; font-style: italic; text-align: center;">Aucune mesure spécifiée.</p>';
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Fiche de Commande - ${order.clientName}</title>
+          <style>
+            body { font-family: 'Inter', sans-serif; color: #1e293b; padding: 40px; }
+            h1 { font-size: 24px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px; }
+            .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; text-transform: uppercase; border: 1px solid #ddd; }
+            .invoice-box { border: 1px solid #e2e8f0; border-radius: 16px; padding: 30px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+            .field { margin-bottom: 15px; }
+            .label { font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b; tracking: 1px; }
+            .value { font-size: 15px; font-weight: 700; margin-top: 3px; }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-box">
+            <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 20px;">
+              <div>
+                <h1>${merchant.name}</h1>
+                <p style="color: #64748b; font-size: 12px; margin: 0;">Atelier de Couture & Création sur Mesure</p>
+              </div>
+              <div style="text-align: right;">
+                <h3 style="margin: 0; font-size: 14px; text-transform: uppercase;">Fiche de Mesures</h3>
+                <p style="font-family: monospace; font-size: 11px; color: #64748b; margin: 5px 0 0 0;">ID: ${order.id?.slice(0,8)}</p>
+              </div>
+            </div>
+
+            <div class="grid" style="margin-bottom: 30px;">
+              <div>
+                <div class="field">
+                  <div class="label">Client Couture</div>
+                  <div class="value">${order.clientName}</div>
+                </div>
+                ${order.clientPhone ? `
+                <div class="field">
+                  <div class="label">Téléphone</div>
+                  <div class="value">${order.clientPhone}</div>
+                </div>
+                ` : ''}
+                <div class="field">
+                  <div class="label">Style / Modèle commandé</div>
+                  <div class="value" style="color: #7c3aed;">${order.model}</div>
+                </div>
+              </div>
+              <div>
+                <div class="field">
+                  <div class="label">Date Commande</div>
+                  <div class="value">${format(new Date(order.createdAt), 'dd MMMM yyyy', { locale: fr })}</div>
+                </div>
+                <div class="field">
+                  <div class="label">Livraison prévue</div>
+                  <div class="value">${order.deliveryDate ? format(new Date(order.deliveryDate), 'dd MMMM yyyy', { locale: fr }) : 'Non spécifiée'}</div>
+                </div>
+                <div class="field">
+                  <div class="label">Utilisation Tissu</div>
+                  <div class="value">${order.tissuUsed || 'Fourni par le client'}</div>
+                </div>
+              </div>
+            </div>
+
+            <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px; color: #7c3aed;">
+              Mesures d'Atelier Associées
+            </h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px;">
+              ${measurementsHtml}
+            </div>
+
+            <h3 style="font-size: 13px; font-weight: 800; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px; color: #7c3aed;">
+              Règlement financier
+            </h3>
+            <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <span style="font-size: 11px; text-transform: uppercase; font-weight: bold; color: #64748b;">Total Convenu</span>
+                <div style="font-size: 20px; font-weight: 900; color: #1e293b;">${formattedPrice} ${merchant.currency}</div>
+              </div>
+              <div>
+                <span style="font-size: 11px; text-transform: uppercase; font-weight: bold; color: #64748b;">Acompte Versé</span>
+                <div style="font-size: 20px; font-weight: 900; color: #10b981;">${formattedAdvance} ${merchant.currency}</div>
+              </div>
+              <div>
+                <span style="font-size: 11px; text-transform: uppercase; font-weight: bold; color: #64748b;">Reste à payer</span>
+                <div style="font-size: 20px; font-weight: 900; color: #ef4444;">${formattedRest} ${merchant.currency}</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
+              <div>Signature Client</div>
+              <div>Signature Gérant</div>
+            </div>
+          </div>
+          <script>window.print();</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const filteredOrders = orders.filter(o => {
+    if (filterStatus !== 'all' && o.status !== filterStatus) return false;
+    return o.clientName.toLowerCase().includes(search.toLowerCase()) || o.model.toLowerCase().includes(search.toLowerCase());
+  });
+
+  // Calculs du Planning de Livraison (Timeline / Kanban de Couture)
+  const now = new Date();
+  const urgentOrders = filteredOrders.filter(o => {
+    if (o.status === 'livre') return false;
+    if (!o.deliveryDate) return false;
+    const dDate = new Date(o.deliveryDate);
+    return dDate < now;
+  });
+
+  const thisWeekOrders = filteredOrders.filter(o => {
+    if (o.status === 'livre') return false;
+    if (!o.deliveryDate) return false;
+    const dDate = new Date(o.deliveryDate);
+    const diffTime = dDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return dDate >= now && diffDays <= 7;
+  });
+
+  const laterOrders = filteredOrders.filter(o => {
+    if (o.status === 'livre') return false;
+    if (!o.deliveryDate) return true;
+    const dDate = new Date(o.deliveryDate);
+    const diffTime = dDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 7;
+  });
+
+  const deliveredOrders = filteredOrders.filter(o => o.status === 'livre');
+
+  const renderTimelineCard = (order: any, themeColor: string) => {
+    const price = Number(order.price || 0);
+    const advance = Number(order.advance || 0);
+    const rest = Math.max(0, price - advance);
+    
+    const themeClasses = 
+      themeColor === 'rose' ? 'hover:border-rose-300 shadow-rose-50/25' :
+      themeColor === 'amber' ? 'hover:border-amber-300 shadow-amber-50/25' :
+      themeColor === 'emerald' ? 'hover:border-emerald-300 shadow-emerald-50/25' :
+      'hover:border-violet-300 shadow-violet-50/25';
+
+    return (
+      <div 
+        key={order.id} 
+        className={`bg-white p-4 rounded-2xl border border-slate-100 shadow-sm ${themeClasses} hover:shadow-md transition-all flex flex-col justify-between text-left`}
+      >
+        <div>
+          <div className="flex justify-between items-start gap-1">
+            <span className="text-[8px] font-mono font-black text-gray-400 uppercase">
+              CMD-{order.id?.slice(0, 5).toUpperCase()}
+            </span>
+            <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-wider ${
+              order.status === 'livre' ? 'bg-emerald-50 text-emerald-600' :
+              order.status === 'pret' ? 'bg-blue-50 text-blue-600' :
+              'bg-amber-50 text-amber-600'
+            }`}>
+              {order.status}
+            </span>
+          </div>
+          <h4 className="font-extrabold text-ink text-sm mt-1.5 leading-tight">{order.clientName}</h4>
+          <p className="text-[10px] text-violet-600 font-bold mt-0.5">{order.model}</p>
+          
+          <div className="mt-2 pt-2 border-t border-slate-50 space-y-1">
+            <div className="flex justify-between text-[10px] font-bold text-gray-500">
+              <span>Reste :</span>
+              <span className="font-mono text-rose-500">{rest.toLocaleString()} {merchant.currency}</span>
+            </div>
+            {order.deliveryDate && (
+              <div className="flex justify-between text-[9px] font-semibold text-slate-400">
+                <span>Échéance :</span>
+                <span>{format(new Date(order.deliveryDate), 'dd/MM/yyyy')}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 pt-2 border-t border-slate-50 flex gap-1 justify-end">
+          <button
+            onClick={() => handleOpenWhatsapp(order)}
+            className="p-1.5 border border-emerald-100 bg-emerald-50/55 text-emerald-600 rounded-lg hover:scale-105 transition-transform"
+            title="Aviser WhatsApp"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => printOrderForm(order)}
+            className="p-1.5 border border-violet-100 bg-violet-50/55 text-violet-600 rounded-lg hover:scale-105 transition-transform"
+            title="Fiche"
+          >
+            <Printer className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              setCurrentOrder(order);
+              setIsFormOpen(true);
+            }}
+            className="p-1.5 border border-slate-100 text-gray-500 rounded-lg hover:scale-105 transition-transform"
+            title="Éditer"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4 text-left">
+        <div>
+          <h2 className="text-2xl font-black text-ink">Gestion des Commandes Couture</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Conceptions en cours : {orders.filter(o => !o.isDeleted && o.status !== 'livre').length.toString().padStart(3, '0')}</p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+          <div className="bg-slate-100 p-1 rounded-xl flex border border-slate-200">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'list' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:text-slate-700'}`}
+            >
+              Fiches Liste
+            </button>
+            <button
+              onClick={() => setViewMode('timeline')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'timeline' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:text-slate-700'}`}
+            >
+              Planning
+            </button>
+            <button
+              onClick={() => setViewMode('campaigns')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'campaigns' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:text-slate-700'}`}
+            >
+              Fidélisation 🌟
+            </button>
+          </div>
+
+          <button
+            onClick={() => triggerSync(true)}
+            disabled={isSyncing}
+            className="flex items-center justify-center space-x-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Sinc...' : 'Sync 🔄'}</span>
+          </button>
+
+          <button
+            onClick={exportOrdersToCSV}
+            className="flex items-center justify-center space-x-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Excel 📊</span>
+          </button>
+
+          <button
+            onClick={exportOrdersToPDF}
+            className="flex items-center justify-center space-x-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>PDF 🖨️</span>
+          </button>
+
+          <button 
+            onClick={handleCreateOrder}
+            className="flex-1 xl:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-600/20 hover:scale-[1.02] transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Créer une Commande</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm justify-between text-left">
+        <div className="flex items-center gap-3 flex-1 w-full">
+          <Search className="w-5 h-5 text-gray-400 shrink-0" />
+          <input 
+            type="text" 
+            placeholder="Rechercher par client ou modèle..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full text-sm text-slate-700 bg-transparent outline-none font-medium placeholder-gray-400"
+          />
+        </div>
+
+        <div className="flex gap-1 overflow-x-auto w-full md:w-auto py-1" style={{ scrollbarWidth: 'none' }}>
+          {[
+            { id: 'all', label: 'Tous' },
+            { id: 'mesures', label: 'Mesures' },
+            { id: 'coupe', label: 'Couture' },
+            { id: 'retouche', label: 'Retouche' },
+            { id: 'pret', label: 'Prêts' },
+            { id: 'livre', label: 'Livrés' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterStatus(tab.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${filterStatus === tab.id ? 'bg-violet-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-100 text-gray-600'}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Form Dialog */}
+      {isFormOpen && currentOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="px-8 py-6 border-b border-gray-100 bg-violet-50/50 flex justify-between items-center shrink-0">
+              <div className="text-left">
+                <h3 className="text-xl font-black text-ink">{currentOrder.id ? 'Modifier la Commande' : 'Créer une Fiche Commande'}</h3>
+                <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Enregistrement d'une création sur mesure</p>
+              </div>
+              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto space-y-6 flex-1 text-left">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Sélectionner le Client *</label>
+                  <select
+                    value={currentOrder.clientId}
+                    onChange={(e) => handleSelectClient(e.target.value)}
+                    required
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm bg-white cursor-pointer"
+                  >
+                    <option value="">-- Choisissez un client couture --</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName} ({c.phone || 'Pas de numéro'})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Description du Modèle Commandé *</label>
+                  <input
+                    type="text"
+                    required
+                    value={currentOrder.model}
+                    placeholder="Ex: Grand Boubou Broderie fine blanche, Robe trapèze wax"
+                    onChange={e => setCurrentOrder({ ...currentOrder, model: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Prix de la Confection ({merchant.currency}) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={currentOrder.price || ''}
+                    placeholder="Ex: 50000"
+                    onChange={e => setCurrentOrder({ ...currentOrder, price: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Acompte Versé ({merchant.currency})</label>
+                  <input
+                    type="number"
+                    value={currentOrder.advance || ''}
+                    placeholder="Ex: 25000"
+                    onChange={e => setCurrentOrder({ ...currentOrder, advance: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Date Prévue de Livraison *</label>
+                  <input
+                    type="date"
+                    required
+                    value={currentOrder.deliveryDate ? currentOrder.deliveryDate.split('T')[0] : ''}
+                    onChange={e => setCurrentOrder({ ...currentOrder, deliveryDate: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Statut Initial *</label>
+                  <select
+                    value={currentOrder.status || 'mesures'}
+                    onChange={e => setCurrentOrder({ ...currentOrder, status: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm bg-white cursor-pointer"
+                  >
+                    <option value="mesures">🧵 Prise de Mesures</option>
+                    <option value="coupe">✂️ Coupe & Couture</option>
+                    <option value="retouche">✏️ Retouches</option>
+                    <option value="pret">👗 Prêt pour Essai</option>
+                    <option value="livre">🤝 Livré</option>
+                  </select>
+                </div>
+
+                <div className="col-span-2 border-t border-dashed border-gray-150 pt-4 space-y-4">
+                  <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">Achat / Consommation de Tissu (Optionnel)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Tissu de l'atelier utilisé</label>
+                      <select
+                        value={currentOrder.selectedTissuId || ''}
+                        onChange={e => setCurrentOrder({ ...currentOrder, selectedTissuId: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm bg-white cursor-pointer"
+                      >
+                        <option value="">-- Ne pas prélever de tissu --</option>
+                        {tissus.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} (Reste {t.quantity}m)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Longueur nécessaire (mètres)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={currentOrder.tissuLengthUsed || ''}
+                        placeholder="Ex: 3.5"
+                        onChange={e => setCurrentOrder({ ...currentOrder, tissuLengthUsed: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-150 pt-6 flex justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsFormOpen(false)}
+                  className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-black uppercase tracking-wider transition cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-600/20 transition cursor-pointer"
+                >
+                  Confirmer la Commande 🚀
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+       {/* Orders List / Planning / Campaigns view */}
+      {viewMode === 'campaigns' ? (
+        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-black/5 shadow-sm text-left space-y-6">
+          <div className="border-b border-gray-150 pb-5">
+            <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+              <span>🎉</span> Campagnes de Fidélisation & Fêtes
+            </h3>
+            <p className="text-xs text-gray-400 font-medium mt-1">
+              Préparez et envoyez des messages personnalisés à vos clients couture pour les grandes occasions et relancez votre activité.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left/Middle Column: Campaign Settings */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">Sélectionner l'Occasion / Fête</label>
+                  <select
+                    value={selectedCampaignHoliday}
+                    onChange={(e) => {
+                      setSelectedCampaignHoliday(e.target.value);
+                      // Pre-fill a template message
+                      const h = e.target.value;
+                      let txt = "";
+                      if (h === 'tabaski') txt = "A l'approche de la Tabaski 🐑, nous serions honorés de confectionner vos plus beaux modèles (Boubous, Bazin, Wax) !";
+                      else if (h === 'korite') txt = "Pour célébrer la Korité 🌟 avec élégance, venez faire vos prises de mesures à l'atelier et découvrez nos nouveaux tissus.";
+                      else if (h === 'ramadan') txt = "Pendant le mois sacré du Ramadan 🌙, préparez sereinement vos tenues de fête avec notre équipe d'artisans.";
+                      else txt = "Pour les fêtes de fin d'année ✨, brillez de mille feux avec une création sur-mesure unique de notre atelier !";
+                      setCampaignCustomText(txt);
+                    }}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm font-bold bg-white cursor-pointer"
+                  >
+                    <option value="tabaski">🐑 Fête de la Tabaski</option>
+                    <option value="korite">🌟 Fête de la Korité</option>
+                    <option value="ramadan">🌙 Mois du Ramadan</option>
+                    <option value="fin_annee">✨ Fêtes de Fin d'Année</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">Note Personnalisée (Ajout au message)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex : Remise de 10% sur les commandes groupées"
+                    value={campaignCustomText || "A l'approche de la Tabaski 🐑, nous serions honorés de confectionner vos plus beaux modèles (Boubous, Bazin, Wax) !"}
+                    onChange={(e) => setCampaignCustomText(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Client Selection Table */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">Destinataires ({clients.length})</h4>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCampaignClients(clients.map(c => c.id))}
+                      className="text-[10px] font-bold text-violet-600 hover:underline cursor-pointer"
+                    >
+                      Tout sélectionner
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCampaignClients([])}
+                      className="text-[10px] font-bold text-gray-400 hover:underline cursor-pointer"
+                    >
+                      Tout désélectionner
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border border-gray-150 rounded-2xl overflow-hidden divide-y divide-gray-100 max-h-[350px] overflow-y-auto">
+                  {clients.length === 0 ? (
+                    <p className="text-xs text-gray-400 p-4 text-center font-medium">Aucun client enregistré pour le moment.</p>
+                  ) : (
+                    clients.map((client) => {
+                      const isSelected = selectedCampaignClients.includes(client.id);
+                      return (
+                        <div key={client.id} className="flex items-center justify-between p-3.5 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {
+                                if (isSelected) {
+                                  setSelectedCampaignClients(selectedCampaignClients.filter(id => id !== client.id));
+                                } else {
+                                  setSelectedCampaignClients([...selectedCampaignClients, client.id]);
+                                }
+                              }}
+                              className="w-4.5 h-4.5 text-violet-600 border-gray-300 rounded focus:ring-violet-500 cursor-pointer"
+                            />
+                            <div>
+                              <p className="text-xs font-extrabold text-slate-800">{client.firstName} {client.lastName}</p>
+                              <p className="text-[10px] text-gray-400 font-mono">{client.phone || 'Pas de numéro'}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-bold bg-violet-50 text-violet-600 px-2.5 py-0.5 rounded-full uppercase">
+                            Couture
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Live Campaign Preview & Batch Launch */}
+            <div className="bg-slate-50/50 border border-slate-100 p-6 rounded-3xl flex flex-col justify-between space-y-4">
+              <div className="space-y-4">
+                <span className="text-[10px] font-mono font-black text-violet-700 bg-violet-100/60 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                  Aperçu du message WhatsApp
+                </span>
+
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative space-y-2">
+                  <div className="absolute top-2 right-2 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[8px] font-bold text-gray-400 font-mono">Prêt</span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed italic whitespace-pre-line font-medium">
+                    {`Bonjour [Nom du Client],\n\nVotre atelier *${merchant.name}* vous souhaite le meilleur !\n\n${campaignCustomText || "A l'approche de la Tabaski 🐑, nous serions honorés de confectionner vos plus beaux modèles (Boubous, Bazin, Wax) !"}\n\nRéservez votre créneau au plus vite au *${merchant.phone || "notre numéro"}*. À très bientôt ! ✨`}
+                  </p>
+                </div>
+
+                <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl text-[10px] font-semibold text-amber-800 space-y-1.5 leading-relaxed">
+                  <p className="font-bold flex items-center gap-1">
+                    💡 Astuce d'envoi groupé
+                  </p>
+                  <p>
+                    WhatsApp n'autorisant pas le spam automatisé, notre outil prépare vos messages personnalisés. Cliquez sur un client ci-dessous pour déclencher l'ouverture de sa conversation avec le bon message pré-rempli !
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-gray-150">
+                <div className="flex justify-between text-xs font-bold text-gray-500">
+                  <span>Destinataires sélectionnés :</span>
+                  <span className="text-violet-600 font-mono">{selectedCampaignClients.length}</span>
+                </div>
+
+                <div className="space-y-2">
+                  {selectedCampaignClients.length === 0 ? (
+                    <button
+                      disabled
+                      type="button"
+                      className="w-full py-3 bg-gray-100 text-gray-400 rounded-2xl font-bold text-xs cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      Sélectionnez des clients pour envoyer
+                    </button>
+                  ) : (
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto">
+                      {selectedCampaignClients.map((clientId) => {
+                        const client = clients.find(c => c.id === clientId);
+                        if (!client) return null;
+                        const clientMsg = `Bonjour ${client.firstName},\n\nVotre atelier *${merchant.name}* vous souhaite le meilleur !\n\n${campaignCustomText || "A l'approche de la Tabaski 🐑, nous serions honorés de confectionner vos plus beaux modèles (Boubous, Bazin, Wax) !"}\n\nRéservez votre créneau au plus vite au *${merchant.phone || ""}*. À très bientôt ! ✨`;
+                        
+                        const handleSend = () => {
+                          const cleanPhone = (client.phone || '').replace(/[^0-9]/g, '');
+                          window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(clientMsg)}`, '_blank');
+                        };
+
+                        return (
+                          <button
+                            key={client.id}
+                            type="button"
+                            onClick={handleSend}
+                            className="w-full p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-800 rounded-xl font-bold text-[11px] flex items-center justify-between transition cursor-pointer"
+                          >
+                            <span className="truncate">Envoyer à {client.firstName} {client.lastName}</span>
+                            <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-lg text-[9px] uppercase tracking-wider shrink-0 flex items-center gap-1 ml-2">
+                              WhatsApp
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : viewMode === 'timeline' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 text-left">
+          {/* URGENT COLUMN */}
+          <div className="bg-rose-50/25 border border-rose-100 p-5 rounded-3xl flex flex-col space-y-4">
+            <div className="flex items-center justify-between border-b border-rose-100 pb-2">
+              <span className="text-xs font-black text-rose-600 uppercase tracking-widest flex items-center gap-1.5">
+                🔴 En Retard / Urgents
+              </span>
+              <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-2 py-0.5 rounded-full">
+                {urgentOrders.length}
+              </span>
+            </div>
+            <div className="space-y-3 overflow-y-auto max-h-[65vh] pr-1" style={{ scrollbarWidth: 'none' }}>
+              {urgentOrders.length === 0 ? (
+                <p className="text-[10px] text-gray-400 font-medium py-6 text-center">Aucune commande urgente en attente.</p>
+              ) : (
+                urgentOrders.map(order => renderTimelineCard(order, "rose"))
+              )}
+            </div>
+          </div>
+
+          {/* THIS WEEK COLUMN */}
+          <div className="bg-amber-50/25 border border-amber-100 p-5 rounded-3xl flex flex-col space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+              <span className="text-xs font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5">
+                🟡 Cette Semaine
+              </span>
+              <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full">
+                {thisWeekOrders.length}
+              </span>
+            </div>
+            <div className="space-y-3 overflow-y-auto max-h-[65vh] pr-1" style={{ scrollbarWidth: 'none' }}>
+              {thisWeekOrders.length === 0 ? (
+                <p className="text-[10px] text-gray-400 font-medium py-6 text-center">Rien de planifié cette semaine.</p>
+              ) : (
+                thisWeekOrders.map(order => renderTimelineCard(order, "amber"))
+              )}
+            </div>
+          </div>
+
+          {/* LATER COLUMN */}
+          <div className="bg-violet-50/25 border border-violet-100 p-5 rounded-3xl flex flex-col space-y-4">
+            <div className="flex items-center justify-between border-b border-violet-100 pb-2">
+              <span className="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-1.5">
+                🟣 Planifiés Plus Tard
+              </span>
+              <span className="bg-violet-100 text-violet-700 text-[10px] font-black px-2 py-0.5 rounded-full">
+                {laterOrders.length}
+              </span>
+            </div>
+            <div className="space-y-3 overflow-y-auto max-h-[65vh] pr-1" style={{ scrollbarWidth: 'none' }}>
+              {laterOrders.length === 0 ? (
+                <p className="text-[10px] text-gray-400 font-medium py-6 text-center">Aucune commande lointaine.</p>
+              ) : (
+                laterOrders.map(order => renderTimelineCard(order, "violet"))
+              )}
+            </div>
+          </div>
+
+          {/* DELIVERED COLUMN */}
+          <div className="bg-emerald-50/25 border border-emerald-100 p-5 rounded-3xl flex flex-col space-y-4">
+            <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+              <span className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
+                🟢 Livrés (Historique)
+              </span>
+              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full">
+                {deliveredOrders.length}
+              </span>
+            </div>
+            <div className="space-y-3 overflow-y-auto max-h-[65vh] pr-1" style={{ scrollbarWidth: 'none' }}>
+              {deliveredOrders.length === 0 ? (
+                <p className="text-[10px] text-gray-400 font-medium py-6 text-center">Aucun modèle livré récemment.</p>
+              ) : (
+                deliveredOrders.map(order => renderTimelineCard(order, "emerald"))
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Original Orders List */
+        filteredOrders.length === 0 ? (
+          <div className="bg-white py-16 text-center rounded-[2rem] border border-gray-150 shadow-sm flex flex-col items-center justify-center text-left">
+            <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mb-4 border border-violet-100">
+              <Scissors className="w-8 h-8 text-violet-400" />
+            </div>
+            <p className="text-gray-500 font-bold mb-1">Aucune commande trouvée</p>
+            <p className="text-xs text-gray-400">Lancez une nouvelle création sur mesure en cliquant sur Créer une Commande.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+          {filteredOrders.map((order) => {
+            const price = Number(order.price || 0);
+            const advance = Number(order.advance || 0);
+            const rest = Math.max(0, price - advance);
+            return (
+              <div key={order.id} className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-4 gap-2">
+                    <div>
+                      <span className="text-[9px] font-mono font-black text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        CMD-{order.id?.slice(0, 5).toUpperCase()}
+                      </span>
+                      <h3 className="font-extrabold text-ink text-lg mt-1 leading-snug">{order.clientName}</h3>
+                      <p className="text-xs text-violet-600 font-bold mt-1 font-sans">{order.model}</p>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-wider bg-white cursor-pointer ${
+                          order.status === 'livre' ? 'text-emerald-600 border-emerald-100 bg-emerald-50/50' :
+                          order.status === 'pret' ? 'text-blue-600 border-blue-100 bg-blue-50/50' :
+                          'text-amber-600 border-amber-100 bg-amber-50/50'
+                        }`}
+                      >
+                        <option value="mesures">🧵 Mesures</option>
+                        <option value="coupe">✂️ Couture</option>
+                        <option value="retouche">✏️ Retouche</option>
+                        <option value="pret">👗 Prêt / Essai</option>
+                        <option value="livre">🤝 Livré</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-gray-150 pt-3">
+                    <div className="flex justify-between text-xs font-bold text-gray-500">
+                      <span>Prix convenu :</span>
+                      <span className="font-mono text-ink">{price.toLocaleString()} {merchant.currency}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-emerald-600">
+                      <span>Acompte versé :</span>
+                      <span className="font-mono">{advance.toLocaleString()} {merchant.currency}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold text-rose-500 pb-1 border-b border-gray-100">
+                      <span>Reste à payer :</span>
+                      <span className="font-mono">{rest.toLocaleString()} {merchant.currency}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold pt-2">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" />
+                        Livraison : {order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : 'Indéterminée'}
+                      </span>
+                      {order.tissuUsed && (
+                        <span className="bg-slate-50 px-2.5 py-1 rounded-lg truncate max-w-[150px] font-medium border border-slate-100 text-slate-500">
+                          {order.tissuUsed}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-gray-100 flex gap-2">
+                  <button
+                    onClick={() => printOrderForm(order)}
+                    className="flex-1 py-2 border border-violet-100 hover:bg-violet-50 text-violet-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-transform cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Imprimer Fiche
+                  </button>
+                  <button
+                    onClick={() => handleOpenWhatsapp(order)}
+                    className="p-2 border border-emerald-150 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-600 rounded-xl hover:scale-105 transition-transform cursor-pointer flex items-center justify-center"
+                    title="Aviser le client via WhatsApp"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCurrentOrder(order);
+                      setIsFormOpen(true);
+                    }}
+                    className="p-2 border border-slate-100 hover:bg-slate-50 text-gray-500 rounded-xl hover:scale-105 transition-transform cursor-pointer"
+                    title="Détails"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(order.id)}
+                    className="p-2 border border-slate-100 hover:bg-rose-50 text-gray-400 hover:text-red-600 rounded-xl hover:scale-105 transition-transform cursor-pointer"
+                    title="Supprimer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )
+      )}
+
+      {/* WhatsApp Custom Notification Modal with dynamic template switcher */}
+      {isWhatsappModalOpen && whatsappOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in flex flex-col">
+            <div className="px-6 py-5 border-b border-gray-150 bg-emerald-50/50 flex justify-between items-center text-left">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-1.5">
+                  <span className="text-emerald-600">💬</span> Notification Client WhatsApp
+                </h3>
+                <p className="text-[10px] font-mono text-emerald-700 uppercase tracking-widest mt-0.5">Personnalisez votre message client</p>
+              </div>
+              <button type="button" onClick={() => setIsWhatsappModalOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 text-left overflow-y-auto max-h-[75vh]">
+              {/* Template selection tabs */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-500">Choisir un modèle de message :</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateWhatsappMessageTemplate(whatsappOrder, 'status')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      whatsappTemplateType === 'status' 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm font-black' 
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-600 font-bold'
+                    }`}
+                  >
+                    📈 Statut Actuel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateWhatsappMessageTemplate(whatsappOrder, 'balance')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      whatsappTemplateType === 'balance' 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm font-black' 
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-600 font-bold'
+                    }`}
+                  >
+                    💰 Solde & Facture
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateWhatsappMessageTemplate(whatsappOrder, 'promo')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      whatsappTemplateType === 'promo' 
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm font-black' 
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-600 font-bold'
+                    }`}
+                  >
+                    🎁 Fidélisation
+                  </button>
+                </div>
+              </div>
+
+              {/* Recipient Phone */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Téléphone Client *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex : +221 77 000 00 00"
+                  value={whatsappClientPhone}
+                  onChange={e => setWhatsappClientPhone(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-bold font-mono"
+                />
+              </div>
+
+              {/* Message Content Area */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Corps du message (Modifiable) *</label>
+                <textarea
+                  rows={6}
+                  required
+                  value={whatsappMessage}
+                  onChange={e => setWhatsappMessage(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-medium leading-relaxed font-sans"
+                />
+              </div>
+
+              {/* Helper disclaimer */}
+              <div className="bg-emerald-50/50 border border-emerald-100 p-3.5 rounded-2xl text-[10px] text-emerald-800 leading-relaxed font-semibold">
+                🔗 Ce message contient un lien de suivi dynamique permettant à votre client d'accéder à son espace de suivi autonome sécurisé.
+              </div>
+
+              <div className="border-t border-gray-100 pt-4 flex justify-end gap-2 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => setIsWhatsappModalOpen(false)} 
+                  className="px-4 py-2 bg-gray-150 hover:bg-gray-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const cleanPhone = whatsappClientPhone.replace(/[^0-9]/g, '');
+                    window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(whatsappMessage)}`, '_blank');
+                    setIsWhatsappModalOpen(false);
+                    toast.success('Conversation de suivi ouverte !');
+                  }}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  Ouvrir sur WhatsApp 🚀
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+const TailleurTissusManager = ({ merchant }: { merchant: Merchant }) => {
+  const [tissus, setTissus] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [currentTissu, setCurrentTissu] = useState<any>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Trigger sync and reload
+  const triggerSync = async (force: boolean = false) => {
+    setIsSyncing(true);
+    try {
+      await syncService.syncTailoringCollection(merchant.id, 'tissus', force);
+      const saved = localStorage.getItem(`tailleur_tissus_${merchant.id}`);
+      if (saved) setTissus(JSON.parse(saved));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`tailleur_tissus_${merchant.id}`);
+      if (saved) setTissus(JSON.parse(saved));
+    } catch (e) {
+      console.error(e);
+    }
+    triggerSync();
+  }, [merchant.id]);
+
+  const saveTissus = (newTissus: any[]) => {
+    setTissus(newTissus);
+    localStorage.setItem(`tailleur_tissus_${merchant.id}`, JSON.stringify(newTissus));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentTissu.name) {
+      toast.error('Veuillez saisir un nom pour le tissu');
+      return;
+    }
+
+    let updated;
+    if (currentTissu.id) {
+      updated = tissus.map(t => t.id === currentTissu.id ? { ...currentTissu, syncStatus: 'pending', updatedAt: new Date().toISOString() } : t);
+      toast.success('Référence de tissu mise à jour');
+    } else {
+      const newTiss = {
+        ...currentTissu,
+        id: crypto.randomUUID(),
+        syncStatus: 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      updated = [newTiss, ...tissus];
+      toast.success('Tissu enregistré dans l\'inventaire');
+    }
+    saveTissus(updated);
+    setIsFormOpen(false);
+    setCurrentTissu(null);
+    triggerSync();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Voulez-vous supprimer ce tissu ?')) {
+      const target = tissus.find(t => t.id === id);
+      let updated;
+      if (target) {
+        if (target.syncStatus === 'synced') {
+          updated = tissus.map(t => t.id === id ? { ...t, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() } : t);
+        } else {
+          updated = tissus.filter(t => t.id !== id);
+        }
+        saveTissus(updated);
+        toast.success('Référence supprimée');
+        triggerSync();
+      }
+    }
+  };
+
+  const exportTissusToCSV = () => {
+    try {
+      const activeTissus = tissus.filter(t => !t.isDeleted);
+      if (activeTissus.length === 0) {
+        toast.error("Aucun tissu à exporter");
+        return;
+      }
+
+      let csvContent = "\uFEFF";
+      csvContent += "Nom / Référence,Couleur / Motif,Métrage (mètres),Prix par Mètre,Fournisseur,Date d'Ajout\n";
+
+      activeTissus.forEach(t => {
+        const row = [
+          t.name || '',
+          t.color || '',
+          t.quantity || 0,
+          t.pricePerMeter || 0,
+          t.supplier || '',
+          t.createdAt || ''
+        ].map(val => `"${String(val).replace(/\n/g, ' ')}"`).join(",");
+        csvContent += row + "\n";
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Inventaire_Tissus_Couture_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Registre d'inventaire tissu exporté avec succès (Excel CSV)");
+    } catch (error) {
+      console.error(error);
+      toast.error("Échec de l'export Excel CSV");
+    }
+  };
+
+  const filteredTissus = tissus
+    .filter(t => !t.isDeleted)
+    .filter(t => 
+      t.name.toLowerCase().includes(search.toLowerCase()) || 
+      (t.supplier && t.supplier.toLowerCase().includes(search.toLowerCase()))
+    );
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 text-left">
+        <div>
+          <h2 className="text-2xl font-black text-ink">Inventaire des Tissus & Wax</h2>
+          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Métrage total stocké : {filteredTissus.reduce((acc, t) => acc + (Number(t.quantity) || 0), 0)} mètres</p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <button
+            onClick={() => triggerSync(true)}
+            disabled={isSyncing}
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Sinc...' : 'Sync 🔄'}</span>
+          </button>
+
+          <button
+            onClick={exportTissusToCSV}
+            className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Excel 📊</span>
+          </button>
+
+          <button 
+            onClick={() => {
+              setCurrentTissu({ name: '', quantity: '', pricePerMeter: '', supplier: '', color: '' });
+              setIsFormOpen(true);
+            }}
+            className="flex-1 lg:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-600/20 hover:scale-[1.02] transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ajouter un Tissu</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-left">
+        <Search className="w-5 h-5 text-gray-400 shrink-0 ml-1" />
+        <input 
+          type="text" 
+          placeholder="Rechercher par nom de tissu ou fournisseur..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full text-sm text-slate-700 bg-transparent outline-none font-medium placeholder-gray-400"
+        />
+      </div>
+
+      {isFormOpen && currentTissu && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-fade-in">
+            <div className="px-6 py-5 border-b border-gray-100 bg-violet-50/50 flex justify-between items-center text-left">
+              <div>
+                <h3 className="text-lg font-black text-ink">{currentTissu.id ? 'Modifier la Référence' : 'Nouveau Tissu'}</h3>
+                <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Enregistrer un rouleau de tissu</p>
+              </div>
+              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-left">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Désignation du Tissu *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex : Wax Hollandais Super-S, Getzner Bazin Royal"
+                  value={currentTissu.name}
+                  onChange={e => setCurrentTissu({ ...currentTissu, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Mètres Disponibles *</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.1"
+                    placeholder="0"
+                    value={currentTissu.quantity}
+                    onChange={e => setCurrentTissu({ ...currentTissu, quantity: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm font-bold font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Prix au mètre ({merchant.currency})</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={currentTissu.pricePerMeter}
+                    onChange={e => setCurrentTissu({ ...currentTissu, pricePerMeter: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm font-bold font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Couleur / Motif</label>
+                <input
+                  type="text"
+                  placeholder="Ex : Indigo à motifs floraux dorés, Uni blanc"
+                  value={currentTissu.color || ''}
+                  onChange={e => setCurrentTissu({ ...currentTissu, color: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Fournisseur</label>
+                <input
+                  type="text"
+                  placeholder="Ex : Marché Sandaga, Grossiste Wax"
+                  value={currentTissu.supplier || ''}
+                  onChange={e => setCurrentTissu({ ...currentTissu, supplier: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none text-sm"
+                />
+              </div>
+
+              <div className="border-t border-gray-100 pt-4 flex justify-end gap-2 shrink-0">
+                <button type="button" onClick={() => setIsFormOpen(false)} className="px-4 py-2 bg-gray-150 hover:bg-gray-200 text-ink rounded-lg text-xs font-bold transition">
+                  Annuler
+                </button>
+                <button type="submit" className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold transition">
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {filteredTissus.length === 0 ? (
+        <div className="bg-white py-16 text-center rounded-[2rem] border border-gray-150 shadow-sm flex flex-col items-center justify-center text-left">
+          <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mb-4 border border-violet-100 border-dashed">
+            <Palette className="w-8 h-8 text-violet-400" />
+          </div>
+          <p className="text-gray-500 font-bold mb-1">Aucun rouleau de tissu répertorié</p>
+          <p className="text-xs text-gray-400">Enregistrez vos tissus disponibles et leurs métrages.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-left">
+          {filteredTissus.map((t) => {
+            const qty = Number(t.quantity || 0);
+            return (
+              <div key={t.id} className="bg-white p-5 rounded-[2rem] border border-black/5 shadow-sm text-left flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-lg">
+                      🎨
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-800 leading-tight">{t.name}</h3>
+                      {t.supplier && <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Fournisseur : {t.supplier}</p>}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs font-medium text-slate-600 bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-fade-in">
+                    <div className="flex justify-between items-center">
+                      <span>Métrage disponible :</span>
+                      <span className={`font-mono font-black ${qty < 5 ? 'text-rose-500 bg-rose-50 px-2 py-0.5 rounded-md' : 'text-slate-800'}`}>{qty} m</span>
+                    </div>
+                    {t.pricePerMeter && (
+                      <div className="flex justify-between items-center">
+                        <span>Valeur au mètre :</span>
+                        <span className="font-mono text-slate-800">{Number(t.pricePerMeter).toLocaleString()} {merchant.currency}</span>
+                      </div>
+                    )}
+                    {t.color && (
+                      <div className="flex justify-between items-center">
+                        <span>Couleur / Motif :</span>
+                        <span className="text-gray-500 truncate max-w-[120px]">{t.color}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-gray-100 flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setCurrentTissu(t);
+                      setIsFormOpen(true);
+                    }}
+                    className="flex-1 py-1 px-2 border border-slate-150 hover:bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg transition"
+                  >
+                    Modifier
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(t.id)}
+                    className="py-1 px-2.5 border border-slate-150 hover:bg-rose-50 text-gray-400 hover:text-red-500 rounded-lg transition"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </motion.div>
   );
 };

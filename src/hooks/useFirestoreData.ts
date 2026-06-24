@@ -47,7 +47,11 @@ export type TableName =
   | 'studio_acom_products'
   | 'partner_ratings'
   | 'variants'
-  | 'assets';
+  | 'assets'
+  | 'tailleur_clients'
+  | 'tailleur_orders'
+  | 'tailleur_measurements'
+  | 'tailleur_fabrics';
 
 export type CollectionName = TableName;
 

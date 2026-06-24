@@ -29,7 +29,7 @@ try {
 
 function getFirestoreDb() {
   if (customDbId) {
-    return admin.firestore(customDbId);
+    return (admin.firestore as any)(customDbId);
   }
   return admin.firestore();
 }
@@ -288,10 +288,10 @@ async function startServer() {
   });
 
 
-  // Gemini Business Analysis
+  // Gemini Business Analysis & Specialized assistants (like Couture Designer)
   app.post("/api/gemini/analyze-business", async (req, res) => {
     try {
-      const { orders, expenses, tenantId } = req.body;
+      const { orders, expenses, tenantId, isDesignerAssist, prompt: customPrompt } = req.body;
       
       if (!process.env.GEMINI_API_KEY) {
         return res.status(500).json({ error: "GEMINI_API_KEY non configurée." });
@@ -304,21 +304,29 @@ async function startServer() {
       const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-      const prompt = `
-        Tu es un analyste financier expert. Analyse les performances suivantes (Dernières commandes et dépenses) pour Acom Technologie.
-        Fournis un résumé concis comprenant:
-        - Tendance globale du CA
-        - Analyse de la rentabilité (par rapport aux dépenses)
-        - Points d'attention ou opportunités.
-        
-        Données :
-        Commandes : ${JSON.stringify(orders.slice(-30))}
-        Dépenses : ${JSON.stringify(expenses.slice(-30))}
-      `;
+      let finalPrompt = "";
+      let modelToUse = "gemini-3.1-flash-lite-preview";
+
+      if (isDesignerAssist) {
+        finalPrompt = customPrompt;
+        modelToUse = "gemini-3.5-flash";
+      } else {
+        finalPrompt = `
+          Tu es un analyste financier expert. Analyse les performances suivantes (Dernières commandes et dépenses) pour Acom Technologie.
+          Fournis un résumé concis comprenant:
+          - Tendance globale du CA
+          - Analyse de la rentabilité (par rapport aux dépenses)
+          - Points d'attention ou opportunités.
+          
+          Données :
+          Commandes : ${JSON.stringify(orders ? orders.slice(-30) : [])}
+          Dépenses : ${JSON.stringify(expenses ? expenses.slice(-30) : [])}
+        `;
+      }
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: prompt
+        model: modelToUse,
+        contents: finalPrompt
       });
 
       res.json({ analysis: response.text || "" });

@@ -216,7 +216,7 @@ const SettingsManager = () => {
           title: "Acom SaaS",
           image: "https://picsum.photos/seed/acom-saas/800/600",
           description: "Solutions logicielles métiers 100% cloud pour piloter votre activité. Une suite d'outils puissants adaptés à chaque secteur.",
-          features: ["Gestion de stock", "Gestion de chantier (BTP)", "Ressources Humaines (RH)", "Gestion médicale", "Gestion des services", "Gestion de transport & flotte", "Gestion scolaire", "Gestion de pressing"],
+          features: ["Gestion de stock", "Gestion de chantier (BTP)", "Ressources Humaines (RH)", "Gestion médicale", "Gestion des services", "Gestion de transport & flotte", "Gestion scolaire", "Gestion de pressing", "Gestion d'ateliers de couture"],
           linkText: "Explorer les solutions SaaS",
           linkUrl: "/solutions-saas",
           baseColor: "#8e008e"

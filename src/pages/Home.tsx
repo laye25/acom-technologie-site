@@ -258,21 +258,27 @@ const Home = () => {
                   {settings?.expertiseSection?.universes?.[0]?.description || "Solutions logicielles métiers 100% cloud pour piloter votre activité. Une suite d'outils puissants adaptés à chaque secteur."}
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mb-10">
-                  {(settings?.expertiseSection?.universes?.[0]?.features || [
-                    'Gestion de stock',
-                    'Gestion des services',
-                    'Gestion de chantier (BTP)',
-                    'Gestion de transport & flotte',
-                    'Ressources Humaines (RH)',
-                    'Gestion scolaire',
-                    'Gestion médicale',
-                    'Gestion de pressing'
-                  ]).map((item, i) => (
-                    <li key={i} className="flex items-center text-xs font-medium text-white/80">
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
-                      {item}
-                    </li>
-                  ))}
+                  {(() => {
+                    let featuresList = settings?.expertiseSection?.universes?.[0]?.features || [
+                      'Gestion de stock',
+                      'Gestion des services',
+                      'Gestion de chantier (BTP)',
+                      'Gestion de transport & flotte',
+                      'Ressources Humaines (RH)',
+                      'Gestion scolaire',
+                      'Gestion médicale',
+                      'Gestion de pressing'
+                    ];
+                    if (!featuresList.includes("Ateliers de couture") && !featuresList.some(f => f.toLowerCase().includes("couture"))) {
+                      featuresList = [...featuresList, "Ateliers de couture"];
+                    }
+                    return featuresList.map((item, i) => (
+                      <li key={i} className="flex items-center text-xs font-medium text-white/80" id={`feature-saas-${i}`}>
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-2 flex-shrink-0" id={`feature-saas-check-${i}`} style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
+                        {item}
+                      </li>
+                    ));
+                  })()}
                 </ul>
                 <Link to={settings?.expertiseSection?.universes?.[0]?.linkUrl || "/solutions-saas"} className="inline-flex items-center font-bold text-white group-hover:gap-4 transition-all gap-2" onClick={(e) => e.stopPropagation()}>
                   {settings?.expertiseSection?.universes?.[0]?.linkText || "Explorer les solutions SaaS"} <ArrowRight className="w-5 h-5" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
