@@ -3,9 +3,10 @@ import {
   Search, Plus, Image as ImageIcon, Scissors, Sparkles, Heart, Palette, 
   Trash2, Edit, Save, Share2, ArrowLeft, Filter, FolderHeart, Info, 
   Clock, Check, RefreshCw, X, Eye, HelpCircle, Layers, MapPin, 
-  ChevronRight, Calendar, DollarSign
+  ChevronRight, Calendar, DollarSign, Download, Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import html2canvas from 'html2canvas';
 
 // Interfaces
 interface Merchant {
@@ -13,6 +14,7 @@ interface Merchant {
   name: string;
   phone?: string;
   address?: string;
+  currency?: string;
 }
 
 interface GalleryModel {
@@ -169,6 +171,22 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
   const [modelEstimatedDays, setModelEstimatedDays] = useState(4);
   const [modelImageUrl, setModelImageUrl] = useState('');
   const [modelTagsInput, setModelTagsInput] = useState('');
+  const [isDraggingImage, setIsDraggingImage] = useState(false);
+
+  const handleImageFileChange = (file: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert("Veuillez sélectionner un fichier image valide (PNG, JPG, WEBP, etc.).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        setModelImageUrl(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Moodboard Form Fields
   const [moodboardName, setMoodboardName] = useState('');
@@ -183,6 +201,10 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiResult, setAiResult] = useState<any | null>(null);
   const [aiError, setAiError] = useState('');
+  const [previewImage, setPreviewImage] = useState<{ url: string, title?: string, subtitle?: string, details?: any } | null>(null);
+
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [isSharingModelId, setIsSharingModelId] = useState<string | null>(null);
 
   // Load Initial Data
   useEffect(() => {
@@ -380,6 +402,157 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
         setSelectedMoodboardId(null);
       }
     }
+  };
+
+  const handleWhatsAppShare = () => {
+    if (!sharingMoodboard) return;
+    const selectedModels = models.filter(m => sharingMoodboard.modelIds.includes(m.id));
+    const currencyStr = merchant.currency || 'FCFA';
+
+    let text = `✨ *LOOKBOOK CLIENT : ${sharingMoodboard.name.toUpperCase()}* ✨\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (sharingMoodboard.description) {
+      text += `_${sharingMoodboard.description}_\n`;
+      text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    }
+
+    if (selectedModels.length === 0) {
+      text += `Aucune tenue n'est sélectionnée dans ce lookbook pour le moment.\n`;
+    } else {
+      text += `Voici les modèles de couture personnalisés pour votre projet :\n\n`;
+      selectedModels.forEach((model, index) => {
+        const diffLabel = model.difficulty === 'Difficile' ? '🔴 Difficile' : model.difficulty === 'Moyen' ? '🟡 Moyen' : '🟢 Facile';
+        const tagsList = model.tags && model.tags.length > 0 ? model.tags.map(t => `#${t.trim()}`).join(' ') : '';
+        
+        text += `👗 *${index + 1}. ${model.title.toUpperCase()}*\n`;
+        text += `──────────────────────────\n`;
+        if (model.description) {
+          text += `📝 _${model.description}_\n\n`;
+        }
+        text += `💰 *Tarif estimé :* ${model.priceMin.toLocaleString('fr-FR')} - ${model.priceMax.toLocaleString('fr-FR')} ${currencyStr}\n`;
+        text += `🧵 *Tissu conseillé :* ${model.fabricType}\n`;
+        text += `📏 *Métrage requis :* ${model.yardageNeeded}\n`;
+        text += `⏳ *Temps de confection :* ~${model.estimatedDays} jours\n`;
+        text += `⚡ *Niveau requis :* ${diffLabel}\n`;
+        if (tagsList) {
+          text += `✨ *Styles :* ${tagsList}\n`;
+        }
+        if (model.imageUrl) {
+          text += `📸 *Visualiser la tenue :* ${model.imageUrl}\n`;
+        }
+        text += `──────────────────────────\n\n`;
+      });
+    }
+
+    text += `✨ *${merchant.name || 'Couture Design Studio'}* ✨\n`;
+    text += `👉 Dites-nous quel modèle retient votre attention pour lancer la confection !`;
+
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+
+    try {
+      navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error("Impossible de copier au presse-papier :", err);
+    }
+
+    window.open(whatsappUrl, '_blank');
+  };
+
+  // Download / Share single card actions
+
+  const downloadModelCard = async (modelId: string, modelTitle: string) => {
+    const element = document.getElementById(`lookbook-card-${modelId}`);
+    if (!element) return;
+    
+    setDownloadingId(modelId);
+    try {
+      const canvas = await html2canvas(element, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 2, // higher quality
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `carte-${modelTitle.toLowerCase().replace(/\s+/g, '-')}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (error) {
+      console.error('Erreur lors de la génération de la carte d\'image:', error);
+      alert('Une erreur est survenue lors du téléchargement de l\'image. Vous pouvez faire une capture d\'écran de la carte directement !');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleShareSingleModel = async (model: GalleryModel) => {
+    const currencyStr = merchant.currency || 'FCFA';
+    const diffLabel = model.difficulty === 'Difficile' ? '🔴 Difficile' : model.difficulty === 'Moyen' ? '🟡 Moyen' : '🟢 Facile';
+    const tagsList = model.tags && model.tags.length > 0 ? model.tags.map(t => `#${t.trim()}`).join(' ') : '';
+
+    let text = `👗 *TENUE : ${model.title.toUpperCase()}* 👗\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    if (model.description) {
+      text += `📝 _${model.description}_\n\n`;
+    }
+    text += `💰 *Tarif estimé :* ${model.priceMin.toLocaleString('fr-FR')} - ${model.priceMax.toLocaleString('fr-FR')} ${currencyStr}\n`;
+    text += `🧵 *Tissu conseillé :* ${model.fabricType}\n`;
+    text += `📏 *Métrage requis :* ${model.yardageNeeded}\n`;
+    text += `⏳ *Temps de confection :* ~${model.estimatedDays} jours\n`;
+    text += `⚡ *Niveau requis :* ${diffLabel}\n`;
+    if (tagsList) {
+      text += `✨ *Styles :* ${tagsList}\n`;
+    }
+    if (model.imageUrl) {
+      text += `📸 *Visualiser la tenue :* ${model.imageUrl}\n`;
+    }
+    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `✨ *${merchant.name || 'Couture Design Studio'}* ✨\n`;
+    text += `👉 Contactez-nous pour lancer la confection de cette magnifique tenue !`;
+
+    // Attempt to generate the image blob to share via Web Share API
+    let fileToShare: File | null = null;
+    const element = document.getElementById(`lookbook-card-${model.id}`);
+    
+    if (element) {
+       setIsSharingModelId(model.id);
+       try {
+         const canvas = await html2canvas(element, {
+           useCORS: true,
+           allowTaint: true,
+           scale: 2,
+           backgroundColor: '#ffffff',
+           logging: false,
+         });
+         const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+         if (blob) {
+           fileToShare = new File([blob], `carte-${model.title.toLowerCase().replace(/\s+/g, '-')}.png`, { type: 'image/png' });
+         }
+       } catch(e) {
+         console.error("Erreur génération image pour partage", e);
+       } finally {
+         setIsSharingModelId(null);
+       }
+    }
+
+    if (navigator.share && fileToShare && navigator.canShare && navigator.canShare({ files: [fileToShare] })) {
+      try {
+        await navigator.share({
+          files: [fileToShare],
+          title: model.title,
+          text: text,
+        });
+        return; // Success! Web Share handles the rest
+      } catch (err) {
+        console.error("Erreur de partage natif:", err);
+        // Fallback to text url below if user aborted or failed
+      }
+    }
+
+    // Fallback if no Web Share API or if it failed
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank');
   };
 
   // Pin / Pinned logic
@@ -688,25 +861,46 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 >
                   <div>
                     {/* Model Image */}
-                    <div className="relative h-48 w-full bg-gray-100 overflow-hidden">
+                    <div 
+                      onClick={() => setPreviewImage({
+                        url: model.imageUrl,
+                        title: model.title,
+                        subtitle: model.description,
+                        details: {
+                          difficulty: model.difficulty,
+                          fabricType: model.fabricType,
+                          yardageNeeded: model.yardageNeeded,
+                          estimatedDays: model.estimatedDays,
+                          priceMin: model.priceMin,
+                          priceMax: model.priceMax
+                        }
+                      })}
+                      className="relative h-80 md:h-[420px] w-full bg-gray-100 overflow-hidden cursor-zoom-in group/img"
+                    >
                       <img
                         src={model.imageUrl}
                         alt={model.title}
                         referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=1000';
                         }}
                       />
+                      {/* Zoom Hover Overlay */}
+                      <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center z-10">
+                        <div className="bg-white/90 backdrop-blur-md p-3 rounded-full text-slate-900 transform scale-90 group-hover/img:scale-100 transition-all duration-300 shadow-xl">
+                          <Eye className="w-5 h-5 text-violet-600" />
+                        </div>
+                      </div>
                       {/* Difficulty Badge */}
-                      <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold text-white shadow-sm ${
+                      <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold text-white shadow-sm z-20 ${
                         model.difficulty === 'Facile' ? 'bg-emerald-500' :
                         model.difficulty === 'Moyen' ? 'bg-amber-500' : 'bg-rose-500'
                       }`}>
                         {model.difficulty}
                       </span>
                       {/* Price Range Badge */}
-                      <span className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-gray-900/80 backdrop-blur-xs">
+                      <span className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-gray-900/80 backdrop-blur-xs z-20">
                         {model.priceMin.toLocaleString('fr-FR')} - {model.priceMax.toLocaleString('fr-FR')} F
                       </span>
                     </div>
@@ -1219,27 +1413,111 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 </div>
               </div>
 
-              {/* Row 5: Tags and Image */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Image URL (Optionnel)</label>
-                  <input
-                    type="url"
-                    value={modelImageUrl}
-                    onChange={(e) => setModelImageUrl(e.target.value)}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Tags (Séparés par virgules)</label>
-                  <input
-                    type="text"
-                    value={modelTagsInput}
-                    onChange={(e) => setModelTagsInput(e.target.value)}
-                    placeholder="Ex : Moderne, Mariage, Wax"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
+              {/* Row 5: Photo upload & URL fallback */}
+              <div className="space-y-3">
+                <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">Photo du modèle *</label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left: Interactive Drop Zone / Preview */}
+                  <div 
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDraggingImage(true);
+                    }}
+                    onDragLeave={() => setIsDraggingImage(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDraggingImage(false);
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        handleImageFileChange(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center text-center transition-all min-h-[160px] relative overflow-hidden ${
+                      isDraggingImage 
+                        ? 'border-violet-500 bg-violet-50/50' 
+                        : modelImageUrl 
+                        ? 'border-emerald-200 bg-emerald-50/10' 
+                        : 'border-gray-200 hover:border-violet-400 bg-gray-50/50'
+                    }`}
+                  >
+                    {modelImageUrl ? (
+                      <div className="absolute inset-0 w-full h-full group">
+                        <img 
+                          src={modelImageUrl} 
+                          alt="Aperçu modèle" 
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-10">
+                          <label className="px-3 py-1.5 bg-white/90 text-gray-800 text-[10px] font-bold uppercase tracking-wider rounded-lg cursor-pointer hover:bg-white shadow-sm flex items-center gap-1">
+                            <Upload className="w-3 h-3 text-violet-600" />
+                            Remplacer
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleImageFileChange(e.target.files[0]);
+                                }
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setModelImageUrl('')}
+                            className="px-3 py-1.5 bg-rose-600/90 hover:bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg shadow-sm cursor-pointer"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center cursor-pointer space-y-2 w-full h-full py-4">
+                        <div className="w-10 h-10 bg-violet-50 rounded-full flex items-center justify-center text-violet-500">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-700">Déposer une photo ici ou <span className="text-violet-600 underline">parcourir</span></p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">PNG, JPG, WEBP jusqu'à 5 Mo</p>
+                        </div>
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleImageFileChange(e.target.files[0]);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Right: URL option & Tags */}
+                  <div className="space-y-3 flex flex-col justify-between">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Ou saisir une URL d'image existante</label>
+                      <input
+                        type="url"
+                        value={modelImageUrl.startsWith('data:') ? '' : modelImageUrl}
+                        onChange={(e) => setModelImageUrl(e.target.value)}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Tags (Séparés par virgules)</label>
+                      <input
+                        type="text"
+                        value={modelTagsInput}
+                        onChange={(e) => setModelTagsInput(e.target.value)}
+                        placeholder="Ex : Moderne, Mariage, Wax"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1432,29 +1710,117 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                   Aucun modèle n'est épinglé dans ce moodboard pour le moment.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {models.filter(m => sharingMoodboard.modelIds.includes(m.id)).map(model => (
-                    <div key={model.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-xs flex flex-col justify-between">
-                      <div className="relative h-44 bg-gray-100">
-                        <img 
-                          src={model.imageUrl} 
-                          alt={model.title} 
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover" 
-                        />
-                        <span className="absolute bottom-3 right-3 px-2.5 py-1 rounded-md text-xs font-bold text-white bg-gray-900/75">
-                          {model.priceMin.toLocaleString('fr-FR')} - {model.priceMax.toLocaleString('fr-FR')} FCFA
-                        </span>
-                      </div>
-                      <div className="p-4 space-y-2 text-left">
-                        <h4 className="font-bold text-gray-900 text-sm">{model.title}</h4>
-                        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{model.description}</p>
-                        
-                        <div className="flex flex-wrap gap-3 pt-2 border-t border-gray-100 text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                          <span>🧵 {model.fabricType}</span>
-                          <span>📏 {model.yardageNeeded}</span>
-                          <span>⏳ ~{model.estimatedDays}j</span>
+                    <div key={model.id} className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-md flex flex-col justify-between">
+                      {/* Printable Area */}
+                      <div id={`lookbook-card-${model.id}`} className="bg-white flex flex-col justify-between h-full p-1">
+                        <div 
+                          onClick={() => setPreviewImage({
+                            url: model.imageUrl,
+                            title: model.title,
+                            subtitle: model.description,
+                            details: {
+                              difficulty: model.difficulty,
+                              fabricType: model.fabricType,
+                              yardageNeeded: model.yardageNeeded,
+                              estimatedDays: model.estimatedDays,
+                              priceMin: model.priceMin,
+                              priceMax: model.priceMax
+                            }
+                          })}
+                          className="relative h-80 md:h-[380px] bg-gray-50 overflow-hidden rounded-2xl cursor-zoom-in group/img"
+                        >
+                          <img 
+                            src={model.imageUrl} 
+                            alt={model.title} 
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500" 
+                          />
+                          {/* Difficulty Pill */}
+                          <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider text-white ${
+                            model.difficulty === 'Difficile' ? 'bg-rose-500' :
+                            model.difficulty === 'Moyen' ? 'bg-amber-500' :
+                            'bg-emerald-500'
+                          }`}>
+                            {model.difficulty}
+                          </span>
+                          
+                          {/* Price Range Pill */}
+                          <span className="absolute bottom-3 right-3 px-3 py-1.5 rounded-xl text-xs font-extrabold text-white bg-slate-900/85 backdrop-blur-xs font-mono shadow-md">
+                            {model.priceMin.toLocaleString('fr-FR')} - {model.priceMax.toLocaleString('fr-FR')} {merchant.currency || 'F'}
+                          </span>
+                          
+                          {/* Zoom Hover Overlay */}
+                          <div className="absolute inset-0 bg-black/35 opacity-0 group-hover/img:opacity-100 transition-opacity duration-300 flex items-center justify-center z-10">
+                            <div className="bg-white/90 backdrop-blur-md p-3 rounded-full text-slate-900 transform scale-90 group-hover/img:scale-100 transition-all duration-300 shadow-xl">
+                              <Eye className="w-5 h-5 text-violet-600" />
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Card Info Details */}
+                        <div className="p-4 space-y-3 text-left">
+                          <h4 className="font-extrabold text-gray-900 text-sm leading-tight tracking-tight">{model.title}</h4>
+                          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{model.description}</p>
+                          
+                          {/* Specs Section from Attachment */}
+                          <div className="pt-3 border-t border-gray-100 space-y-2">
+                            <div className="grid grid-cols-2 gap-2 text-xs font-medium text-gray-600">
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span className="text-violet-500">🔮</span>
+                                <span className="truncate">Tissu : {model.fabricType}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 truncate">
+                                <span className="text-rose-500">✂️</span>
+                                <span className="truncate">Métrage : {model.yardageNeeded}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                              <span className="text-sky-500">⏳</span>
+                              <span>Temps de confection : ~{model.estimatedDays} jours</span>
+                            </div>
+                          </div>
+
+                          {/* Horizontal Tags */}
+                          {model.tags && model.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {model.tags.map(tag => (
+                                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-bold tracking-tight">
+                                  #{tag.trim()}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action buttons (Excluded from the download/screenshot!) */}
+                      <div className="px-4 pb-4 pt-2 border-t border-gray-50 flex items-center justify-between gap-2 bg-gray-50/50">
+                        <button
+                          onClick={() => downloadModelCard(model.id, model.title)}
+                          disabled={downloadingId !== null}
+                          className="flex-1 flex items-center justify-center gap-1 py-2 bg-white hover:bg-gray-100 text-gray-700 rounded-xl text-[11px] font-bold transition-all border border-gray-100 cursor-pointer disabled:opacity-55"
+                        >
+                          {downloadingId === model.id ? (
+                            <span className="w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span>
+                          ) : (
+                            <Download className="w-3.5 h-3.5 text-slate-500" />
+                          )}
+                          Télécharger la Carte
+                        </button>
+                        <button
+                          onClick={() => handleShareSingleModel(model)}
+                          disabled={isSharingModelId !== null}
+                          className="flex items-center justify-center gap-1 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-[11px] font-bold transition-all cursor-pointer disabled:opacity-55"
+                        >
+                          {isSharingModelId === model.id ? (
+                            <span className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></span>
+                          ) : (
+                            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                          )}
+                          Partager
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1467,9 +1833,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <p className="text-xs text-gray-500 font-medium">💡 Présentez cette interface élégante à vos clients sur tablette ou mobile pour faciliter le choix de coupe.</p>
               
               <button
-                onClick={() => {
-                  alert('Lien de partage copié dans le presse-papier ! Vous pouvez l\'envoyer par WhatsApp au client.');
-                }}
+                onClick={handleWhatsAppShare}
                 className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-sm cursor-pointer"
               >
                 <Share2 className="w-4 h-4" /> Partager par WhatsApp (Lien)
@@ -1478,6 +1842,113 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
           </motion.div>
         </div>
       )}
+
+      {/* Lightbox / Image Viewer Modal */}
+      <AnimatePresence>
+        {previewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setPreviewImage(null)}
+            className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-8 cursor-zoom-out"
+          >
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition-colors cursor-pointer z-[110]"
+              title="Fermer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-w-4xl w-full bg-slate-900 border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row cursor-default"
+            >
+              {/* Image Column */}
+              <div className="flex-1 max-h-[70vh] md:max-h-[80vh] bg-slate-950 flex items-center justify-center relative">
+                <img
+                  src={previewImage.url}
+                  alt={previewImage.title || ''}
+                  className="w-full h-full object-contain select-none"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              {/* Sidebar Info Column */}
+              <div className="w-full md:w-80 p-6 md:p-8 flex flex-col justify-between border-t md:border-t-0 md:border-l border-white/10 text-white bg-slate-900 shrink-0">
+                <div className="space-y-6 text-left">
+                  <div className="flex flex-wrap gap-2">
+                    {previewImage.details?.difficulty && (
+                      <span className={`text-[9px] px-2.5 py-1 rounded-full uppercase font-black tracking-widest ${
+                        previewImage.details.difficulty === 'Facile' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                        previewImage.details.difficulty === 'Moyen' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 
+                        'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      }`}>
+                        {previewImage.details.difficulty}
+                      </span>
+                    )}
+                    {previewImage.details?.fabricType && (
+                      <span className="text-[9px] bg-violet-600/20 text-violet-300 border border-violet-500/30 px-2.5 py-1 rounded-full uppercase font-black tracking-widest">
+                        Tissu : {previewImage.details.fabricType}
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-black tracking-tight text-white mb-2">{previewImage.title}</h3>
+                    {previewImage.subtitle && (
+                      <p className="text-xs text-slate-400 font-medium leading-relaxed mb-4">
+                        {previewImage.subtitle}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Technical Spec List */}
+                  {previewImage.details && (
+                    <div className="space-y-3 pt-4 border-t border-white/10 text-xs">
+                      {previewImage.details.yardageNeeded && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-bold uppercase text-[9px] tracking-widest">Métrage requis</span>
+                          <span className="font-bold text-slate-200">{previewImage.details.yardageNeeded}</span>
+                        </div>
+                      )}
+                      {previewImage.details.estimatedDays && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-bold uppercase text-[9px] tracking-widest">Temps de confection</span>
+                          <span className="font-bold text-slate-200">~{previewImage.details.estimatedDays} jours</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {previewImage.details?.priceMin !== undefined && (
+                  <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-between">
+                    <div>
+                      <span className="text-[9px] text-slate-500 block uppercase font-black tracking-widest">ESTIMATION PRIX</span>
+                      <span className="text-lg font-black text-violet-400 font-mono">
+                        {previewImage.details.priceMin.toLocaleString('fr-FR')} - {previewImage.details.priceMax.toLocaleString('fr-FR')} F
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => setPreviewImage(null)}
+                      className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-white/10"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

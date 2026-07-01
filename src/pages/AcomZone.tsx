@@ -6,6 +6,7 @@ import {
   User, FileText, CheckCircle, XCircle, Eye, Calendar, Phone, ClipboardList, Info, ArrowLeft, Clock,
   Megaphone, MessageSquare, ShoppingCart, Plus, Minus, Trash2
 } from 'lucide-react';
+import { ImageLightbox } from '../components/ImageLightbox';
 import { Link, useNavigate } from 'react-router-dom';
 import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Merchant, Order } from '../types';
@@ -22,6 +23,7 @@ interface PublicationCardProps {
   onPageClick: (page: any) => void;
   onAddToCart: (product: any, merchant: any) => void;
   onContact: (publication: any) => void;
+  onImageClick?: () => void;
 }
 
 const PublicationCard: React.FC<PublicationCardProps> = ({
@@ -29,7 +31,8 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
   idx,
   onPageClick,
   onAddToCart,
-  onContact
+  onContact,
+  onImageClick
 }) => {
   const page = publication.page;
   const isVehicle = publication.pubType === 'vehicle';
@@ -94,13 +97,24 @@ const PublicationCard: React.FC<PublicationCardProps> = ({
       className="group bg-white rounded-3xl border border-gray-100 hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden flex flex-col justify-between h-full"
     >
       {/* Visual Container */}
-      <div className="relative h-64 w-full bg-gray-50 overflow-hidden shrink-0">
+      <div 
+        onClick={() => onImageClick && onImageClick()}
+        className="relative h-80 md:h-[420px] w-full bg-gray-50 overflow-hidden shrink-0 cursor-pointer group/img"
+      >
         <img 
           src={publication.image || (isVehicle ? 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=400' : 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400')} 
           alt={publication.name || publication.model} 
           referrerPolicy="no-referrer"
-          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" 
+          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500" 
         />
+
+        {/* Premium Lightbox Hover Zoom Overlay */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-all duration-300 z-20">
+          <div className="bg-white/95 backdrop-blur-md text-gray-950 rounded-full px-5 py-2.5 flex items-center gap-2 shadow-2xl transform scale-90 group-hover/img:scale-100 transition-all duration-300 font-extrabold text-[10px] uppercase tracking-wider">
+            <Eye className="w-4 h-4 text-violet-600 animate-pulse" />
+            <span>Aperçu Premium</span>
+          </div>
+        </div>
         
         {/* Category Badge overlay */}
         <div className="absolute top-3 right-3 z-10 flex gap-1.5">
@@ -548,6 +562,10 @@ export default function AcomZone() {
   const [selectedZone, setSelectedZone] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [viewMode, setViewMode] = useState<'grid' | 'map' | 'client' | 'feed'>('feed');
+
+  // Lightbox state for feed publications
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Load publication feed products and vehicles reactively
   const localProducts = useLiveQuery(() => db.products.toArray()) || [];
@@ -1272,6 +1290,10 @@ export default function AcomZone() {
                     onPageClick={handlePageClickFromFeed}
                     onAddToCart={handleAddToCartFromFeed}
                     onContact={handleContactMerchant}
+                    onImageClick={() => {
+                      setLightboxIndex(idx);
+                      setLightboxOpen(true);
+                    }}
                   />
                 ))}
               </div>
@@ -2302,6 +2324,13 @@ export default function AcomZone() {
           </div>
         )}
       </AnimatePresence>
+
+      <ImageLightbox
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        items={filteredPublications}
+        initialIndex={lightboxIndex}
+      />
     </div>
   );
 }

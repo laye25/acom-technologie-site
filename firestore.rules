@@ -377,6 +377,21 @@ service cloud.firestore {
       allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
     }
 
+    match /tailleur_clients/{clientId} {
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+    }
+
+    match /tailleur_orders/{orderId} {
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+    }
+
+    match /tailleur_fabrics/{fabricId} {
+      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
+      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+    }
+
     match /communications/{docId} {
       allow read, write: if true;
     }

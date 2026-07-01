@@ -64,9 +64,12 @@ class ErrorBoundary extends Component<Props, State> {
             <h2 className="text-2xl font-bold text-red-900 mb-4">Oups !</h2>
             <p className="text-red-700 mb-4">{errorMessage}</p>
             {errorDetails && (
-              <p className="text-[10px] text-red-400 font-mono mb-6 break-all max-w-xs mx-auto opacity-50">
-                {errorDetails}
-              </p>
+              <div className="text-[10px] text-red-400 font-mono mb-6 max-w-lg mx-auto opacity-75 bg-red-100/50 p-4 rounded-xl text-left overflow-auto max-h-48 whitespace-pre-wrap">
+                <p className="font-bold">{errorDetails}</p>
+                {this.state.error?.stack && (
+                  <p className="mt-2 text-[9px] text-red-500/70">{this.state.error.stack}</p>
+                )}
+              </div>
             )}
             <button
               onClick={() => window.location.reload()}

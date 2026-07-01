@@ -74,6 +74,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [customClaims, setCustomClaims] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Restaurer immédiatement la session locale si présente pour accélérer le démarrage et tolérer le mode hors-ligne
+  useEffect(() => {
+    const storedSession = localStorage.getItem('acom_offline_session');
+    if (storedSession) {
+      try {
+        const session = JSON.parse(storedSession);
+        setUser(session.user);
+        setProfile(session.profile);
+        setCustomClaims(session.customClaims);
+        setLoading(false);
+        console.log('AuthContext: Restored cached session immediately:', session.profile.email);
+      } catch (e) {
+        console.error('Error reading cached session:', e);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     // Check for redirect result on mount to catch errors from Google login flow
     if (typeof window !== 'undefined') {
@@ -102,11 +119,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profileUnsubscribe = null;
       }
 
-      setUser(currentUser);
       if (currentUser) {
+        setUser(currentUser);
         // Fetch custom claims
-        const tokenResult = await currentUser.getIdTokenResult();
-        setCustomClaims(tokenResult.claims);
+        try {
+          const tokenResult = await currentUser.getIdTokenResult();
+          setCustomClaims(tokenResult.claims);
+        } catch (e) {
+          console.warn('AuthContext: Could not fetch custom claims (offline fallback):', e);
+          if (!customClaims) {
+            setCustomClaims({
+              admin: currentUser.email && ADMIN_EMAILS.includes(currentUser.email),
+              role: (currentUser.email && ADMIN_EMAILS.includes(currentUser.email)) ? 'admin' : 'client'
+            });
+          }
+        }
         
         // Setup local watcher for profile using Dexie
         const observable = liveQuery(() => localDb.users.get(currentUser.uid));
@@ -157,9 +184,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Immediate sync
         getSyncService().then(service => service.syncUserProfile(currentUser.uid));
       } else {
-        setProfile(null);
-        setCustomClaims(null);
-        setLoading(false);
+        // Firebase Auth est null, vérification de la présence d'une session hors-ligne conservée
+        const storedSession = localStorage.getItem('acom_offline_session');
+        const isOffline = !navigator.onLine;
+
+        if (storedSession && isOffline) {
+          console.log('AuthContext: Firebase returned null but offline is active. Keeping current session.');
+          try {
+            const session = JSON.parse(storedSession);
+            setUser(session.user);
+            setProfile(session.profile);
+            setCustomClaims(session.customClaims);
+            setLoading(false);
+          } catch (e) {
+            console.error('Error parsing offline session:', e);
+            setUser(null);
+            setProfile(null);
+            setCustomClaims(null);
+            setLoading(false);
+          }
+        } else {
+          setUser(null);
+          setProfile(null);
+          setCustomClaims(null);
+          setLoading(false);
+        }
       }
     });
 
@@ -168,6 +217,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (profileUnsubscribe) profileUnsubscribe();
     };
   }, []);
+
+  // Mettre à jour la session locale dès que le profil ou l'utilisateur change
+  useEffect(() => {
+    if (user && profile) {
+      const serializableUser = {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL
+      };
+      
+      const claims = {
+        admin: customClaims?.admin || false,
+        role: profile.role,
+        merchantId: profile.merchantId || null
+      };
+
+      localStorage.setItem('acom_offline_profile', JSON.stringify(profile));
+      localStorage.setItem('acom_offline_session', JSON.stringify({
+        user: serializableUser,
+        profile: profile,
+        customClaims: claims
+      }));
+    }
+  }, [user, profile, customClaims]);
 
   useEffect(() => {
     if (user && profile) {
@@ -248,7 +322,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+      // Tenter la connexion normale en ligne
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Enregistrer le hash des identifiants pour les futures connexions hors-ligne
+      const hash = await hashCredential(email, password);
+      localStorage.setItem('acom_offline_hash', hash);
+    } catch (error: any) {
+      console.error('Online login failed or network down:', error);
+      
+      // En cas de panne réseau ou hors-ligne, basculer sur l'authentification locale
+      const isNetworkError = error.code === 'auth/network-request-failed' || !navigator.onLine;
+      if (isNetworkError) {
+        console.log('Attempting offline login fallback...');
+        const cachedHash = localStorage.getItem('acom_offline_hash');
+        const cachedProfileStr = localStorage.getItem('acom_offline_profile');
+        
+        if (cachedHash && cachedProfileStr) {
+          const inputHash = await hashCredential(email, password);
+          if (inputHash === cachedHash) {
+            console.log('Offline login successful! Restoring local session.');
+            const cachedProfile = JSON.parse(cachedProfileStr);
+            
+            const mockUser = {
+              uid: cachedProfile.uid,
+              email: cachedProfile.email,
+              displayName: cachedProfile.displayName,
+              photoURL: cachedProfile.photoURL,
+              getIdTokenResult: async () => ({
+                claims: {
+                  admin: cachedProfile.role === 'admin',
+                  role: cachedProfile.role,
+                  merchantId: cachedProfile.merchantId || null,
+                }
+              }),
+              getIdToken: async () => 'mock-offline-token'
+            } as unknown as User;
+
+            setUser(mockUser);
+            setProfile(cachedProfile);
+            setCustomClaims({
+              admin: cachedProfile.role === 'admin',
+              role: cachedProfile.role,
+              merchantId: cachedProfile.merchantId || null
+            });
+            
+            localStorage.setItem('acom_offline_session', JSON.stringify({
+              user: {
+                uid: mockUser.uid,
+                email: mockUser.email,
+                displayName: mockUser.displayName,
+                photoURL: mockUser.photoURL
+              },
+              profile: cachedProfile,
+              customClaims: {
+                admin: cachedProfile.role === 'admin',
+                role: cachedProfile.role,
+                merchantId: cachedProfile.merchantId || null
+              }
+            }));
+            return;
+          } else {
+            throw new Error('Identifiants incorrects en mode hors-ligne.');
+          }
+        } else {
+          throw new Error('Aucune session locale enregistrée. Veuillez vous connecter une première fois avec internet.');
+        }
+      }
+      throw error;
+    }
   };
 
   const signUpWithEmail = async (email: string, password: string, fullName: string) => {
@@ -274,6 +417,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role: newProfile.role,
       created_at: newProfile.createdAt
     });
+
+    // Enregistrer le hash pour les connexions hors-ligne
+    const hash = await hashCredential(email, password);
+    localStorage.setItem('acom_offline_hash', hash);
 
     setProfile(newProfile);
   };
@@ -301,6 +448,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    localStorage.removeItem('acom_offline_session');
     await firebaseSignOut(auth);
   };
 
@@ -331,4 +479,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return <AuthContext.Provider value={{ ...value, isPartner }}>{children}</AuthContext.Provider>;
 };
+
+async function hashCredential(email: string, password: string): Promise<string> {
+  const normalized = email.toLowerCase().trim() + ":" + password;
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    const msgUint8 = new TextEncoder().encode(normalized);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  // Fallback hash (simple djb2 or sdbm hash) to prevent app from crashing in insecure HTTP dev environments
+  let hash = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return 'fallback_' + hash.toString();
+}
 

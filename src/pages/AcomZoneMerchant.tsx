@@ -6,8 +6,9 @@ import {
   Info, ArrowRight, Search, Scan, ArrowUpDown, SlidersHorizontal, Sparkles, X, 
   HelpCircle, CheckCircle2, ChevronDown, ListFilter, RefreshCw, Smartphone, 
   Shirt, Stethoscope, GraduationCap, Wrench, HardHat, Car, Users, ShoppingBag,
-  Tag, Scissors, Palette, Plus, Minus, Trash2, LayoutDashboard
+  Tag, Scissors, Palette, Plus, Minus, Trash2, LayoutDashboard, MessageCircle, Eye
 } from 'lucide-react';
+import { ImageLightbox } from '../components/ImageLightbox';
 import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Merchant, MerchantProduct, Order } from '../types';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -63,6 +64,10 @@ export default function AcomZoneMerchant() {
   const [clientEmail, setClientEmail] = useState('');
   const [specificFields, setSpecificFields] = useState<Record<string, any>>({});
   const [orderQuantity, setOrderQuantity] = useState(1);
+
+  // Lightbox States
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Fallbacks using local Dexie data
   const localMerchants = useLiveQuery(() => db.merchants.toArray()) || [];
@@ -1107,7 +1112,7 @@ export default function AcomZoneMerchant() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProducts.map((product, idx) => {
                 const isOutOfStock = (product.stockQuantity || 0) <= 0;
                 const isAlert = product.stockQuantity > 0 && product.stockQuantity <= (product.minStockLevel || 2);
@@ -1118,141 +1123,138 @@ export default function AcomZoneMerchant() {
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(idx * 0.04, 0.4) }}
-                    className="group bg-white rounded-2xl border border-gray-150/40 overflow-hidden hover:shadow-xl transition-all duration-300 shadow-sm flex flex-col relative"
+                    className="group bg-white rounded-3xl border border-gray-100 hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden flex flex-col justify-between h-full relative"
                   >
-                    {/* Status Dot / Ribbon */}
-                    {hasStockManagement && (
-                      isOutOfStock ? (
-                        <span className="absolute top-3 right-3 bg-rose-50 text-rose-600 border border-rose-100 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full z-10">
-                          Rupture
-                        </span>
-                      ) : isAlert ? (
-                        <span className="absolute top-3 right-3 bg-amber-50 text-amber-700 border border-amber-100 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full z-10">
-                          Stock Limité
-                        </span>
-                      ) : (
-                        <span className="absolute top-3 right-3 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full z-10">
-                          Disponible
-                        </span>
-                      )
-                    )}
-
-                    <div className="h-44 bg-gray-50/50 relative overflow-hidden flex items-center justify-center p-6">
+                    {/* Visual Container */}
+                    <div 
+                      onClick={() => {
+                        setLightboxIndex(idx);
+                        setLightboxOpen(true);
+                      }}
+                      className="relative h-80 md:h-[420px] w-full bg-gray-50 overflow-hidden shrink-0 rounded-t-3xl flex items-center justify-center cursor-pointer group/img"
+                    >
                       {product.image ? (
-                        <img referrerPolicy="no-referrer" src={product.image} alt={product.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+                        <img 
+                          referrerPolicy="no-referrer" 
+                          src={product.image} 
+                          alt={product.name} 
+                          className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500" 
+                        />
                       ) : (
-                        <Package className="w-12 h-12 text-gray-300 group-hover:scale-110 transition-transform duration-300" />
+                        <Package className="w-16 h-16 text-gray-300 group-hover/img:scale-110 transition-transform duration-300" />
                       )}
-                    </div>
-                    
-                    <div className="p-5 flex flex-col flex-1 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-violet-500 uppercase tracking-widest bg-violet-50 px-2 py-0.5 rounded">
+
+                      {/* Premium Lightbox Hover Zoom Overlay */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-all duration-300 z-20">
+                        <div className="bg-white/95 backdrop-blur-md text-gray-950 rounded-full px-5 py-2.5 flex items-center gap-2 shadow-2xl transform scale-90 group-hover/img:scale-100 transition-all duration-300 font-extrabold text-[10px] uppercase tracking-wider">
+                          <Eye className="w-4 h-4 text-violet-600 animate-pulse" />
+                          <span>Aperçu Premium</span>
+                        </div>
+                      </div>
+
+                      {/* Badges on top-right of image */}
+                      <div className="absolute top-4 right-4 flex flex-col items-end gap-1.5 z-10">
+                        <span className="bg-[#FAF5FF] text-[#7C3AED] text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-sm border border-violet-100/30">
                           {product.category || 'Général'}
                         </span>
-                        {product.sku && (
-                          <span className="text-[9px] font-mono font-bold text-gray-400">
-                            {product.sku}
-                          </span>
+                        {hasStockManagement && (
+                          isOutOfStock ? (
+                            <span className="bg-rose-600 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-sm">
+                              Rupture
+                            </span>
+                          ) : isAlert ? (
+                            <span className="bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg shadow-sm">
+                              Stock Limité
+                            </span>
+                          ) : null
                         )}
                       </div>
-                      
-                      <h3 className="text-sm font-black text-gray-900 group-hover:text-violet-600 transition-colors line-clamp-2">{product.name}</h3>
-                      
-                      {product.description && (
-                        <p className="text-xs text-gray-450 line-clamp-2 pb-2 leading-relaxed">
-                          {product.description}
-                        </p>
-                      )}
-                      
-                      {/* Available units stock info */}
-                      {hasStockManagement ? (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500 py-1 font-medium bg-gray-50/60 rounded-xl px-3 py-1.5 border border-gray-100/80 mt-auto select-none">
-                          <Package className={`w-3.5 h-3.5 ${isOutOfStock ? 'text-rose-500' : isAlert ? 'text-amber-500' : 'text-emerald-500'}`} />
-                          <span>Dispo :</span>
-                          <span className={`font-black ${isOutOfStock ? 'text-rose-600' : isAlert ? 'text-amber-700' : 'text-emerald-700'}`}>
-                            {isOutOfStock ? 'Fermé / Rupture' : `${product.stockQuantity !== undefined ? product.stockQuantity : 0} ${product.stockQuantity && product.stockQuantity > 1 ? 'unités' : 'unité'}`}
-                          </span>
+
+                      {/* Floating merchant badge on bottom-left of image */}
+                      <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-white shadow-lg z-10">
+                        {merchant?.logo ? (
+                          <img src={merchant.logo} alt="" className="w-5 h-5 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-violet-600 flex items-center justify-center text-[10px] font-bold">
+                            {merchant?.name?.charAt(0) || 'M'}
+                          </div>
+                        )}
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-extrabold leading-none">{merchant?.name || 'Acom'}</span>
+                          <span className="text-[7px] font-medium text-gray-300 leading-none mt-0.5 uppercase tracking-widest">BOUTIQUE</span>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500 py-1 font-medium bg-gray-50/60 rounded-xl px-3 py-1.5 border border-gray-100/80 mt-auto select-none">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                          <span>Statut :</span>
-                          <span className="font-black text-emerald-700">Disponible</span>
-                        </div>
-                      )}
-                      
-                      <div className="pt-3 border-t border-gray-50 flex items-center justify-between gap-1.5">
-                        <div className="text-sm font-black text-gray-900 shrink-0">
-                          {product.price.toLocaleString()} <span className="text-[10px] text-gray-400 font-medium">{merchant?.currency || 'FCFA'}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="p-5 flex flex-col flex-1 justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="text-sm font-black text-gray-900 group-hover:text-violet-600 transition-colors line-clamp-1">{product.name}</h3>
+                          {product.sku && (
+                            <span className="text-[9px] font-mono font-bold text-gray-400 mt-0.5 shrink-0">
+                              TICKET : {product.sku}
+                            </span>
+                          )}
                         </div>
                         
-                        <div className="flex items-center gap-1.5 ml-auto">
-                          {/* Cart Button or Stepper if already added to cart */}
-                          {!isOutOfStock && (() => {
-                            const cartItem = cart.find(i => i.product.id === product.id);
-                            if (cartItem) {
-                              return (
-                                <div className="flex items-center bg-violet-50 text-violet-700 rounded-xl p-0.5 border border-violet-100 shadow-sm shrink-0">
-                                  <button
-                                    onClick={() => updateCartItemQuantity(product.id, cartItem.quantity - 1)}
-                                    className="w-7 h-7 flex items-center justify-center hover:bg-white rounded-lg transition-all font-black text-xs text-violet-600"
-                                    title="Diminuer la quantité"
-                                  >
-                                    <Minus className="w-3 h-3" />
-                                  </button>
-                                  <span className="w-5 text-center text-[11px] font-black text-violet-800 select-none">
-                                    {cartItem.quantity}
-                                  </span>
-                                  <button
-                                    onClick={() => updateCartItemQuantity(product.id, cartItem.quantity + 1)}
-                                    className="w-7 h-7 flex items-center justify-center hover:bg-white rounded-lg transition-all font-black text-xs text-violet-600"
-                                    title="Augmenter la quantité"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <button
-                                  onClick={() => addToCart(product)}
-                                  className="h-8 px-2.5 rounded-xl bg-violet-600 hover:bg-[#7C3AED] text-white flex items-center gap-1 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm shadow-violet-200 active:scale-95 shrink-0"
-                                  title="Ajouter au panier"
-                                >
-                                  <ShoppingBag className="w-3.5 h-3.5" />
-                                  <span>Ajouter</span>
-                                </button>
-                              );
-                            }
-                          })()}
-
-                          {/* Direct Purchase Button */}
-                          <button 
-                            disabled={isOutOfStock}
-                            onClick={() => {
-                              if (isOutOfStock) return;
-                              setOrderingProduct(product);
-                              setOrderQuantity(1);
-                              // Set initial adapted specific values
-                              setSpecificFields({
-                                saasSector: saasType,
-                                productName: product.name,
-                                price: product.price
-                              });
-                            }}
-                            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all shadow-sm shrink-0 ${
-                              isOutOfStock 
-                                ? 'bg-gray-100 text-gray-450 cursor-not-allowed border border-gray-200' 
-                                : 'bg-gray-50 text-gray-600 hover:bg-[#7C3AED] hover:text-white border border-gray-150'
-                            }`}
-                            title={isOutOfStock ? "Rupture de stock" : "Commander immédiatement"}
-                          >
-                            <ArrowRight className="w-4 h-4 pointer-events-none" />
-                          </button>
+                        <p className="text-xs text-gray-450 line-clamp-2 h-8 leading-relaxed">
+                          {product.description || "Aucune description détaillée n'a été fournie pour cette publication."}
+                        </p>
+                        
+                        {/* Gray elegant line divider */}
+                        <div className="h-[1px] bg-gray-100 my-3" />
+                        
+                        {/* Pricing Row */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">OFFRE</span>
+                          <span className="text-sm font-black text-violet-700">
+                            {product.price.toLocaleString('fr-FR')} {merchant?.currency || 'FCFA'}
+                          </span>
                         </div>
                       </div>
 
+                      {/* Action Buttons Row */}
+                      <div className="flex items-center gap-2.5 mt-4 pt-1">
+                        {/* Contacter Button */}
+                        <button
+                          onClick={() => {
+                            if (merchant?.phone) {
+                              const message = `Bonjour, je suis intéressé par le produit "${product.name}" au prix de ${product.price.toLocaleString('fr-FR')} ${merchant.currency || 'FCFA'}.`;
+                              const cleanPhone = merchant.phone.replace(/\s+/g, '');
+                              window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+                            } else {
+                              toast.error("Numéro de contact non disponible pour cet établissement.");
+                            }
+                          }}
+                          className="flex-1 h-10 px-3 rounded-xl border border-gray-250 hover:bg-gray-50 text-gray-700 flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer"
+                        >
+                          <MessageCircle className="w-4 h-4 text-gray-400" />
+                          <span>Contacter</span>
+                        </button>
+
+                        {/* Acheter Button */}
+                        <button
+                          disabled={isOutOfStock}
+                          onClick={() => {
+                            if (isOutOfStock) return;
+                            setOrderingProduct(product);
+                            setOrderQuantity(1);
+                            setSpecificFields({
+                              saasSector: saasType,
+                              productName: product.name,
+                              price: product.price
+                            });
+                          }}
+                          className={`flex-1 h-10 px-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all shadow-sm cursor-pointer ${
+                            isOutOfStock
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-violet-600 hover:bg-[#7C3AED] text-white shadow-violet-200'
+                          }`}
+                        >
+                          <ShoppingBag className="w-4 h-4" />
+                          <span>Acheter</span>
+                        </button>
+                      </div>
                     </div>
                   </motion.div>
                 );
@@ -2225,6 +2227,14 @@ export default function AcomZoneMerchant() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ImageLightbox
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        items={filteredProducts}
+        initialIndex={lightboxIndex}
+        merchant={merchant}
+      />
 
     </div>
   );
