@@ -9,8 +9,6 @@ name: Deploy to Firebase Hosting on merge
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
       - run: npm install && npm run build
@@ -24,3 +22,4 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0320127599 }}'
           channelId: live
           projectId: gen-lang-client-0320127599
+          firebaseToolsVersion: '13.15.4'
