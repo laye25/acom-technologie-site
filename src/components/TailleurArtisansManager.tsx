@@ -18,11 +18,11 @@ interface Artisan {
   id: string;
   name: string;
   phone: string;
-  specialty: 'Couturier Principal' | 'Brodeur' | 'Apprenti' | 'Finisseur' | 'Styliste';
+  specialty: string;
   status: 'Disponible' | 'Occupé' | 'En congé';
   notes?: string;
   createdAt: string;
-  remunerationType?: 'Pièce' | 'Salarié';
+  remunerationType?: 'Pièce' | 'Salarié' | 'Mensuel' | 'Hebdomadaire' | 'Journalier';
   monthlySalary?: number;
 }
 
@@ -68,12 +68,121 @@ interface TailleurArtisansManagerProps {
 }
 
 const SPECIALTIES = [
-  'Couturier Principal',
+  'Couturier(e) Principal',
+  'Couturier(e)',
   'Brodeur',
   'Apprenti',
   'Finisseur',
   'Styliste'
 ] as const;
+
+const isSalariedType = (type?: string) => {
+  return type === 'Salarié' || type === 'Mensuel' || type === 'Hebdomadaire' || type === 'Journalier';
+};
+
+const getProfileBadge = (type?: string) => {
+  if (type === 'Hebdomadaire') {
+    return {
+      label: 'Hebdomadaire',
+      desc: 'Il est payé chaque semaine',
+      bg: 'bg-amber-50 text-amber-700 border-amber-200',
+    };
+  }
+  if (type === 'Journalier') {
+    return {
+      label: 'Journalier',
+      desc: 'Il est payé chaque jour',
+      bg: 'bg-teal-50 text-teal-700 border-teal-200',
+    };
+  }
+  if (type === 'Mensuel' || type === 'Salarié') {
+    return {
+      label: 'Mensuel',
+      desc: 'Il est payé chaque mois',
+      bg: 'bg-blue-50 text-blue-700 border-blue-200',
+    };
+  }
+  return {
+    label: 'Rémunération à la pièce',
+    desc: 'Il est payé à la tâche',
+    bg: 'bg-violet-50 text-violet-700 border-violet-200',
+  };
+};
+
+const getArtisanCategoryKey = (remunerationType?: string): 'piece' | 'mensuel' | 'hebdomadaire' | 'journalier' => {
+  if (remunerationType === 'Hebdomadaire') return 'hebdomadaire';
+  if (remunerationType === 'Journalier') return 'journalier';
+  if (remunerationType === 'Mensuel' || remunerationType === 'Salarié') return 'mensuel';
+  return 'piece';
+};
+
+const ARTISAN_CATEGORIES = [
+  {
+    key: 'piece' as const,
+    label: 'Rémunération à la pièce',
+    shortLabel: 'À la pièce',
+    desc: 'Il est payé à la tâche',
+    bg: 'bg-violet-50 text-violet-700 border-violet-100 hover:bg-violet-100/50',
+    badgeBg: 'bg-violet-50 text-violet-700 border-violet-100',
+    ringColor: 'focus:ring-violet-500',
+    activeBg: 'bg-violet-600 text-white shadow-sm'
+  },
+  {
+    key: 'mensuel' as const,
+    label: 'Mensuel',
+    shortLabel: 'Mensuel',
+    desc: 'Il est payé chaque mois',
+    bg: 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100/50',
+    badgeBg: 'bg-blue-50 text-blue-700 border-blue-100',
+    ringColor: 'focus:ring-blue-500',
+    activeBg: 'bg-blue-600 text-white shadow-sm'
+  },
+  {
+    key: 'hebdomadaire' as const,
+    label: 'Hebdomadaire',
+    shortLabel: 'Hebdomadaire',
+    desc: 'Il est payé chaque semaine',
+    bg: 'bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100/50',
+    badgeBg: 'bg-amber-50 text-amber-700 border-amber-100',
+    ringColor: 'focus:ring-amber-500',
+    activeBg: 'bg-amber-600 text-white shadow-sm'
+  },
+  {
+    key: 'journalier' as const,
+    label: 'Journalier',
+    shortLabel: 'Journalier',
+    desc: 'Il est payé chaque jour',
+    bg: 'bg-teal-50 text-teal-700 border-teal-100 hover:bg-teal-100/50',
+    badgeBg: 'bg-teal-50 text-teal-700 border-teal-100',
+    ringColor: 'focus:ring-teal-500',
+    activeBg: 'bg-teal-600 text-white shadow-sm'
+  }
+];
+
+const getProfilePaymentLabel = (type?: string) => {
+  if (type === 'Pièce') return 'Rémunération à la pièce';
+  if (type === 'Hebdomadaire') return 'Rémunération hebdomadaire';
+  if (type === 'Journalier') return 'Rémunération journalière';
+  if (type === 'Salarié') return 'Rémunération mensuelle (Salarié)';
+  return 'Rémunération mensuelle';
+};
+
+const getSalaryLabel = (type?: string) => {
+  if (type === 'Hebdomadaire') return 'Salaire Hebdomadaire';
+  if (type === 'Journalier') return 'Tarif Journalier';
+  return 'Salaire Mensuel';
+};
+
+const getPeriodLabel = (type?: string) => {
+  if (type === 'Hebdomadaire') return 'Semaine concernée';
+  if (type === 'Journalier') return 'Jour concerné';
+  return 'Mois concerné';
+};
+
+const getPeriodInputType = (type?: string) => {
+  if (type === 'Journalier' || type === 'Hebdomadaire') return 'date';
+  return 'month';
+};
 
 export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerProps) => {
   const currency = merchant.currency || 'FCFA';
@@ -85,7 +194,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
   const [orders, setOrders] = useState<any[]>([]);
 
   // Navigation sub-tabs
-  const [subTab, setSubTab] = useState<'artisans' | 'assignments' | 'payments' | 'fiche_artisan' | 'salaries'>('artisans');
+  const [subTab, setSubTab] = useState<'artisans' | 'assignments' | 'payments' | 'fiche_artisan' | 'salaries_mensuel' | 'salaries_hebdomadaire' | 'salaries_journalier'>('artisans');
   
   // Selection / Detail state
   const [selectedArtisanId, setSelectedArtisanId] = useState<string | null>(null);
@@ -106,7 +215,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
   // Form Fields - Artisan
   const [artisanName, setArtisanName] = useState('');
   const [artisanPhone, setArtisanPhone] = useState('');
-  const [artisanSpecialty, setArtisanSpecialty] = useState<Artisan['specialty']>('Couturier Principal');
+  const [artisanSpecialty, setArtisanSpecialty] = useState<string>('Couturier(e) Principal');
   const [artisanStatus, setArtisanStatus] = useState<Artisan['status']>('Disponible');
   const [artisanNotes, setArtisanNotes] = useState('');
   const [artisanRemunerationType, setArtisanRemunerationType] = useState<Artisan['remunerationType']>('Pièce');
@@ -138,6 +247,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSpecialty, setFilterSpecialty] = useState<string>('all');
   const [filterAssignStatus, setFilterAssignStatus] = useState<string>('all');
+  const [artisanCategoryFilter, setArtisanCategoryFilter] = useState<'all' | 'piece' | 'mensuel' | 'hebdomadaire' | 'journalier'>('all');
 
   // Load Data
   useEffect(() => {
@@ -153,7 +263,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             id: 'art-1',
             name: 'Moustapha Diop',
             phone: '+221 77 543 21 09',
-            specialty: 'Couturier Principal',
+            specialty: 'Couturier(e) Principal',
             status: 'Disponible',
             notes: 'Spécialiste du Basin Riche et du drapé haute couture.',
             createdAt: new Date().toISOString(),
@@ -343,7 +453,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
       setEditingArtisan(null);
       setArtisanName('');
       setArtisanPhone('');
-      setArtisanSpecialty('Couturier Principal');
+      setArtisanSpecialty('Couturier(e) Principal');
       setArtisanStatus('Disponible');
       setArtisanNotes('');
       setArtisanRemunerationType('Pièce');
@@ -370,7 +480,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             status: artisanStatus,
             notes: artisanNotes,
             remunerationType: artisanRemunerationType,
-            monthlySalary: artisanRemunerationType === 'Salarié' ? Number(artisanMonthlySalary) : undefined
+            monthlySalary: isSalariedType(artisanRemunerationType) ? Number(artisanMonthlySalary) : undefined
           };
         }
         return art;
@@ -399,7 +509,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
         status: artisanStatus,
         notes: artisanNotes,
         remunerationType: artisanRemunerationType,
-        monthlySalary: artisanRemunerationType === 'Salarié' ? Number(artisanMonthlySalary) : undefined,
+        monthlySalary: isSalariedType(artisanRemunerationType) ? Number(artisanMonthlySalary) : undefined,
         createdAt: new Date().toISOString()
       };
       syncArtisans([newArtisan, ...artisans]);
@@ -608,13 +718,17 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
 
   // Salary Payment Handlers
   const openSalaryForm = (artisanId: string = '') => {
-    const salaried = artisans.filter(a => a.remunerationType === 'Salarié');
+    const salaried = artisans.filter(a => isSalariedType(a.remunerationType));
     const defaultId = artisanId || (salaried.length > 0 ? salaried[0].id : (artisans[0]?.id || ''));
     const selectedArtisan = artisans.find(a => a.id === defaultId);
     
     setPaySalaryArtisanId(defaultId);
     setPaySalaryAmount(selectedArtisan?.monthlySalary || 150000);
-    setPaySalaryMonth(new Date().toISOString().substring(0, 7));
+    if (selectedArtisan && (selectedArtisan.remunerationType === 'Journalier' || selectedArtisan.remunerationType === 'Hebdomadaire')) {
+      setPaySalaryMonth(new Date().toISOString().split('T')[0]);
+    } else {
+      setPaySalaryMonth(new Date().toISOString().substring(0, 7));
+    }
     setPaySalaryMethod('Espèces');
     setPaySalaryNotes('');
     setIsSalaryModalOpen(true);
@@ -623,11 +737,11 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
   const handleSaveSalaryPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!paySalaryArtisanId) {
-      toast.error('Sélectionnez un artisan salarié');
+      toast.error('Sélectionnez un artisan');
       return;
     }
     if (paySalaryAmount <= 0) {
-      toast.error('Le montant du salaire doit être positif');
+      toast.error('Le montant de la rémunération doit être positif');
       return;
     }
 
@@ -637,9 +751,11 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
       return;
     }
 
+    const formattedPeriod = formatMonthFrench(paySalaryMonth, selectedArtisan.remunerationType);
+
     const alreadyPaid = salaryPayments.find(p => p.artisanId === paySalaryArtisanId && p.month === paySalaryMonth);
     if (alreadyPaid) {
-      if (!confirm(`Un salaire a déjà été enregistré pour ${selectedArtisan.name} pour le mois de ${paySalaryMonth}. Voulez-vous tout de même enregistrer un versement supplémentaire ?`)) {
+      if (!confirm(`Un règlement a déjà été enregistré pour ${selectedArtisan.name} pour la période : ${formattedPeriod}. Voulez-vous tout de même enregistrer un versement supplémentaire ?`)) {
         return;
       }
     }
@@ -656,7 +772,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
     };
 
     syncSalaryPayments([newSalaryPay, ...salaryPayments]);
-    toast.success(`Salaire de ${Number(paySalaryAmount).toLocaleString('fr-FR')} ${currency} enregistré pour ${selectedArtisan.name} (${paySalaryMonth})`);
+    toast.success(`Règlement de ${Number(paySalaryAmount).toLocaleString('fr-FR')} ${currency} enregistré pour ${selectedArtisan.name} (${formattedPeriod})`);
     setIsSalaryModalOpen(false);
   };
 
@@ -669,8 +785,24 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
   };
 
   // Payslip helper functions
-  const formatMonthFrench = (monthStr: string) => {
-    if (!monthStr || !monthStr.includes('-')) return monthStr;
+  const formatMonthFrench = (monthStr: string, type?: string) => {
+    if (!monthStr) return '';
+    if (type === 'Journalier') {
+      try {
+        return 'Journée du ' + new Date(monthStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      } catch {
+        return 'Journée du ' + monthStr;
+      }
+    }
+    if (type === 'Hebdomadaire') {
+      try {
+        const d = new Date(monthStr);
+        return 'Semaine du ' + d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+      } catch {
+        return 'Semaine du ' + monthStr;
+      }
+    }
+    if (!monthStr.includes('-')) return monthStr;
     const [year, month] = monthStr.split('-');
     const months: Record<string, string> = {
       '01': 'Janvier',
@@ -723,9 +855,18 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
   };
 
   const generatePayslipHtml = (isSalary: boolean, payment: any, artisan: any) => {
-    const title = isSalary ? "BULLETIN DE PAIE MENSUEL" : "BON DE RÈGLEMENT À LA TÂCHE";
-    const periodLabel = isSalary ? "Période de Paie" : "Date du Versement";
-    const periodValue = isSalary ? formatMonthFrench(payment.month) : new Date(payment.paymentDate).toLocaleDateString('fr-FR');
+    let title = "BON DE RÈGLEMENT À LA TÂCHE";
+    if (isSalary) {
+      if (artisan?.remunerationType === 'Hebdomadaire') {
+        title = "BULLETIN DE PAIE HEBDOMADAIRE";
+      } else if (artisan?.remunerationType === 'Journalier') {
+        title = "BULLETIN DE PAIE JOURNALIER";
+      } else {
+        title = "BULLETIN DE PAIE MENSUEL";
+      }
+    }
+    const periodLabel = isSalary ? getPeriodLabel(artisan?.remunerationType) : "Date du Versement";
+    const periodValue = isSalary ? formatMonthFrench(payment.month, artisan?.remunerationType) : new Date(payment.paymentDate).toLocaleDateString('fr-FR');
     const detailsTitle = isSalary ? "DÉTAILS DU SALAIRE" : "DÉTAILS DU RÈGLEMENT";
     const amountFormatted = payment.amount.toLocaleString('fr-FR') + " " + currency;
 
@@ -784,7 +925,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             ` : ''}
             ${isSalary && artisan?.monthlySalary ? `
             <tr style="height: 26px;">
-              <td style="color: #4b5563; font-weight: 500;">Salaire Mensuel Contractuel :</td>
+              <td style="color: #4b5563; font-weight: 500;">${getSalaryLabel(artisan.remunerationType)} Contractuel :</td>
               <td style="text-align: right; font-weight: bold; color: #111827;">${artisan.monthlySalary.toLocaleString('fr-FR')} ${currency}</td>
             </tr>
             ` : ''}
@@ -929,6 +1070,9 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
     if (filterSpecialty !== 'all') {
       list = list.filter(a => a.specialty === filterSpecialty);
     }
+    if (artisanCategoryFilter !== 'all') {
+      list = list.filter(a => getArtisanCategoryKey(a.remunerationType) === artisanCategoryFilter);
+    }
     return list;
   };
 
@@ -991,13 +1135,25 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             onClick={() => setSubTab('payments')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'payments' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
-            <Wallet className="w-3.5 h-3.5 inline mr-1.5" /> Rémunérations à la Pièce
+            <Wallet className="w-3.5 h-3.5 inline mr-1.5" /> Rémunération à la pièce
           </button>
           <button
-            onClick={() => setSubTab('salaries')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'salaries' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            onClick={() => setSubTab('salaries_mensuel')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'salaries_mensuel' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
-            <Calendar className="w-3.5 h-3.5 inline mr-1.5" /> Salariés
+            <Calendar className="w-3.5 h-3.5 inline mr-1.5" /> Rémunération Mensuelle
+          </button>
+          <button
+            onClick={() => setSubTab('salaries_hebdomadaire')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'salaries_hebdomadaire' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+          >
+            <Clock className="w-3.5 h-3.5 inline mr-1.5" /> Rémunération Hebdomadaire
+          </button>
+          <button
+            onClick={() => setSubTab('salaries_journalier')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'salaries_journalier' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+          >
+            <Clock className="w-3.5 h-3.5 inline mr-1.5" /> Rémunération Journalière
           </button>
         </div>
       </div>
@@ -1073,6 +1229,60 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             </button>
           </div>
 
+          {/* Sub-tab segment for payment profiles */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 p-1.5 bg-gray-50 border border-gray-100 rounded-2xl">
+            <button
+              onClick={() => setArtisanCategoryFilter('all')}
+              className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all cursor-pointer border text-center ${
+                artisanCategoryFilter === 'all' 
+                  ? 'bg-white border-violet-200 text-violet-700 shadow-sm font-bold' 
+                  : 'bg-transparent border-transparent text-gray-500 hover:text-gray-900 font-medium'
+              }`}
+            >
+              <Users className="w-5 h-5 mb-1 text-violet-600" />
+              <span className="text-xs font-bold">Toute l'équipe</span>
+              <span className="text-[9px] text-gray-400 mt-0.5">{artisans.length} membres</span>
+            </button>
+
+            {ARTISAN_CATEGORIES.map(cat => {
+              const count = artisans.filter(a => getArtisanCategoryKey(a.remunerationType) === cat.key).length;
+              const IconComponent = cat.key === 'piece' ? Scissors : cat.key === 'mensuel' ? Calendar : cat.key === 'hebdomadaire' ? Clock : Clock;
+              const isActive = artisanCategoryFilter === cat.key;
+              return (
+                <button
+                  key={cat.key}
+                  onClick={() => setArtisanCategoryFilter(cat.key)}
+                  className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all cursor-pointer border text-center ${
+                    isActive 
+                      ? 'bg-white border-violet-200 text-violet-700 shadow-sm font-bold' 
+                      : 'bg-transparent border-transparent text-gray-500 hover:text-gray-900 font-medium'
+                  }`}
+                >
+                  <IconComponent className={`w-5 h-5 mb-1 ${isActive ? 'text-violet-600' : 'text-gray-400'}`} />
+                  <span className="text-xs font-bold truncate max-w-full">{cat.shortLabel}</span>
+                  <span className="text-[9px] text-gray-400 mt-0.5">{count} {count > 1 ? 'membres' : 'membre'}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Category Header & Desc */}
+          <div className="bg-violet-50/20 border border-violet-100 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-gray-900 text-sm">
+                {artisanCategoryFilter === 'all' ? 'Toute l’Équipe' : ARTISAN_CATEGORIES.find(c => c.key === artisanCategoryFilter)?.label}
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {artisanCategoryFilter === 'all' 
+                  ? 'Consultez la liste complète des artisans de l’atelier et leur mode de rémunération.' 
+                  : ARTISAN_CATEGORIES.find(c => c.key === artisanCategoryFilter)?.desc}
+              </p>
+            </div>
+            <div className="text-xs font-semibold text-gray-600 font-mono bg-white px-3 py-1 rounded-lg border border-gray-100 self-start md:self-auto">
+              Total : {filteredArtisans.length} {filteredArtisans.length > 1 ? 'artisans' : 'artisan'}
+            </div>
+          </div>
+
           {/* Artisans Grid Cards */}
           {filteredArtisans.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-3xl">
@@ -1080,9 +1290,10 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                 <Users className="w-6 h-6" />
               </div>
               <p className="text-gray-500 font-bold mb-1">Aucun artisan trouvé</p>
-              <p className="text-xs text-gray-400">Modifiez votre recherche ou recrutez votre premier équipier.</p>
+              <p className="text-xs text-gray-400">Modifiez votre recherche, changez de filtre ou recrutez votre premier équipier.</p>
             </div>
-          ) : (
+          ) : artisanCategoryFilter !== 'all' ? (
+            /* Single Category Grid */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {filteredArtisans.map((artisan) => {
                 const stats = getArtisanStats(artisan.id);
@@ -1103,11 +1314,19 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                     <div className="space-y-4">
                       {/* Name & Specialty */}
                       <div>
-                        <div className="flex flex-wrap gap-1 items-center">
+                        <div className="flex flex-wrap gap-1.5 items-center">
                           <span className="text-[10px] uppercase font-bold text-violet-600 tracking-wider bg-violet-50 px-2 py-0.5 rounded-md">{artisan.specialty}</span>
-                          <span className="text-[10px] font-semibold text-gray-500 tracking-wider bg-gray-100 px-2 py-0.5 rounded-md">
-                            {artisan.remunerationType === 'Salarié' ? 'Salarié' : 'À la pièce'}
-                          </span>
+                          {(() => {
+                            const badge = getProfileBadge(artisan.remunerationType);
+                            return (
+                              <span 
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badge.bg}`} 
+                                title={badge.desc}
+                              >
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <h4 className="font-bold text-gray-900 text-sm mt-2">{artisan.name}</h4>
                         <p className="text-xs text-gray-500 font-mono mt-0.5">{artisan.phone}</p>
@@ -1162,6 +1381,126 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Grouped Categories View */
+            <div className="space-y-10">
+              {ARTISAN_CATEGORIES.map((category) => {
+                const categoryArtisans = filteredArtisans.filter(
+                  (a) => getArtisanCategoryKey(a.remunerationType) === category.key
+                );
+
+                if (categoryArtisans.length === 0) return null;
+
+                return (
+                  <div key={category.key} className="space-y-4">
+                    {/* Category Title Header */}
+                    <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+                      <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${category.badgeBg}`}>
+                        {category.label}
+                      </div>
+                      <span className="text-xs text-gray-400 font-medium">— {category.desc}</span>
+                      <span className="text-[11px] font-mono text-gray-400 ml-auto bg-gray-100 px-2 py-0.5 rounded">
+                        {categoryArtisans.length} {categoryArtisans.length > 1 ? 'membres' : 'membre'}
+                      </span>
+                    </div>
+
+                    {/* Artisans Grid under Category */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {categoryArtisans.map((artisan) => {
+                        const stats = getArtisanStats(artisan.id);
+                        return (
+                          <div
+                            key={artisan.id}
+                            className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden"
+                          >
+                            {/* Status corner tag */}
+                            <span className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                              artisan.status === 'Disponible' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                              artisan.status === 'Occupé' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                              'bg-rose-50 text-rose-700 border border-rose-100'
+                            }`}>
+                              ● {artisan.status}
+                            </span>
+
+                            <div className="space-y-4">
+                              {/* Name & Specialty */}
+                              <div>
+                                <div className="flex flex-wrap gap-1.5 items-center">
+                                  <span className="text-[10px] uppercase font-bold text-violet-600 tracking-wider bg-violet-50 px-2 py-0.5 rounded-md">{artisan.specialty}</span>
+                                  {(() => {
+                                    const badge = getProfileBadge(artisan.remunerationType);
+                                    return (
+                                      <span 
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badge.bg}`} 
+                                        title={badge.desc}
+                                      >
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                                <h4 className="font-bold text-gray-900 text-sm mt-2">{artisan.name}</h4>
+                                <p className="text-xs text-gray-500 font-mono mt-0.5">{artisan.phone}</p>
+                              </div>
+
+                              {/* Brief description */}
+                              {artisan.notes && (
+                                <p className="text-xs text-gray-600 italic line-clamp-2 h-8 leading-relaxed">
+                                  "{artisan.notes}"
+                                </p>
+                              )}
+
+                              {/* Mini stats table */}
+                              <div className="grid grid-cols-3 gap-1 pt-3 border-t border-gray-100 text-center text-gray-600">
+                                <div>
+                                  <p className="text-[10px] text-gray-400 uppercase font-medium">Assigné</p>
+                                  <p className="text-xs font-bold text-gray-800">{stats.assignedCount}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-gray-400 uppercase font-medium">En cours</p>
+                                  <p className="text-xs font-bold text-amber-600">{stats.inProgressCount}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] text-gray-400 uppercase font-medium">Solde Dû</p>
+                                  <p className={`text-xs font-bold ${stats.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{stats.balance.toLocaleString('fr-FR')} F</p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Footer Actions */}
+                            <div className="flex items-center gap-2 pt-4 mt-4 border-t border-gray-50">
+                              <button
+                                onClick={() => {
+                                  setSelectedArtisanId(artisan.id);
+                                  setSubTab('fiche_artisan');
+                                }}
+                                className="flex-1 py-2 text-center bg-gray-50 hover:bg-violet-50 hover:text-violet-700 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer"
+                              >
+                                Voir Fiche de Paie
+                              </button>
+                              <button
+                                onClick={() => openArtisanForm(artisan)}
+                                className="p-2 text-gray-400 hover:text-violet-600 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+                                title="Modifier"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteArtisan(artisan.id)}
+                                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1338,7 +1677,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
 
       {/* SUB TAB 3: REMUNERATIONS / HISTORIQUE PAIEMENTS */}
       {subTab === 'payments' && (() => {
-        const pieceRateArtisans = artisans.filter(a => a.remunerationType !== 'Salarié');
+        const pieceRateArtisans = artisans.filter(a => !isSalariedType(a.remunerationType));
         const totalEarnedPiece = pieceRateArtisans.reduce((sum, art) => sum + getArtisanStats(art.id).totalEarned, 0);
         const totalPaidPiece = pieceRateArtisans.reduce((sum, art) => sum + getArtisanStats(art.id).totalPaid, 0);
         const totalBalancePiece = pieceRateArtisans.reduce((sum, art) => sum + getArtisanStats(art.id).balance, 0);
@@ -1402,7 +1741,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                 <div className="text-center py-8 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
                   <p className="text-gray-500 font-bold mb-1">Aucun artisan rémunéré à la pièce</p>
                   <p className="text-xs text-gray-400 max-w-md mx-auto">
-                    Tous vos artisans ont été configurés en salariés. Vous pouvez changer leur type de rémunération en "À la pièce" depuis l'onglet 'Équipe & Statuts'.
+                    Tous vos artisans ont été configurés avec des rémunérations régulières. Vous pouvez changer leur type de rémunération en "À la pièce" depuis l'onglet 'Équipe & Statuts'.
                   </p>
                 </div>
               ) : (
@@ -1471,7 +1810,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
               {(() => {
                 const pieceRatePayments = payments.filter(p => {
                   const art = artisans.find(a => a.id === p.artisanId);
-                  return !art || art.remunerationType !== 'Salarié';
+                  return !art || !isSalariedType(art.remunerationType);
                 });
 
                 return pieceRatePayments.length === 0 ? (
@@ -1587,7 +1926,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-5 rounded-2xl border border-gray-100">
                   <div className="space-y-1">
                     <p className="text-[10px] text-gray-400 uppercase font-bold">Rôle principal & Rémunération</p>
-                    <p className="text-sm font-bold text-violet-700">{artisan.specialty} • {artisan.remunerationType === 'Salarié' ? 'Salarié' : 'À la pièce'}</p>
+                    <p className="text-sm font-bold text-violet-700">{artisan.specialty} • {getProfilePaymentLabel(artisan.remunerationType)}</p>
                     <p className="text-[11px] text-gray-500">Recruté le {new Date(artisan.createdAt).toLocaleDateString('fr-FR')}</p>
                   </div>
 
@@ -1648,7 +1987,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                             </div>
                             <div className="text-right shrink-0">
                               <p className="text-xs font-bold text-violet-700">
-                                {artisan.remunerationType === 'Salarié' ? 'Inclus (Salarié)' : `${task.pieceRateAmount.toLocaleString('fr-FR')} ${currency}`}
+                                {isSalariedType(artisan.remunerationType) ? 'Inclus (Régulier)' : `${task.pieceRateAmount.toLocaleString('fr-FR')} ${currency}`}
                               </p>
                               <p className="text-[10px] text-gray-400 mt-1">Limite : {task.dueDate}</p>
                             </div>
@@ -1713,168 +2052,199 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
       )}
 
       {/* SUB TAB 5: GESTION DES SALARIÉS ET MENSUALITÉS */}
-      {subTab === 'salaries' && (
-        <div className="space-y-6">
-          {/* Header & Payment Action */}
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h3 className="text-base font-bold text-gray-900">Rémunération des Salariés</h3>
-              <p className="text-xs text-gray-500 font-medium">Gérez le personnel payé de façon fixe chaque mois et enregistrez les bulletins de paie.</p>
+      {/* SUB TAB 5: GESTION DES SALARIÉS ET MENSUALITÉS */}
+      {(subTab === 'salaries_mensuel' || subTab === 'salaries_hebdomadaire' || subTab === 'salaries_journalier') && (() => {
+        const activeType = subTab === 'salaries_mensuel' ? 'Mensuel' : subTab === 'salaries_hebdomadaire' ? 'Hebdomadaire' : 'Journalier';
+        
+        // Filter artisans belonging to this active salary type
+        const activeArtisans = artisans.filter(a => {
+          if (activeType === 'Mensuel') {
+            return a.remunerationType === 'Mensuel' || a.remunerationType === 'Salarié';
+          }
+          return a.remunerationType === activeType;
+        });
+
+        // Filter salary payments belonging to these artisans
+        const activeSalaryPayments = salaryPayments.filter(p => {
+          const art = artisans.find(a => a.id === p.artisanId);
+          if (!art) return false;
+          if (activeType === 'Mensuel') {
+            return art.remunerationType === 'Mensuel' || art.remunerationType === 'Salarié';
+          }
+          return art.remunerationType === activeType;
+        });
+
+        const activeTitle = subTab === 'salaries_mensuel' ? 'Rémunération Mensuelle' : subTab === 'salaries_hebdomadaire' ? 'Rémunération Hebdomadaire' : 'Rémunération Journalière';
+        const activeDesc = subTab === 'salaries_mensuel' ? 'Gérez le personnel payé de façon mensuelle et enregistrez les bulletins de paie.' :
+                           subTab === 'salaries_hebdomadaire' ? 'Gérez le personnel payé chaque semaine et enregistrez les règlements hebdomadaires.' :
+                           'Gérez le personnel payé de façon journalière et enregistrez les indemnités journalières.';
+
+        return (
+          <div className="space-y-6">
+            {/* Header & Payment Action */}
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">{activeTitle}</h3>
+                <p className="text-xs text-gray-500 font-medium">{activeDesc}</p>
+              </div>
+              <button
+                onClick={() => openSalaryForm(activeArtisans[0]?.id || '')}
+                className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+              >
+                <DollarSign className="w-4 h-4" /> Enregistrer un Versement
+              </button>
             </div>
-            <button
-              onClick={() => openSalaryForm()}
-              className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
-            >
-              <DollarSign className="w-4 h-4" /> Enregistrer un Salaire
-            </button>
-          </div>
 
-          {/* List of Salaried Artisans */}
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
-            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5 border-b border-gray-50 pb-3">
-              <Users className="w-4 h-4 text-violet-600" /> Liste du Personnel Salarié
-            </h4>
-
-            {artisans.filter(a => a.remunerationType === 'Salarié').length === 0 ? (
-              <div className="text-center py-8 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
-                <p className="text-gray-500 font-bold mb-1">Aucun artisan salarié</p>
-                <p className="text-xs text-gray-400 max-w-md mx-auto">
-                  Pour ajouter un artisan salarié, recrutez un nouvel artisan ou modifiez un membre existant de votre équipe en choisissant le type de rémunération <strong>"Salarié"</strong>.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {artisans.filter(a => a.remunerationType === 'Salarié').map(art => {
-                  const artSalaryPayments = salaryPayments.filter(p => p.artisanId === art.id);
-                  const totalPaidSal = artSalaryPayments.reduce((sum, p) => sum + p.amount, 0);
-                  const lastPayMonth = artSalaryPayments.sort((x, y) => y.month.localeCompare(x.month))[0]?.month;
-
-                  return (
-                    <div key={art.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50/50 flex flex-col justify-between space-y-4 hover:border-violet-100 transition-all">
-                      <div className="space-y-2">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h5 className="font-bold text-gray-900 text-sm">{art.name}</h5>
-                            <p className="text-[11px] text-gray-500">{art.specialty} • {art.phone}</p>
-                          </div>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                            art.status === 'Disponible' ? 'bg-emerald-50 text-emerald-700' :
-                            art.status === 'Occupé' ? 'bg-amber-50 text-amber-700' :
-                            'bg-gray-100 text-gray-600'
-                          }`}>
-                            {art.status}
-                          </span>
-                        </div>
-
-                        <div className="pt-2 border-t border-gray-100/50 grid grid-cols-2 gap-2 text-xs font-semibold text-gray-600">
-                          <div>
-                            <p className="text-[9px] text-gray-400 uppercase">Salaire Mensuel</p>
-                            <p className="text-sm font-bold text-violet-700 mt-0.5">{(art.monthlySalary || 150000).toLocaleString('fr-FR')} F</p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] text-gray-400 uppercase">Dernier Règlement</p>
-                            <p className="text-xs font-bold text-gray-800 mt-1">
-                              {lastPayMonth ? lastPayMonth : <span className="text-gray-400 italic font-normal">Aucun</span>}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="text-[10px] text-gray-500 flex justify-between items-center bg-white px-2.5 py-1.5 rounded-lg border border-gray-100">
-                          <span>Total payé à ce jour :</span>
-                          <span className="font-bold text-gray-900">{totalPaidSal.toLocaleString('fr-FR')} F</span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => openSalaryForm(art.id)}
-                        className="w-full py-2 bg-white border border-violet-200 text-violet-700 hover:bg-violet-50 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5"
-                      >
-                        <DollarSign className="w-3.5 h-3.5" /> Enregistrer une paie
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Salary Payments Log */}
-          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-              <h4 className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
-                <Receipt className="w-4 h-4 text-emerald-600" /> Historique de tous les Versements de Salaires
+            {/* List of Salaried Artisans */}
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 space-y-4">
+              <h4 className="text-sm font-bold text-gray-900 flex items-center gap-1.5 border-b border-gray-50 pb-3">
+                <Users className="w-4 h-4 text-violet-600" /> Liste du Personnel ({activeTitle})
               </h4>
+
+              {activeArtisans.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 border border-dashed border-gray-200 rounded-2xl">
+                  <p className="text-gray-500 font-bold mb-1">Aucun artisan avec {activeTitle.toLowerCase()}</p>
+                  <p className="text-xs text-gray-400 max-w-md mx-auto">
+                    Pour ajouter un artisan à cette catégorie, modifiez un membre de votre équipe ou recrutez un nouvel artisan en choisissant {activeTitle.toLowerCase()} dans l'onglet 'Équipe & Statuts'.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activeArtisans.map(art => {
+                    const artSalaryPayments = activeSalaryPayments.filter(p => p.artisanId === art.id);
+                    const totalPaidSal = artSalaryPayments.reduce((sum, p) => sum + p.amount, 0);
+                    const lastPayMonth = artSalaryPayments.sort((x, y) => y.month.localeCompare(x.month))[0]?.month;
+
+                    return (
+                      <div key={art.id} className="border border-gray-100 rounded-xl p-4 bg-gray-50/50 flex flex-col justify-between space-y-4 hover:border-violet-100 transition-all">
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h5 className="font-bold text-gray-900 text-sm">{art.name}</h5>
+                              <p className="text-[11px] text-gray-500">{art.specialty} • {art.phone}</p>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                              art.status === 'Disponible' ? 'bg-emerald-50 text-emerald-700' :
+                              art.status === 'Occupé' ? 'bg-amber-50 text-amber-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {art.status}
+                            </span>
+                          </div>
+
+                          <div className="pt-2 border-t border-gray-100/50 grid grid-cols-2 gap-2 text-xs font-semibold text-gray-600">
+                            <div>
+                              <p className="text-[9px] text-gray-400 uppercase">{getSalaryLabel(art.remunerationType)}</p>
+                              <p className="text-sm font-bold text-violet-700 mt-0.5">{(art.monthlySalary || 150000).toLocaleString('fr-FR')} F</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] text-gray-400 uppercase">Dernière Période</p>
+                              <p className="text-xs font-bold text-gray-800 mt-1">
+                                {lastPayMonth ? lastPayMonth : <span className="text-gray-400 italic font-normal">Aucun</span>}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="text-[10px] text-gray-500 flex justify-between items-center bg-white px-2.5 py-1.5 rounded-lg border border-gray-100">
+                            <span>Total payé à ce jour :</span>
+                            <span className="font-bold text-gray-900">{totalPaidSal.toLocaleString('fr-FR')} F</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => openSalaryForm(art.id)}
+                          className="w-full py-2 bg-white border border-violet-200 text-violet-700 hover:bg-violet-50 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <DollarSign className="w-3.5 h-3.5" /> Enregistrer un règlement
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {salaryPayments.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50/20">
-                <p className="text-gray-400 text-xs italic">Aucun règlement de salaire enregistré dans l'historique.</p>
+            {/* Salary Payments Log */}
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                <h4 className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-emerald-600" /> Historique des Versements ({activeTitle})
+                </h4>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                      <th className="py-4 px-5">Artisan</th>
-                      <th className="py-4 px-5">Mois concerné</th>
-                      <th className="py-4 px-5">Date de paiement</th>
-                      <th className="py-4 px-5">Mode de transaction</th>
-                      <th className="py-4 px-5">Notes / Libellé</th>
-                      <th className="py-4 px-5 text-right">Montant</th>
-                      <th className="py-4 px-5 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-xs font-semibold text-gray-700">
-                    {salaryPayments.map((p) => (
-                      <tr key={p.id} className="hover:bg-gray-50/30 transition-all">
-                        <td className="py-3.5 px-5 font-bold text-gray-900">{p.artisanName}</td>
-                        <td className="py-3.5 px-5">
-                          <span className="px-2 py-0.5 bg-violet-50 text-violet-700 rounded-md text-[10px] font-bold">
-                            {p.month}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-5 font-mono text-gray-500 text-[11px]">{p.paymentDate}</td>
-                        <td className="py-3.5 px-5">
-                          <span className="inline-flex items-center gap-1 text-gray-600">
-                            <CreditCard className="w-3.5 h-3.5 text-gray-400" /> {p.paymentMethod}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-5 max-w-[200px] truncate">{p.notes || <span className="text-gray-400 italic">Aucune note</span>}</td>
-                        <td className="py-3.5 px-5 text-right font-bold text-emerald-600">{p.amount.toLocaleString('fr-FR')} {currency}</td>
-                        <td className="py-3.5 px-5 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => handleOpenPayslipPreview(true, p)}
-                              className="p-1.5 text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg transition-all cursor-pointer"
-                              title="Voir & Imprimer le bulletin"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDownloadPayslip(true, p, p.artisanName)}
-                              className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer"
-                              title="Télécharger le bulletin"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSalaryPayment(p.id)}
-                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-gray-50 rounded-lg transition-all cursor-pointer"
-                              title="Supprimer"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
+
+              {activeSalaryPayments.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50/20">
+                  <p className="text-gray-400 text-xs italic">Aucun règlement enregistré dans l'historique de cette catégorie.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                        <th className="py-4 px-5">Artisan</th>
+                        <th className="py-4 px-5">{getPeriodLabel(activeType)}</th>
+                        <th className="py-4 px-5">Date de paiement</th>
+                        <th className="py-4 px-5">Mode de transaction</th>
+                        <th className="py-4 px-5">Notes / Libellé</th>
+                        <th className="py-4 px-5 text-right">Montant</th>
+                        <th className="py-4 px-5 text-center">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 text-xs font-semibold text-gray-700">
+                      {activeSalaryPayments.map((p) => (
+                        <tr key={p.id} className="hover:bg-gray-50/30 transition-all">
+                          <td className="py-3.5 px-5 font-bold text-gray-900">{p.artisanName}</td>
+                          <td className="py-3.5 px-5">
+                            <span className="px-2 py-0.5 bg-violet-50 text-violet-700 rounded-md text-[10px] font-bold">
+                              {(() => {
+                                const art = artisans.find(a => a.id === p.artisanId);
+                                return formatMonthFrench(p.month, art?.remunerationType);
+                              })()}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-5 font-mono text-gray-500 text-[11px]">{p.paymentDate}</td>
+                          <td className="py-3.5 px-5">
+                            <span className="inline-flex items-center gap-1 text-gray-600">
+                              <CreditCard className="w-3.5 h-3.5 text-gray-400" /> {p.paymentMethod}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-5 max-w-[200px] truncate">{p.notes || <span className="text-gray-400 italic">Aucune note</span>}</td>
+                          <td className="py-3.5 px-5 text-right font-bold text-emerald-600">{p.amount.toLocaleString('fr-FR')} {currency}</td>
+                          <td className="py-3.5 px-5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenPayslipPreview(true, p)}
+                                className="p-1.5 text-violet-600 hover:text-violet-800 hover:bg-violet-50 rounded-lg transition-all cursor-pointer"
+                                title="Voir & Imprimer le bulletin"
+                              >
+                                <Printer className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDownloadPayslip(true, p, p.artisanName)}
+                                className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition-all cursor-pointer"
+                                title="Télécharger le bulletin"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSalaryPayment(p.id)}
+                                className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-gray-50 rounded-lg transition-all cursor-pointer"
+                                title="Supprimer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* --- MODALS SECTION --- */}
 
@@ -1966,24 +2336,51 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                       <span className="text-xs font-bold text-gray-900">Rémunération à la pièce</span>
                       <span className="text-[10px] text-gray-500 mt-1">Il est payé à la tâche</span>
                     </label>
-                    <label className={`flex flex-col p-3 border-2 rounded-2xl cursor-pointer transition-all text-left ${artisanRemunerationType === 'Salarié' ? 'border-violet-600 bg-violet-50/50' : 'border-gray-200 bg-gray-50/30 hover:bg-gray-50'}`}>
+
+                    <label className={`flex flex-col p-3 border-2 rounded-2xl cursor-pointer transition-all text-left ${artisanRemunerationType === 'Mensuel' || artisanRemunerationType === 'Salarié' ? 'border-violet-600 bg-violet-50/50' : 'border-gray-200 bg-gray-50/30 hover:bg-gray-50'}`}>
                       <input 
                         type="radio" 
                         name="remunerationType" 
-                        value="Salarié" 
-                        checked={artisanRemunerationType === 'Salarié'} 
-                        onChange={() => setArtisanRemunerationType('Salarié')} 
+                        value="Mensuel" 
+                        checked={artisanRemunerationType === 'Mensuel' || artisanRemunerationType === 'Salarié'} 
+                        onChange={() => setArtisanRemunerationType('Mensuel')} 
                         className="sr-only" 
                       />
-                      <span className="text-xs font-bold text-gray-900">Salarié</span>
+                      <span className="text-xs font-bold text-gray-900">Mensuel</span>
                       <span className="text-[10px] text-gray-500 mt-1">Il est payé chaque mois</span>
+                    </label>
+
+                    <label className={`flex flex-col p-3 border-2 rounded-2xl cursor-pointer transition-all text-left ${artisanRemunerationType === 'Hebdomadaire' ? 'border-violet-600 bg-violet-50/50' : 'border-gray-200 bg-gray-50/30 hover:bg-gray-50'}`}>
+                      <input 
+                        type="radio" 
+                        name="remunerationType" 
+                        value="Hebdomadaire" 
+                        checked={artisanRemunerationType === 'Hebdomadaire'} 
+                        onChange={() => setArtisanRemunerationType('Hebdomadaire')} 
+                        className="sr-only" 
+                      />
+                      <span className="text-xs font-bold text-gray-900">Hebdomadaire</span>
+                      <span className="text-[10px] text-gray-500 mt-1">Il est payé chaque semaine</span>
+                    </label>
+
+                    <label className={`flex flex-col p-3 border-2 rounded-2xl cursor-pointer transition-all text-left ${artisanRemunerationType === 'Journalier' ? 'border-violet-600 bg-violet-50/50' : 'border-gray-200 bg-gray-50/30 hover:bg-gray-50'}`}>
+                      <input 
+                        type="radio" 
+                        name="remunerationType" 
+                        value="Journalier" 
+                        checked={artisanRemunerationType === 'Journalier'} 
+                        onChange={() => setArtisanRemunerationType('Journalier')} 
+                        className="sr-only" 
+                      />
+                      <span className="text-xs font-bold text-gray-900">Journalier</span>
+                      <span className="text-[10px] text-gray-500 mt-1">Il est payé chaque jour</span>
                     </label>
                   </div>
                 </div>
 
-                {artisanRemunerationType === 'Salarié' && (
+                {isSalariedType(artisanRemunerationType) && (
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Salaire Mensuel ({currency})</label>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">{getSalaryLabel(artisanRemunerationType)} ({currency})</label>
                     <input
                       type="number"
                       required
@@ -2052,7 +2449,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
               <form onSubmit={handleSaveAssignment} className="p-6 space-y-4">
                 {(() => {
                   const selectedArtisanInModal = artisans.find(a => a.id === assignArtisanId);
-                  const isSalariedInModal = selectedArtisanInModal?.remunerationType === 'Salarié';
+                  const isSalariedInModal = isSalariedType(selectedArtisanInModal?.remunerationType);
                   return (
                     <>
                       <div>
@@ -2102,7 +2499,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                             type="text"
                             required
                             disabled={isSalariedInModal}
-                            value={isSalariedInModal ? "Inclus (Salarié)" : assignPieceRate}
+                            value={isSalariedInModal ? "Inclus (Régulier)" : assignPieceRate}
                             onChange={(e) => setAssignPieceRate(Number(e.target.value))}
                             placeholder="Ex : 5000"
                             className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all font-semibold disabled:opacity-60 disabled:bg-gray-100 disabled:text-gray-500"
@@ -2191,7 +2588,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
                   >
                     <option value="">Sélectionner l'artisan...</option>
-                    {artisans.filter(a => a.remunerationType !== 'Salarié').map(a => {
+                    {artisans.filter(a => !isSalariedType(a.remunerationType)).map(a => {
                       const stats = getArtisanStats(a.id);
                       return (
                         <option key={a.id} value={a.id}>{a.name} (Solde dû: {stats.balance} F)</option>
@@ -2272,7 +2669,10 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
               <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-violet-50/50">
                 <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
                   <DollarSign className="w-5 h-5 text-violet-600" />
-                  Régler un Salaire Mensuel
+                  {(() => {
+                    const art = artisans.find(a => a.id === paySalaryArtisanId);
+                    return art ? `Régler - ${getProfilePaymentLabel(art.remunerationType)}` : 'Régler une Rémunération Fixe';
+                  })()}
                 </h4>
                 <button
                   onClick={() => setIsSalaryModalOpen(false)}
@@ -2284,7 +2684,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
 
               <form onSubmit={handleSaveSalaryPayment} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Artisan salarié</label>
+                  <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Artisan destinataire</label>
                   <select
                     value={paySalaryArtisanId}
                     onChange={(e) => {
@@ -2293,22 +2693,35 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                       const art = artisans.find(a => a.id === id);
                       if (art) {
                         setPaySalaryAmount(art.monthlySalary || 150000);
+                        if (art.remunerationType === 'Journalier' || art.remunerationType === 'Hebdomadaire') {
+                          setPaySalaryMonth(new Date().toISOString().split('T')[0]);
+                        } else {
+                          setPaySalaryMonth(new Date().toISOString().substring(0, 7));
+                        }
                       }
                     }}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
                   >
                     <option value="">Sélectionner un artisan...</option>
-                    {artisans.filter(a => a.remunerationType === 'Salarié').map(a => (
-                      <option key={a.id} value={a.id}>{a.name} (Mensuel : {a.monthlySalary || 150000} F)</option>
+                    {artisans.filter(a => isSalariedType(a.remunerationType)).map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({getSalaryLabel(a.remunerationType)} : {a.monthlySalary || 150000} F)</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Mois concerné</label>
+                    <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      {(() => {
+                        const art = artisans.find(a => a.id === paySalaryArtisanId);
+                        return getPeriodLabel(art?.remunerationType);
+                      })()}
+                    </label>
                     <input
-                      type="month"
+                      type={(() => {
+                        const art = artisans.find(a => a.id === paySalaryArtisanId);
+                        return getPeriodInputType(art?.remunerationType);
+                      })()}
                       required
                       value={paySalaryMonth}
                       onChange={(e) => setPaySalaryMonth(e.target.value)}
