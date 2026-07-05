@@ -763,6 +763,53 @@ export interface HREmployee {
   createdAt: any;
 }
 
+export interface EmployeeLeave {
+  id: string;
+  merchantId: string;
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  type: 'paid' | 'sick' | 'unpaid' | 'maternity' | 'other';
+  status: 'pending' | 'approved' | 'rejected';
+  reason?: string;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface EmployeeAttendance {
+  id: string;
+  merchantId: string;
+  employeeId: string;
+  date: string; // YYYY-MM-DD
+  status: 'present' | 'absent' | 'late' | 'half_day';
+  checkIn?: string; // HH:MM
+  checkOut?: string; // HH:MM
+  notes?: string;
+  createdAt: any;
+  updatedAt: any;
+}
+
+export interface Payslip {
+  id: string;
+  merchantId: string;
+  employeeId: string;
+  period: string; // YYYY-MM
+  baseSalary: number;
+  transportAllowance: number;
+  performanceBonus: number;
+  otherAllowances: number;
+  ipresDeduction: number; // local retirement
+  cssDeduction: number; // social security
+  taxDeduction: number; // income tax
+  otherDeductions: number;
+  netPay: number;
+  status: 'draft' | 'paid';
+  paymentMethod?: 'cash' | 'wave' | 'orange_money' | 'transfer';
+  paymentDate?: string;
+  createdAt: any;
+  updatedAt: any;
+}
+
 // 5. School
 export interface SchoolStudent {
   id: string;

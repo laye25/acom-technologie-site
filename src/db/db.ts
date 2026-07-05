@@ -50,10 +50,13 @@ export class StudioAcomDB extends Dexie {
   vehicle_maintenances!: Table<any>;
   delivery_agents!: Table<any>;
   delivery_assignments!: Table<any>;
+  employee_leaves!: Table<any>;
+  employee_attendance!: Table<any>;
+  payslips!: Table<any>;
 
   constructor() {
     super('StudioAcomDB');
-    this.version(21).stores({
+    this.version(22).stores({
       categories: 'id, merchantId, name, syncStatus',
       products: 'id, merchantId, name, category, updatedAt, syncStatus',
       sales: 'id, merchantId, createdAt, syncStatus',
@@ -101,7 +104,10 @@ export class StudioAcomDB extends Dexie {
       discipline_records: 'id, merchantId, studentId, type, date, syncStatus, updatedAt',
       vehicle_maintenances: 'id, merchantId, vehicleId, date, syncStatus, updatedAt',
       delivery_agents: 'id, merchantId, syncStatus, updatedAt',
-      delivery_assignments: 'id, merchantId, ticketId, agentId, status, syncStatus, updatedAt'
+      delivery_assignments: 'id, merchantId, ticketId, agentId, status, syncStatus, updatedAt',
+      employee_leaves: 'id, merchantId, employeeId, startDate, endDate, syncStatus, updatedAt',
+      employee_attendance: 'id, merchantId, employeeId, date, status, syncStatus, updatedAt',
+      payslips: 'id, merchantId, employeeId, period, status, syncStatus, updatedAt'
     });
   }
 }
@@ -132,7 +138,11 @@ if (typeof window !== 'undefined') {
     'parents',
     'vehicle_maintenances',
     'delivery_agents',
-    'delivery_assignments'
+    'delivery_assignments',
+    'employees',
+    'employee_leaves',
+    'employee_attendance',
+    'payslips'
   ];
 
   OFFLINE_SYNC_TABLES.forEach(tableName => {
