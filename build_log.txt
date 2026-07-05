@@ -1,6 +1,0 @@
-
-> acom-technologie-site@1.0.0 build
-> node copy-sqlite.js && cross-env NODE_OPTIONS=--max-old-space-size=1536 vite build
-
-Copying SQLite WASM assets to public directory...
-Source directory not found: /app/applet/node_modules/@sqlite.org/sqlite-wasm/dist

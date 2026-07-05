@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncPhysicalFile: async (arrayBuffer) => {
     return ipcRenderer.invoke('sync-physical-file', arrayBuffer);
   },
+  exportSqliteFile: async (arrayBuffer) => {
+    return ipcRenderer.invoke('export-sqlite-file', arrayBuffer);
+  },
   makeApiRequest: async (url, options) => {
     return ipcRenderer.invoke('make-api-request', { url, options });
   },

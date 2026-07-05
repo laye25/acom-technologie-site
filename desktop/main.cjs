@@ -137,6 +137,29 @@ function createWindow() {
     }
   });
 
+  // Export SQLite database to user-selected folder (USB key, etc.)
+  ipcMain.handle('export-sqlite-file', async (event, arrayBuffer) => {
+    try {
+      const fs = require('fs');
+      const { filePath } = await dialog.showSaveDialog({
+        title: 'Exporter la base de données SQLite',
+        defaultPath: 'acom_studio.sqlite3',
+        filters: [
+          { name: 'SQLite Database', extensions: ['sqlite3', 'sqlite', 'db'] }
+        ]
+      });
+      if (filePath) {
+        fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+        console.log(`[IPC] Database exported successfully to: ${filePath}`);
+        return { success: true, path: filePath };
+      }
+      return { success: false, cancelled: true };
+    } catch (error) {
+      console.error('[IPC] Failed to export SQLite file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Handle bypassed desktop-to-web API proxy calls using Electron operating-system-level network engine
   ipcMain.handle('make-api-request', async (event, { url, options }) => {
     try {

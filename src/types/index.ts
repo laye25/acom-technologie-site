@@ -46,6 +46,8 @@ export interface PaymentRecord {
 }
 
 export interface Order {
+  isLater?: boolean;
+  isUrgent?: boolean;
   id: string;
   userId: string;
   user_id?: string;
@@ -802,4 +804,23 @@ export interface MedicalAppointment {
   reason?: string;
   notes?: string;
   createdAt: any;
+}
+
+export interface MedicalPrescription {
+  id: string;
+  merchantId: string;
+  patientId: string;
+  patientName: string;
+  appointmentId?: string;
+  date: string;
+  medicines: {
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    instructions?: string;
+  }[];
+  notes?: string;
+  createdAt: any;
+  updatedAt: any;
 }

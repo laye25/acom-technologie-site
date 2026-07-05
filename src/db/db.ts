@@ -24,6 +24,7 @@ export class StudioAcomDB extends Dexie {
   students!: Table<any>;
   patients!: Table<any>;
   appointments!: Table<any>;
+  prescriptions!: Table<any>;
   suppliers!: Table<any>;
   movements!: Table<any>;
   partner_ratings!: Table<any>;
@@ -46,10 +47,13 @@ export class StudioAcomDB extends Dexie {
   schedules!: Table<any>;
   homeworks!: Table<any>;
   discipline_records!: Table<any>;
+  vehicle_maintenances!: Table<any>;
+  delivery_agents!: Table<any>;
+  delivery_assignments!: Table<any>;
 
   constructor() {
     super('StudioAcomDB');
-    this.version(20).stores({
+    this.version(21).stores({
       categories: 'id, merchantId, name, syncStatus',
       products: 'id, merchantId, name, category, updatedAt, syncStatus',
       sales: 'id, merchantId, createdAt, syncStatus',
@@ -73,6 +77,7 @@ export class StudioAcomDB extends Dexie {
       students: 'id, merchantId, updatedAt',
       patients: 'id, merchantId, updatedAt',
       appointments: 'id, merchantId, updatedAt',
+      prescriptions: 'id, merchantId, patientId, appointmentId, updatedAt',
       suppliers: 'id, merchantId, updatedAt',
       movements: 'id, merchantId, createdAt',
       partner_ratings: 'id, partnerId, updatedAt',
@@ -93,7 +98,10 @@ export class StudioAcomDB extends Dexie {
       ai_insights: 'id, merchantId, studentId, type, date, syncStatus, updatedAt',
       schedules: 'id, merchantId, classId, dayOfWeek, syncStatus, updatedAt',
       homeworks: 'id, merchantId, classId, subjectId, dueDate, syncStatus, updatedAt',
-      discipline_records: 'id, merchantId, studentId, type, date, syncStatus, updatedAt'
+      discipline_records: 'id, merchantId, studentId, type, date, syncStatus, updatedAt',
+      vehicle_maintenances: 'id, merchantId, vehicleId, date, syncStatus, updatedAt',
+      delivery_agents: 'id, merchantId, syncStatus, updatedAt',
+      delivery_assignments: 'id, merchantId, ticketId, agentId, status, syncStatus, updatedAt'
     });
   }
 }
@@ -109,7 +117,7 @@ export function setRemoteSyncState(state: boolean) {
 
 // Hook to sync local offline writes to Firestore
 if (typeof window !== 'undefined') {
-  const EDUCATIONAL_SYNC_TABLES = [
+  const OFFLINE_SYNC_TABLES = [
     'classes',
     'subjects',
     'grades',
@@ -121,10 +129,13 @@ if (typeof window !== 'undefined') {
     'discipline_records',
     'students',
     'teachers',
-    'parents'
+    'parents',
+    'vehicle_maintenances',
+    'delivery_agents',
+    'delivery_assignments'
   ];
 
-  EDUCATIONAL_SYNC_TABLES.forEach(tableName => {
+  OFFLINE_SYNC_TABLES.forEach(tableName => {
     const table = (db as any)[tableName];
     if (!table) return;
 

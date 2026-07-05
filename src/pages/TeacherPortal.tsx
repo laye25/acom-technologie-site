@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
 import { useNavigate } from 'react-router-dom';
-import { TeacherDashboardWrapper } from './MerchantSaaS';
+import { TeacherDashboardWrapper } from '../modules/scolaire/components/TeacherDashboardWrapper';
 
 const TeacherPortal = () => {
   const navigate = useNavigate();

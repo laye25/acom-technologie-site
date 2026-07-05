@@ -733,6 +733,7 @@ export const syncService = {
       { name: 'students', table: db.students },
       { name: 'patients', table: db.patients },
       { name: 'appointments', table: db.appointments },
+      { name: 'prescriptions', table: db.prescriptions },
       { name: 'merchant_suppliers', table: db.suppliers },
       { name: 'stock_movements', table: db.movements },
       { name: 'merchant_categories', table: db.categories },
@@ -746,7 +747,10 @@ export const syncService = {
       { name: 'ai_insights', table: db.ai_insights },
       { name: 'schedules', table: db.schedules },
       { name: 'homeworks', table: db.homeworks },
-      { name: 'discipline_records', table: db.discipline_records }
+      { name: 'discipline_records', table: db.discipline_records },
+      { name: 'vehicle_maintenances', table: db.vehicle_maintenances },
+      { name: 'delivery_agents', table: db.delivery_agents },
+      { name: 'delivery_assignments', table: db.delivery_assignments }
     ];
     
     for (const col of collections) {

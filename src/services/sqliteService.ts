@@ -539,6 +539,11 @@ export const syncPhysicalFile = async () => {
     const isElectronNew = !!electronAPI;
     const isElectronOld = typeof window !== 'undefined' && typeof (window as any).require !== 'undefined' && navigator.userAgent.includes('Electron');
     
+    // Track last write/sync timestamp for the visual status bar indicator
+    const now = new Date().toISOString();
+    localStorage.setItem('last_sqlite_sync_timestamp', now);
+    window.dispatchEvent(new CustomEvent('sqlite-sync-completed', { detail: { timestamp: now } }));
+
     if (!isElectronNew && !isElectronOld) return;
 
     // Export DB

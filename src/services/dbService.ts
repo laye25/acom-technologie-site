@@ -1,6 +1,6 @@
 import { auth } from '../firebase';
 import { where, orderBy, limit } from 'firebase/firestore';
-import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment, PartnerRating, Category } from '../types';
+import { Service, PortfolioItem, BlogPost, UserProfile, Order, Design, Expense, Merchant, MerchantProduct, MerchantSale, MerchantExpense, MerchantSupplier, StockMovement, ServiceIntervention, ConstructionProject, TransportVehicle, HREmployee, SchoolStudent, MedicalPatient, MedicalAppointment, MedicalPrescription, PartnerRating, Category } from '../types';
 import { serviceRepository } from '../data/repositories/service.repository';
 import { orderRepository } from '../data/repositories/order.repository';
 import { portfolioRepository } from '../data/repositories/portfolio.repository';
@@ -25,6 +25,7 @@ import { teacherRepository } from '../data/repositories/teacher.repository';
 import { parentRepository } from '../data/repositories/parent.repository';
 import { patientRepository } from '../data/repositories/patient.repository';
 import { appointmentRepository } from '../data/repositories/appointment.repository';
+import { prescriptionRepository } from '../data/repositories/prescription.repository';
 import { designRepository } from '../data/repositories/design.repository';
 import { designBlockRepository } from '../data/repositories/design-block.repository';
 import { categoryRepository } from '../data/repositories/category.repository';
@@ -1043,6 +1044,28 @@ export const dbService = {
     async delete(id: string) {
       await appointmentRepository.delete(id);
       await db.appointments.delete(id);
+    }
+  },
+  prescriptions: {
+    async save(prescription: Partial<MedicalPrescription>) {
+      const user = auth.currentUser;
+      const data = {
+        ...prescription,
+        owner_id: user?.uid,
+        ownerId: user?.uid
+      };
+      let id = prescription.id;
+      if (prescription.id) {
+        await prescriptionRepository.update(prescription.id, data);
+      } else {
+        id = await prescriptionRepository.create(data as any);
+      }
+      await db.table('prescriptions').put({ ...data, id, updatedAt: new Date() } as any);
+      return id;
+    },
+    async delete(id: string) {
+      await prescriptionRepository.delete(id);
+      await db.table('prescriptions').delete(id);
     }
   },
   designBlocks: {
