@@ -40,7 +40,7 @@ jobs:
 
       - name: Build Electron Desktop App (Windows)
         if: matrix.os == 'windows-latest'
-        run: npx electron-builder --win --publish never
+        run: npx electron-builder --win --x64 --ia32 --publish never
 
       - name: Build Electron Desktop App (macOS)
         if: matrix.os == 'macos-latest'
