@@ -247,7 +247,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       </div>
 
       {/* KPI Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${merchant.type === 'transport' ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
         {/* Card 1: Total outflows */}
         <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
           <div>
@@ -287,47 +287,51 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
           </div>
         </div>
 
-        {/* Card 3: Deliveries costs */}
-        <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">Coût des Courses</span>
-              <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-                <Truck className="w-3.5 h-3.5" />
+        {merchant.type === 'transport' && (
+          <>
+            {/* Card 3: Deliveries costs */}
+            <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">Coût des Courses</span>
+                  <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+                    <Truck className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-blue-500 font-mono mt-1">
+                  {stats.totalDeliveries.toLocaleString()} <span className="text-[10px] text-gray-400 font-bold">{merchant.currency}</span>
+                </p>
+              </div>
+              <div className="w-full bg-gray-100 h-1 rounded-full mt-4 overflow-hidden">
+                <div 
+                  className="bg-blue-500 h-full" 
+                  style={{ width: `${stats.totalOutflow > 0 ? (stats.totalDeliveries / stats.totalOutflow) * 100 : 0}%` }}
+                ></div>
               </div>
             </div>
-            <p className="text-2xl font-black text-blue-500 font-mono mt-1">
-              {stats.totalDeliveries.toLocaleString()} <span className="text-[10px] text-gray-400 font-bold">{merchant.currency}</span>
-            </p>
-          </div>
-          <div className="w-full bg-gray-100 h-1 rounded-full mt-4 overflow-hidden">
-            <div 
-              className="bg-blue-500 h-full" 
-              style={{ width: `${stats.totalOutflow > 0 ? (stats.totalDeliveries / stats.totalOutflow) * 100 : 0}%` }}
-            ></div>
-          </div>
-        </div>
 
-        {/* Card 4: Fleet maintenances */}
-        <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">Entretien de la Flotte</span>
-              <div className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
-                <Wrench className="w-3.5 h-3.5" />
+            {/* Card 4: Fleet maintenances */}
+            <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">Entretien de la Flotte</span>
+                  <div className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500">
+                    <Wrench className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-emerald-500 font-mono mt-1">
+                  {stats.totalMaintenances.toLocaleString()} <span className="text-[10px] text-gray-400 font-bold">{merchant.currency}</span>
+                </p>
+              </div>
+              <div className="w-full bg-gray-100 h-1 rounded-full mt-4 overflow-hidden">
+                <div 
+                  className="bg-emerald-500 h-full" 
+                  style={{ width: `${stats.totalOutflow > 0 ? (stats.totalMaintenances / stats.totalOutflow) * 100 : 0}%` }}
+                ></div>
               </div>
             </div>
-            <p className="text-2xl font-black text-emerald-500 font-mono mt-1">
-              {stats.totalMaintenances.toLocaleString()} <span className="text-[10px] text-gray-400 font-bold">{merchant.currency}</span>
-            </p>
-          </div>
-          <div className="w-full bg-gray-100 h-1 rounded-full mt-4 overflow-hidden">
-            <div 
-              className="bg-emerald-500 h-full" 
-              style={{ width: `${stats.totalOutflow > 0 ? (stats.totalMaintenances / stats.totalOutflow) * 100 : 0}%` }}
-            ></div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Filters */}
@@ -335,8 +339,10 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
         {[
           { id: 'all', label: 'Tout le flux de trésorerie' },
           { id: 'general', label: 'Dépenses Générales' },
-          { id: 'delivery', label: 'Courses & Logistique' },
-          { id: 'maintenance', label: 'Entretien Véhicules' }
+          ...(merchant.type === 'transport' ? [
+            { id: 'delivery', label: 'Courses & Logistique' },
+            { id: 'maintenance', label: 'Entretien Véhicules' }
+          ] : [])
         ].map((btn) => (
           <button
             key={btn.id}
