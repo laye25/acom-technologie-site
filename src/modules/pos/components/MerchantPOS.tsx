@@ -19,6 +19,94 @@ import { fr } from 'date-fns/locale';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 
 
+const useHorizontalScroll = <T extends HTMLElement>() => {
+  const elRef = useRef<T>(null);
+
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el) return;
+
+    // 1. Convert vertical wheel scroll to horizontal
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return;
+      if (Math.abs(e.deltaX) > 0) return; // Allow native trackpad horizontal scrolling
+      if (el.scrollWidth <= el.clientWidth) return;
+
+      const isAtLeft = el.scrollLeft <= 0;
+      const isAtRight = Math.abs(el.scrollWidth - el.clientWidth - el.scrollLeft) < 1;
+      
+      if ((e.deltaY < 0 && !isAtLeft) || (e.deltaY > 0 && !isAtRight)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+
+    // 2. Drag-to-scroll (glisser-déposer / mouse grab drag)
+    let isDown = false;
+    let startX: number;
+    let scrollLeft: number;
+    let hasMoved = false;
+
+    // Set initial cursor style to indicate click-and-drag capability
+    el.style.cursor = 'grab';
+
+    const handleMouseDown = (e: MouseEvent) => {
+      isDown = true;
+      hasMoved = false;
+      startX = e.pageX - el.offsetLeft;
+      scrollLeft = el.scrollLeft;
+      el.style.cursor = 'grabbing';
+      el.style.userSelect = 'none';
+    };
+
+    const handleMouseLeave = () => {
+      isDown = false;
+      el.style.cursor = 'grab';
+      el.style.userSelect = '';
+    };
+
+    const handleMouseUp = () => {
+      isDown = false;
+      el.style.cursor = 'grab';
+      el.style.userSelect = '';
+      if (hasMoved) {
+        // Intercept and prevent the immediate subsequent click event to avoid accidental item clicks
+        const preventClick = (evt: MouseEvent) => {
+          evt.stopImmediatePropagation();
+          el.removeEventListener('click', preventClick, true);
+        };
+        el.addEventListener('click', preventClick, true);
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDown) return;
+      const x = e.pageX - el.offsetLeft;
+      const walk = (x - startX) * 1.5; // Drag speed multiplier
+      if (Math.abs(walk) > 5) {
+        hasMoved = true;
+      }
+      el.scrollLeft = scrollLeft - walk;
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    el.addEventListener('mousedown', handleMouseDown);
+    el.addEventListener('mouseleave', handleMouseLeave);
+    el.addEventListener('mouseup', handleMouseUp);
+    el.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      el.removeEventListener('mousedown', handleMouseDown);
+      el.removeEventListener('mouseleave', handleMouseLeave);
+      el.removeEventListener('mouseup', handleMouseUp);
+      el.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
+  return elRef;
+};
+
 const PaymentMethodBtn = ({ active, onClick, label }: any) => (
   <button
     type="button"
@@ -226,6 +314,12 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
   const [sortBy, setSortBy] = useState<'name' | 'price_asc' | 'price_desc' | 'stock_desc' | 'newest'>('name');
   const [selectedSize, setSelectedSize] = useState<string>('all');
   const [selectedColor, setSelectedColor] = useState<string>('all');
+
+  const categoriesRef = useHorizontalScroll<HTMLDivElement>();
+  const subCategoriesRef = useHorizontalScroll<HTMLDivElement>();
+  const sizesRef = useHorizontalScroll<HTMLDivElement>();
+  const colorsRef = useHorizontalScroll<HTMLDivElement>();
+  const stockFiltersRef = useHorizontalScroll<HTMLDivElement>();
 
   const availableSizes = useMemo(() => {
     if (selectedCategory === 'all') return []; // Hide sizes to prevent confusing mix of laptop and shoe sizes
@@ -983,7 +1077,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               )}
             </div>
             
-            <div className="flex gap-2 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div ref={categoriesRef} className="flex gap-2 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setSelectedCategory('all')}
                 className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all border ${
@@ -1034,7 +1128,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 </span>
               </div>
               
-              <div className="flex gap-2 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+              <div ref={subCategoriesRef} className="flex gap-2 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
                 <button
                   onClick={() => setSelectedSubCategory('all')}
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all border ${
@@ -1095,7 +1189,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                       </button>
                     )}
                   </div>
-                  <div className="flex gap-1.5 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+                  <div ref={sizesRef} className="flex gap-1.5 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
                     <button
                       onClick={() => setSelectedSize('all')}
                       className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
@@ -1147,7 +1241,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                       </button>
                     )}
                   </div>
-                  <div className="flex gap-1.5 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+                  <div ref={colorsRef} className="flex gap-1.5 w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
                     <button
                       onClick={() => setSelectedColor('all')}
                       className={`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-bold whitespace-nowrap transition-all border ${
@@ -1188,7 +1282,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           {/* Ligne 2: Disponibilité & Tri */}
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between border-t border-black/5 pt-3">
             {/* Disponibilité Segmented Control */}
-            <div className="flex items-center gap-2 w-full overflow-x-auto pb-2 -mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div ref={stockFiltersRef} className="flex items-center gap-2 w-full overflow-x-auto pb-2 -mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
               <span className="text-[10px] shrink-0 font-black text-gray-400 uppercase tracking-widest mr-1">Filtrer Stock :</span>
               <div className="bg-white border border-black/5 rounded-2xl p-1 flex gap-1 shadow-sm shrink-0">
                 <button
