@@ -898,7 +898,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       exit={{ opacity: 0, x: -20 }}
       className="flex flex-col lg:flex-row gap-8"
     >
-      <div className="flex-1 space-y-6">
+      <div className="flex-1 min-w-0 space-y-6">
         <div className="flex gap-3">
           <div className="relative group flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
