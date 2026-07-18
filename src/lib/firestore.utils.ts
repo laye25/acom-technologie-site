@@ -145,3 +145,19 @@ export function restoreFromFirestore(data: any): any {
   }
   return restored;
 }
+
+export async function withFirestoreTimeout<T>(promise: Promise<T>, timeoutMs = 5000): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Firestore request timed out after ${timeoutMs}ms. Possible quota limit or network issue.`));
+    }, timeoutMs);
+  });
+  
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}

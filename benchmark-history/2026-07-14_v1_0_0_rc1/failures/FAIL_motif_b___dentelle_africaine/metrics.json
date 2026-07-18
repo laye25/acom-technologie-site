@@ -1,0 +1,16 @@
+{
+  "id": "Motif B - Dentelle Africaine",
+  "responsibleEngine": "Physics",
+  "overallScore": 92.86626406150057,
+  "metrics": {
+    "Geometry": 92.66431259876477,
+    "Topology": 100,
+    "Ribbon": 97.28065607182916,
+    "Tatami": 98,
+    "Satin": 99.71887975991005,
+    "Travel": 99.4,
+    "Physics": 63
+  },
+  "warnings": [],
+  "executionTimeMs": 149.58773300000001
+}

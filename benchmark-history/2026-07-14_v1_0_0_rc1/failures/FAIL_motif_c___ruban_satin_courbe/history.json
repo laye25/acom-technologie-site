@@ -1,0 +1,53 @@
+{
+  "id": "Motif C - Ruban Satin Courbe",
+  "responsibleEngine": "Geometry",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 58.587716544843374
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 58.587716544843374
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 64.50375703843717
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 64.50375703843717
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 64.50375703843717
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 61.16999080467094
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 60.77531012465128
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 62.693563213464714
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 59.90683640412816
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 72.35673923405356
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 92.10494344344511
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

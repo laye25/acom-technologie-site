@@ -113,6 +113,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log('AuthContext: onAuthStateChanged - currentUser:', currentUser);
       
+      const safetyTimeout = setTimeout(() => {
+        setLoading(prev => {
+          if (prev) {
+            console.warn('AuthContext: Loading timed out after 4s. Forcing UI to load.');
+            return false;
+          }
+          return prev;
+        });
+      }, 4000);
+
       // Cleanup previous profile listener
       if (profileUnsubscribe) {
         profileUnsubscribe();

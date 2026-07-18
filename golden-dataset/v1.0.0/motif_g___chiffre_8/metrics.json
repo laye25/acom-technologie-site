@@ -1,0 +1,54 @@
+{
+  "id": "Motif G - Chiffre 8",
+  "difficulty": "Medium",
+  "type": "Topology",
+  "topology": {
+    "euler": -1,
+    "holes": 2,
+    "islands": 1,
+    "components": 1,
+    "maxDepth": 2,
+    "adjacencyEdges": 0,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 1.2490866959454393e-15,
+    "hausdorff": 0.48643497683332837,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9346831396400972,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 60,
+    "fabricDistortion": 2.247,
+    "threadTension": 6.74,
+    "pushPullError": 2.247,
+    "bucklingRisk": 18.182,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 4.35,
+    "estimatedShrinkage": 2.247,
+    "simulationTimeMs": 1.534
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 0.6429580000000215,
+      "TopologyPass": 0.2518599999999651,
+      "RibbonPass": 35.191924000000085,
+      "TatamiPass": 1.3643389999999727,
+      "SatinPass": 2.487781000000041,
+      "TravelPass": 0.1695670000000291,
+      "PhysicsPass": 1.5520719999999528,
+      "ExportPass": 0.42319799999995666
+    },
+    "totalMs": 42.10071300000004
+  }
+}

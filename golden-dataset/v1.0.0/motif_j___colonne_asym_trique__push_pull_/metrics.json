@@ -1,0 +1,54 @@
+{
+  "id": "Motif J - Colonne Asymétrique (Push-Pull)",
+  "difficulty": "Extreme",
+  "type": "Ribbon",
+  "topology": {
+    "euler": 1,
+    "holes": 0,
+    "islands": 1,
+    "components": 1,
+    "maxDepth": 1,
+    "adjacencyEdges": 0,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 1.299109086608153e-14,
+    "hausdorff": 0.12358614223657291,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9727365984009266,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 63,
+    "fabricDistortion": 2.155,
+    "threadTension": 6.465,
+    "pushPullError": 2.155,
+    "bucklingRisk": 9.091,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 3.46,
+    "estimatedShrinkage": 2.155,
+    "simulationTimeMs": 0.388
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 0.28817900000001373,
+      "TopologyPass": 0.0887319999999363,
+      "RibbonPass": 14.868029999999976,
+      "TatamiPass": 0.6189679999999953,
+      "SatinPass": 0.961029999999937,
+      "TravelPass": 0.12229899999999816,
+      "PhysicsPass": 0.43841500000007727,
+      "ExportPass": 0.2430580000000191
+    },
+    "totalMs": 17.650504999999953
+  }
+}

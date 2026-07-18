@@ -1,0 +1,37 @@
+{
+  "id": "Motif I - Tatami Haute Densité (Buckling Risk)",
+  "responsibleEngine": "Geometry",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": -29.031600295948806
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -32.10692497127348
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -32.04920769472756
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -30.831721701696356
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -32.940786029279025
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -18.997511182135632
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 94.07394525026872
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

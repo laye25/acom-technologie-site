@@ -1,0 +1,16 @@
+{
+  "id": "Motif J - Colonne Asymétrique (Push-Pull)",
+  "responsibleEngine": "Physics",
+  "overallScore": 93.72295001202693,
+  "metrics": {
+    "Geometry": 98.76413857763427,
+    "Topology": 100,
+    "Ribbon": 97.27365984009266,
+    "Tatami": 98,
+    "Satin": 99.62285166646163,
+    "Travel": 99.4,
+    "Physics": 63
+  },
+  "warnings": [],
+  "executionTimeMs": 16.11652700000002
+}

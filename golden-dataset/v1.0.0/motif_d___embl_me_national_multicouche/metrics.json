@@ -1,0 +1,62 @@
+{
+  "id": "Motif D - Emblème National Multicouche",
+  "difficulty": "Extreme",
+  "type": "Mixed",
+  "topology": {
+    "euler": -1,
+    "holes": 3,
+    "islands": 2,
+    "components": 1,
+    "maxDepth": 4,
+    "adjacencyEdges": 0,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 3.2870802717929484e-15,
+    "hausdorff": 0.26001891314454556,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9892459943435096,
+      "cornerScore": 1,
+      "junctionScore": 1
+    },
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.939660841812292,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 65,
+    "fabricDistortion": 2.094,
+    "threadTension": 6.281,
+    "pushPullError": 2.094,
+    "bucklingRisk": 9.091,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 7.89,
+    "estimatedShrinkage": 2.094,
+    "simulationTimeMs": 1.867
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 0.7297419999999875,
+      "TopologyPass": 22.58365200000003,
+      "RibbonPass": 69.20006899999998,
+      "TatamiPass": 3.022528999999963,
+      "SatinPass": 2.5134089999999105,
+      "TravelPass": 0.17053800000007868,
+      "PhysicsPass": 1.896457000000055,
+      "ExportPass": 0.7349340000000666
+    },
+    "totalMs": 100.87933700000008
+  }
+}

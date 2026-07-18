@@ -1,0 +1,17 @@
+{
+  "id": "mock_motif_214",
+  "responsibleEngine": "Tatami",
+  "overallScore": 86.11452335473797,
+  "metrics": {
+    "Geometry": 86.02300439474706,
+    "Topology": 100,
+    "Ribbon": 85.79615270687277,
+    "Tatami": 85.71285315456392,
+    "Satin": 86.50694362575452,
+    "Travel": 85.84747475114301
+  },
+  "warnings": [
+    "Score below threshold"
+  ],
+  "executionTimeMs": 23.09527081081704
+}

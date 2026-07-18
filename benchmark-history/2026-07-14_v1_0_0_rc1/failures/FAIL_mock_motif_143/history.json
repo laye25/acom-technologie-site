@@ -1,0 +1,13 @@
+{
+  "id": "mock_motif_143",
+  "responsibleEngine": "Satin",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 85.6061463733437
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

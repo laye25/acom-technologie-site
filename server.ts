@@ -34,8 +34,12 @@ function getFirestoreDb() {
   return admin.firestore();
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Handle ESM and CJS
+let currentFilename, currentDirname;
+try { currentFilename = __filename; } catch (e) { currentFilename = ''; }
+try { currentDirname = __dirname; } catch (e) { currentDirname = ''; }
+const filename = currentFilename;
+const dirname = currentDirname;
 
 async function startServer() {
   // Ensure SQLite assets are copied to public before serving
@@ -290,26 +294,55 @@ async function startServer() {
 
   // Gemini Business Analysis & Specialized assistants (like Couture Designer)
   app.post("/api/gemini/analyze-business", async (req, res) => {
+    const startTime = Date.now();
+    let modelToUse = "gemini-2.0-flash";
+    let finalPrompt = "";
+    let imageSummary: any[] = [];
+    
     try {
-      const { orders, expenses, tenantId, isDesignerAssist, prompt: customPrompt } = req.body;
+      const { orders, expenses, tenantId, isDesignerAssist, prompt: customPrompt, images } = req.body;
       
-      if (!process.env.GEMINI_API_KEY) {
-        return res.status(500).json({ error: "GEMINI_API_KEY non configurée." });
+      const apiKey = process.env.GEMINI_API_KEY2 || process.env.GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        console.error("[Gemini API Proxy] ERROR: No API Key configured.");
+        return res.status(500).json({ 
+          error: "GEMINI_API_KEY ou GEMINI_API_KEY2 non configurée.",
+          diagnostics: {
+            step: "API_KEY_CHECK",
+            errorType: "MissingApiKey",
+            message: "Neither GEMINI_API_KEY nor GEMINI_API_KEY2 is set in environment variables.",
+            envKeysPresent: Object.keys(process.env).filter(k => k.includes("GEMINI"))
+          }
+        });
       }
 
+      const maskedKey = apiKey.length > 8 
+        ? `${apiKey.substring(0, 6)}...${apiKey.substring(apiKey.length - 4)}`
+        : "invalid-short-key";
+
       // Track usage BEFORE calling AI (Proactive)
-      const { trackUsage } = await import("./src/services/billingService.js");
-      await trackUsage(tenantId, 'ai_generations');
+      console.log(`[Gemini API Proxy] Tracking billing usage for tenant: ${tenantId}`);
+      try {
+        const { trackUsage } = await import("./src/services/billingService.js");
+        await trackUsage(tenantId, 'ai_generations');
+      } catch (billingErr: any) {
+        console.warn("[Gemini API Proxy] Non-blocking warning: Failed to track billing usage:", billingErr.message);
+      }
 
       const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-      let finalPrompt = "";
-      let modelToUse = "gemini-3.1-flash-lite-preview";
+      const ai = new GoogleGenAI({ 
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
 
       if (isDesignerAssist) {
         finalPrompt = customPrompt;
-        modelToUse = "gemini-3.5-flash";
+        modelToUse = "gemini-2.0-flash";
       } else {
         finalPrompt = `
           Tu es un analyste financier expert. Analyse les performances suivantes (Dernières commandes et dépenses) pour Acom Technologie.
@@ -324,15 +357,117 @@ async function startServer() {
         `;
       }
 
+      let contents: any = finalPrompt;
+
+      if (images && Array.isArray(images) && images.length > 0) {
+        const parts: any[] = [{ text: finalPrompt }];
+        for (let i = 0; i < images.length; i++) {
+          const img = images[i];
+          const match = img.match(/^data:(image\/[a-zA-Z0-9\+\-\.]+);base64,(.*)$/);
+          if (match) {
+            imageSummary.push({
+              index: i,
+              mimeType: match[1],
+              base64Length: match[2].length
+            });
+            parts.push({
+              inlineData: {
+                mimeType: match[1],
+                data: match[2]
+              }
+            });
+          } else {
+            imageSummary.push({
+              index: i,
+              error: "Invalid base64 pattern or data uri"
+            });
+          }
+        }
+        contents = parts;
+      }
+
+      const expectedUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent`;
+      const configObj = isDesignerAssist ? { responseMimeType: "application/json" } : undefined;
+
+      console.log("======================================================================");
+      console.log(`[Gemini API Request Log] [Timestamp: ${new Date().toISOString()}]`);
+      console.log(`- Target URL: ${expectedUrl}`);
+      console.log(`- Selected Model: ${modelToUse}`);
+      console.log(`- API Key (Masked): ${maskedKey}`);
+      console.log(`- Prompt length: ${finalPrompt?.length || 0} chars`);
+      console.log(`- Prompt Preview: "${finalPrompt?.substring(0, 150).replace(/\n/g, ' ')}..."`);
+      console.log(`- Images Sent: ${imageSummary.length}`);
+      if (imageSummary.length > 0) {
+        console.log(`- Images Metadata: ${JSON.stringify(imageSummary)}`);
+      }
+      console.log(`- Request Config: ${JSON.stringify(configObj)}`);
+      console.log("======================================================================");
+
+      console.log(`[Gemini API Call] Invoking ai.models.generateContent()...`);
+      
       const response = await ai.models.generateContent({
         model: modelToUse,
-        contents: finalPrompt
+        contents: contents,
+        config: configObj
       });
 
-      res.json({ analysis: response.text || "" });
+      const duration = Date.now() - startTime;
+      const responseText = response.text || "";
+      
+      console.log("======================================================================");
+      console.log(`[Gemini API Response Log] [Status: SUCCESS] [Duration: ${duration}ms]`);
+      console.log(`- Response Character Count: ${responseText.length}`);
+      console.log(`- Response Preview: "${responseText.substring(0, 150).replace(/\n/g, ' ')}..."`);
+      console.log("======================================================================");
+
+      res.json({ 
+        analysis: responseText,
+        diagnostics: {
+          status: "success",
+          durationMs: duration,
+          model: modelToUse,
+          responseLength: responseText.length
+        }
+      });
     } catch (error: any) {
-      console.error("Gemini API error:", error);
-      res.status(500).json({ error: error.message });
+      const duration = Date.now() - startTime;
+      console.error("======================================================================");
+      console.error(`[Gemini API Response Log] [Status: FAILURE] [Duration: ${duration}ms]`);
+      console.error(`- Error Name: ${error.name || "Error"}`);
+      console.error(`- Error Message: ${error.message}`);
+      
+      // Inspect all fields of the error object for maximum visibility
+      const errorDetails: Record<string, any> = {};
+      try {
+        const keys = Object.getOwnPropertyNames(error);
+        for (const key of keys) {
+          if (key === 'stack') continue; // Skip raw stack in structured fields, but will print it below
+          errorDetails[key] = error[key];
+        }
+      } catch (e) {
+        errorDetails.parseError = "Failed to extract all property names";
+      }
+
+      console.error(`- Error Properties:`, JSON.stringify(errorDetails, null, 2));
+      if (error.stack) {
+        console.error(`- Stack Trace:\n${error.stack}`);
+      }
+      console.error("======================================================================");
+
+      res.status(500).json({ 
+        error: error.message || "An error occurred during Gemini API generation.",
+        diagnostics: {
+          status: "failure",
+          durationMs: duration,
+          model: modelToUse,
+          errorType: error.name || "UnknownError",
+          errorMessage: error.message,
+          errorProperties: errorDetails,
+          promptLength: finalPrompt?.length || 0,
+          imagesCount: imageSummary.length,
+          imagesMetadata: imageSummary
+        }
+      });
     }
   });
 

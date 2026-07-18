@@ -1,0 +1,53 @@
+{
+  "id": "Motif B - Dentelle Africaine",
+  "responsibleEngine": "Geometry",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 62.20487485462269
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 62.20487485462269
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 67.60417844681945
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 67.60417844681945
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 67.60417844681945
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 63.89768494032594
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 63.412739586670625
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 65.2391250424793
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 63.34159097071199
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 76.85034984837748
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 92.86626406150057
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

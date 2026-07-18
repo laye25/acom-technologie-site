@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { subscriptionEngine } from '../services/subscription.engine';
-import { handleFirestoreError, OperationType, prepareForFirestore, restoreFromFirestore } from '../../lib/firestore.utils';
+import { handleFirestoreError, OperationType, prepareForFirestore, restoreFromFirestore, withFirestoreTimeout } from '../../lib/firestore.utils';
 
 export abstract class BaseRepository<T extends { id?: string }> {
   protected abstract collectionName: string;
@@ -24,7 +24,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
   async getById(id: string): Promise<T | null> {
     try {
       const docRef = doc(db, this.collectionName, id);
-      const docSnap = await getDoc(docRef);
+      const docSnap = await withFirestoreTimeout(getDoc(docRef));
       
       if (docSnap.exists()) {
         const data = { id: docSnap.id, ...docSnap.data() };
@@ -44,7 +44,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
     try {
       const colRef = collection(db, this.collectionName);
       const q = query(colRef, ...constraints);
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await withFirestoreTimeout(getDocs(q));
       
       return querySnapshot.docs.map(doc => {
         const data = { id: doc.id, ...doc.data() };
@@ -67,7 +67,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       });
-      const docRef = await addDoc(colRef, dataToSave);
+      const docRef = await withFirestoreTimeout(addDoc(colRef, dataToSave));
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, this.collectionName);
@@ -85,7 +85,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
         ...data,
         updated_at: serverTimestamp()
       });
-      await setDoc(docRef, dataToUpdate, { merge: true });
+      await withFirestoreTimeout(setDoc(docRef, dataToUpdate, { merge: true }));
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `${this.collectionName}/${id}`);
       throw error;
@@ -102,7 +102,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
         ...data,
         updated_at: serverTimestamp()
       });
-      await setDoc(docRef, dataToSave, { merge: true });
+      await withFirestoreTimeout(setDoc(docRef, dataToSave, { merge: true }));
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${this.collectionName}/${id}`);
       throw error;
@@ -115,7 +115,7 @@ export abstract class BaseRepository<T extends { id?: string }> {
   async delete(id: string): Promise<void> {
     try {
       const docRef = doc(db, this.collectionName, id);
-      await deleteDoc(docRef);
+      await withFirestoreTimeout(deleteDoc(docRef));
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `${this.collectionName}/${id}`);
       throw error;

@@ -384,20 +384,41 @@ export const dbService = {
       }
     },
     async save(merchant: Partial<Merchant>) {
-      const data = {
+      // Fetch existing local merchant to merge fields and prevent accidental wipeout of other fields!
+      let existing: any = null;
+      if (merchant.id) {
+        existing = await db.merchants.get(merchant.id);
+        if (!existing) {
+          try {
+            existing = await merchantRepository.getById(merchant.id);
+          } catch (e) {
+            console.warn('Could not fetch existing merchant for merge from remote:', e);
+          }
+        }
+      }
+
+      const merged = {
+        ...(existing || {}),
         ...merchant,
-        ownerId: merchant.ownerId,
         updatedAt: new Date()
       };
+
+      // Ensure critical identifiers and types are fully preserved or resolved
+      const ownerId = merged.ownerId || (merged as any).owner_id || merchant.ownerId || (merchant as any).owner_id;
+      if (ownerId) {
+        merged.ownerId = ownerId;
+        (merged as any).owner_id = ownerId;
+      }
+
       let id = merchant.id || uuidv4();
       
       // Always attempt cloud save for merchants to sync licenses
       try {
         if (merchant.id) {
-          await merchantRepository.update(merchant.id, data);
+          await merchantRepository.update(merchant.id, merged);
           id = merchant.id;
         } else {
-          id = await merchantRepository.create(data as any);
+          id = await merchantRepository.create(merged as any);
         }
       } catch (error) {
         console.warn('Merchant cloud save failed, keeping local');
@@ -406,7 +427,7 @@ export const dbService = {
       
       if (id) {
         const finalId = id;
-        await db.merchants.put({ ...data, id: finalId, updatedAt: new Date() } as any);
+        await db.merchants.put({ ...merged, id: finalId, updatedAt: new Date() } as any);
         
         if (!merchant.id) {
           await activityService.log({
@@ -414,7 +435,7 @@ export const dbService = {
             entityId: finalId,
             entityType: 'merchant',
             merchantId: finalId,
-            message: `Nouveau marchand créé: ${merchant.name}`
+            message: `Nouveau marchand créé: ${merged.name}`
           });
         }
         return finalId;

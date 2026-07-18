@@ -1,0 +1,16 @@
+{
+  "id": "Motif H - Croisement de Satin (Collision & Tension)",
+  "responsibleEngine": "Topology",
+  "overallScore": 78.62545894634829,
+  "metrics": {
+    "Geometry": 96.27181120710394,
+    "Topology": 0,
+    "Ribbon": 96.33201059145478,
+    "Tatami": 98,
+    "Satin": 99.37439082587922,
+    "Travel": 99.4,
+    "Physics": 61
+  },
+  "warnings": [],
+  "executionTimeMs": 42.13635899999997
+}

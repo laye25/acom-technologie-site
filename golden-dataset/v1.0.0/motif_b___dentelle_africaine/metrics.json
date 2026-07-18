@@ -1,0 +1,54 @@
+{
+  "id": "Motif B - Dentelle Africaine",
+  "difficulty": "High",
+  "type": "Geometry",
+  "topology": {
+    "euler": 1,
+    "holes": 0,
+    "islands": 1,
+    "components": 1,
+    "maxDepth": 1,
+    "adjacencyEdges": 0,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 0.1053135471416528,
+    "hausdorff": 0.7335687401235231,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9728065607182915,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 63,
+    "fabricDistortion": 2.136,
+    "threadTension": 6.408,
+    "pushPullError": 2.136,
+    "bucklingRisk": 13.636,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 10.31,
+    "estimatedShrinkage": 2.136,
+    "simulationTimeMs": 2.189
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 12.310438999999974,
+      "TopologyPass": 0.2121890000000235,
+      "RibbonPass": 136.36637299999995,
+      "TatamiPass": 3.7914329999999836,
+      "SatinPass": 4.714290000000005,
+      "TravelPass": 0.23579499999993914,
+      "PhysicsPass": 2.2060330000000477,
+      "ExportPass": 0.6428189999999177
+    },
+    "totalMs": 160.51176899999996
+  }
+}

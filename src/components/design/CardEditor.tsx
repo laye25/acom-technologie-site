@@ -1235,9 +1235,10 @@ export const CardEditor: React.FC<CardEditorProps> = ({ initialTemplate, initial
       const svgText = event.target?.result as string;
       const { parseSvgToElements } = await import('../../lib/svgParser');
       const { elements: newElements } = await parseSvgToElements(svgText);
-      setElements([...elements, ...newElements]);
+      setElements(prev => [...prev, ...newElements]);
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);

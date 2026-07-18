@@ -1,0 +1,13 @@
+{
+  "id": "mock_motif_736",
+  "responsibleEngine": "Ribbon",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 88.92618255773831
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

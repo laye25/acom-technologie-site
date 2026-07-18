@@ -1,0 +1,15 @@
+{
+  "id": "Motif D - Emblème National Multicouche",
+  "responsibleEngine": "Geometry",
+  "overallScore": -75.5442528071984,
+  "metrics": {
+    "Geometry": -794.02298893292,
+    "Topology": 50,
+    "Ribbon": 1.0754005656490384,
+    "Tatami": 98,
+    "Satin": 92.2820715240806,
+    "Travel": 99.4
+  },
+  "warnings": [],
+  "executionTimeMs": 88.00838499999998
+}

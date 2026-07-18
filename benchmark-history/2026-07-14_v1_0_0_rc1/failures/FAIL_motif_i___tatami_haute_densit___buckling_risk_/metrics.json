@@ -1,0 +1,16 @@
+{
+  "id": "Motif I - Tatami Haute Densité (Buckling Risk)",
+  "responsibleEngine": "Physics",
+  "overallScore": 94.07394525026872,
+  "metrics": {
+    "Geometry": 97.42327332939988,
+    "Topology": 100,
+    "Ribbon": 98.80146196500183,
+    "Tatami": 98,
+    "Satin": 99.89288145747938,
+    "Travel": 99.4,
+    "Physics": 65
+  },
+  "warnings": [],
+  "executionTimeMs": 44.157430999999974
+}

@@ -1,0 +1,17 @@
+{
+  "id": "mock_motif_143",
+  "responsibleEngine": "Satin",
+  "overallScore": 85.6061463733437,
+  "metrics": {
+    "Geometry": 85.3248257010722,
+    "Topology": 100,
+    "Ribbon": 85.6680567443746,
+    "Tatami": 85.35378458886227,
+    "Satin": 85.18875014346581,
+    "Travel": 85.75640682063305
+  },
+  "warnings": [
+    "Score below threshold"
+  ],
+  "executionTimeMs": 24.417961635019072
+}

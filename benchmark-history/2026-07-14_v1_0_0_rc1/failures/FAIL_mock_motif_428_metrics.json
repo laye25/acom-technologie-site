@@ -1,0 +1,17 @@
+{
+  "id": "mock_motif_428",
+  "responsibleEngine": "Travel",
+  "overallScore": 86.70052063053598,
+  "metrics": {
+    "Geometry": 86.81521424707088,
+    "Topology": 100,
+    "Ribbon": 87,
+    "Tatami": 87.13715963084663,
+    "Satin": 86.84419972528686,
+    "Travel": 86.4348592267561
+  },
+  "warnings": [
+    "Score below threshold"
+  ],
+  "executionTimeMs": 23.681986038549482
+}

@@ -1,0 +1,54 @@
+{
+  "id": "Motif C - Ruban Satin Courbe",
+  "difficulty": "Extreme",
+  "type": "Ribbon",
+  "topology": {
+    "euler": 1,
+    "holes": 0,
+    "islands": 1,
+    "components": 1,
+    "maxDepth": 1,
+    "adjacencyEdges": 0,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 1.312590289001888e-14,
+    "hausdorff": 0.45256474631054605,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9357465990473892,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 59,
+    "fabricDistortion": 2.277,
+    "threadTension": 6.831,
+    "pushPullError": 2.277,
+    "bucklingRisk": 18.182,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 7.5,
+    "estimatedShrinkage": 2.277,
+    "simulationTimeMs": 1.988
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 3.4361940000000004,
+      "TopologyPass": 0.3874870000000783,
+      "RibbonPass": 73.53016100000002,
+      "TatamiPass": 1.2702130000000125,
+      "SatinPass": 2.6883659999999736,
+      "TravelPass": 0.14362000000005537,
+      "PhysicsPass": 2.138274000000024,
+      "ExportPass": 0.40399200000001656
+    },
+    "totalMs": 84.05517500000008
+  }
+}

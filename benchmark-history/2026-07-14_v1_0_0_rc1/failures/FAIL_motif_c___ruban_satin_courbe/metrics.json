@@ -1,0 +1,16 @@
+{
+  "id": "Motif C - Ruban Satin Courbe",
+  "responsibleEngine": "Physics",
+  "overallScore": 92.10494344344511,
+  "metrics": {
+    "Geometry": 95.47435253689454,
+    "Topology": 100,
+    "Ribbon": 93.57465990473892,
+    "Tatami": 98,
+    "Satin": 99.28559166248233,
+    "Travel": 99.4,
+    "Physics": 59
+  },
+  "warnings": [],
+  "executionTimeMs": 83.88358700000003
+}

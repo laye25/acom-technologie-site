@@ -1,0 +1,15 @@
+{
+  "id": "Motif F - Deux régions éloignées",
+  "responsibleEngine": "Topology",
+  "overallScore": 49.58791224017339,
+  "metrics": {
+    "Geometry": 3.7763363591380994,
+    "Topology": 0,
+    "Ribbon": 6.0339158187708,
+    "Tatami": 98,
+    "Satin": 90.31722126313149,
+    "Travel": 99.4
+  },
+  "warnings": [],
+  "executionTimeMs": 5.408613000000059
+}

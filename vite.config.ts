@@ -15,6 +15,7 @@ export default defineConfig(({mode}) => {
       emptyOutDir: true,
       minify: false, // Prevent OOM in low-RAM developer containers due to massive file sizes
       sourcemap: false, // Exclude heavy sourcemaps
+      chunkSizeWarningLimit: 2000,
       rollupOptions: {
         maxParallelFileOps: 1, // Restrict file operations to prevent thread starvation/OOM
       }
@@ -36,7 +37,7 @@ export default defineConfig(({mode}) => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modify—file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };

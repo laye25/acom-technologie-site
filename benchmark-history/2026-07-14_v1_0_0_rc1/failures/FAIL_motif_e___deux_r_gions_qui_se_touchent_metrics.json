@@ -1,0 +1,15 @@
+{
+  "id": "Motif E - Deux régions qui se touchent",
+  "responsibleEngine": "Topology",
+  "overallScore": 49.36080490742739,
+  "metrics": {
+    "Geometry": 0.5883371001597766,
+    "Topology": 0,
+    "Ribbon": 8.01802639784307,
+    "Tatami": 98,
+    "Satin": 90.15846594656145,
+    "Travel": 99.4
+  },
+  "warnings": [],
+  "executionTimeMs": 5.6690589999999474
+}

@@ -1,0 +1,54 @@
+{
+  "id": "Motif A - Glyphe de Lettre A",
+  "difficulty": "Medium",
+  "type": "Topology",
+  "topology": {
+    "euler": 0,
+    "holes": 1,
+    "islands": 1,
+    "components": 1,
+    "maxDepth": 2,
+    "adjacencyEdges": 0,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 7.232384892952906e-15,
+    "hausdorff": 0.4180332921090999,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 2,
+      "smoothness": 0.9542844282456803,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 61,
+    "fabricDistortion": 2.203,
+    "threadTension": 6.61,
+    "pushPullError": 2.203,
+    "bucklingRisk": 9.091,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 3.99,
+    "estimatedShrinkage": 2.203,
+    "simulationTimeMs": 4.654
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 5.955105000000003,
+      "TopologyPass": 1.382284000000027,
+      "RibbonPass": 41.069816,
+      "TatamiPass": 3.3671750000000316,
+      "SatinPass": 3.9549580000000333,
+      "TravelPass": 0.42889900000000125,
+      "PhysicsPass": 4.926428000000044,
+      "ExportPass": 1.2447259999999574
+    },
+    "totalMs": 62.370813
+  }
+}

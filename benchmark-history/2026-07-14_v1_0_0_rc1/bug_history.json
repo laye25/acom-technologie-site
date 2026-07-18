@@ -1,0 +1,523 @@
+{
+  "Motif D - Emblème National Multicouche": {
+    "id": "Motif D - Emblème National Multicouche",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": -75.5442528071984
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -75.5442528071984
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -50.46650240617006
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -50.46650240617006
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -50.46650240617006
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -53.79572318539084
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -53.73088696545347
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -52.44180644989745
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -54.377660908351814
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -40.39920392710868
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 86.94691033024482
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif A - Glyphe de Lettre A": {
+    "id": "Motif A - Glyphe de Lettre A",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 26.13498709061113
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 26.13498709061113
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 36.68713179195239
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 36.68713179195239
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 36.68713179195239
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 34.54427464909525
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 34.39388850062288
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 35.80276597018049
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 32.37950374943044
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 45.35905884216417
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 92.7224481950261
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif E - Deux régions qui se touchent": {
+    "id": "Motif E - Deux régions qui se touchent",
+    "responsibleEngine": "Topology",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 49.36080490742739
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 49.36080490742739
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.59497563493776
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.59497563493776
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.59497563493776
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 55.24140420636633
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 55.20691822799212
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.9029001589836
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 51.95050502661663
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 63.945354627232895
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 77.61627704148778
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif G - Chiffre 8": {
+    "id": "Motif G - Chiffre 8",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 49.58182654832816
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 49.58182654832816
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.78442275570985
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.78442275570985
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.78442275570985
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 54.64156561285271
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 54.34860679362415
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 55.90676525907376
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 52.35433847751967
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 64.77385675295102
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 92.15812977612403
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif F - Deux régions éloignées": {
+    "id": "Motif F - Deux régions éloignées",
+    "responsibleEngine": "Topology",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 49.58791224017339
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 49.58791224017339
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.789639063005765
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.789639063005765
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.789639063005765
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 54.861067634434335
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 54.820259536439934
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 56.71501768711323
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 52.09304840164469
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 64.65478673913876
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 78.16633498371971
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif C - Ruban Satin Courbe": {
+    "id": "Motif C - Ruban Satin Courbe",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 58.587716544843374
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 58.587716544843374
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 64.50375703843717
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 64.50375703843717
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 64.50375703843717
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 61.16999080467094
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 60.77531012465128
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 62.693563213464714
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 59.90683640412816
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 72.35673923405356
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 92.10494344344511
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif B - Dentelle Africaine": {
+    "id": "Motif B - Dentelle Africaine",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 62.20487485462269
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 62.20487485462269
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 67.60417844681945
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 67.60417844681945
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 67.60417844681945
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 63.89768494032594
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 63.412739586670625
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 65.2391250424793
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 63.34159097071199
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 76.85034984837748
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 92.86626406150057
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "mock_motif_718": {
+    "id": "mock_motif_718",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 85.87523011813921
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "mock_motif_143": {
+    "id": "mock_motif_143",
+    "responsibleEngine": "Satin",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 85.6061463733437
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "mock_motif_736": {
+    "id": "mock_motif_736",
+    "responsibleEngine": "Ribbon",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 88.92618255773831
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif H - Croisement de Satin (Collision & Tension)": {
+    "id": "Motif H - Croisement de Satin (Collision & Tension)",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": -0.8429654221036132
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -3.7208875000256905
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -3.778914620772503
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -1.8547034056162934
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -5.276298298828891
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 7.961419013015329
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 78.62545894634829
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif I - Tatami Haute Densité (Buckling Risk)": {
+    "id": "Motif I - Tatami Haute Densité (Buckling Risk)",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": -29.031600295948806
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -32.10692497127348
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -32.04920769472756
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -30.831721701696356
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -32.940786029279025
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": -18.997511182135632
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 94.07394525026872
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  },
+  "Motif J - Colonne Asymétrique (Push-Pull)": {
+    "id": "Motif J - Colonne Asymétrique (Push-Pull)",
+    "responsibleEngine": "Geometry",
+    "firstSeen": "v1.0.0-rc1",
+    "history": [
+      {
+        "version": "v1.0.0-rc1",
+        "score": 43.7425767880874
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 41.59971964523026
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 41.41166447601593
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 42.82819267689637
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 39.677809429522235
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 53.184569383834415
+      },
+      {
+        "version": "v1.0.0-rc1",
+        "score": 93.72295001202693
+      }
+    ],
+    "lastSeen": "v1.0.0-rc1",
+    "status": "FAIL"
+  }
+}

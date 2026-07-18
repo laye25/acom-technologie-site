@@ -832,6 +832,7 @@ const StudioAcomManager = () => {
                                                 }
                                               });
                                             }
+                                            e.target.value = '';
                                           }} 
                                         />
                                       </label>

@@ -1,0 +1,53 @@
+{
+  "id": "Motif E - Deux régions qui se touchent",
+  "responsibleEngine": "Topology",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 49.36080490742739
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 49.36080490742739
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.59497563493776
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.59497563493776
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.59497563493776
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 55.24140420636633
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 55.20691822799212
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.9029001589836
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 51.95050502661663
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 63.945354627232895
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 77.61627704148778
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Store, Building2, ChevronRight, MapPin, Search, Star, ArrowRight, Home, ShoppingBag, Utensils, Scissors, Car, Target,
-  Briefcase, HeartPulse, GraduationCap, Truck, HardHat, SquareActivity, Shirt, Map as MapIcon, Grid,
+  Briefcase, HeartPulse, GraduationCap, Truck, HardHat, ActivitySquare, Shirt, Map as MapIcon, Grid,
   User, FileText, CheckCircle, XCircle, Eye, Calendar, Phone, ClipboardList, Info, ArrowLeft, Clock,
   Megaphone, MessageSquare, ShoppingCart, Plus, Minus, Trash2
 } from 'lucide-react';
@@ -234,7 +234,7 @@ const DEFAULT_CENTER = { lat: 14.6928, lng: -17.4467 };
 const categories = [
   { id: 'all', name: 'Tout', icon: MapPin, keywords: [] },
   { id: 'boutique', name: 'Commerces & Stock', icon: ShoppingBag, keywords: ['boutique', 'commerce', 'magasin', 'stock'] },
-  { id: 'medical', name: 'Santé & Médical', icon: SquareActivity, keywords: ['medical', 'santé', 'clinique', 'pharmacie'] },
+  { id: 'medical', name: 'Santé & Médical', icon: ActivitySquare, keywords: ['medical', 'santé', 'clinique', 'pharmacie'] },
   { id: 'transport', name: 'Transport & Logistique', icon: Truck, keywords: ['transport', 'logistique', 'flotte'] },
   { id: 'scolaire', name: 'Écoles & Formations', icon: GraduationCap, keywords: ['scolaire', 'école', 'formation', 'université'] },
   { id: 'chantier', name: 'BTP & Construction', icon: HardHat, keywords: ['chantier', 'btp', 'construction'] },
@@ -332,7 +332,7 @@ function renderSaaSPurchasedContent(order: any, saasType?: string) {
       return (
         <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 space-y-2 text-left">
           <div className="flex items-center gap-2 text-emerald-700 font-bold text-xs">
-            <SquareActivity className="w-4 h-4" />
+            <ActivitySquare className="w-4 h-4" />
             <span>Rendez-vous Clinique &amp; Santé</span>
           </div>
           <p className="text-gray-900 font-black text-sm">{order.serviceName || 'Consultation'}</p>

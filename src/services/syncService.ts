@@ -728,6 +728,7 @@ export const syncService = {
       { name: 'merchant_expenses', table: db.expenses },
       { name: 'interventions', table: db.interventions },
       { name: 'projects', table: db.projects },
+      { name: 'scientific_textile_assets', table: db.scientific_textile_assets },
       { name: 'vehicles', table: db.vehicles },
       { name: 'employees', table: db.employees },
       { name: 'students', table: db.students },

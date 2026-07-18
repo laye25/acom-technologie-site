@@ -1,0 +1,62 @@
+{
+  "id": "Motif E - Deux régions qui se touchent",
+  "difficulty": "Low",
+  "type": "Topology",
+  "topology": {
+    "euler": 2,
+    "holes": 0,
+    "islands": 2,
+    "components": 2,
+    "maxDepth": 1,
+    "adjacencyEdges": 1,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 8.880892944721889e-16,
+    "hausdorff": 0.37152060000560777,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9198197360215693,
+      "cornerScore": 1,
+      "junctionScore": 1
+    },
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9198197360215693,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 58,
+    "fabricDistortion": 2.303,
+    "threadTension": 6.908,
+    "pushPullError": 2.303,
+    "bucklingRisk": 13.636,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 1.57,
+    "estimatedShrinkage": 2.303,
+    "simulationTimeMs": 0.402
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 0.32785100000000966,
+      "TopologyPass": 1.5083190000000286,
+      "RibbonPass": 3.969522999999981,
+      "TatamiPass": 0.37509399999999005,
+      "SatinPass": 0.7554499999999962,
+      "TravelPass": 0.04879300000004605,
+      "PhysicsPass": 0.4188369999999395,
+      "ExportPass": 0.3306519999999864
+    },
+    "totalMs": 7.749761999999919
+  }
+}

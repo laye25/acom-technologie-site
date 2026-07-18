@@ -1,0 +1,37 @@
+{
+  "id": "Motif J - Colonne Asymétrique (Push-Pull)",
+  "responsibleEngine": "Geometry",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 43.7425767880874
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 41.59971964523026
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 41.41166447601593
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 42.82819267689637
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 39.677809429522235
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 53.184569383834415
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 93.72295001202693
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

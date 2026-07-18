@@ -1,0 +1,53 @@
+{
+  "id": "Motif F - Deux régions éloignées",
+  "responsibleEngine": "Topology",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 49.58791224017339
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 49.58791224017339
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.789639063005765
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.789639063005765
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.789639063005765
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 54.861067634434335
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 54.820259536439934
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.71501768711323
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 52.09304840164469
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 64.65478673913876
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 78.16633498371971
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

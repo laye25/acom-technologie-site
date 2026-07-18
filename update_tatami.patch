@@ -1,0 +1,165 @@
+--- src/modules/tailleur/services/embroideryServices.ts
++++ src/modules/tailleur/services/embroideryServices.ts
+@@ -285,42 +285,15 @@
+   const flatPoints = isPolygons ? (pointsOrPolygons as EmbroideryPoint[][]).flat() : pointsOrPolygons as EmbroideryPoint[];
+   
+   const segments: EmbroideryPoint[][] = [];
+   if (flatPoints.length < 3) return segments;
+   
+-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+-  flatPoints.forEach(p => {
+-    if (p.x < minX) minX = p.x;
+-    if (p.x > maxX) maxX = p.x;
+-    if (p.y < minY) minY = p.y;
+-    if (p.y > maxY) maxY = p.y;
+-  });
+-  
+-  const cx = (minX + maxX) / 2;
+-  const cy = (minY + maxY) / 2;
+-  const width = maxX - minX;
+-  const height = maxY - minY;
+-  if (width <= 0 || height <= 0) return segments;
+-  
+-  // Use diagonal to fully cover the rotated grid
+-  const diagonal = Math.sqrt(width * width + height * height);
+-  const halfDiag = diagonal / 2;
+-  
+-  const rows = Math.max(3, Math.floor(diagonal / density));
+-  const rad = (angle * Math.PI) / 180;
++  // 1. Rotate polygons by -angle to align slice lines horizontally
++  const rad = (-angle * Math.PI) / 180;
+   const cosA = Math.cos(rad);
+   const sinA = Math.sin(rad);
+ 
+-  const stitchLength = 25;
+-  const cols = Math.max(3, Math.floor(diagonal / stitchLength));
+-
+-  for (let r = 0; r <= rows; r++) {
+-    const yFraction = r / rows;
+-    const localY = -halfDiag + yFraction * diagonal;
+-    const isEven = r % 2 === 0;
+-    
+-    // Shift column alignment based on row to create a staggered, woven brick-like texture
+-    const staggerOffset = ((r % 4) * 0.25) * (diagonal / cols);
+-    
+-    let currentSegment: EmbroideryPoint[] = [];
+-    
+-    for (let c = 0; c <= cols; c++) {
+-      const xFraction = isEven ? (c / cols) : (1 - c / cols);
+-      const localXBase = -halfDiag + xFraction * diagonal;
+-      const localX = localXBase + (isEven ? staggerOffset : -staggerOffset);
+-      
+-      const rx = cx + localX * cosA - localY * sinA;
+-      const ry = cy + localX * sinA + localY * cosA;
+-      
+-      const pt = { x: Math.round(rx), y: Math.round(ry) };
+-      
+-      if (isPointInPolygons(pt, polygons)) {
+-        currentSegment.push(pt);
+-      } else {
+-        if (currentSegment.length > 0) {
+-          segments.push(currentSegment);
+-          currentSegment = [];
+-        }
+-      }
+-    }
+-    
+-    if (currentSegment.length > 0) {
+-      segments.push(currentSegment);
+-    }
+-  }
+-  return segments;
++  const rotatedPolygons = polygons.map(poly => poly.map(p => ({
++    x: p.x * cosA - p.y * sinA,
++    y: p.x * sinA + p.y * cosA
++  })));
++
++  // 2. Find bounding box of rotated points
++  let minY = Infinity, maxY = -Infinity, minX = Infinity, maxX = -Infinity;
++  rotatedPolygons.forEach(poly => poly.forEach(p => {
++    if (p.y < minY) minY = p.y;
++    if (p.y > maxY) maxY = p.y;
++    if (p.x < minX) minX = p.x;
++    if (p.x > maxX) maxX = p.x;
++  }));
++
++  if (minY >= maxY || minX >= maxX) return segments;
++
++  // 3. Loop through horizontal slices
++  const rows = Math.floor((maxY - minY) / density);
++  const backRad = (angle * Math.PI) / 180;
++  const backCos = Math.cos(backRad);
++  const backSin = Math.sin(backRad);
++
++  const stitchLength = 25;
++
++  for (let r = 0; r <= rows; r++) {
++    const yVal = minY + r * density;
++    const isEven = r % 2 === 0;
++    
++    // Shift column alignment based on row to create a staggered, woven brick-like texture
++    const staggerOffset = ((r % 4) * 0.25) * stitchLength;
++    
++    // Find intersections of Y = yVal with the edges of the rotated polygons
++    const intersections: number[] = [];
++
++    for (const poly of rotatedPolygons) {
++      const len = poly.length;
++      for (let i = 0; i < len; i++) {
++        const p0 = poly[i];
++        const p1 = poly[(i + 1) % len];
++
++        const yMinEdge = Math.min(p0.y, p1.y);
++        const yMaxEdge = Math.max(p0.y, p1.y);
++
++        if (yVal >= yMinEdge && yVal < yMaxEdge) {
++          const t = (yVal - p0.y) / (p1.y - p0.y);
++          const xIntersect = p0.x + t * (p1.x - p0.x);
++          intersections.push(xIntersect);
++        }
++      }
++    }
++
++    intersections.sort((a, b) => a - b);
++
++    // Create segments between pairs of intersections
++    for (let i = 0; i < intersections.length - 1; i += 2) {
++      const xStart = intersections[i];
++      const xEnd = intersections[i + 1];
++      if (xEnd - xStart < 1) continue;
++
++      const currentSegment: EmbroideryPoint[] = [];
++      
++      const firstK = Math.ceil((xStart - minX - staggerOffset) / stitchLength);
++      const lastK = Math.floor((xEnd - minX - staggerOffset) / stitchLength);
++      
++      let xs: number[] = [];
++      xs.push(xStart); // left point
++
++      for (let k = firstK; k <= lastK; k++) {
++        const px = minX + staggerOffset + k * stitchLength;
++        if (px > xStart + 1 && px < xEnd - 1) {
++          xs.push(px);
++        }
++      }
++      
++      xs.push(xEnd); // right point
++      
++      if (!isEven) {
++        xs.reverse();
++      }
++      
++      xs.forEach(px => {
++        currentSegment.push({
++          x: Math.round(px * backCos - yVal * backSin),
++          y: Math.round(px * backSin + yVal * backCos)
++        });
++      });
++
++      if (currentSegment.length > 0) {
++        segments.push(currentSegment);
++      }
++    }
++  }
++  return segments;
+ };

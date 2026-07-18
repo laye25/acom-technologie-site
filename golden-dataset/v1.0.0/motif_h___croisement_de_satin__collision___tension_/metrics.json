@@ -1,0 +1,62 @@
+{
+  "id": "Motif H - Croisement de Satin (Collision & Tension)",
+  "difficulty": "High",
+  "type": "Mixed",
+  "topology": {
+    "euler": 2,
+    "holes": 0,
+    "islands": 2,
+    "components": 2,
+    "maxDepth": 1,
+    "adjacencyEdges": 1,
+    "passVersion": "2.0-industrial"
+  },
+  "geometry": {
+    "rms": 4.278246001320925e-15,
+    "hausdorff": 0.37281887928960566,
+    "passVersion": "2.0-industrial"
+  },
+  "ribbon": [
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9633201059145478,
+      "cornerScore": 1,
+      "junctionScore": 1
+    },
+    {
+      "continuity": 1,
+      "widthError": 0,
+      "railCrossings": 0,
+      "smoothness": 0.9762143043963152,
+      "cornerScore": 1,
+      "junctionScore": 1
+    }
+  ],
+  "physics": {
+    "physicsScore": 61,
+    "fabricDistortion": 2.205,
+    "threadTension": 6.616,
+    "pushPullError": 2.205,
+    "bucklingRisk": 9.091,
+    "needleStress": 0,
+    "collisionIndex": 0,
+    "densityPressure": 4.77,
+    "estimatedShrinkage": 2.205,
+    "simulationTimeMs": 0.487
+  },
+  "performance": {
+    "passes": {
+      "GeometryPass": 0.2392259999999169,
+      "TopologyPass": 9.521163999999999,
+      "RibbonPass": 23.583619999999996,
+      "TatamiPass": 0.7850979999999481,
+      "SatinPass": 1.3553560000000289,
+      "TravelPass": 0.1556430000000546,
+      "PhysicsPass": 0.5022889999999052,
+      "ExportPass": 0.21160899999995308
+    },
+    "totalMs": 36.37433199999998
+  }
+}

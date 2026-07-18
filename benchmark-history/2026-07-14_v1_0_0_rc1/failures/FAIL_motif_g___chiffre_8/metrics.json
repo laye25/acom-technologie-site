@@ -1,0 +1,16 @@
+{
+  "id": "Motif G - Chiffre 8",
+  "responsibleEngine": "Physics",
+  "overallScore": 92.15812977612403,
+  "metrics": {
+    "Geometry": 95.13565023166672,
+    "Topology": 100,
+    "Ribbon": 93.46831396400972,
+    "Tatami": 98,
+    "Satin": 99.10294423719178,
+    "Travel": 99.4,
+    "Physics": 60
+  },
+  "warnings": [],
+  "executionTimeMs": 36.16828499999997
+}

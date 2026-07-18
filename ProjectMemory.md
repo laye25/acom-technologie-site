@@ -34,3 +34,9 @@ Pour le registre détaillé, consultez le dossier `/docs/adr/`.
 - **Contexte** : Le fichier `AGENTS.md` devenait trop long (500+ lignes) et difficile à lire pour les agents IA.
 - **Décision** : Mise en place d'une hiérarchie documentaire stricte en 5 niveaux (CONSTITUTION.md, AGENTS.md, Knowledge Base, Docs Métier, Project Memory).
 - **Impact** : Gouvernance documentaire plus modulaire et spécialisée, évitant la surcharge cognitive des agents IA.
+
+### Décision 006 : Cadre de Certification Industrielle, Reproductibilité Scientifique et Archivage des Régressions (SPR-008.8 & SPR-008.9)
+- **Date** : 2026-07-13
+- **Contexte** : Nécessité de sortir d'une logique de développement réactif pour atteindre une robustesse industrielle et mathématique irréprochable avant le simulateur machine (SPR-009).
+- **Décision** : Adoption d'un partitionnement quadruple des données (entraînement, d'or, archive de bugs, validation aveugle), dépréciation des ExpectedHoles au profit d'un solveur topologique mathématique (Region Tree, Euler, isomorphismes de graphes), historisation des métriques en séries temporelles, et critères de passage stricts (gatekeeping) formalisés dans l'ADR-015.
+- **Impact** : Élimination complète de l'overfitting de benchmark, traçabilité et reproductibilité à 100% des résultats scientifiques, élimination durable des régressions.

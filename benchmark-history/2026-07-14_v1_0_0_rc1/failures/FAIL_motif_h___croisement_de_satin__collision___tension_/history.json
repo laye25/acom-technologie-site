@@ -1,0 +1,37 @@
+{
+  "id": "Motif H - Croisement de Satin (Collision & Tension)",
+  "responsibleEngine": "Geometry",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": -0.8429654221036132
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -3.7208875000256905
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -3.778914620772503
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -1.8547034056162934
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": -5.276298298828891
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 7.961419013015329
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 78.62545894634829
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

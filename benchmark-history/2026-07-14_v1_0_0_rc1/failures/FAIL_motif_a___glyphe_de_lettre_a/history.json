@@ -1,0 +1,53 @@
+{
+  "id": "Motif A - Glyphe de Lettre A",
+  "responsibleEngine": "Geometry",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 26.13498709061113
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 26.13498709061113
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 36.68713179195239
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 36.68713179195239
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 36.68713179195239
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 34.54427464909525
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 34.39388850062288
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 35.80276597018049
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 32.37950374943044
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 45.35905884216417
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 92.7224481950261
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}

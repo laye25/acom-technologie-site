@@ -53,10 +53,27 @@ export class StudioAcomDB extends Dexie {
   employee_leaves!: Table<any>;
   employee_attendance!: Table<any>;
   payslips!: Table<any>;
+  geometry_audits!: Table<any>;
+  geometry_snapshots!: Table<any>;
+  geometry_metrics!: Table<any>;
+  geometry_drift!: Table<any>;
+  geometry_errors!: Table<any>;
+
+  dst_files!: Table<any>;
+  scientific_textile_assets!: Table<any>;
+  ekle_memory!: Table<any>;
+  verseau_laws!: Table<any>;
+  scientific_observations!: Table<any>;
+  scientific_hypotheses!: Table<any>;
+  scientific_experiments!: Table<any>;
+  scientific_principles!: Table<any>;
+  night_campaigns!: Table<any>;
+  scientific_revisions!: Table<any>;
+  scientific_passports!: Table<any>;
 
   constructor() {
     super('StudioAcomDB');
-    this.version(22).stores({
+    this.version(1005).stores({
       categories: 'id, merchantId, name, syncStatus',
       products: 'id, merchantId, name, category, updatedAt, syncStatus',
       sales: 'id, merchantId, createdAt, syncStatus',
@@ -107,7 +124,23 @@ export class StudioAcomDB extends Dexie {
       delivery_assignments: 'id, merchantId, ticketId, agentId, status, syncStatus, updatedAt',
       employee_leaves: 'id, merchantId, employeeId, startDate, endDate, syncStatus, updatedAt',
       employee_attendance: 'id, merchantId, employeeId, date, status, syncStatus, updatedAt',
-      payslips: 'id, merchantId, employeeId, period, status, syncStatus, updatedAt'
+      payslips: 'id, merchantId, employeeId, period, status, syncStatus, updatedAt',
+      geometry_audits: 'id, date, algorithm, uuid, signature',
+      geometry_snapshots: 'id, assetId, auditId, step, hash, createdAt',
+      geometry_metrics: 'id, auditId, step',
+      geometry_drift: 'id, auditId, step',
+      geometry_errors: 'id, auditId, step',
+      dst_files: 'id, name, hash, status, createdAt, updatedAt',
+      scientific_textile_assets: 'id, merchantId, name, status, hash, createdAt, updatedAt',
+      ekle_memory: 'id, type, hash, component, createdAt',
+      verseau_laws: 'id, law, valid, createdAt',
+      scientific_observations: 'id, dstId, description, confidence, status, createdAt',
+      scientific_hypotheses: 'id, description, status, createdAt',
+      scientific_experiments: 'id, description, result, status, createdAt',
+      scientific_principles: 'id, description, createdAt',
+      night_campaigns: 'id, startTime, endTime, stats, createdAt',
+      scientific_revisions: 'id, assetId, snapshotId, hash, reason, createdAt',
+      scientific_passports: 'id, revisionId, validationId, certifiedAt'
     });
   }
 }
@@ -142,7 +175,8 @@ if (typeof window !== 'undefined') {
     'employees',
     'employee_leaves',
     'employee_attendance',
-    'payslips'
+    'payslips',
+    'scientific_textile_assets'
   ];
 
   OFFLINE_SYNC_TABLES.forEach(tableName => {

@@ -1,0 +1,16 @@
+{
+  "id": "Motif A - Glyphe de Lettre A",
+  "responsibleEngine": "Physics",
+  "overallScore": 92.7224481950261,
+  "metrics": {
+    "Geometry": 95.819667078909,
+    "Topology": 100,
+    "Ribbon": 95.42844282456802,
+    "Tatami": 98,
+    "Satin": 99.40902746170568,
+    "Travel": 99.4,
+    "Physics": 61
+  },
+  "warnings": [],
+  "executionTimeMs": 54.948689
+}

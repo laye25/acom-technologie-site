@@ -36,6 +36,7 @@ const TailleurTissusManager = lazy(() => import('../modules/tailleur/components/
 const TailleurBoutiqueManager = lazy(() => import('../modules/tailleur/components/TailleurBoutiqueManager').then(m => ({ default: m.TailleurBoutiqueManager })));
 const TailleurClientsManager = lazy(() => import('../modules/tailleur/components/TailleurClientsManager').then(m => ({ default: m.TailleurClientsManager })));
 const TailleurOrdersManager = lazy(() => import('../modules/tailleur/components/TailleurOrdersManager').then(m => ({ default: m.TailleurOrdersManager })));
+const TailleurEmbroideryManager = lazy(() => import('../modules/tailleur/components/TailleurEmbroideryManager').then(m => ({ default: m.TailleurEmbroideryManager })));
 
 // Scolaire Lazy Modules
 const AlertParentsManager = lazy(() => import('../modules/scolaire/components/AlertParentsManager').then(m => ({ default: m.AlertParentsManager })));
@@ -142,18 +143,36 @@ const MerchantSaaS = () => {
   
   const displayMerchant = useMemo(() => {
     if (!dbMerchant) return null;
-    const activeSaaSType = (isSpecialManager && overrideType) ? overrideType : (dbMerchant.type || 'boutique');
+    // Allow URL query parameter 'type' to override/route for any user, fallback to merchant.type
+    const activeSaaSType = overrideType || dbMerchant.type || 'boutique';
     return { ...dbMerchant, type: activeSaaSType };
-  }, [dbMerchant, isSpecialManager, overrideType]);
+  }, [dbMerchant, overrideType]);
 
   const merchant = displayMerchant || dbMerchant;
 
   useEffect(() => {
     const urlType = searchParams.get('type');
-    if (urlType && isSpecialManager) {
+    if (urlType) {
       setOverrideType(urlType);
     }
-  }, [searchParams, isSpecialManager]);
+  }, [searchParams]);
+
+  // Auto-heal missing merchant type for regular merchants
+  useEffect(() => {
+    if (dbMerchant && !isSpecialManager && !dbMerchant.type && displayMerchant?.type) {
+      const healMerchant = async () => {
+        try {
+          console.log('Self-healing merchant type to:', displayMerchant.type);
+          await dbService.merchants.save({ id: dbMerchant.id, type: displayMerchant.type });
+          // Update local state to reflect healed data
+          setMerchant(prev => prev ? { ...prev, type: displayMerchant.type } : null);
+        } catch (e) {
+          console.error('Self-healing failed:', e);
+        }
+      };
+      healMerchant();
+    }
+  }, [dbMerchant, displayMerchant, isSpecialManager]);
 
   const [loadingMerchant, setLoadingMerchant] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -255,7 +274,22 @@ const MerchantSaaS = () => {
       const activeTeacherId = localStorage.getItem('activeTeacherId');
       const activeParentId = localStorage.getItem('activeParentId');
       const activeStudentId = localStorage.getItem('activeStudentId');
-      if (!user && !activeTeacherId && !activeParentId && !activeStudentId) return;
+      
+      const timeoutId = setTimeout(() => {
+        setLoadingMerchant(prev => {
+          if (prev) {
+            console.warn('Timeout fetching merchant. Forcing load to false.');
+            return false;
+          }
+          return prev;
+        });
+      }, 5000);
+
+      if (!user && !activeTeacherId && !activeParentId && !activeStudentId) {
+        clearTimeout(timeoutId);
+        setLoadingMerchant(false);
+        return;
+      }
       try {
         setLoadingMerchant(true);
         setError(null);
@@ -431,8 +465,13 @@ const MerchantSaaS = () => {
             localMerchant = allMerchants.find(m => m.ownerId === user.uid || m.owner_id === user.uid);
           }
 
-          // Fetch from Supabase via dbService
-          const m = await dbService.merchants.getByOwner(user.uid);
+          // Fetch from Cloud via dbService (with fallback to local)
+          let m = null;
+          try {
+            m = await dbService.merchants.getByOwner(user.uid);
+          } catch (cloudErr) {
+            console.warn('Could not fetch merchant from cloud, using local fallback:', cloudErr);
+          }
           
           finalMerchant = m || localMerchant;
           
@@ -441,7 +480,11 @@ const MerchantSaaS = () => {
               await db.merchants.put({ ...m, id: m.id });
           } else if (localMerchant && localMerchant.id) {
               // Rescue: it's local but not in cloud, push it to cloud now!
-              await dbService.merchants.save(localMerchant);
+              try {
+                await dbService.merchants.save(localMerchant);
+              } catch (e) {
+                console.warn('Could not sync local merchant to cloud:', e);
+              }
           }
         }
         
@@ -458,6 +501,7 @@ const MerchantSaaS = () => {
         // We set merchant to null which will trigger the Onboarding screen.
         setMerchant(null);
       } finally {
+        clearTimeout(timeoutId);
         setLoadingMerchant(false);
       }
     };
@@ -584,6 +628,7 @@ const MerchantSaaS = () => {
           { id: 'tailleur_gallery', label: 'Inspirations & Moodboards', icon: Sparkles },
           { id: 'tailleur_artisans', label: 'Artisans & Équipe', icon: Users },
           { id: 'tailleur_mercerie', label: 'Mercerie & Coût de Revient', icon: Calculator },
+          { id: 'tailleur_embroidery', label: 'Atelier de Broderie (AEE) & IA', icon: Cpu },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
@@ -900,6 +945,7 @@ const MerchantSaaS = () => {
             {activeTab === 'tailleur_gallery' && <TailleurGalleryManager key="tailleur_gallery" merchant={merchant} />}
             {activeTab === 'tailleur_artisans' && <TailleurArtisansManager key="tailleur_artisans" merchant={merchant} />}
             {activeTab === 'tailleur_mercerie' && <TailleurMercerieCostManager key="tailleur_mercerie" merchant={merchant} />}
+            {activeTab === 'tailleur_embroidery' && <TailleurEmbroideryManager key="tailleur_embroidery" merchant={merchant} />}
             {activeTab === 'pressing_receipt' && <PressingReceiptManager key="pressing_receipt" merchant={merchant} />}
             {activeTab === 'pressing_delivery' && <PressingDeliveryManager key="pressing_delivery" merchant={merchant} />}
             {activeTab === 'pressing_stock' && <PressingStockManager key="pressing_stock" merchant={merchant} />}

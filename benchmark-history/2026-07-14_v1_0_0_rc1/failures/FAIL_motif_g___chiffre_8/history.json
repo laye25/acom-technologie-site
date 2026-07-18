@@ -1,0 +1,53 @@
+{
+  "id": "Motif G - Chiffre 8",
+  "responsibleEngine": "Geometry",
+  "firstSeen": "v1.0.0-rc1",
+  "history": [
+    {
+      "version": "v1.0.0-rc1",
+      "score": 49.58182654832816
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 49.58182654832816
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.78442275570985
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.78442275570985
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 56.78442275570985
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 54.64156561285271
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 54.34860679362415
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 55.90676525907376
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 52.35433847751967
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 64.77385675295102
+    },
+    {
+      "version": "v1.0.0-rc1",
+      "score": 92.15812977612403
+    }
+  ],
+  "lastSeen": "v1.0.0-rc1",
+  "status": "FAIL"
+}
