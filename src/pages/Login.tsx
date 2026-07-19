@@ -102,7 +102,8 @@ const Login = () => {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email) {
+    const cleanEmail = formData.email.trim();
+    if (!cleanEmail) {
       setError('Veuillez entrer votre adresse email.');
       return;
     }
@@ -110,7 +111,7 @@ const Login = () => {
     setError(null);
     setSuccess(null);
     try {
-      await resetPassword(formData.email);
+      await resetPassword(cleanEmail);
       setSuccess('Un email de réinitialisation a été envoyé.');
       setIsResetting(false);
     } catch (error: any) {
@@ -302,10 +303,10 @@ const Login = () => {
         localStorage.removeItem('activeTeacherId');
         localStorage.removeItem('activeParentId');
         localStorage.removeItem('activeStudentId');
-        await signInWithEmail(formData.email, formData.password);
+        await signInWithEmail(formData.email.trim(), formData.password);
         navigate(targetUrl);
       } else {
-        await signUpWithEmail(formData.email, formData.password, formData.fullName);
+        await signUpWithEmail(formData.email.trim(), formData.password, formData.fullName);
         setSuccess('Compte créé avec succès !');
         // Navigate immediately after signup since Firebase auto-logs in
         setTimeout(() => navigate(targetUrl), 1500);

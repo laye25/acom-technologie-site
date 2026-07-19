@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Store, Loader2, ArrowRight, CreditCard, X, Package, Wrench, HardHat, Truck, Users, GraduationCap, Stethoscope, WashingMachine, Scissors } from 'lucide-react';
+import { Store, Loader2, ArrowRight, CreditCard, X, Package, Wrench, HardHat, Truck, Users, GraduationCap, Stethoscope, WashingMachine, Scissors, Cpu } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { dbService } from '../../../services/dbService';
 import { useAuth } from '../../../context/AuthContext';
@@ -39,6 +39,7 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
     { id: 'medical', label: 'Établissement Médical', icon: Stethoscope, color: 'text-red-500', bgColor: 'bg-red-50' },
     { id: 'pressing', label: 'Gestion de Pressing', icon: WashingMachine, color: 'text-cyan-500', bgColor: 'bg-cyan-50' },
     { id: 'tailleur', label: 'Ateliers de Couture', icon: Scissors, color: 'text-violet-500', bgColor: 'bg-violet-50' },
+    { id: 'broderie', label: 'Acom Creative Studio', icon: Cpu, color: 'text-purple-600', bgColor: 'bg-purple-50' },
   ];
 
   const plans = PAYMENT_PLANS;
@@ -61,6 +62,8 @@ const MerchantOnboarding = ({ onComplete }: { onComplete: (m: Merchant) => void 
         return { label: "le pressing / laverie", placeholder: "ex: Pressing Prestige" };
       case 'tailleur':
         return { label: "l'atelier de couture", placeholder: "ex: Atelier de Couture Élégance" };
+      case 'broderie':
+        return { label: "le studio de création", placeholder: "ex: Acom Creative Studio Paris" };
       default:
         return { label: "votre organisation", placeholder: "ex: Mon Entreprise / Établissement" };
     }

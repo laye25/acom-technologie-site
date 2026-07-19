@@ -88,6 +88,14 @@ export const AcomSaaSSettings = () => {
         color: "bg-pink-500",
         image: "https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&q=80&w=800&h=600",
         link: "/merchant/saas?type=tailleur"
+      },
+      {
+        title: "Acom Creative Studio",
+        description: "Plateforme intelligente de conception et de production textile : numérisation de motifs par IA, génération automatique de points (Tatami, Satin, Zigzag), compilation machines et simulation physique réaliste.",
+        iconName: "Cpu",
+        color: "bg-violet-600",
+        image: "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&q=80&w=800&h=600",
+        link: "/merchant/saas?type=broderie"
       }
     ]
   };
@@ -110,6 +118,24 @@ export const AcomSaaSSettings = () => {
               content.solutions = [...content.solutions, tailleurSol];
             }
           }
+           const hasBroderie = content.solutions.some((s: any) => s.link && s.link.includes('type=broderie'));
+          if (!hasBroderie) {
+            const broderieSol = defaultSettings.solutions.find((s: any) => s.link && s.link.includes('type=broderie'));
+            if (broderieSol) {
+              content.solutions = [...content.solutions, broderieSol];
+            }
+          }
+          // Map solutions to auto-update type=broderie name/description/signature
+          content.solutions = content.solutions.map((s: any) => {
+            if (s.link && s.link.includes('type=broderie')) {
+              return {
+                ...s,
+                title: "Acom Creative Studio",
+                description: "Plateforme intelligente de conception et de production textile : numérisation de motifs par IA, génération automatique de points (Tatami, Satin, Zigzag), compilation machines et simulation physique réaliste."
+              };
+            }
+            return s;
+          });
         }
         setSettings(content);
       } else {

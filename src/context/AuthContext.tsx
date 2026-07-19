@@ -332,12 +332,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, password: string) => {
+    const trimmedEmail = email.trim();
     try {
       // Tenter la connexion normale en ligne
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
       
       // Enregistrer le hash des identifiants pour les futures connexions hors-ligne
-      const hash = await hashCredential(email, password);
+      const hash = await hashCredential(trimmedEmail, password);
       localStorage.setItem('acom_offline_hash', hash);
     } catch (error: any) {
       console.error('Online login failed or network down:', error);
@@ -350,7 +351,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cachedProfileStr = localStorage.getItem('acom_offline_profile');
         
         if (cachedHash && cachedProfileStr) {
-          const inputHash = await hashCredential(email, password);
+          const inputHash = await hashCredential(trimmedEmail, password);
           if (inputHash === cachedHash) {
             console.log('Offline login successful! Restoring local session.');
             const cachedProfile = JSON.parse(cachedProfileStr);
@@ -405,15 +406,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUpWithEmail = async (email: string, password: string, fullName: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const trimmedEmail = email.trim();
+    const userCredential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
     const newUser = userCredential.user;
 
-    const isAdminEmail = email && ADMIN_EMAILS.includes(email);
-    const isManagerEmail = email && MANAGER_EMAILS.includes(email);
+    const isAdminEmail = trimmedEmail && ADMIN_EMAILS.includes(trimmedEmail);
+    const isManagerEmail = trimmedEmail && MANAGER_EMAILS.includes(trimmedEmail);
 
     const newProfile: UserProfile = {
       uid: newUser.uid,
-      email: email,
+      email: trimmedEmail,
       displayName: fullName,
       photoURL: '',
       role: isAdminEmail ? 'admin' : (isManagerEmail ? 'manager' : 'client'),
@@ -429,7 +431,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     // Enregistrer le hash pour les connexions hors-ligne
-    const hash = await hashCredential(email, password);
+    const hash = await hashCredential(trimmedEmail, password);
     localStorage.setItem('acom_offline_hash', hash);
 
     setProfile(newProfile);
@@ -463,7 +465,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, email.trim());
   };
 
   const isAdmin = customClaims?.admin || (!!user?.email && ADMIN_EMAILS.includes(user.email));

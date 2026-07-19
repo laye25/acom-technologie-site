@@ -513,7 +513,7 @@ export interface Merchant {
   id: string;
   ownerId: string;
   name: string;
-  type?: string; // e.g., 'boutique', 'entreprise', 'chantier', 'transport', 'rh', 'scolaire', 'medical'
+  type?: string; // e.g., 'boutique', 'entreprise', 'chantier', 'transport', 'rh', 'scolaire', 'medical', 'pressing', 'tailleur', 'broderie'
   plan?: MerchantPlan;
   licenseType?: 'local' | 'cloud';
   subscriptionStatus?: 'active' | 'expired' | 'none';

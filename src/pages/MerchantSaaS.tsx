@@ -628,7 +628,15 @@ const MerchantSaaS = () => {
           { id: 'tailleur_gallery', label: 'Inspirations & Moodboards', icon: Sparkles },
           { id: 'tailleur_artisans', label: 'Artisans & Équipe', icon: Users },
           { id: 'tailleur_mercerie', label: 'Mercerie & Coût de Revient', icon: Calculator },
-          { id: 'tailleur_embroidery', label: 'Atelier de Broderie (AEE) & IA', icon: Cpu },
+          { id: 'accounting', label: 'Compta', icon: BarChart3 },
+          { id: 'reports', label: 'Rapports', icon: FileText },
+          { id: 'settings', label: 'Réglages', icon: Settings },
+        ];
+        break;
+      case 'broderie':
+        tabs = [
+          { id: 'dashboard', label: 'Aperçu', icon: PieChart },
+          { id: 'tailleur_embroidery', label: 'Acom Creative Studio', icon: Cpu },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
@@ -774,6 +782,7 @@ const MerchantSaaS = () => {
                        merchant.type === 'medical' ? 'Management Médical' :
                        merchant.type === 'pressing' ? 'Management Pressing' :
                        merchant.type === 'tailleur' ? 'Ateliers de Couture' :
+                       merchant.type === 'broderie' ? 'Acom Creative Studio' :
                        'Management Commerce'}
                     </span>
                     <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
@@ -823,6 +832,7 @@ const MerchantSaaS = () => {
                             <option value="medical">🏥 Clinique & Médical</option>
                             <option value="pressing">🧺 Pressing & Laverie</option>
                             <option value="tailleur">🪡 Ateliers de Couture</option>
+                            <option value="broderie">✨ Acom Creative Studio</option>
                           </select>
                         </div>
                       </>
