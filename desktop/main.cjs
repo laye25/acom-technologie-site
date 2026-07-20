@@ -26,57 +26,64 @@ const MIME_TYPES = {
 };
 
 // Retrieve a highly persistent directory independent of the app's standard userData folder.
-// This ensures databases and setting files are NEVER deleted or wiped upon updating or reinstalling the app.
+// Placing this as a hidden dotfolder directly in the user's home folder ensures that it is NEVER
+// wiped, modified, or cleaned up by standard uninstallers, installers, updates, or profile resets.
 function getPersistentDir() {
   const os = require('os');
   const homeDir = app.getPath('home') || os.homedir();
-  let baseDir;
-  
-  if (process.platform === 'win32') {
-    baseDir = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
-  } else if (process.platform === 'darwin') {
-    baseDir = path.join(homeDir, 'Library', 'Application Support');
-  } else {
-    baseDir = process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config');
-  }
-  
-  return path.join(baseDir, 'AcomGestion');
+  return path.join(homeDir, '.acom_creative_studio');
 }
 
-// Seamlessly migrates existing user data from standard userData folder to the new, ultra-persistent folder
+// Seamlessly migrates existing user data from standard userData folder and older AppData locations
+// to the new, ultra-persistent dotfolder inside the user's home directory.
 function migrateDataToPersistentDir() {
   try {
-    const oldDir = path.join(app.getPath('userData'), 'AcomGestion');
+    const os = require('os');
+    const homeDir = app.getPath('home') || os.homedir();
     const newDir = getPersistentDir();
+
+    // Setup older paths for backward compatibility checks
+    const oldDir1 = path.join(app.getPath('userData'), 'AcomGestion');
     
-    if (oldDir === newDir) {
-      console.log('[MIGRATION] Old folder and persistent folder are the same path:', oldDir);
-      return;
+    let oldBaseDir;
+    if (process.platform === 'win32') {
+      oldBaseDir = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
+    } else if (process.platform === 'darwin') {
+      oldBaseDir = path.join(homeDir, 'Library', 'Application Support');
+    } else {
+      oldBaseDir = process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config');
+    }
+    const oldDir2 = path.join(oldBaseDir, 'AcomGestion');
+
+    // Create the new persistent folder if it doesn't exist
+    if (!fs.existsSync(newDir)) {
+      fs.mkdirSync(newDir, { recursive: true });
     }
 
-    if (fs.existsSync(oldDir)) {
-      console.log(`[MIGRATION] Old folder found at: ${oldDir}. Checking for files to migrate to: ${newDir}`);
-      if (!fs.existsSync(newDir)) {
-        fs.mkdirSync(newDir, { recursive: true });
+    const migrationCandidates = [oldDir1, oldDir2];
+
+    for (const oldDir of migrationCandidates) {
+      if (oldDir === newDir) continue;
+
+      if (fs.existsSync(oldDir)) {
+        console.log(`[MIGRATION] Scanning old directory: ${oldDir} for files...`);
+        
+        // Migrate database
+        const oldDb = path.join(oldDir, 'data.sqlite');
+        const newDb = path.join(newDir, 'data.sqlite');
+        if (fs.existsSync(oldDb) && !fs.existsSync(newDb)) {
+          fs.copyFileSync(oldDb, newDb);
+          console.log(`[MIGRATION] Successfully copied SQLite database from ${oldDb} to ${newDb}`);
+        }
+        
+        // Migrate settings
+        const oldSettings = path.join(oldDir, 'desktop_settings.json');
+        const newSettings = path.join(newDir, 'desktop_settings.json');
+        if (fs.existsSync(oldSettings) && !fs.existsSync(newSettings)) {
+          fs.copyFileSync(oldSettings, newSettings);
+          console.log(`[MIGRATION] Successfully copied desktop settings from ${oldSettings} to ${newSettings}`);
+        }
       }
-      
-      // Migrate database
-      const oldDb = path.join(oldDir, 'data.sqlite');
-      const newDb = path.join(newDir, 'data.sqlite');
-      if (fs.existsSync(oldDb) && !fs.existsSync(newDb)) {
-        fs.copyFileSync(oldDb, newDb);
-        console.log('[MIGRATION] SQLite database successfully migrated to new persistent folder:', newDb);
-      }
-      
-      // Migrate settings
-      const oldSettings = path.join(oldDir, 'desktop_settings.json');
-      const newSettings = path.join(newDir, 'desktop_settings.json');
-      if (fs.existsSync(oldSettings) && !fs.existsSync(newSettings)) {
-        fs.copyFileSync(oldSettings, newSettings);
-        console.log('[MIGRATION] Desktop settings successfully migrated to new persistent folder:', newSettings);
-      }
-    } else {
-      console.log('[MIGRATION] No old AcomGestion folder found inside userData.');
     }
   } catch (err) {
     console.error('[MIGRATION] Error migrating to persistent folder:', err);

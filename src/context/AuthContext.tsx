@@ -74,6 +74,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [customClaims, setCustomClaims] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const saveSettingsToDesktop = async (email?: string, password?: string) => {
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.saveDesktopSettings) {
+      try {
+        const currentSessionStr = localStorage.getItem('acom_offline_session');
+        const currentProfileStr = localStorage.getItem('acom_offline_profile');
+        const currentHash = localStorage.getItem('acom_offline_hash') || '';
+
+        const currentSession = currentSessionStr ? JSON.parse(currentSessionStr) : null;
+        const currentProfile = currentProfileStr ? JSON.parse(currentProfileStr) : null;
+
+        let savedEmail = email;
+        let savedPassword = password ? btoa(password) : undefined;
+
+        if (!savedEmail || !savedPassword) {
+          const existingResult = await electronAPI.getDesktopSettings();
+          if (existingResult && existingResult.success && existingResult.settings) {
+            if (!savedEmail) savedEmail = existingResult.settings.savedEmail;
+            if (!savedPassword) savedPassword = existingResult.settings.savedPassword;
+          }
+        }
+
+        await electronAPI.saveDesktopSettings({
+          savedEmail,
+          savedPassword,
+          acom_offline_session: currentSession,
+          acom_offline_profile: currentProfile,
+          acom_offline_hash: currentHash
+        });
+        console.log('AuthContext: Updated persistent desktop settings file.');
+      } catch (err) {
+        console.error('AuthContext: Failed to save settings to desktop file:', err);
+      }
+    }
+  };
+
   // Restaurer immédiatement la session locale si présente pour accélérer le démarrage et tolérer le mode hors-ligne
   useEffect(() => {
     const restoreSession = async () => {
@@ -81,18 +117,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let storedProfile = localStorage.getItem('acom_offline_profile');
       let storedHash = localStorage.getItem('acom_offline_hash');
 
-      // Si on est sur Desktop Electron et que la session localStorage est vide, essayer de restaurer depuis le fichier physique
+      // Si on est sur Desktop Electron, essayer systématiquement de restaurer depuis le fichier physique
       const electronAPI = (window as any).electronAPI;
-      if (!storedSession && electronAPI?.getDesktopSettings) {
+      if (electronAPI?.getDesktopSettings) {
         try {
-          console.log('AuthContext: Aucun token localStorage trouvé. Tentative de restauration synchrone depuis desktop_settings.json...');
+          console.log('AuthContext: Tentative de récupération et synchronisation des paramètres depuis desktop_settings.json...');
           const result = await electronAPI.getDesktopSettings();
           if (result && result.success && result.settings) {
-            const { acom_offline_session, acom_offline_profile, acom_offline_hash } = result.settings;
+            const { acom_offline_session, acom_offline_profile, acom_offline_hash, savedEmail, savedPassword } = result.settings;
+            
             if (acom_offline_session) {
               console.log('AuthContext: Session physique trouvée pour:', acom_offline_session.profile?.email);
               
-              // Restaurer dans le localStorage local pour le bon fonctionnement des modules amont
               localStorage.setItem('acom_offline_session', JSON.stringify(acom_offline_session));
               if (acom_offline_profile) {
                 localStorage.setItem('acom_offline_profile', JSON.stringify(acom_offline_profile));
@@ -102,6 +138,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
 
               storedSession = JSON.stringify(acom_offline_session);
+            }
+
+            // Tenter une reconnexion automatique transparente en arrière-plan si en ligne
+            if (savedEmail && savedPassword && navigator.onLine) {
+              try {
+                const decryptedPassword = atob(savedPassword);
+                console.log('AuthContext: Reconduction de session automatique en ligne avec les identifiants stockés...');
+                await signInWithEmailAndPassword(auth, savedEmail, decryptedPassword);
+                console.log('AuthContext: Reconnexion automatique en ligne réussie !');
+              } catch (loginErr) {
+                console.error('AuthContext: Échec de la reconnexion automatique en ligne:', loginErr);
+              }
             }
           }
         } catch (err) {
@@ -229,12 +277,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Immediate sync
         getSyncService().then(service => service.syncUserProfile(currentUser.uid));
       } else {
-        // Firebase Auth est null, vérification de la présence d'une session hors-ligne conservée
+        // Firebase Auth est null, vérification de la présence d'une session hors-ligne ou Desktop persistée
         const storedSession = localStorage.getItem('acom_offline_session');
         const isOffline = !navigator.onLine;
+        const isElectron = typeof (window as any).electronAPI !== 'undefined';
 
-        if (storedSession && isOffline) {
-          console.log('AuthContext: Firebase returned null but offline is active. Keeping current session.');
+        if (storedSession && (isOffline || isElectron)) {
+          console.log('AuthContext: Firebase returned null but offline or Electron is active. Keeping current session.');
           try {
             const session = JSON.parse(storedSession);
             setUser(session.user);
@@ -388,6 +437,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Enregistrer le hash des identifiants pour les futures connexions hors-ligne
       const hash = await hashCredential(trimmedEmail, password);
       localStorage.setItem('acom_offline_hash', hash);
+
+      // Sauvegarder les identifiants et la session sur Desktop
+      await saveSettingsToDesktop(trimmedEmail, password);
     } catch (error: any) {
       console.error('Online login failed or network down:', error);
       
@@ -441,6 +493,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 merchantId: cachedProfile.merchantId || null
               }
             }));
+
+            // Sauvegarder les identifiants et la session sur Desktop
+            await saveSettingsToDesktop(trimmedEmail, password);
             return;
           } else {
             throw new Error('Identifiants incorrects en mode hors-ligne.');
@@ -483,6 +538,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('acom_offline_hash', hash);
 
     setProfile(newProfile);
+
+    // Sauvegarder les identifiants et la session sur Desktop
+    await saveSettingsToDesktop(trimmedEmail, password);
   };
 
   const signInWithGoogle = async () => {
