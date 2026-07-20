@@ -91,25 +91,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const currentSession = currentSessionStr ? JSON.parse(currentSessionStr) : null;
         const currentProfile = currentProfileStr ? JSON.parse(currentProfileStr) : null;
 
-        let savedEmail = email;
-        let savedPassword = password ? btoa(password) : undefined;
-
-        if (!savedEmail || !savedPassword) {
-          const existingResult = await electronAPI.getDesktopSettings();
-          if (existingResult && existingResult.success && existingResult.settings) {
-            if (!savedEmail) savedEmail = existingResult.settings.savedEmail;
-            if (!savedPassword) savedPassword = existingResult.settings.savedPassword;
-          }
+        // Si des identifiants valides sont fournis, les synchroniser de manière synchrone dans localStorage
+        if (email) {
+          localStorage.setItem('acom_offline_email', email.trim());
+        }
+        if (password) {
+          localStorage.setItem('acom_offline_password_b64', safeBtoa(password));
         }
 
+        // Récupérer de façon synchrone et sans race condition depuis localStorage
+        const savedEmail = localStorage.getItem('acom_offline_email') || undefined;
+        const savedPassword = localStorage.getItem('acom_offline_password_b64') || undefined;
+
         await electronAPI.saveDesktopSettings({
-          savedEmail,
-          savedPassword,
+          savedEmail: savedEmail || null,
+          savedPassword: savedPassword || null,
           acom_offline_session: currentSession,
           acom_offline_profile: currentProfile,
           acom_offline_hash: currentHash
         });
-        console.log('AuthContext: Updated persistent desktop settings file.');
+        console.log('AuthContext: Updated persistent desktop settings file successfully.');
       } catch (err) {
         console.error('AuthContext: Failed to save settings to desktop file:', err);
       }
@@ -132,6 +133,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (result && result.success && result.settings) {
             const { acom_offline_session, acom_offline_profile, acom_offline_hash, savedEmail, savedPassword } = result.settings;
             
+            if (savedEmail) {
+              localStorage.setItem('acom_offline_email', savedEmail);
+            }
+            if (savedPassword) {
+              localStorage.setItem('acom_offline_password_b64', savedPassword);
+            }
+
             if (acom_offline_session) {
               console.log('AuthContext: Session physique trouvée pour:', acom_offline_session.profile?.email);
               
@@ -149,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Tenter une reconnexion automatique transparente en arrière-plan si en ligne
             if (savedEmail && savedPassword && navigator.onLine) {
               try {
-                const decryptedPassword = atob(savedPassword);
+                const decryptedPassword = safeAtob(savedPassword);
                 console.log('AuthContext: Reconduction de session automatique en ligne avec les identifiants stockés...');
                 await signInWithEmailAndPassword(auth, savedEmail, decryptedPassword);
                 console.log('AuthContext: Reconnexion automatique en ligne réussie !');
@@ -637,5 +645,27 @@ async function hashCredential(email: string, password: string): Promise<string> 
     hash = hash & hash; // Convert to 32bit integer
   }
   return 'fallback_' + hash.toString();
+}
+
+function safeBtoa(str: string): string {
+  try {
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+      return String.fromCharCode(parseInt(p1, 16));
+    }));
+  } catch (e) {
+    console.error('safeBtoa failed, falling back to standard btoa:', e);
+    return btoa(str);
+  }
+}
+
+function safeAtob(str: string): string {
+  try {
+    return decodeURIComponent(Array.prototype.map.call(atob(str), (c) => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+  } catch (e) {
+    console.error('safeAtob failed, falling back to standard atob:', e);
+    return atob(str);
+  }
 }
 

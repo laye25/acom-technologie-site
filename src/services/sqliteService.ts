@@ -181,6 +181,35 @@ export const initSQLite = async () => {
       db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
     } catch (_) {}
 
+    // Sanity check: if Dexie is completely empty on Electron, but the physical file contains products, populate Dexie automatically
+    const isDesktop = typeof window !== 'undefined' && (window as any).electronAPI;
+    if (isDesktop) {
+      try {
+        const prodCount = await dexieDb.products.count();
+        if (prodCount === 0) {
+          console.log('SQLite init: Dexie is empty on Desktop. Checking if SQLite contains data...');
+          const results: any[] = [];
+          db.exec({
+            sql: 'SELECT COUNT(*) as count FROM merchant_products',
+            rowMode: 'object',
+            callback: (row: any) => {
+              results.push(row);
+            }
+          });
+          if (results && results[0] && results[0].count > 0) {
+            console.log(`SQLite init: Found ${results[0].count} products in SQLite. Restoring to Dexie automatically...`);
+            setTimeout(() => {
+              populateDexieFromSQLite().catch(err => {
+                console.error('SQLite init: Failed to automatically populate Dexie:', err);
+              });
+            }, 0);
+          }
+        }
+      } catch (countErr) {
+        console.warn('SQLite init: Automatic Dexie sanity check failed:', countErr);
+      }
+    }
+
     return db;
   } catch (e) {
     console.error('Failed to init SQLite:', e);
