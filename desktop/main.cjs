@@ -25,6 +25,64 @@ const MIME_TYPES = {
   '.txt': 'text/plain; charset=utf-8'
 };
 
+// Retrieve a highly persistent directory independent of the app's standard userData folder.
+// This ensures databases and setting files are NEVER deleted or wiped upon updating or reinstalling the app.
+function getPersistentDir() {
+  const os = require('os');
+  const homeDir = app.getPath('home') || os.homedir();
+  let baseDir;
+  
+  if (process.platform === 'win32') {
+    baseDir = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
+  } else if (process.platform === 'darwin') {
+    baseDir = path.join(homeDir, 'Library', 'Application Support');
+  } else {
+    baseDir = process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config');
+  }
+  
+  return path.join(baseDir, 'AcomGestion');
+}
+
+// Seamlessly migrates existing user data from standard userData folder to the new, ultra-persistent folder
+function migrateDataToPersistentDir() {
+  try {
+    const oldDir = path.join(app.getPath('userData'), 'AcomGestion');
+    const newDir = getPersistentDir();
+    
+    if (oldDir === newDir) {
+      console.log('[MIGRATION] Old folder and persistent folder are the same path:', oldDir);
+      return;
+    }
+
+    if (fs.existsSync(oldDir)) {
+      console.log(`[MIGRATION] Old folder found at: ${oldDir}. Checking for files to migrate to: ${newDir}`);
+      if (!fs.existsSync(newDir)) {
+        fs.mkdirSync(newDir, { recursive: true });
+      }
+      
+      // Migrate database
+      const oldDb = path.join(oldDir, 'data.sqlite');
+      const newDb = path.join(newDir, 'data.sqlite');
+      if (fs.existsSync(oldDb) && !fs.existsSync(newDb)) {
+        fs.copyFileSync(oldDb, newDb);
+        console.log('[MIGRATION] SQLite database successfully migrated to new persistent folder:', newDb);
+      }
+      
+      // Migrate settings
+      const oldSettings = path.join(oldDir, 'desktop_settings.json');
+      const newSettings = path.join(newDir, 'desktop_settings.json');
+      if (fs.existsSync(oldSettings) && !fs.existsSync(newSettings)) {
+        fs.copyFileSync(oldSettings, newSettings);
+        console.log('[MIGRATION] Desktop settings successfully migrated to new persistent folder:', newSettings);
+      }
+    } else {
+      console.log('[MIGRATION] No old AcomGestion folder found inside userData.');
+    }
+  } catch (err) {
+    console.error('[MIGRATION] Error migrating to persistent folder:', err);
+  }
+}
+
 // Global exception handler for the main process to show direct error popups instead of failing silently
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception in Main Process:', err);
@@ -113,14 +171,16 @@ function createWindow() {
 }
 
   app.whenReady().then(() => {
+  // Execute migration of database and settings files to the independent persistent folder
+  migrateDataToPersistentDir();
+
   // Expose physical file synchronization over secure IPC
   const { ipcMain } = require('electron');
   ipcMain.handle('sync-physical-file', async (event, arrayBuffer) => {
     try {
       const fs = require('fs');
       const path = require('path');
-      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
-      const folderPath = path.join(appData, 'AcomGestion');
+      const folderPath = getPersistentDir();
       
       if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath, { recursive: true });
@@ -141,8 +201,7 @@ function createWindow() {
     try {
       const fs = require('fs');
       const path = require('path');
-      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
-      const folderPath = path.join(appData, 'AcomGestion');
+      const folderPath = getPersistentDir();
       const dbPath = path.join(folderPath, 'data.sqlite');
       
       if (fs.existsSync(dbPath)) {
@@ -161,8 +220,7 @@ function createWindow() {
     try {
       const fs = require('fs');
       const path = require('path');
-      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
-      const folderPath = path.join(appData, 'AcomGestion');
+      const folderPath = getPersistentDir();
       
       if (!fs.existsSync(folderPath)) {
         fs.mkdirSync(folderPath, { recursive: true });
@@ -182,8 +240,7 @@ function createWindow() {
     try {
       const fs = require('fs');
       const path = require('path');
-      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
-      const folderPath = path.join(appData, 'AcomGestion');
+      const folderPath = getPersistentDir();
       const settingsPath = path.join(folderPath, 'desktop_settings.json');
       
       if (fs.existsSync(settingsPath)) {
