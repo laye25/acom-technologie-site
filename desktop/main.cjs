@@ -57,12 +57,26 @@ function migrateDataToPersistentDir() {
 
     const oldDir3 = app.getPath('userData');
 
+    // Add explicit candidates for both the reference and modified product names
+    const oldDirProduct1 = path.join(oldBaseDir, 'Acom Gestion Desktop');
+    const oldDirProduct2 = path.join(oldBaseDir, 'Acom Gestion');
+    const oldDirProduct1Sub = path.join(oldDirProduct1, 'AcomGestion');
+    const oldDirProduct2Sub = path.join(oldDirProduct2, 'AcomGestion');
+
     // Create the new persistent folder if it doesn't exist
     if (!fs.existsSync(newDir)) {
       fs.mkdirSync(newDir, { recursive: true });
     }
 
-    const migrationCandidates = [oldDir1, oldDir2, oldDir3];
+    const migrationCandidates = [
+      oldDir1, 
+      oldDir2, 
+      oldDir3, 
+      oldDirProduct1, 
+      oldDirProduct2, 
+      oldDirProduct1Sub, 
+      oldDirProduct2Sub
+    ];
 
     for (const oldDir of migrationCandidates) {
       if (oldDir === newDir) continue;
