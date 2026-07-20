@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { auth, db } from '../firebase';
 import { 
   signInWithEmailAndPassword, 
@@ -73,6 +73,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [customClaims, setCustomClaims] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isRestoring, setIsRestoring] = useState(typeof (window as any).electronAPI !== 'undefined');
+  const isRestoringRef = useRef(isRestoring);
+
+  useEffect(() => {
+    isRestoringRef.current = isRestoring;
+  }, [isRestoring]);
 
   const saveSettingsToDesktop = async (email?: string, password?: string) => {
     const electronAPI = (window as any).electronAPI;
@@ -169,6 +175,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error reading cached session:', e);
         }
       }
+
+      // Finish restoring session on Electron and stop loading spinner if no session
+      setIsRestoring(false);
+      if (!storedSession) {
+        setLoading(false);
+      }
     };
 
     restoreSession();
@@ -195,6 +207,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log('AuthContext: onAuthStateChanged - currentUser:', currentUser);
+      
+      // If we are still restoring the physical session from the file system, ignore null events
+      if (isRestoringRef.current && !currentUser) {
+        console.log('AuthContext: Ignoring null onAuthStateChanged event during active desktop restoration...');
+        return;
+      }
       
       const safetyTimeout = setTimeout(() => {
         setLoading(prev => {
@@ -337,16 +355,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('acom_offline_profile', JSON.stringify(profile));
       localStorage.setItem('acom_offline_session', JSON.stringify(sessionObj));
 
-      // Synchroniser avec les réglages physiques persistants sur Desktop
-      const electronAPI = (window as any).electronAPI;
-      if (electronAPI?.saveDesktopSettings) {
-        const storedHash = localStorage.getItem('acom_offline_hash') || '';
-        electronAPI.saveDesktopSettings({
-          acom_offline_session: sessionObj,
-          acom_offline_profile: profile,
-          acom_offline_hash: storedHash
-        }).catch((err: any) => console.error('Failed to sync settings to desktop file:', err));
-      }
+      // Synchroniser de façon sécurisée avec les réglages physiques persistants sur Desktop tout en conservant les identifiants
+      saveSettingsToDesktop();
     }
   }, [user, profile, customClaims]);
 

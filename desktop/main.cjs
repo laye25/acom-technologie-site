@@ -55,12 +55,14 @@ function migrateDataToPersistentDir() {
     }
     const oldDir2 = path.join(oldBaseDir, 'AcomGestion');
 
+    const oldDir3 = app.getPath('userData');
+
     // Create the new persistent folder if it doesn't exist
     if (!fs.existsSync(newDir)) {
       fs.mkdirSync(newDir, { recursive: true });
     }
 
-    const migrationCandidates = [oldDir1, oldDir2];
+    const migrationCandidates = [oldDir1, oldDir2, oldDir3];
 
     for (const oldDir of migrationCandidates) {
       if (oldDir === newDir) continue;
