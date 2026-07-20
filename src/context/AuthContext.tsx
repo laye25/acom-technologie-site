@@ -76,19 +76,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Restaurer immédiatement la session locale si présente pour accélérer le démarrage et tolérer le mode hors-ligne
   useEffect(() => {
-    const storedSession = localStorage.getItem('acom_offline_session');
-    if (storedSession) {
-      try {
-        const session = JSON.parse(storedSession);
-        setUser(session.user);
-        setProfile(session.profile);
-        setCustomClaims(session.customClaims);
-        setLoading(false);
-        console.log('AuthContext: Restored cached session immediately:', session.profile.email);
-      } catch (e) {
-        console.error('Error reading cached session:', e);
+    const restoreSession = async () => {
+      let storedSession = localStorage.getItem('acom_offline_session');
+      let storedProfile = localStorage.getItem('acom_offline_profile');
+      let storedHash = localStorage.getItem('acom_offline_hash');
+
+      // Si on est sur Desktop Electron et que la session localStorage est vide, essayer de restaurer depuis le fichier physique
+      const electronAPI = (window as any).electronAPI;
+      if (!storedSession && electronAPI?.getDesktopSettings) {
+        try {
+          console.log('AuthContext: Aucun token localStorage trouvé. Tentative de restauration synchrone depuis desktop_settings.json...');
+          const result = await electronAPI.getDesktopSettings();
+          if (result && result.success && result.settings) {
+            const { acom_offline_session, acom_offline_profile, acom_offline_hash } = result.settings;
+            if (acom_offline_session) {
+              console.log('AuthContext: Session physique trouvée pour:', acom_offline_session.profile?.email);
+              
+              // Restaurer dans le localStorage local pour le bon fonctionnement des modules amont
+              localStorage.setItem('acom_offline_session', JSON.stringify(acom_offline_session));
+              if (acom_offline_profile) {
+                localStorage.setItem('acom_offline_profile', JSON.stringify(acom_offline_profile));
+              }
+              if (acom_offline_hash) {
+                localStorage.setItem('acom_offline_hash', acom_offline_hash);
+              }
+
+              storedSession = JSON.stringify(acom_offline_session);
+            }
+          }
+        } catch (err) {
+          console.error('AuthContext: Erreur lors de la récupération des paramètres de bureau:', err);
+        }
       }
-    }
+
+      if (storedSession) {
+        try {
+          const session = JSON.parse(storedSession);
+          setUser(session.user);
+          setProfile(session.profile);
+          setCustomClaims(session.customClaims);
+          setLoading(false);
+          console.log('AuthContext: Restored cached session immediately:', session.profile.email);
+        } catch (e) {
+          console.error('Error reading cached session:', e);
+        }
+      }
+    };
+
+    restoreSession();
   }, []);
 
   useEffect(() => {
@@ -244,12 +279,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         merchantId: profile.merchantId || null
       };
 
-      localStorage.setItem('acom_offline_profile', JSON.stringify(profile));
-      localStorage.setItem('acom_offline_session', JSON.stringify({
+      const sessionObj = {
         user: serializableUser,
         profile: profile,
         customClaims: claims
-      }));
+      };
+
+      localStorage.setItem('acom_offline_profile', JSON.stringify(profile));
+      localStorage.setItem('acom_offline_session', JSON.stringify(sessionObj));
+
+      // Synchroniser avec les réglages physiques persistants sur Desktop
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI?.saveDesktopSettings) {
+        const storedHash = localStorage.getItem('acom_offline_hash') || '';
+        electronAPI.saveDesktopSettings({
+          acom_offline_session: sessionObj,
+          acom_offline_profile: profile,
+          acom_offline_hash: storedHash
+        }).catch((err: any) => console.error('Failed to sync settings to desktop file:', err));
+      }
     }
   }, [user, profile, customClaims]);
 
@@ -461,6 +509,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     localStorage.removeItem('acom_offline_session');
+    localStorage.removeItem('acom_offline_profile');
+    localStorage.removeItem('acom_offline_hash');
+    
+    // Nettoyer également les paramètres physiques sur Desktop au logout
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.saveDesktopSettings) {
+      try {
+        await electronAPI.saveDesktopSettings({});
+      } catch (err) {
+        console.error('Failed to clear desktop settings file:', err);
+      }
+    }
+
     await firebaseSignOut(auth);
   };
 

@@ -88,6 +88,35 @@ export const initSQLite = async () => {
     sqlite3Obj = sqlite3;
     console.log('SQLite loaded. Version:', sqlite3.version.libVersion);
 
+    // Restauration automatique du fichier de base de données physique sur Desktop (si non fait lors du démarrage initial)
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI && typeof electronAPI.loadPhysicalDbFile === 'function') {
+      const dataRestored = localStorage.getItem('acom_desktop_data_restored');
+      if (!dataRestored) {
+        try {
+          console.log('SQLite init: Tentative de restauration de la base de données physique de sauvegarde...');
+          const response = await electronAPI.loadPhysicalDbFile();
+          if (response && response.success && response.data) {
+            if ('opfs' in sqlite3) {
+              const root = await navigator.storage.getDirectory();
+              const fileHandle = await root.getFileHandle('acom_studio.sqlite3', { create: true });
+              const writable = await (fileHandle as any).createWritable();
+              await writable.write(new Uint8Array(response.data));
+              await writable.close();
+              console.log('SQLite init: Restauration réussie du fichier OPFS depuis la base de données physique.');
+              localStorage.setItem('acom_desktop_data_restored', 'true');
+              localStorage.setItem('acom_desktop_needs_dexie_populate', 'true');
+            }
+          } else {
+            console.log('SQLite init: Aucun fichier physique de base de données trouvé. Initialisation standard.');
+            localStorage.setItem('acom_desktop_data_restored', 'true');
+          }
+        } catch (err) {
+          console.error('SQLite init: Erreur durant la restauration automatique du fichier physique:', err);
+        }
+      }
+    }
+
     if ('opfs' in sqlite3) {
       try {
         db = new sqlite3.oo1.OpfsDb('/acom_studio.sqlite3');
@@ -99,6 +128,14 @@ export const initSQLite = async () => {
     } else {
       db = new sqlite3.oo1.DB('/acom_studio.sqlite3', 'ct');
       console.log('Using transient/In-memory store (Fallthrough)');
+    }
+
+    const needsPopulate = localStorage.getItem('acom_desktop_needs_dexie_populate');
+    if (needsPopulate === 'true') {
+      localStorage.removeItem('acom_desktop_needs_dexie_populate');
+      populateDexieFromSQLite().catch(err => {
+        console.error('SQLite init: Failed to populate Dexie from restored SQLite db:', err);
+      });
     }
 
     // Create tables if they don't exist

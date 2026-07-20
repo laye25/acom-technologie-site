@@ -137,6 +137,66 @@ function createWindow() {
     }
   });
 
+  ipcMain.handle('load-physical-db-file', async (event) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
+      const folderPath = path.join(appData, 'AcomGestion');
+      const dbPath = path.join(folderPath, 'data.sqlite');
+      
+      if (fs.existsSync(dbPath)) {
+        const buffer = fs.readFileSync(dbPath);
+        console.log(`[IPC] Physical database file loaded successfully: ${dbPath}`);
+        return { success: true, data: buffer };
+      }
+      return { success: false, reason: 'File does not exist' };
+    } catch (error) {
+      console.error('[IPC] Failed to load physical SQLite file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('save-desktop-settings', async (event, settingsObj) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
+      const folderPath = path.join(appData, 'AcomGestion');
+      
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath, { recursive: true });
+      }
+
+      const settingsPath = path.join(folderPath, 'desktop_settings.json');
+      fs.writeFileSync(settingsPath, JSON.stringify(settingsObj, null, 2), 'utf-8');
+      console.log(`[IPC] Desktop settings saved to: ${settingsPath}`);
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Failed to save desktop settings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('get-desktop-settings', async (event) => {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const appData = app.getPath('userData') || process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
+      const folderPath = path.join(appData, 'AcomGestion');
+      const settingsPath = path.join(folderPath, 'desktop_settings.json');
+      
+      if (fs.existsSync(settingsPath)) {
+        const content = fs.readFileSync(settingsPath, 'utf-8');
+        return { success: true, settings: JSON.parse(content) };
+      }
+      return { success: false, reason: 'No settings file' };
+    } catch (error) {
+      console.error('[IPC] Failed to read desktop settings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Export SQLite database to user-selected folder (USB key, etc.)
   ipcMain.handle('export-sqlite-file', async (event, arrayBuffer) => {
     try {

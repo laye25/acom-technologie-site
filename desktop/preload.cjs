@@ -21,5 +21,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   sendEmailSecure: async (payload) => {
     return ipcRenderer.invoke('send-email-secure', payload);
+  },
+  loadPhysicalDbFile: async () => {
+    return ipcRenderer.invoke('load-physical-db-file');
+  },
+  saveDesktopSettings: async (settingsObj) => {
+    return ipcRenderer.invoke('save-desktop-settings', settingsObj);
+  },
+  getDesktopSettings: async () => {
+    return ipcRenderer.invoke('get-desktop-settings');
   }
 });

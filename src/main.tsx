@@ -27,6 +27,9 @@ interface ElectronAPI {
   exportSqliteFile?: (buffer: ArrayBuffer) => Promise<any>;
   makeApiRequest: (url: string, options: any) => Promise<any>;
   sendEmailSecure: (payload: any) => Promise<{ok: boolean, status: number, text: string, json?: () => Promise<any>}>;
+  loadPhysicalDbFile?: () => Promise<any>;
+  saveDesktopSettings?: (settingsObj: any) => Promise<any>;
+  getDesktopSettings?: () => Promise<any>;
 }
 
 declare global {
