@@ -238,6 +238,18 @@ function createWindow() {
   // Execute migration of database and settings files to the independent persistent folder
   migrateDataToPersistentDir();
 
+  // Detect if an update has just been performed (via the installer marker file)
+  try {
+    const updateMarkerPath = path.join(getPersistentDir(), '.updated');
+    if (fs.existsSync(updateMarkerPath)) {
+      console.log('[UPDATE] Application updated successfully! Preserving persistent session and SQLite database.');
+      // Clean up the marker file
+      fs.unlinkSync(updateMarkerPath);
+    }
+  } catch (err) {
+    console.error('[UPDATE] Failed to check/clean update marker file:', err);
+  }
+
   // Expose physical file synchronization over secure IPC
   const { ipcMain } = require('electron');
   ipcMain.handle('sync-physical-file', async (event, arrayBuffer) => {

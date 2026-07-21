@@ -123,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let storedSession = localStorage.getItem('acom_offline_session');
       let storedProfile = localStorage.getItem('acom_offline_profile');
       let storedHash = localStorage.getItem('acom_offline_hash');
+      let isAutologinSuccessful = false;
 
       // Si on est sur Desktop Electron, essayer systématiquement de restaurer depuis le fichier physique
       const electronAPI = (window as any).electronAPI;
@@ -161,6 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.log('AuthContext: Reconduction de session automatique en ligne avec les identifiants stockés...');
                 await signInWithEmailAndPassword(auth, savedEmail, decryptedPassword);
                 console.log('AuthContext: Reconnexion automatique en ligne réussie !');
+                isAutologinSuccessful = true;
               } catch (loginErr) {
                 console.error('AuthContext: Échec de la reconnexion automatique en ligne:', loginErr);
               }
@@ -169,6 +171,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (err) {
           console.error('AuthContext: Erreur lors de la récupération des paramètres de bureau:', err);
         }
+      }
+
+      if (isAutologinSuccessful) {
+        // L'auto-login a réussi, le listener onAuthStateChanged gèrera l'affectation de l'utilisateur, du profil et arrêtera le spinner de chargement.
+        setIsRestoring(false);
+        return;
       }
 
       if (storedSession) {
