@@ -73,7 +73,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [customClaims, setCustomClaims] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isRestoring, setIsRestoring] = useState(typeof (window as any).electronAPI !== 'undefined');
+  const [isRestoring, setIsRestoring] = useState(() => {
+    const isElectronEnv = typeof window !== 'undefined' && (
+      (window.process && (window.process as any).type) || 
+      (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
+      (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol)) ||
+      (typeof (window as any).electronAPI !== 'undefined')
+    );
+    console.log('[DIAGNOSTIC] Initialising AuthContext, isElectronEnv:', isElectronEnv);
+    return isElectronEnv;
+  });
   const isRestoringRef = useRef(isRestoring);
 
   useEffect(() => {
@@ -120,19 +129,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Restaurer immédiatement la session locale si présente pour accélérer le démarrage et tolérer le mode hors-ligne
   useEffect(() => {
     const restoreSession = async () => {
+      console.log('[DIAGNOSTIC] Démarrage de restoreSession...');
       let storedSession = localStorage.getItem('acom_offline_session');
       let storedProfile = localStorage.getItem('acom_offline_profile');
       let storedHash = localStorage.getItem('acom_offline_hash');
       let isAutologinSuccessful = false;
 
+      console.log('[DIAGNOSTIC] Données localStorage initiales - storedSession existe:', !!storedSession, 'storedProfile existe:', !!storedProfile);
+
       // Si on est sur Desktop Electron, essayer systématiquement de restaurer depuis le fichier physique
       const electronAPI = (window as any).electronAPI;
       if (electronAPI?.getDesktopSettings) {
         try {
-          console.log('AuthContext: Tentative de récupération et synchronisation des paramètres depuis desktop_settings.json...');
+          console.log('[DIAGNOSTIC] ElectronAPI détecté. Appel de getDesktopSettings...');
           const result = await electronAPI.getDesktopSettings();
+          console.log('[DIAGNOSTIC] getDesktopSettings result:', JSON.stringify(result));
+          
           if (result && result.success && result.settings) {
             const { acom_offline_session, acom_offline_profile, acom_offline_hash, savedEmail, savedPassword } = result.settings;
+            console.log('[DIAGNOSTIC] Paramètres récupérés - savedEmail:', savedEmail, 'acom_offline_session existe:', !!acom_offline_session);
             
             if (savedEmail) {
               localStorage.setItem('acom_offline_email', savedEmail);
@@ -142,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             if (acom_offline_session) {
-              console.log('AuthContext: Session physique trouvée pour:', acom_offline_session.profile?.email);
+              console.log('[DIAGNOSTIC] Session physique trouvée pour:', acom_offline_session.profile?.email);
               
               localStorage.setItem('acom_offline_session', JSON.stringify(acom_offline_session));
               if (acom_offline_profile) {
@@ -153,28 +168,70 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
 
               storedSession = JSON.stringify(acom_offline_session);
+            } else if (savedEmail && savedPassword) {
+              console.log('[DIAGNOSTIC] Aucune session physique trouvée mais identifiants présents. Recherche de profil de secours dans Dexie...');
+              try {
+                const users = await localDb.users.toArray();
+                console.log('[DIAGNOSTIC] Utilisateurs dans Dexie:', users.length);
+                const cachedProfile = users.find(u => u.email?.toLowerCase() === savedEmail.toLowerCase());
+                if (cachedProfile) {
+                  console.log('[DIAGNOSTIC] Profil de secours trouvé dans Dexie pour:', savedEmail);
+                  const mockOfflineSession = {
+                    user: {
+                      uid: cachedProfile.uid,
+                      email: cachedProfile.email,
+                      displayName: cachedProfile.displayName,
+                      photoURL: cachedProfile.photoURL
+                    },
+                    profile: cachedProfile,
+                    customClaims: {
+                      admin: cachedProfile.role === 'admin',
+                      role: cachedProfile.role,
+                      merchantId: cachedProfile.merchantId || null
+                    }
+                  };
+                  localStorage.setItem('acom_offline_session', JSON.stringify(mockOfflineSession));
+                  localStorage.setItem('acom_offline_profile', JSON.stringify(cachedProfile));
+                  
+                  const hash = await hashCredential(savedEmail, safeAtob(savedPassword));
+                  localStorage.setItem('acom_offline_hash', hash);
+                  
+                  storedSession = JSON.stringify(mockOfflineSession);
+                  console.log('[DIAGNOSTIC] Session locale reconstruite avec succès depuis Dexie.');
+                } else {
+                  console.log('[DIAGNOSTIC] Aucun profil trouvé dans Dexie pour email:', savedEmail);
+                }
+              } catch (dexieErr) {
+                console.error('[DIAGNOSTIC] Échec de la recherche de profil dans Dexie:', dexieErr);
+              }
             }
 
             // Tenter une reconnexion automatique transparente en arrière-plan si en ligne
             if (savedEmail && savedPassword && navigator.onLine) {
               try {
                 const decryptedPassword = safeAtob(savedPassword);
-                console.log('AuthContext: Reconduction de session automatique en ligne avec les identifiants stockés...');
+                console.log('[DIAGNOSTIC] Tentative de connexion automatique en ligne avec les identifiants stockés pour:', savedEmail);
                 await signInWithEmailAndPassword(auth, savedEmail, decryptedPassword);
-                console.log('AuthContext: Reconnexion automatique en ligne réussie !');
+                console.log('[DIAGNOSTIC] Reconnexion automatique en ligne réussie !');
                 isAutologinSuccessful = true;
-              } catch (loginErr) {
-                console.error('AuthContext: Échec de la reconnexion automatique en ligne:', loginErr);
+              } catch (loginErr: any) {
+                console.error('[DIAGNOSTIC] Échec de la reconnexion automatique en ligne:', loginErr.message, loginErr.code);
               }
+            } else {
+              console.log('[DIAGNOSTIC] Saut d\'auto-login - savedEmail:', !!savedEmail, 'savedPassword:', !!savedPassword, 'onLine:', navigator.onLine);
             }
+          } else {
+            console.log('[DIAGNOSTIC] Aucun paramètre valide retourné par getDesktopSettings.');
           }
         } catch (err) {
-          console.error('AuthContext: Erreur lors de la récupération des paramètres de bureau:', err);
+          console.error('[DIAGNOSTIC] Erreur lors de la récupération des paramètres de bureau:', err);
         }
+      } else {
+        console.log('[DIAGNOSTIC] electronAPI.getDesktopSettings non disponible.');
       }
 
       if (isAutologinSuccessful) {
-        // L'auto-login a réussi, le listener onAuthStateChanged gèrera l'affectation de l'utilisateur, du profil et arrêtera le spinner de chargement.
+        console.log('[DIAGNOSTIC] L\'auto-login a réussi, on retourne pour laisser onAuthStateChanged gérer le profil.');
         setIsRestoring(false);
         return;
       }
@@ -182,19 +239,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (storedSession) {
         try {
           const session = JSON.parse(storedSession);
+          console.log('[DIAGNOSTIC] Restauration immédiate de la session locale pour:', session.profile?.email);
           setUser(session.user);
           setProfile(session.profile);
           setCustomClaims(session.customClaims);
           setLoading(false);
-          console.log('AuthContext: Restored cached session immediately:', session.profile.email);
         } catch (e) {
-          console.error('Error reading cached session:', e);
+          console.error('[DIAGNOSTIC] Échec de la lecture de la session locale:', e);
         }
+      } else {
+        console.log('[DIAGNOSTIC] Aucune session stockée à restaurer.');
       }
 
       // Finish restoring session on Electron and stop loading spinner if no session
       setIsRestoring(false);
+      console.log('[DIAGNOSTIC] Fin de restoreSession. isRestoring réglé à false.');
       if (!storedSession) {
+        console.log('[DIAGNOSTIC] Aucune session trouvée, désactivation du loading spinner (renvoi vers Login).');
         setLoading(false);
       }
     };
@@ -222,18 +283,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let profileUnsubscribe: (() => void) | null = null;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      console.log('AuthContext: onAuthStateChanged - currentUser:', currentUser);
+      console.log('[DIAGNOSTIC] onAuthStateChanged déclenché - currentUser:', currentUser ? currentUser.email : 'null');
       
       // If we are still restoring the physical session from the file system, ignore null events
       if (isRestoringRef.current && !currentUser) {
-        console.log('AuthContext: Ignoring null onAuthStateChanged event during active desktop restoration...');
+        console.log('[DIAGNOSTIC] onAuthStateChanged: Ignorance de l\'événement null pendant la restauration active...');
         return;
       }
       
       const safetyTimeout = setTimeout(() => {
         setLoading(prev => {
           if (prev) {
-            console.warn('AuthContext: Loading timed out after 4s. Forcing UI to load.');
+            console.warn('[DIAGNOSTIC] AuthContext: Chargement expiré après 4s. Forçage de l\'affichage de l\'interface.');
             return false;
           }
           return prev;
@@ -247,13 +308,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (currentUser) {
+        console.log('[DIAGNOSTIC] onAuthStateChanged: Utilisateur valide retourné par Firebase:', currentUser.email, 'uid:', currentUser.uid);
         setUser(currentUser);
         // Fetch custom claims
         try {
           const tokenResult = await currentUser.getIdTokenResult();
+          console.log('[DIAGNOSTIC] claims récupérées:', JSON.stringify(tokenResult.claims));
           setCustomClaims(tokenResult.claims);
         } catch (e) {
-          console.warn('AuthContext: Could not fetch custom claims (offline fallback):', e);
+          console.warn('[DIAGNOSTIC] Impossible de récupérer les custom claims (repli hors-ligne):', e);
           if (!customClaims) {
             setCustomClaims({
               admin: currentUser.email && ADMIN_EMAILS.includes(currentUser.email),
@@ -263,9 +326,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         
         // Setup local watcher for profile using Dexie
+        console.log('[DIAGNOSTIC] Souscription liveQuery au profil de l\'utilisateur dans Dexie...');
         const observable = liveQuery(() => localDb.users.get(currentUser.uid));
         const sub = observable.subscribe({
           next: (data) => {
+            console.log('[DIAGNOSTIC] liveQuery profil mis à jour, data existe:', !!data);
             if (data) {
               const isAdminEmail = currentUser.email && ADMIN_EMAILS.includes(currentUser.email);
               const isManagerEmail = currentUser.email && MANAGER_EMAILS.includes(currentUser.email);
@@ -284,10 +349,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
               setLoading(false);
             } else {
+              console.log('[DIAGNOSTIC] Profil non trouvé dans Dexie, tentative de synchronisation depuis le Cloud...');
               // If not in Dexie, try to fetch then create if missing
               getSyncService().then(service => service.syncUserProfile(currentUser.uid)).then(() => {
                 // After sync attempt, checking one last time
                 localDb.users.get(currentUser.uid).then(profile => {
+                  console.log('[DIAGNOSTIC] Profil après synchro Cloud, profile existe:', !!profile);
                   if (!profile) {
                     createProfileIfMissing(currentUser).finally(() => setLoading(false));
                   } else {
@@ -295,13 +362,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   }
                 });
               }).catch(err => {
-                console.error('Initial profile sync failed:', err);
+                console.error('[DIAGNOSTIC] Échec de la synchronisation initiale du profil:', err);
                 setLoading(false);
               });
             }
           },
           error: (err) => {
-            console.error('Dexie profile subscription error:', err);
+            console.error('[DIAGNOSTIC] Erreur de souscription Dexie au profil:', err);
             setLoading(false);
           }
         });
@@ -314,10 +381,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Firebase Auth est null, vérification de la présence d'une session hors-ligne ou Desktop persistée
         const storedSession = localStorage.getItem('acom_offline_session');
         const isOffline = !navigator.onLine;
-        const isElectron = typeof (window as any).electronAPI !== 'undefined';
+        const isElectronEnv = typeof window !== 'undefined' && (
+          (window.process && (window.process as any).type) || 
+          (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
+          (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol)) ||
+          (typeof (window as any).electronAPI !== 'undefined')
+        );
 
-        if (storedSession && (isOffline || isElectron)) {
-          console.log('AuthContext: Firebase returned null but offline or Electron is active. Keeping current session.');
+        console.log('[DIAGNOSTIC] onAuthStateChanged: Firebase a renvoyé un utilisateur null. isRestoringRef:', isRestoringRef.current, 'storedSession existe:', !!storedSession, 'isOffline:', isOffline, 'isElectron:', isElectronEnv);
+
+        if (storedSession && (isOffline || isElectronEnv)) {
+          console.log('[DIAGNOSTIC] Firebase a renvoyé null mais hors-ligne ou Electron est actif. Conservation de la session actuelle.');
           try {
             const session = JSON.parse(storedSession);
             setUser(session.user);
@@ -325,13 +399,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setCustomClaims(session.customClaims);
             setLoading(false);
           } catch (e) {
-            console.error('Error parsing offline session:', e);
+            console.error('[DIAGNOSTIC] Échec de l\'analyse de la session hors-ligne:', e);
             setUser(null);
             setProfile(null);
             setCustomClaims(null);
             setLoading(false);
           }
         } else {
+          console.log('[DIAGNOSTIC] Déconnexion complète : pas de session hors-ligne valide ou pas dans les conditions requises (offline/Electron).');
           setUser(null);
           setProfile(null);
           setCustomClaims(null);
