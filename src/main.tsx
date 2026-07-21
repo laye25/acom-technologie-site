@@ -14,11 +14,11 @@ if (typeof window !== 'undefined') {
   }
 }
 
-import {StrictMode, useEffect, useState} from 'react';
+import {StrictMode, useEffect, useState, Suspense, lazy} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
 import './index.css';
 import { initSQLite } from './services/sqliteService';
+import { desktopSessionManager } from './services/desktopSessionManager';
 
 // Expose TypeScript typing for our custom electronAPI
 interface ElectronAPI {
@@ -129,22 +129,35 @@ if (import.meta.env.DEV) {
   });
 }
 
+const LazyApp = lazy(() => import('./App.tsx'));
+
 function Main() {
-  const [isDbReady, setIsDbReady] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    initSQLite()
-      .then(() => {
-        setIsDbReady(true);
-      })
-      .catch((err) => {
+    async function initializeSystem() {
+      try {
+        // 1. Desktop Session Manager: Restore Firebase session into IndexedDB BEFORE Firebase Auth loads.
+        // This ensures session persistence across origin changes (e.g. file:// to app://localhost).
+        await desktopSessionManager.restoreSessionBeforeFirebaseInit();
+      } catch (err) {
+        console.warn('Session restoration skipped or failed:', err);
+      }
+
+      try {
+        // 2. Initialize SQLite
+        await initSQLite();
+      } catch (err) {
         console.error('Failed to initialize SQLite database:', err);
-        // Fallback to true so the app does not remain completely blocked on failure
-        setIsDbReady(true);
-      });
+      }
+      
+      setIsReady(true);
+    }
+    
+    initializeSystem();
   }, []);
 
-  if (!isDbReady) {
+  if (!isReady) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans">
         <div className="w-12 h-12 border-4 border-[#3a5ccc] border-t-transparent rounded-full animate-spin"></div>
@@ -155,7 +168,9 @@ function Main() {
 
   return (
     <StrictMode>
-      <App />
+      <Suspense fallback={null}>
+        <LazyApp />
+      </Suspense>
     </StrictMode>
   );
 }
