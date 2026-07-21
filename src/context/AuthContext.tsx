@@ -468,15 +468,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('acom_offline_session');
     localStorage.removeItem('acom_offline_profile');
     localStorage.removeItem('acom_offline_hash');
+    localStorage.removeItem('acom_offline_email');
+    localStorage.removeItem('acom_offline_password_b64');
     
     // Nettoyer également les paramètres physiques sur Desktop au logout
     const electronAPI = (window as any).electronAPI;
-    if (electronAPI?.saveDesktopSettings) {
+    if (electronAPI?.saveDesktopSettings && electronAPI?.getDesktopSettings) {
       try {
-        await electronAPI.saveDesktopSettings({});
+        const result = await electronAPI.getDesktopSettings();
+        const settings = result?.settings || {};
+        delete settings.savedEmail;
+        delete settings.savedPassword;
+        delete settings.acom_offline_session;
+        delete settings.acom_offline_profile;
+        delete settings.acom_offline_hash;
+        delete settings.firebase_session;
+        await electronAPI.saveDesktopSettings(settings);
       } catch (err) {
-        console.error('Failed to clear desktop settings file:', err);
+        console.error('Failed to clear desktop auth settings:', err);
       }
+    } else if (electronAPI?.saveDesktopSettings) {
+      await electronAPI.saveDesktopSettings({});
     }
 
     await firebaseSignOut(auth);
