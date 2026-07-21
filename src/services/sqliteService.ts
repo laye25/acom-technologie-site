@@ -6,6 +6,20 @@ import { Capacitor } from '@capacitor/core';
 let db: any = null;
 let sqlite3Obj: any = null;
 let nativeDbConnection: SQLiteDBConnection | null = null;
+let hooksRegistered = false;
+let syncTimeout: any = null;
+
+export const debouncedSyncPhysicalFile = () => {
+  if (syncTimeout) {
+    clearTimeout(syncTimeout);
+  }
+  syncTimeout = setTimeout(() => {
+    syncPhysicalFile().catch(err => {
+      console.error('SQLite: Failed to run debounced physical file sync:', err);
+    });
+  }, 200);
+};
+
 const sqlitePlugin = new SQLiteConnection(CapacitorSQLite);
 const isNative = Capacitor.isNativePlatform();
 
@@ -133,9 +147,12 @@ export const initSQLite = async () => {
     const needsPopulate = localStorage.getItem('acom_desktop_needs_dexie_populate');
     if (needsPopulate === 'true') {
       localStorage.removeItem('acom_desktop_needs_dexie_populate');
-      populateDexieFromSQLite().catch(err => {
+      try {
+        await populateDexieFromSQLite();
+        console.log('SQLite init: Successfully populated Dexie from restored SQLite db synchronously.');
+      } catch (err) {
         console.error('SQLite init: Failed to populate Dexie from restored SQLite db:', err);
-      });
+      }
     }
 
     // Create tables if they don't exist
@@ -198,15 +215,88 @@ export const initSQLite = async () => {
           });
           if (results && results[0] && results[0].count > 0) {
             console.log(`SQLite init: Found ${results[0].count} products in SQLite. Restoring to Dexie automatically...`);
-            setTimeout(() => {
-              populateDexieFromSQLite().catch(err => {
-                console.error('SQLite init: Failed to automatically populate Dexie:', err);
-              });
-            }, 0);
+            await populateDexieFromSQLite();
           }
         }
       } catch (countErr) {
         console.warn('SQLite init: Automatic Dexie sanity check failed:', countErr);
+      }
+    }
+
+    // Register automatic Dexie -> SQLite mirroring hooks
+    // This ensures any Dexie writes (online Firestore pulls/syncs, background tasks, or local creations)
+    // are automatically and asynchronously written to the physical SQLite database on disk
+    if (isDesktop && !hooksRegistered) {
+      try {
+        const tablesToMirror = ['products', 'sales', 'expenses'];
+        tablesToMirror.forEach(tableName => {
+          const table = (dexieDb as any)[tableName];
+          if (!table) return;
+
+          table.hook('creating', (primKey: any, obj: any) => {
+            const id = primKey || obj.id;
+            if (!id) return;
+            
+            setTimeout(async () => {
+              try {
+                if (tableName === 'products') {
+                  await sqliteHelper.insertProduct({ ...obj, id });
+                } else if (tableName === 'sales') {
+                  await sqliteHelper.insertSale({ ...obj, id });
+                } else if (tableName === 'expenses') {
+                  await sqliteHelper.insertExpense({ ...obj, id });
+                }
+                debouncedSyncPhysicalFile();
+              } catch (err) {
+                console.error(`SQLite mirror hook error (creating ${tableName}):`, err);
+              }
+            }, 0);
+          });
+
+          table.hook('updating', (modifications: any, primKey: any, obj: any) => {
+            const id = primKey || obj.id;
+            if (!id) return;
+            const merged = { ...obj, ...modifications, id };
+            
+            setTimeout(async () => {
+              try {
+                if (tableName === 'products') {
+                  await sqliteHelper.insertProduct(merged);
+                } else if (tableName === 'sales') {
+                  await sqliteHelper.insertSale(merged);
+                } else if (tableName === 'expenses') {
+                  await sqliteHelper.insertExpense(merged);
+                }
+                debouncedSyncPhysicalFile();
+              } catch (err) {
+                console.error(`SQLite mirror hook error (updating ${tableName}):`, err);
+              }
+            }, 0);
+          });
+
+          table.hook('deleting', (primKey: any) => {
+            if (!primKey) return;
+            
+            setTimeout(async () => {
+              try {
+                if (tableName === 'products') {
+                  await executeSQL('DELETE FROM merchant_products WHERE id = ?', [primKey]);
+                } else if (tableName === 'sales') {
+                  await executeSQL('DELETE FROM merchant_sales WHERE id = ?', [primKey]);
+                } else if (tableName === 'expenses') {
+                  await executeSQL('DELETE FROM merchant_expenses WHERE id = ?', [primKey]);
+                }
+                debouncedSyncPhysicalFile();
+              } catch (err) {
+                console.error(`SQLite mirror hook error (deleting ${tableName}):`, err);
+              }
+            }, 0);
+          });
+        });
+        hooksRegistered = true;
+        console.log('SQLite: Dexie mirroring hooks registered successfully.');
+      } catch (hookErr) {
+        console.warn('SQLite: Failed to register Dexie mirroring hooks:', hookErr);
       }
     }
 
@@ -656,7 +746,7 @@ export const syncPhysicalFile = async () => {
 export const sqliteHelper = {
   async insertProduct(product: any) {
     await executeSQL(
-      'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         product.id,
         product.merchantId || product.merchant_id,
@@ -665,10 +755,12 @@ export const sqliteHelper = {
         product.category,
         product.stockQuantity || product.stock || 0,
         product.syncStatus,
-        product.updatedAt?.toString() || new Date().toISOString()
+        product.updatedAt?.toString() || new Date().toISOString(),
+        product.sizes ? (typeof product.sizes === 'string' ? product.sizes : JSON.stringify(product.sizes)) : null,
+        product.colors ? (typeof product.colors === 'string' ? product.colors : JSON.stringify(product.colors)) : null
       ]
     );
-    await syncPhysicalFile();
+    debouncedSyncPhysicalFile();
   },
 
   async insertSale(sale: any) {
@@ -683,7 +775,7 @@ export const sqliteHelper = {
         sale.createdAt?.toString() || new Date().toISOString()
       ]
     );
-    await syncPhysicalFile();
+    debouncedSyncPhysicalFile();
   },
 
   async insertExpense(expense: any) {
@@ -699,6 +791,6 @@ export const sqliteHelper = {
         expense.createdAt?.toString() || new Date().toISOString()
       ]
     );
-    await syncPhysicalFile();
+    debouncedSyncPhysicalFile();
   }
 };

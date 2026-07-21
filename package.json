@@ -32,7 +32,8 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Acom Gestion Desktop"
+      "shortcutName": "Acom Gestion Desktop",
+      "include": "desktop/installer.nsh"
     },
     "mac": {
       "target": [

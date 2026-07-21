@@ -60,8 +60,12 @@ function migrateDataToPersistentDir() {
     // Add explicit candidates for both the reference and modified product names
     const oldDirProduct1 = path.join(oldBaseDir, 'Acom Gestion Desktop');
     const oldDirProduct2 = path.join(oldBaseDir, 'Acom Gestion');
+    const oldDirProduct3 = path.join(oldBaseDir, 'AcomGestionDesktop');
+    const oldDirProduct4 = path.join(oldBaseDir, 'Acom_Gestion_Desktop');
+    const oldDirProduct5 = path.join(oldBaseDir, 'acom-gestion-desktop');
     const oldDirProduct1Sub = path.join(oldDirProduct1, 'AcomGestion');
     const oldDirProduct2Sub = path.join(oldDirProduct2, 'AcomGestion');
+    const oldDirProduct3Sub = path.join(oldDirProduct3, 'AcomGestion');
 
     // Create the new persistent folder if it doesn't exist
     if (!fs.existsSync(newDir)) {
@@ -74,12 +78,16 @@ function migrateDataToPersistentDir() {
       oldDir3, 
       oldDirProduct1, 
       oldDirProduct2, 
+      oldDirProduct3,
+      oldDirProduct4,
+      oldDirProduct5,
       oldDirProduct1Sub, 
-      oldDirProduct2Sub
+      oldDirProduct2Sub,
+      oldDirProduct3Sub
     ];
 
     for (const oldDir of migrationCandidates) {
-      if (oldDir === newDir) continue;
+      if (!oldDir || oldDir === newDir) continue;
 
       if (fs.existsSync(oldDir)) {
         console.log(`[MIGRATION] Scanning old directory: ${oldDir} for files...`);
@@ -87,17 +95,50 @@ function migrateDataToPersistentDir() {
         // Migrate database
         const oldDb = path.join(oldDir, 'data.sqlite');
         const newDb = path.join(newDir, 'data.sqlite');
-        if (fs.existsSync(oldDb) && !fs.existsSync(newDb)) {
-          fs.copyFileSync(oldDb, newDb);
-          console.log(`[MIGRATION] Successfully copied SQLite database from ${oldDb} to ${newDb}`);
+        if (fs.existsSync(oldDb)) {
+          let shouldCopy = false;
+          if (!fs.existsSync(newDb)) {
+            shouldCopy = true;
+          } else {
+            try {
+              const oldSize = fs.statSync(oldDb).size;
+              const newSize = fs.statSync(newDb).size;
+              // If the existing database is empty (0 bytes) or extremely small (< 4KB) and the old one is larger, overwrite it
+              if (newSize === 0 || (oldSize > newSize && newSize < 4096)) {
+                shouldCopy = true;
+                console.log(`[MIGRATION] Overwriting empty or small new database (${newSize} bytes) with old database (${oldSize} bytes)`);
+              }
+            } catch (statErr) {
+              console.error('[MIGRATION] Error reading file sizes:', statErr);
+            }
+          }
+          if (shouldCopy) {
+            fs.copyFileSync(oldDb, newDb);
+            console.log(`[MIGRATION] Successfully copied SQLite database from ${oldDb} to ${newDb}`);
+          }
         }
         
         // Migrate settings
         const oldSettings = path.join(oldDir, 'desktop_settings.json');
         const newSettings = path.join(newDir, 'desktop_settings.json');
-        if (fs.existsSync(oldSettings) && !fs.existsSync(newSettings)) {
-          fs.copyFileSync(oldSettings, newSettings);
-          console.log(`[MIGRATION] Successfully copied desktop settings from ${oldSettings} to ${newSettings}`);
+        if (fs.existsSync(oldSettings)) {
+          let shouldCopySettings = false;
+          if (!fs.existsSync(newSettings)) {
+            shouldCopySettings = true;
+          } else {
+            try {
+              const oldSize = fs.statSync(oldSettings).size;
+              const newSize = fs.statSync(newSettings).size;
+              if (newSize <= 2 && oldSize > newSize) { // effectively empty or empty json {}
+                shouldCopySettings = true;
+                console.log(`[MIGRATION] Overwriting empty new settings with old settings`);
+              }
+            } catch (_) {}
+          }
+          if (shouldCopySettings) {
+            fs.copyFileSync(oldSettings, newSettings);
+            console.log(`[MIGRATION] Successfully copied desktop settings from ${oldSettings} to ${newSettings}`);
+          }
         }
       }
     }

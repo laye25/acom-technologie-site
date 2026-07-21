@@ -14,7 +14,7 @@ if (typeof window !== 'undefined') {
   }
 }
 
-import {StrictMode, useEffect} from 'react';
+import {StrictMode, useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
@@ -130,9 +130,28 @@ if (import.meta.env.DEV) {
 }
 
 function Main() {
+  const [isDbReady, setIsDbReady] = useState(false);
+
   useEffect(() => {
-    initSQLite().catch(console.error);
+    initSQLite()
+      .then(() => {
+        setIsDbReady(true);
+      })
+      .catch((err) => {
+        console.error('Failed to initialize SQLite database:', err);
+        // Fallback to true so the app does not remain completely blocked on failure
+        setIsDbReady(true);
+      });
   }, []);
+
+  if (!isDbReady) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans">
+        <div className="w-12 h-12 border-4 border-[#3a5ccc] border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm font-medium text-slate-600">Initialisation de la base de données sécurisée...</p>
+      </div>
+    );
+  }
 
   return (
     <StrictMode>
