@@ -730,7 +730,7 @@ export const ensureSQLiteReady = async (logs?: string[]): Promise<boolean> => {
       logs.push('Le moteur SQLite n\'est pas encore initialisé.');
       logs.push('Initialisation automatique en cours... Veuillez patienter.');
     }
-    await initSQLite();
+    await initSQLite(logs);
   }
 
   const isReady = checkLoaded();
@@ -870,7 +870,7 @@ export const restoreSQLiteDB = async (file: File, currentMerchantId?: string): P
       logs.push('Le moteur SQLite n\'est pas encore initialisé.');
       logs.push('Initialisation automatique en cours... Veuillez patienter.');
       await new Promise(r => setTimeout(r, 300));
-      await initSQLite();
+      await initSQLite(logs);
       isReady = await ensureSQLiteReady(logs);
     }
 
