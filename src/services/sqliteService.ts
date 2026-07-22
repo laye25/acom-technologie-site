@@ -8,6 +8,7 @@ let sqlite3Obj: any = null;
 let nativeDbConnection: SQLiteDBConnection | null = null;
 let hooksRegistered = false;
 let syncTimeout: any = null;
+let initPromise: Promise<any> | null = null;
 
 export const debouncedSyncPhysicalFile = () => {
   if (syncTimeout) {
@@ -25,16 +26,142 @@ const isNative = Capacitor.isNativePlatform();
 
 export const initSQLite = async () => {
   if (db) return db;
+  if (initPromise) return initPromise;
 
-  if (isNative) {
+  initPromise = (async () => {
+    if (isNative) {
+      try {
+        console.log('Initializing native Capacitor SQLite...');
+        nativeDbConnection = await sqlitePlugin.createConnection('acom_studio', false, 'no-encryption', 1, false);
+        await nativeDbConnection.open();
+        db = nativeDbConnection;
+        
+        // Setup tables for native
+        await db.execute(`
+          CREATE TABLE IF NOT EXISTS merchant_products (
+            id TEXT PRIMARY KEY,
+            merchantId TEXT,
+            name TEXT,
+            price REAL,
+            category TEXT,
+            stock INTEGER,
+            syncStatus TEXT,
+            updatedAt TEXT,
+            sizes TEXT,
+            colors TEXT
+          );
+
+          CREATE TABLE IF NOT EXISTS merchant_sales (
+            id TEXT PRIMARY KEY,
+            merchantId TEXT,
+            total REAL,
+            items TEXT,
+            syncStatus TEXT,
+            createdAt TEXT
+          );
+
+          CREATE TABLE IF NOT EXISTS merchant_expenses (
+            id TEXT PRIMARY KEY,
+            merchantId TEXT,
+            title TEXT,
+            amount REAL,
+            category TEXT,
+            syncStatus TEXT,
+            createdAt TEXT
+          );
+        `);
+        return db;
+      } catch (e) {
+        console.error('Failed to init native SQLite:', e);
+        return null;
+      }
+    }
+
+    // Fallback to WASM
     try {
-      console.log('Initializing native Capacitor SQLite...');
-      nativeDbConnection = await sqlitePlugin.createConnection('acom_studio', false, 'no-encryption', 1, false);
-      await nativeDbConnection.open();
-      db = nativeDbConnection;
-      
-      // Setup tables for native
-      await db.execute(`
+      if (!sqlite3Obj) {
+        const sqlite3 = await (sqlite3InitModule as any)({
+          print: console.log,
+          printErr: console.error,
+          locateFile: (file: string) => {
+            const isDesktop = typeof window !== 'undefined' && (
+              ('__TAURI__' in window) || 
+              (window.process && (window.process as any).type) || 
+              (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
+              (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
+            );
+            if (isDesktop) {
+              if (file.endsWith('.wasm')) {
+                return '/sqlite3.wasm';
+              }
+              return `/${file}`;
+            }
+            if (file.endsWith('.wasm')) {
+              return '/sqlite3.wasm';
+            }
+            return `/${file}`;
+          }
+        });
+
+        sqlite3Obj = sqlite3;
+        console.log('SQLite loaded. Version:', sqlite3.version?.libVersion || 'Inconnue');
+      }
+
+      // Restauration automatique du fichier de base de données physique sur Desktop (si non fait lors du démarrage initial)
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI && typeof electronAPI.loadPhysicalDbFile === 'function') {
+        const dataRestored = localStorage.getItem('acom_desktop_data_restored');
+        if (!dataRestored) {
+          try {
+            console.log('SQLite init: Tentative de restauration de la base de données physique de sauvegarde...');
+            const response = await electronAPI.loadPhysicalDbFile();
+            if (response && response.success && response.data) {
+              if ('opfs' in sqlite3Obj) {
+                const root = await navigator.storage.getDirectory();
+                const fileHandle = await root.getFileHandle('acom_studio.sqlite3', { create: true });
+                const writable = await (fileHandle as any).createWritable();
+                await writable.write(new Uint8Array(response.data));
+                await writable.close();
+                console.log('SQLite init: Restauration réussie du fichier OPFS depuis la base de données physique.');
+                localStorage.setItem('acom_desktop_data_restored', 'true');
+                localStorage.setItem('acom_desktop_needs_dexie_populate', 'true');
+              }
+            } else {
+              console.log('SQLite init: Aucun fichier physique de base de données trouvé. Initialisation standard.');
+              localStorage.setItem('acom_desktop_data_restored', 'true');
+            }
+          } catch (err) {
+            console.error('SQLite init: Erreur durant la restauration automatique du fichier physique:', err);
+          }
+        }
+      }
+
+      if ('opfs' in sqlite3Obj) {
+        try {
+          db = new sqlite3Obj.oo1.OpfsDb('/acom_studio.sqlite3');
+          console.log('Using OPFS for SQLite persistence');
+        } catch (opfsErr) {
+          console.warn('Failed to construct OpfsDb, falling back to in-memory oo1.DB:', opfsErr);
+          db = new sqlite3Obj.oo1.DB('/acom_studio.sqlite3', 'ct');
+        }
+      } else {
+        db = new sqlite3Obj.oo1.DB('/acom_studio.sqlite3', 'ct');
+        console.log('Using transient/In-memory store (Fallthrough)');
+      }
+
+      const needsPopulate = localStorage.getItem('acom_desktop_needs_dexie_populate');
+      if (needsPopulate === 'true') {
+        localStorage.removeItem('acom_desktop_needs_dexie_populate');
+        try {
+          await populateDexieFromSQLite();
+          console.log('SQLite init: Successfully populated Dexie from restored SQLite db synchronously.');
+        } catch (err) {
+          console.error('SQLite init: Failed to populate Dexie from restored SQLite db:', err);
+        }
+      }
+
+      // Create tables if they don't exist
+      db.exec(`
         CREATE TABLE IF NOT EXISTS merchant_products (
           id TEXT PRIMARY KEY,
           merchantId TEXT,
@@ -67,244 +194,125 @@ export const initSQLite = async () => {
           createdAt TEXT
         );
       `);
+
+      // Run safe migrations for existing desktop databases
+      try {
+        db.exec("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
+      } catch (_) {}
+      try {
+        db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
+      } catch (_) {}
+
+      // Sanity check: if Dexie is completely empty on Electron, but the physical file contains products, populate Dexie automatically
+      const isDesktop = typeof window !== 'undefined' && (window as any).electronAPI;
+      if (isDesktop) {
+        try {
+          const prodCount = await dexieDb.products.count();
+          if (prodCount === 0) {
+            console.log('SQLite init: Dexie is empty on Desktop. Checking if SQLite contains data...');
+            const results: any[] = [];
+            db.exec({
+              sql: 'SELECT COUNT(*) as count FROM merchant_products',
+              rowMode: 'object',
+              callback: (row: any) => {
+                results.push(row);
+              }
+            });
+            if (results && results[0] && results[0].count > 0) {
+              console.log(`SQLite init: Found ${results[0].count} products in SQLite. Restoring to Dexie automatically...`);
+              await populateDexieFromSQLite();
+            }
+          }
+        } catch (countErr) {
+          console.warn('SQLite init: Automatic Dexie sanity check failed:', countErr);
+        }
+      }
+
+      // Register automatic Dexie -> SQLite mirroring hooks
+      if (isDesktop && !hooksRegistered) {
+        try {
+          const tablesToMirror = ['products', 'sales', 'expenses'];
+          tablesToMirror.forEach(tableName => {
+            const table = (dexieDb as any)[tableName];
+            if (!table) return;
+
+            table.hook('creating', (primKey: any, obj: any) => {
+              const id = primKey || obj.id;
+              if (!id) return;
+              
+              setTimeout(async () => {
+                try {
+                  if (tableName === 'products') {
+                    await sqliteHelper.insertProduct({ ...obj, id });
+                  } else if (tableName === 'sales') {
+                    await sqliteHelper.insertSale({ ...obj, id });
+                  } else if (tableName === 'expenses') {
+                    await sqliteHelper.insertExpense({ ...obj, id });
+                  }
+                  debouncedSyncPhysicalFile();
+                } catch (err) {
+                  console.error(`SQLite mirror hook error (creating ${tableName}):`, err);
+                }
+              }, 0);
+            });
+
+            table.hook('updating', (modifications: any, primKey: any, obj: any) => {
+              const id = primKey || obj.id;
+              if (!id) return;
+              const merged = { ...obj, ...modifications, id };
+              
+              setTimeout(async () => {
+                try {
+                  if (tableName === 'products') {
+                    await sqliteHelper.insertProduct(merged);
+                  } else if (tableName === 'sales') {
+                    await sqliteHelper.insertSale(merged);
+                  } else if (tableName === 'expenses') {
+                    await sqliteHelper.insertExpense(merged);
+                  }
+                  debouncedSyncPhysicalFile();
+                } catch (err) {
+                  console.error(`SQLite mirror hook error (updating ${tableName}):`, err);
+                }
+              }, 0);
+            });
+
+            table.hook('deleting', (primKey: any) => {
+              if (!primKey) return;
+              
+              setTimeout(async () => {
+                try {
+                  if (tableName === 'products') {
+                    await executeSQL('DELETE FROM merchant_products WHERE id = ?', [primKey]);
+                  } else if (tableName === 'sales') {
+                    await executeSQL('DELETE FROM merchant_sales WHERE id = ?', [primKey]);
+                  } else if (tableName === 'expenses') {
+                    await executeSQL('DELETE FROM merchant_expenses WHERE id = ?', [primKey]);
+                  }
+                  debouncedSyncPhysicalFile();
+                } catch (err) {
+                  console.error(`SQLite mirror hook error (deleting ${tableName}):`, err);
+                }
+              }, 0);
+            });
+          });
+          hooksRegistered = true;
+          console.log('SQLite: Dexie mirroring hooks registered successfully.');
+        } catch (hookErr) {
+          console.warn('SQLite: Failed to register Dexie mirroring hooks:', hookErr);
+        }
+      }
+
       return db;
     } catch (e) {
-      console.error('Failed to init native SQLite:', e);
+      console.error('Failed to init SQLite:', e);
       return null;
+    } finally {
+      initPromise = null;
     }
-  }
+  })();
 
-  // Fallback to WASM
-  try {
-    const sqlite3 = await (sqlite3InitModule as any)({
-      print: console.log,
-      printErr: console.error,
-      locateFile: (file: string) => {
-        const isDesktop = typeof window !== 'undefined' && (
-          ('__TAURI__' in window) || 
-          (window.process && (window.process as any).type) || 
-          (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
-          (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
-        );
-        if (isDesktop) {
-          if (file.endsWith('.wasm')) {
-            return '/sqlite3.wasm';
-          }
-          return `/${file}`;
-        }
-        if (file.endsWith('.wasm')) {
-          return '/sqlite3.wasm';
-        }
-        return `/${file}`;
-      }
-    });
-
-    sqlite3Obj = sqlite3;
-    console.log('SQLite loaded. Version:', sqlite3.version.libVersion);
-
-    // Restauration automatique du fichier de base de données physique sur Desktop (si non fait lors du démarrage initial)
-    const electronAPI = (window as any).electronAPI;
-    if (electronAPI && typeof electronAPI.loadPhysicalDbFile === 'function') {
-      const dataRestored = localStorage.getItem('acom_desktop_data_restored');
-      if (!dataRestored) {
-        try {
-          console.log('SQLite init: Tentative de restauration de la base de données physique de sauvegarde...');
-          const response = await electronAPI.loadPhysicalDbFile();
-          if (response && response.success && response.data) {
-            if ('opfs' in sqlite3) {
-              const root = await navigator.storage.getDirectory();
-              const fileHandle = await root.getFileHandle('acom_studio.sqlite3', { create: true });
-              const writable = await (fileHandle as any).createWritable();
-              await writable.write(new Uint8Array(response.data));
-              await writable.close();
-              console.log('SQLite init: Restauration réussie du fichier OPFS depuis la base de données physique.');
-              localStorage.setItem('acom_desktop_data_restored', 'true');
-              localStorage.setItem('acom_desktop_needs_dexie_populate', 'true');
-            }
-          } else {
-            console.log('SQLite init: Aucun fichier physique de base de données trouvé. Initialisation standard.');
-            localStorage.setItem('acom_desktop_data_restored', 'true');
-          }
-        } catch (err) {
-          console.error('SQLite init: Erreur durant la restauration automatique du fichier physique:', err);
-        }
-      }
-    }
-
-    if ('opfs' in sqlite3) {
-      try {
-        db = new sqlite3.oo1.OpfsDb('/acom_studio.sqlite3');
-        console.log('Using OPFS for SQLite persistence');
-      } catch (opfsErr) {
-        console.warn('Failed to construct OpfsDb, falling back to in-memory oo1.DB:', opfsErr);
-        db = new sqlite3.oo1.DB('/acom_studio.sqlite3', 'ct');
-      }
-    } else {
-      db = new sqlite3.oo1.DB('/acom_studio.sqlite3', 'ct');
-      console.log('Using transient/In-memory store (Fallthrough)');
-    }
-
-    const needsPopulate = localStorage.getItem('acom_desktop_needs_dexie_populate');
-    if (needsPopulate === 'true') {
-      localStorage.removeItem('acom_desktop_needs_dexie_populate');
-      try {
-        await populateDexieFromSQLite();
-        console.log('SQLite init: Successfully populated Dexie from restored SQLite db synchronously.');
-      } catch (err) {
-        console.error('SQLite init: Failed to populate Dexie from restored SQLite db:', err);
-      }
-    }
-
-    // Create tables if they don't exist
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS merchant_products (
-        id TEXT PRIMARY KEY,
-        merchantId TEXT,
-        name TEXT,
-        price REAL,
-        category TEXT,
-        stock INTEGER,
-        syncStatus TEXT,
-        updatedAt TEXT,
-        sizes TEXT,
-        colors TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS merchant_sales (
-        id TEXT PRIMARY KEY,
-        merchantId TEXT,
-        total REAL,
-        items TEXT,
-        syncStatus TEXT,
-        createdAt TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS merchant_expenses (
-        id TEXT PRIMARY KEY,
-        merchantId TEXT,
-        title TEXT,
-        amount REAL,
-        category TEXT,
-        syncStatus TEXT,
-        createdAt TEXT
-      );
-    `);
-
-    // Run safe migrations for existing desktop databases
-    try {
-      db.exec("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
-    } catch (_) {}
-    try {
-      db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
-    } catch (_) {}
-
-    // Sanity check: if Dexie is completely empty on Electron, but the physical file contains products, populate Dexie automatically
-    const isDesktop = typeof window !== 'undefined' && (window as any).electronAPI;
-    if (isDesktop) {
-      try {
-        const prodCount = await dexieDb.products.count();
-        if (prodCount === 0) {
-          console.log('SQLite init: Dexie is empty on Desktop. Checking if SQLite contains data...');
-          const results: any[] = [];
-          db.exec({
-            sql: 'SELECT COUNT(*) as count FROM merchant_products',
-            rowMode: 'object',
-            callback: (row: any) => {
-              results.push(row);
-            }
-          });
-          if (results && results[0] && results[0].count > 0) {
-            console.log(`SQLite init: Found ${results[0].count} products in SQLite. Restoring to Dexie automatically...`);
-            await populateDexieFromSQLite();
-          }
-        }
-      } catch (countErr) {
-        console.warn('SQLite init: Automatic Dexie sanity check failed:', countErr);
-      }
-    }
-
-    // Register automatic Dexie -> SQLite mirroring hooks
-    // This ensures any Dexie writes (online Firestore pulls/syncs, background tasks, or local creations)
-    // are automatically and asynchronously written to the physical SQLite database on disk
-    if (isDesktop && !hooksRegistered) {
-      try {
-        const tablesToMirror = ['products', 'sales', 'expenses'];
-        tablesToMirror.forEach(tableName => {
-          const table = (dexieDb as any)[tableName];
-          if (!table) return;
-
-          table.hook('creating', (primKey: any, obj: any) => {
-            const id = primKey || obj.id;
-            if (!id) return;
-            
-            setTimeout(async () => {
-              try {
-                if (tableName === 'products') {
-                  await sqliteHelper.insertProduct({ ...obj, id });
-                } else if (tableName === 'sales') {
-                  await sqliteHelper.insertSale({ ...obj, id });
-                } else if (tableName === 'expenses') {
-                  await sqliteHelper.insertExpense({ ...obj, id });
-                }
-                debouncedSyncPhysicalFile();
-              } catch (err) {
-                console.error(`SQLite mirror hook error (creating ${tableName}):`, err);
-              }
-            }, 0);
-          });
-
-          table.hook('updating', (modifications: any, primKey: any, obj: any) => {
-            const id = primKey || obj.id;
-            if (!id) return;
-            const merged = { ...obj, ...modifications, id };
-            
-            setTimeout(async () => {
-              try {
-                if (tableName === 'products') {
-                  await sqliteHelper.insertProduct(merged);
-                } else if (tableName === 'sales') {
-                  await sqliteHelper.insertSale(merged);
-                } else if (tableName === 'expenses') {
-                  await sqliteHelper.insertExpense(merged);
-                }
-                debouncedSyncPhysicalFile();
-              } catch (err) {
-                console.error(`SQLite mirror hook error (updating ${tableName}):`, err);
-              }
-            }, 0);
-          });
-
-          table.hook('deleting', (primKey: any) => {
-            if (!primKey) return;
-            
-            setTimeout(async () => {
-              try {
-                if (tableName === 'products') {
-                  await executeSQL('DELETE FROM merchant_products WHERE id = ?', [primKey]);
-                } else if (tableName === 'sales') {
-                  await executeSQL('DELETE FROM merchant_sales WHERE id = ?', [primKey]);
-                } else if (tableName === 'expenses') {
-                  await executeSQL('DELETE FROM merchant_expenses WHERE id = ?', [primKey]);
-                }
-                debouncedSyncPhysicalFile();
-              } catch (err) {
-                console.error(`SQLite mirror hook error (deleting ${tableName}):`, err);
-              }
-            }, 0);
-          });
-        });
-        hooksRegistered = true;
-        console.log('SQLite: Dexie mirroring hooks registered successfully.');
-      } catch (hookErr) {
-        console.warn('SQLite: Failed to register Dexie mirroring hooks:', hookErr);
-      }
-    }
-
-    return db;
-  } catch (e) {
-    console.error('Failed to init SQLite:', e);
-    return null;
-  }
+  return initPromise;
 };
 
 export const getSQLiteDB = () => db;
@@ -659,8 +667,51 @@ export const populateDexieFromSQLite = async (currentMerchantId?: string) => {
   }
 };
 
+export const ensureSQLiteReady = async (logs?: string[]): Promise<boolean> => {
+  if (logs) {
+    logs.push('[SQLite]');
+    logs.push('Initialisation...');
+  }
+
+  const isAlreadyLoaded = db && (isNative || (sqlite3Obj && sqlite3Obj.capi && sqlite3Obj.oo1 && sqlite3Obj.wasm));
+
+  if (!isAlreadyLoaded) {
+    if (logs) {
+      logs.push('Le moteur SQLite n\'est pas encore initialisé. Initialisation automatique en cours... Veuillez patienter.');
+    }
+    await initSQLite();
+  }
+
+  const isReady = db && (isNative || (sqlite3Obj && sqlite3Obj.capi && sqlite3Obj.oo1 && sqlite3Obj.wasm));
+
+  if (!isReady) {
+    if (logs) {
+      logs.push('[SQLite] ERREUR FATALE : Moteur SQLite non initialisé après tentative.');
+    }
+    return false;
+  }
+
+  if (logs) {
+    if (!isNative && sqlite3Obj) {
+      const version = sqlite3Obj.version?.libVersion || 'Inconnue';
+      const opfsAvailable = ('opfs' in sqlite3Obj) ? 'OK' : 'Non disponible (Fallthrough in-memory)';
+      logs.push('sqlite3.wasm chargé');
+      logs.push(`Version : ${version}`);
+      logs.push('Connexion ouverte : OK');
+      logs.push(`OPFS : ${opfsAvailable}`);
+      logs.push('Base active : acom_studio.sqlite3');
+    } else {
+      logs.push('Capacitor SQLite Native chargé : OK');
+      logs.push('Connexion ouverte : OK');
+      logs.push('Base active : acom_studio');
+    }
+  }
+
+  return true;
+};
+
 export const inspectSqliteBuffer = (uint8Array: Uint8Array) => {
-  if (!sqlite3Obj) {
+  if (!sqlite3Obj || !sqlite3Obj.capi || !sqlite3Obj.oo1 || !sqlite3Obj.wasm) {
     throw new Error("Moteur SQLite (WASM) non initialisé");
   }
 
@@ -761,8 +812,12 @@ export const restoreSQLiteDB = async (file: File, currentMerchantId?: string): P
   try {
     logs.push(`[RESTORE] Initialisation du processus de restauration pour : ${file.name}`);
 
-    if (!sqlite3Obj || !db) {
-      await initSQLite();
+    // GARANTIE SÉQUENTIELLE OBLIGATOIRE :
+    // S'assurer que le moteur SQLite WASM est entièrement initialisé et prêt
+    const isReady = await ensureSQLiteReady(logs);
+    if (!isReady) {
+      logs.push('[RESTORE] ERREUR : Le moteur SQLite (WASM) n\'est pas encore initialisé.');
+      return createFailureResult('Audit 1 - Fichier importé', 'Moteur SQLite (WASM) non initialisé');
     }
 
     // -------------------------------------------------------------
@@ -858,7 +913,7 @@ export const restoreSQLiteDB = async (file: File, currentMerchantId?: string): P
     logs.push('--------------------------------------------------');
     logs.push('[3. RÉOUVERTURE & VÉRIFICATION DB ACTIF]');
 
-    await initSQLite();
+    await ensureSQLiteReady();
     if (!db) {
       logs.push('[RESTORE] ERREUR : Connexion SQLite impossible après remplacement.');
       return createFailureResult('Audit 3 - Connexion SQLite', 'Impossible de rouvrir la base');
