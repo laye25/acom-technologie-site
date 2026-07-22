@@ -1,4 +1,5 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
+import { SQLITE3_WASM_BASE64, SQLITE3_WASM_BYTES_LENGTH, SQLITE3_WASM_SHA256 } from './sqlite3WasmData';
 import { db as dexieDb } from '../db/db';
 import { CapacitorSQLite, SQLiteConnection, SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { Capacitor } from '@capacitor/core';
@@ -145,62 +146,99 @@ export const initSQLite = async (logs?: string[]) => {
         }
 
         pushLog('[SQLite] Pré-chargement et audit du binaire WASM...');
-        for (const candidateUrl of candidates) {
-          try {
-            pushLog(`  -> Tentative fetch: ${candidateUrl}`);
-            const res = await fetch(candidateUrl);
-            if (res.ok) {
-              const buf = await res.arrayBuffer();
-              const u8 = new Uint8Array(buf);
-              
-              // 1. Audit Header Magic WASM : 0x00 0x61 0x73 0x6d 0x01 0x00 0x00 0x00 (\0asm\1\0\0\0)
-              const isWasmHeader = u8.length >= 8 &&
-                u8[0] === 0x00 && u8[1] === 0x61 && u8[2] === 0x73 && u8[3] === 0x6d &&
-                u8[4] === 0x01 && u8[5] === 0x00 && u8[6] === 0x00 && u8[7] === 0x00;
+        
+        // Source 1 : Binaire WASM embarqué dans le bundle JS (Zero-network / Anti-troncation Electron)
+        try {
+          pushLog('  -> Decodage du binaire WASM embarqué (Base64)...');
+          const binaryString = atob(SQLITE3_WASM_BASE64);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const embeddedBuf = bytes.buffer;
 
-              // 2. Audit strict du moteur WebAssembly du navigateur (WebAssembly.validate)
-              let isWasmValid = false;
-              if (typeof WebAssembly !== 'undefined' && typeof WebAssembly.validate === 'function') {
-                try {
-                  isWasmValid = WebAssembly.validate(buf);
-                } catch (vErr) {
-                  isWasmValid = false;
-                }
-              } else {
-                isWasmValid = isWasmHeader;
-              }
+          let isEmbeddedValid = false;
+          if (typeof WebAssembly !== 'undefined' && typeof WebAssembly.validate === 'function') {
+            isEmbeddedValid = WebAssembly.validate(embeddedBuf);
+          } else {
+            isEmbeddedValid = bytes.length === SQLITE3_WASM_BYTES_LENGTH && bytes[0] === 0x00 && bytes[1] === 0x61;
+          }
 
-              if (isWasmValid) {
-                wasmBinary = buf;
-                loadedUrl = candidateUrl;
+          if (isEmbeddedValid) {
+            wasmBinary = embeddedBuf;
+            loadedUrl = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host || 'localhost'}/sqlite3.wasm (Embedded Base64)` : 'app://localhost/sqlite3.wasm (Embedded Base64)';
+            
+            pushLog('----------------------------------------');
+            pushLog('Préchargement terminé');
+            pushLog(`URL utilisée : ${loadedUrl}`);
+            pushLog(`Octets reçus : ${wasmBinary.byteLength}`);
+            pushLog(`SHA-256 : ${SQLITE3_WASM_SHA256}`);
+            pushLog('Validation : OK');
+            pushLog('----------------------------------------');
+          } else {
+            pushLog('  -> Échec validation WebAssembly sur le binaire embarqué, bascule vers fetch...');
+          }
+        } catch (embeddedErr: any) {
+          pushLog(`  -> Erreur décodage binaire embarqué: ${embeddedErr?.message || embeddedErr}, bascule vers fetch...`);
+        }
+
+        // Source 2 (Fallback) : Recherche réseau si le binaire embarqué n'a pas pu être instancié
+        if (!wasmBinary) {
+          for (const candidateUrl of candidates) {
+            try {
+              pushLog(`  -> Tentative fetch: ${candidateUrl}`);
+              const res = await fetch(candidateUrl);
+              if (res.ok) {
+                const buf = await res.arrayBuffer();
+                const u8 = new Uint8Array(buf);
                 
-                // Calcul du SHA-256
-                let sha256Hex = 'Calcul en cours...';
-                try {
-                  if (typeof crypto !== 'undefined' && crypto.subtle && crypto.subtle.digest) {
-                    const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
-                    sha256Hex = Array.from(new Uint8Array(hashBuffer))
-                      .map(b => b.toString(16).padStart(2, '0'))
-                      .join('');
+                const isWasmHeader = u8.length >= 8 &&
+                  u8[0] === 0x00 && u8[1] === 0x61 && u8[2] === 0x73 && u8[3] === 0x6d &&
+                  u8[4] === 0x01 && u8[5] === 0x00 && u8[6] === 0x00 && u8[7] === 0x00;
+
+                let isWasmValid = false;
+                if (typeof WebAssembly !== 'undefined' && typeof WebAssembly.validate === 'function') {
+                  try {
+                    isWasmValid = WebAssembly.validate(buf);
+                  } catch (vErr) {
+                    isWasmValid = false;
                   }
-                } catch (hashErr) {
-                  sha256Hex = 'Indisponible';
+                } else {
+                  isWasmValid = isWasmHeader;
                 }
 
-                pushLog('----------------------------------------');
-                pushLog('Préchargement terminé');
-                pushLog(`URL utilisée : ${loadedUrl}`);
-                pushLog(`Octets reçus : ${buf.byteLength}`);
-                pushLog(`SHA-256 : ${sha256Hex}`);
-                pushLog('Validation : OK');
-                pushLog('----------------------------------------');
-                break;
-              } else {
-                pushLog(`  -> Échec WebAssembly.validate() sur ${candidateUrl} (${buf.byteLength} octets reçus, header: [${Array.from(u8.slice(0, 8)).join(', ')}]) - Réponse invalide / Fallback page SPA`);
+                if (isWasmValid) {
+                  wasmBinary = buf;
+                  loadedUrl = candidateUrl;
+                  
+                  let sha256Hex = 'Calcul en cours...';
+                  try {
+                    if (typeof crypto !== 'undefined' && crypto.subtle && crypto.subtle.digest) {
+                      const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
+                      sha256Hex = Array.from(new Uint8Array(hashBuffer))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join('');
+                    }
+                  } catch (hashErr) {
+                    sha256Hex = 'Indisponible';
+                  }
+
+                  pushLog('----------------------------------------');
+                  pushLog('Préchargement terminé');
+                  pushLog(`URL utilisée : ${loadedUrl}`);
+                  pushLog(`Octets reçus : ${buf.byteLength}`);
+                  pushLog(`SHA-256 : ${sha256Hex}`);
+                  pushLog('Validation : OK');
+                  pushLog('----------------------------------------');
+                  break;
+                } else {
+                  pushLog(`  -> Échec WebAssembly.validate() sur ${candidateUrl} (${buf.byteLength} octets reçus, header: [${Array.from(u8.slice(0, 8)).join(', ')}]) - Réponse invalide / Fallback page SPA`);
+                }
               }
+            } catch (fetchErr: any) {
+              pushLog(`  -> Échec fetch (${candidateUrl}): ${fetchErr?.message || fetchErr}`);
             }
-          } catch (fetchErr: any) {
-            pushLog(`  -> Échec fetch (${candidateUrl}): ${fetchErr?.message || fetchErr}`);
           }
         }
 
