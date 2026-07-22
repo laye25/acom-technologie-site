@@ -25,7 +25,9 @@ const sqlitePlugin = new SQLiteConnection(CapacitorSQLite);
 const isNative = Capacitor.isNativePlatform();
 
 export const initSQLite = async () => {
-  if (db) return db;
+  if (db && (isNative || (sqlite3Obj && sqlite3Obj.capi && sqlite3Obj.oo1 && sqlite3Obj.wasm))) {
+    return db;
+  }
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
@@ -673,16 +675,19 @@ export const ensureSQLiteReady = async (logs?: string[]): Promise<boolean> => {
     logs.push('Initialisation...');
   }
 
-  const isAlreadyLoaded = db && (isNative || (sqlite3Obj && sqlite3Obj.capi && sqlite3Obj.oo1 && sqlite3Obj.wasm));
+  const checkLoaded = () => {
+    return !!(db && (isNative || (sqlite3Obj && sqlite3Obj.capi && sqlite3Obj.oo1 && sqlite3Obj.wasm)));
+  };
 
-  if (!isAlreadyLoaded) {
+  if (!checkLoaded()) {
     if (logs) {
-      logs.push('Le moteur SQLite n\'est pas encore initialisé. Initialisation automatique en cours... Veuillez patienter.');
+      logs.push('Le moteur SQLite n\'est pas encore initialisé.');
+      logs.push('Initialisation automatique en cours... Veuillez patienter.');
     }
     await initSQLite();
   }
 
-  const isReady = db && (isNative || (sqlite3Obj && sqlite3Obj.capi && sqlite3Obj.oo1 && sqlite3Obj.wasm));
+  const isReady = checkLoaded();
 
   if (!isReady) {
     if (logs) {
@@ -695,7 +700,7 @@ export const ensureSQLiteReady = async (logs?: string[]): Promise<boolean> => {
     if (!isNative && sqlite3Obj) {
       const version = sqlite3Obj.version?.libVersion || 'Inconnue';
       const opfsAvailable = ('opfs' in sqlite3Obj) ? 'OK' : 'Non disponible (Fallthrough in-memory)';
-      logs.push('sqlite3.wasm chargé');
+      logs.push('sqlite3.wasm chargé : OK');
       logs.push(`Version : ${version}`);
       logs.push('Connexion ouverte : OK');
       logs.push(`OPFS : ${opfsAvailable}`);
@@ -814,7 +819,15 @@ export const restoreSQLiteDB = async (file: File, currentMerchantId?: string): P
 
     // GARANTIE SÉQUENTIELLE OBLIGATOIRE :
     // S'assurer que le moteur SQLite WASM est entièrement initialisé et prêt
-    const isReady = await ensureSQLiteReady(logs);
+    let isReady = await ensureSQLiteReady(logs);
+    if (!isReady) {
+      logs.push('Le moteur SQLite n\'est pas encore initialisé.');
+      logs.push('Initialisation automatique en cours... Veuillez patienter.');
+      await new Promise(r => setTimeout(r, 300));
+      await initSQLite();
+      isReady = await ensureSQLiteReady(logs);
+    }
+
     if (!isReady) {
       logs.push('[RESTORE] ERREUR : Le moteur SQLite (WASM) n\'est pas encore initialisé.');
       return createFailureResult('Audit 1 - Fichier importé', 'Moteur SQLite (WASM) non initialisé');
