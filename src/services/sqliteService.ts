@@ -110,9 +110,10 @@ export const initSQLite = async (logs?: string[]) => {
         pushLog(`[SQLite] Étape 3 : Chargement sqlite3.wasm (Target WASM: ${wasmLoc})`);
 
         let wasmBinary: ArrayBuffer | undefined = undefined;
+        let loadedUrl = '';
         const candidates = [
-          wasmLoc,
           '/sqlite3.wasm',
+          wasmLoc,
           './sqlite3.wasm',
           'sqlite3.wasm'
         ];
@@ -120,20 +121,44 @@ export const initSQLite = async (logs?: string[]) => {
           candidates.push(`${window.location.origin}/sqlite3.wasm`);
         }
 
-        pushLog('[SQLite] Pré-chargement du binaire WASM pour éviter la troncation de flux Electron/app://...');
+        pushLog('[SQLite] Pré-chargement et audit du binaire WASM...');
         for (const candidateUrl of candidates) {
           try {
             pushLog(`  -> Tentative fetch: ${candidateUrl}`);
             const res = await fetch(candidateUrl);
             if (res.ok) {
               const buf = await res.arrayBuffer();
-              pushLog(`  -> Reçu ${buf.byteLength} octets depuis ${candidateUrl}`);
-              if (buf.byteLength > 5000000) {
+              const u8 = new Uint8Array(buf);
+              // Vérification du Magic Header WASM: 0x00 0x61 0x73 0x6d (\0asm)
+              const isWasmHeader = u8.length >= 4 && u8[0] === 0x00 && u8[1] === 0x61 && u8[2] === 0x73 && u8[3] === 0x6d;
+              
+              if (isWasmHeader) {
                 wasmBinary = buf;
-                pushLog(`[SQLite] Étape 3 RÉUSSIE : Binaire WASM complet chargé (${buf.byteLength} octets)`);
+                loadedUrl = candidateUrl;
+                
+                // Calcul du SHA-256
+                let sha256Hex = 'Calcul en cours...';
+                try {
+                  if (typeof crypto !== 'undefined' && crypto.subtle && crypto.subtle.digest) {
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
+                    sha256Hex = Array.from(new Uint8Array(hashBuffer))
+                      .map(b => b.toString(16).padStart(2, '0'))
+                      .join('');
+                  }
+                } catch (hashErr) {
+                  sha256Hex = 'Indisponible';
+                }
+
+                pushLog('----------------------------------------');
+                pushLog('Préchargement terminé');
+                pushLog(`URL utilisée : ${loadedUrl}`);
+                pushLog(`Octets reçus : ${buf.byteLength}`);
+                pushLog(`SHA-256 : ${sha256Hex}`);
+                pushLog('Validation : OK (Magic bytes \\0asm validés)');
+                pushLog('----------------------------------------');
                 break;
               } else {
-                pushLog(`  -> Fichier partiel ou trop petit (${buf.byteLength} octets), essai suivant...`);
+                pushLog(`  -> Échec validation magic bytes sur ${candidateUrl} (${buf.byteLength} octets reçus, header: [${u8.slice(0, 4).join(', ')}]) - Fallback page SPA probable`);
               }
             }
           } catch (fetchErr: any) {
@@ -141,7 +166,13 @@ export const initSQLite = async (logs?: string[]) => {
           }
         }
 
-        pushLog('[SQLite] Étape 4 : Exécution sqlite3InitModule()...');
+        pushLog('[SQLite] Transmission à sqlite3InitModule()');
+        if (wasmBinary) {
+          pushLog(`  - wasmBinary : ${wasmBinary.byteLength} octets transmis directement à Emscripten`);
+        } else {
+          pushLog('  - ATTENTION: Aucun buffer WASM pré-chargé, tentative via fetch Emscripten interne');
+        }
+
         const initOptions: any = {
           print: (msg: any) => console.log('[sqlite-wasm]', msg),
           printErr: (msg: any) => console.error('[sqlite-wasm err]', msg),
@@ -160,13 +191,13 @@ export const initSQLite = async (logs?: string[]) => {
 
         if (wasmBinary) {
           initOptions.wasmBinary = wasmBinary;
-          pushLog('[SQLite] Passage direct de wasmBinary (ArrayBuffer) à Emscripten - Contournement fetch interne');
         }
 
         const sqlite3 = await (sqlite3InitModule as any)(initOptions);
 
         sqlite3Obj = sqlite3;
-        pushLog(`[SQLite] Étape 4 RÉUSSIE : sqlite3Obj créé. Version: ${sqlite3.version?.libVersion || 'Inconnue'}`);
+        pushLog('Compilation WASM : OK');
+        pushLog(`sqlite3Obj créé : OUI (Version: ${sqlite3.version?.libVersion || 'Inconnue'})`);
       } else {
         pushLog('[SQLite] Étape 4 : sqlite3Obj déjà existant en mémoire');
       }
