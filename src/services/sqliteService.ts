@@ -109,8 +109,40 @@ export const initSQLite = async (logs?: string[]) => {
         const wasmLoc = isFileProtocol ? './sqlite3.wasm' : '/sqlite3.wasm';
         pushLog(`[SQLite] Étape 3 : Chargement sqlite3.wasm (Target WASM: ${wasmLoc})`);
 
+        let wasmBinary: ArrayBuffer | undefined = undefined;
+        const candidates = [
+          wasmLoc,
+          '/sqlite3.wasm',
+          './sqlite3.wasm',
+          'sqlite3.wasm'
+        ];
+        if (typeof window !== 'undefined' && window.location && window.location.origin) {
+          candidates.push(`${window.location.origin}/sqlite3.wasm`);
+        }
+
+        pushLog('[SQLite] Pré-chargement du binaire WASM pour éviter la troncation de flux Electron/app://...');
+        for (const candidateUrl of candidates) {
+          try {
+            pushLog(`  -> Tentative fetch: ${candidateUrl}`);
+            const res = await fetch(candidateUrl);
+            if (res.ok) {
+              const buf = await res.arrayBuffer();
+              pushLog(`  -> Reçu ${buf.byteLength} octets depuis ${candidateUrl}`);
+              if (buf.byteLength > 5000000) {
+                wasmBinary = buf;
+                pushLog(`[SQLite] Étape 3 RÉUSSIE : Binaire WASM complet chargé (${buf.byteLength} octets)`);
+                break;
+              } else {
+                pushLog(`  -> Fichier partiel ou trop petit (${buf.byteLength} octets), essai suivant...`);
+              }
+            }
+          } catch (fetchErr: any) {
+            pushLog(`  -> Échec fetch (${candidateUrl}): ${fetchErr?.message || fetchErr}`);
+          }
+        }
+
         pushLog('[SQLite] Étape 4 : Exécution sqlite3InitModule()...');
-        const sqlite3 = await (sqlite3InitModule as any)({
+        const initOptions: any = {
           print: (msg: any) => console.log('[sqlite-wasm]', msg),
           printErr: (msg: any) => console.error('[sqlite-wasm err]', msg),
           locateFile: (file: string) => {
@@ -124,7 +156,14 @@ export const initSQLite = async (logs?: string[]) => {
             }
             return `/${file}`;
           }
-        });
+        };
+
+        if (wasmBinary) {
+          initOptions.wasmBinary = wasmBinary;
+          pushLog('[SQLite] Passage direct de wasmBinary (ArrayBuffer) à Emscripten - Contournement fetch interne');
+        }
+
+        const sqlite3 = await (sqlite3InitModule as any)(initOptions);
 
         sqlite3Obj = sqlite3;
         pushLog(`[SQLite] Étape 4 RÉUSSIE : sqlite3Obj créé. Version: ${sqlite3.version?.libVersion || 'Inconnue'}`);
