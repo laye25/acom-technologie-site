@@ -432,7 +432,8 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
-      if (response.ok) {
+      const resData = await response.json().catch(() => null);
+      if (response.ok && resData?.success !== false) {
         showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
         
         // Add to history
@@ -448,9 +449,9 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         localStorage.setItem(`pressing_manager_notifs_${merchant.id}`, JSON.stringify([newLog, ...currentNotifs]));
         return true;
       } else {
-        const errorData = await response.json().catch(() => null);
-        console.error('Failed to send background email to manager for sale:', errorData || response.statusText);
-        showAlert("Erreur d'envoi Email (Vente)", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
+        console.warn('Failed to send background email to manager for sale:', resData || response.statusText);
+        const errMsg = resData?.error ? ` (${resData.error})` : '';
+        toast.error(`Rapport e-mail de vente non envoyé${errMsg}`);
         return false;
       }
     } catch (err) {

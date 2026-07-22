@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, MapPin, Phone, Mail, Globe, Clock, Star, Package, Check, Share2, 
@@ -33,10 +33,20 @@ const DEFAULT_SAAS_PRODUCTS: Record<string, any[]> = {
   ]
 };
 
-export default function AcomZoneMerchant() {
-  const { merchantId } = useParams<{ merchantId: string }>();
+interface AcomZoneMerchantProps {
+  overrideMerchantId?: string;
+  overrideSaasType?: string;
+}
+
+export default function AcomZoneMerchant({ overrideMerchantId, overrideSaasType }: AcomZoneMerchantProps = {}) {
+  const params = useParams<{ merchantId: string }>();
+  const [searchParams] = useSearchParams();
+
+  const merchantId = overrideMerchantId || params.merchantId;
+  const urlSaas = overrideSaasType || searchParams.get('type') || searchParams.get('saas');
+  
   const [merchant, setMerchant] = useState<Merchant | null>(null);
-  const saasType = merchant?.type || 'boutique';
+  const saasType = urlSaas || merchant?.type || 'boutique';
   
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');

@@ -31,6 +31,7 @@ import {
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Merchant, MerchantSale, MerchantExpense } from '../types';
+import { RestoreResult } from '../services/sqliteService';
 import { triggerAcomAlert } from './AcomAlertEventProvider';
 import { sendEmailDirectlyOrViaBackend } from '../lib/api';
 import { GlobalActivityFeed } from './GlobalActivityFeed';
@@ -61,6 +62,7 @@ export const MerchantDashboard = ({
 }) => {
   const [desktopOS, setDesktopOS] = useState<'windows' | 'mac' | 'linux'>('windows');
   const [fileToRestore, setFileToRestore] = useState<File | null>(null);
+  const [restoreLogResult, setRestoreLogResult] = useState<RestoreResult | null>(null);
   const [dashboardSelectedMonth, setDashboardSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
 
   // Load tailleur-specific data if merchant type is tailleur
@@ -539,24 +541,134 @@ export const MerchantDashboard = ({
                 onClick={async () => {
                   const file = fileToRestore;
                   setFileToRestore(null);
-                  const toastId = toast.loading('Restauration et importation en cours...');
+                  const toastId = toast.loading('Restauration et analyse SQLite en cours...');
                   try {
                     const { restoreSQLiteDB } = await import('../services/sqliteService');
-                    const success = await restoreSQLiteDB(file);
-                    if (success) {
-                      toast.success('Restauration réussie ! Chargement des nouvelles données...', { id: toastId });
-                    } else {
-                      toast.error('Échec de la restauration (format .sqlite3 invalide)', { id: toastId });
-                    }
-                  } catch (err) {
+                    const result = await restoreSQLiteDB(file, merchant.id);
+                    toast.dismiss(toastId);
+                    setRestoreLogResult(result);
+                  } catch (err: any) {
                     console.error(err);
                     toast.error('Restauration impossible', { id: toastId });
+                    setRestoreLogResult({
+                      success: false,
+                      logs: [`[RESTORE] ERREUR FATALE : ${err.message || String(err)}`],
+                      importedCounts: { products: 0, sales: 0, expenses: 0 },
+                      copiedCounts: { products: 0, sales: 0, expenses: 0 },
+                      openedCounts: { products: 0, sales: 0, expenses: 0 },
+                      dexieCounts: { products: 0, sales: 0, expenses: 0 },
+                      dashboardCounts: { products: 0, sales: 0, expenses: 0 },
+                      activeDbPath: 'Erreur',
+                      detectedDbFiles: [],
+                      errorStep: 'Restauration globale',
+                      errorMessage: err.message || String(err)
+                    });
                   }
                 }}
                 className="flex-1 px-6 py-4 bg-rose-600 hover:bg-rose-700 rounded-2xl text-xs font-black uppercase tracking-widest text-white transition-all shadow-lg shadow-rose-600/10 hover:shadow-rose-600/20 active:scale-[0.98] cursor-pointer text-center"
               >
                 Confirmer l'import
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restoreLogResult && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="w-full max-w-2xl bg-slate-900 rounded-3xl shadow-2xl border border-slate-800 p-6 md:p-8 animate-in fade-in zoom-in-95 duration-200 text-slate-100 space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className={`p-3 rounded-2xl ${restoreLogResult.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                  {restoreLogResult.success ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+                </div>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight text-white">
+                    {restoreLogResult.success ? 'Restauration Réussie (Conformité 100%)' : `Échec : ${restoreLogResult.errorStep || 'Erreur'}`}
+                  </h3>
+                  <p className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                    Audit de Contrôle à 5 Niveaux [RESTORE]
+                  </p>
+                </div>
+              </div>
+              <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg font-mono ${restoreLogResult.success ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
+                {restoreLogResult.success ? 'SUCCÈS 100%' : 'ERREUR DIVERGENCE'}
+              </span>
+            </div>
+
+            {/* 5-Level Audit Comparison Table */}
+            <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3 font-mono text-xs">
+              <div className="text-[11px] font-bold uppercase text-slate-400 tracking-wider flex items-center justify-between">
+                <span>Tableau d'Audit des Enregistrements</span>
+                <span className="text-[10px] text-slate-500 font-normal">Base active : {restoreLogResult.activeDbPath}</span>
+              </div>
+
+              <div className="grid grid-cols-6 gap-1 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-800 pb-2">
+                <div>Table</div>
+                <div className="text-center">1. Importé</div>
+                <div className="text-center">2. Copié</div>
+                <div className="text-center">3. Ouvert</div>
+                <div className="text-center">4. Dexie</div>
+                <div className="text-center">5. Dashboard</div>
+              </div>
+
+              <div className="grid grid-cols-6 gap-1 text-slate-200 text-[11px] items-center">
+                <div className="font-bold text-emerald-400">Products</div>
+                <div className="text-center font-bold">{restoreLogResult.importedCounts.products}</div>
+                <div className="text-center font-bold">{restoreLogResult.copiedCounts.products}</div>
+                <div className="text-center font-bold">{restoreLogResult.openedCounts.products}</div>
+                <div className="text-center font-bold">{restoreLogResult.dexieCounts.products}</div>
+                <div className="text-center font-bold text-emerald-400">{restoreLogResult.dashboardCounts.products}</div>
+              </div>
+
+              <div className="grid grid-cols-6 gap-1 text-slate-200 text-[11px] items-center">
+                <div className="font-bold text-emerald-400">Sales</div>
+                <div className="text-center font-bold">{restoreLogResult.importedCounts.sales}</div>
+                <div className="text-center font-bold">{restoreLogResult.copiedCounts.sales}</div>
+                <div className="text-center font-bold">{restoreLogResult.openedCounts.sales}</div>
+                <div className="text-center font-bold">{restoreLogResult.dexieCounts.sales}</div>
+                <div className="text-center font-bold text-emerald-400">{restoreLogResult.dashboardCounts.sales}</div>
+              </div>
+
+              <div className="grid grid-cols-6 gap-1 text-slate-200 text-[11px] items-center">
+                <div className="font-bold text-emerald-400">Expenses</div>
+                <div className="text-center font-bold">{restoreLogResult.importedCounts.expenses}</div>
+                <div className="text-center font-bold">{restoreLogResult.copiedCounts.expenses}</div>
+                <div className="text-center font-bold">{restoreLogResult.openedCounts.expenses}</div>
+                <div className="text-center font-bold">{restoreLogResult.dexieCounts.expenses}</div>
+                <div className="text-center font-bold text-emerald-400">{restoreLogResult.dashboardCounts.expenses}</div>
+              </div>
+            </div>
+
+            {/* Complete Log Output Stream */}
+            <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 font-mono text-xs leading-relaxed overflow-x-auto max-h-60 space-y-1 shadow-inner select-all">
+              {restoreLogResult.logs.map((logLine, idx) => (
+                <div key={idx} className={logLine.includes('ERREUR') || logLine.includes('ÉCHEC') ? 'text-rose-400 font-bold' : logLine.startsWith('  ') ? 'text-slate-300 pl-3' : 'text-emerald-400'}>
+                  {logLine}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              {restoreLogResult.success ? (
+                <button
+                  onClick={() => {
+                    setRestoreLogResult(null);
+                    window.location.reload();
+                  }}
+                  className="w-full sm:w-auto px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 rounded-2xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Recharger le Tableau de Bord
+                </button>
+              ) : (
+                <button
+                  onClick={() => setRestoreLogResult(null)}
+                  className="w-full sm:w-auto px-8 py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
+                >
+                  Fermer
+                </button>
+              )}
             </div>
           </div>
         </div>

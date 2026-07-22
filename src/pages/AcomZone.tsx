@@ -316,7 +316,13 @@ function renderSaaSPurchasedContent(order: any, saasType?: string) {
             {details.items && (
               <div>
                 <span className="block text-gray-400 text-[10px] uppercase font-bold">Vêtements</span>
-                <span className="font-bold text-gray-800">{details.items}</span>
+                <span className="font-bold text-gray-800">
+                  {typeof details.items === 'string'
+                    ? details.items
+                    : Array.isArray(details.items)
+                      ? details.items.map((it: any) => typeof it === 'string' ? it : `${it.name || 'Article'} (x${it.quantity || 1})`).join(', ')
+                      : 'Articles à laver'}
+                </span>
               </div>
             )}
             {details.mode && (
@@ -1518,7 +1524,7 @@ export default function AcomZone() {
                                   return (
                                     <p className="text-gray-900 text-sm font-bold flex items-center gap-2">
                                       <ShoppingBag className="w-4 h-4 text-violet-500" />
-                                      {order.serviceName || order.details?.items || 'Articles divers'}
+                                      {order.serviceName || (typeof order.details?.items === 'string' ? order.details.items : 'Articles divers')}
                                     </p>
                                   );
                                 })()}
@@ -1818,7 +1824,7 @@ export default function AcomZone() {
                     return (
                       <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-sm font-bold text-gray-900 flex items-center gap-2">
                         <ShoppingBag className="w-5 h-5 text-violet-500" />
-                        {selectedOrderDetails.serviceName || selectedOrderDetails.details?.items || 'Articles divers'}
+                        {selectedOrderDetails.serviceName || (typeof selectedOrderDetails.details?.items === 'string' ? selectedOrderDetails.details.items : 'Articles divers')}
                       </div>
                     );
                   })()}

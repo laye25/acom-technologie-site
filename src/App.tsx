@@ -19,6 +19,7 @@ const MerchantSaaS = React.lazy(() => import('./pages/MerchantSaaS'));
 const DesignEditor = React.lazy(() => import('./pages/DesignEditor'));
 const AcomZone = React.lazy(() => import('./pages/AcomZone'));
 const AcomZoneMerchant = React.lazy(() => import('./pages/AcomZoneMerchant'));
+const SaaSRouter = React.lazy(() => import('./components/SaaSRouter'));
 const Chat = React.lazy(() => import('./pages/Chat'));
 const OrderDetails = React.lazy(() => import('./pages/OrderDetails'));
 const OrderQuote = React.lazy(() => import('./pages/OrderQuote'));
@@ -131,6 +132,16 @@ function AppContent() {
             <Route path="/solutions-saas" element={<SaaSSolutions />} />
             <Route path="/acomzone" element={<AcomZone />} />
             <Route path="/acomzone/:merchantId" element={<AcomZoneMerchant />} />
+
+            {/* Centralized SaaS Client Dashboards */}
+            <Route path="/merchant-dashboard" element={<SaaSRouter defaultType="stock" />} />
+            <Route path="/pressing-dashboard" element={<SaaSRouter defaultType="pressing" />} />
+            <Route path="/tailor-dashboard" element={<SaaSRouter defaultType="couture" />} />
+            <Route path="/medical-dashboard" element={<SaaSRouter defaultType="medical" />} />
+            <Route path="/school-dashboard" element={<SaaSRouter defaultType="school" />} />
+            <Route path="/transport-dashboard" element={<SaaSRouter defaultType="transport" />} />
+            <Route path="/hr-dashboard" element={<SaaSRouter defaultType="rh" />} />
+            <Route path="/construction-dashboard" element={<SaaSRouter defaultType="btp" />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/prix" element={<Pricing />} />
             <Route path="/design-editor" element={<ProtectedRoute><DesignEditor /></ProtectedRoute>} />

@@ -691,7 +691,8 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
         defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
-      if (response.ok) {
+      const resData = await response.json().catch(() => null);
+      if (response.ok && resData?.success !== false) {
         showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
         
         // Add to local history
@@ -705,9 +706,9 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
         setManagerNotifsHistory(prev => [newLog, ...prev]);
         return true;
       } else {
-        const errorData = await response.json().catch(() => null);
-        console.error('Failed to send background email to manager:', errorData || response.statusText);
-        showAlert("Erreur d'envoi", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
+        console.warn('Failed to send background email to manager:', resData || response.statusText);
+        const errMsg = resData?.error ? ` (${resData.error})` : '';
+        toast.error(`Mail gérant non délivré${errMsg}`);
         return false;
       }
     } catch (error) {
@@ -809,7 +810,8 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
         defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
-      if (response.ok) {
+      const resData = await response.json().catch(() => null);
+      if (response.ok && resData?.success !== false) {
         showMailSuccessToast("Mail d'encaissement de solde envoyé au gérant avec succès !");
         
         // Add to local history
@@ -823,8 +825,9 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
         setManagerNotifsHistory(prev => [newLog, ...prev]);
         return true;
       } else {
-        const errorData = await response.json().catch(() => null);
-        console.error('Failed to send background balance email to manager:', errorData || response.statusText);
+        console.warn('Failed to send background balance email to manager:', resData || response.statusText);
+        const errMsg = resData?.error ? ` (${resData.error})` : '';
+        toast.error(`Mail gérant non délivré${errMsg}`);
         return false;
       }
     } catch (error) {
@@ -1086,12 +1089,13 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
         defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error('Error dispatching silent manager background mail:', errorData || response.statusText);
-        showAlert("Erreur d'envoi Email (Clôture)", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
+      const resData = await response.json().catch(() => null);
+      if (response.ok && resData?.success !== false) {
+        return true;
+      } else {
+        console.warn('Error dispatching silent manager background mail:', resData || response.statusText);
+        return false;
       }
-      return response.ok;
     } catch {
       return false;
     }

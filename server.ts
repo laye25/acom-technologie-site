@@ -210,14 +210,25 @@ async function startServer() {
   });
 
 
+  // Helper to sanitize API keys (removes quotes and whitespace)
+  function sanitizeApiKey(key: any): string | null {
+    if (!key || typeof key !== 'string') return null;
+    const cleaned = key.trim().replace(/^["']|["']$/g, '').trim();
+    if (!cleaned || cleaned === '.' || cleaned === 'null' || cleaned === 'undefined' || cleaned.length < 5) return null;
+    return cleaned;
+  }
+
   // Helper to validate email addresses and "Name <email@domain>" format
   function cleanAndValidateFromEmail(email: any): string {
-    const defaultFrom = "Acom Technologie <service-technique@acomtechnologie.com>";
+    const defaultFrom = "Acom Technologie <gestion@acomtechnologie.com>";
     if (!email || typeof email !== 'string') {
       return defaultFrom;
     }
     
-    const trimmed = email.trim();
+    const trimmed = email.trim().replace(/^["']|["']$/g, '').trim();
+    if (trimmed === '.' || trimmed === '') {
+      return defaultFrom;
+    }
     
     // Simple checks for email containing @ and .
     // Accept standard: test@example.com
@@ -229,7 +240,7 @@ async function startServer() {
       return trimmed;
     }
     
-    console.warn(`[Email Service] Format de l'expéditeur ("from") invalide détecté: "${trimmed}". Rabattement sur la valeur par défaut: "${defaultFrom}"`);
+    console.warn(`[Email Service] Format de l'expéditeur ("from") invalide détecté: "${trimmed}". Rabattement sur: "${defaultFrom}"`);
     return defaultFrom;
   }
 
@@ -238,20 +249,24 @@ async function startServer() {
     try {
       const { to, subject, html, from, de, overrideApiKey } = req.body;
       
-      const apiKeyToUse = overrideApiKey || process.env.RESEND_API_KEY;
+      // Sanitize custom key or system env key
+      let validOverrideKey = sanitizeApiKey(overrideApiKey);
+      let systemEnvKey = sanitizeApiKey(process.env.RESEND_API_KEY);
+      
+      const apiKeyToUse = validOverrideKey || systemEnvKey;
 
       if (!apiKeyToUse) {
-        return res.json({ success: true, message: "Email simulation (API key missing)" });
+        console.log("[Email Service] No valid Resend API key available (format re_...). Simulating email dispatch.");
+        return res.json({ success: true, simulated: true, message: "Email simulation (Valid Resend API key missing)" });
       }
 
-      const resend = new Resend(apiKeyToUse);
+      let resend = new Resend(apiKeyToUse);
       
       // Extract from request body if available (both standard 'from' and French 'de'), 
       // then try environment variable, and fallback to default.
-      const fromEmailRaw = from || de || process.env.RESEND_FROM;
+      const fromEmailRaw = from || de || (process.env.RESEND_FROM && process.env.RESEND_FROM.trim() !== '.' ? process.env.RESEND_FROM : null);
       let fromEmail = cleanAndValidateFromEmail(fromEmailRaw);
 
-      
       let result = await resend.emails.send({
         from: fromEmail,
         to: Array.isArray(to) ? to : [to],
@@ -261,11 +276,11 @@ async function startServer() {
 
       let { data, error } = result;
 
-      // If the default sender fails due to a domain/from field restriction,
-      // attempt a fallback to Resend's standard 'onboarding@resend.dev' sandbox address
-      if (error && error.message && (error.message.includes("from") || error.message.includes("domain") || error.message.includes("registered"))) {
-        console.warn("Resend default sender rejected. Retrying with onboarding@resend.dev fallback...");
-        fromEmail = "onboarding@resend.dev";
+      // If overrideApiKey was supplied but failed with an API key error,
+      // and we have a valid systemEnvKey, retry using systemEnvKey
+      if (error && (error.message?.includes("API key") || error.message?.includes("api_key") || String(error.name).toLowerCase().includes("api_key")) && validOverrideKey && systemEnvKey && systemEnvKey !== validOverrideKey) {
+        console.warn("[Email Service] Custom overrideApiKey failed. Retrying with system RESEND_API_KEY...");
+        resend = new Resend(systemEnvKey);
         const retryResult = await resend.emails.send({
           from: fromEmail,
           to: Array.isArray(to) ? to : [to],
@@ -276,18 +291,51 @@ async function startServer() {
         error = retryResult.error;
       }
 
-      if (error) {
-        let userFriendlyError = error.message;
-        if (error.message.includes("domain") || error.message.includes("from") || error.message.includes("registered")) {
-          userFriendlyError = `L'adresse d'expéditeur '${fromEmail}' n'est pas autorisée sur votre compte Resend. Veuillez vérifier votre domaine sur Resend ou configurer la variable d'environnement RESEND_FROM avec une adresse d'expéditeur valide de votre domaine enregistré (ex: service@votredomaine.com).`;
+      // If sending fails due to domain / from restrictions, retry with onboarding@resend.dev
+      if (error && error.message && (
+        error.message.includes("from") || 
+        error.message.includes("domain") || 
+        error.message.includes("registered") ||
+        error.message.includes("verify") ||
+        error.name === "validation_error"
+      ) && fromEmail !== "onboarding@resend.dev") {
+        console.warn(`Resend sender '${fromEmail}' rejected. Retrying with onboarding@resend.dev fallback...`);
+        fromEmail = "onboarding@resend.dev";
+        const retryResult = await resend.emails.send({
+          from: fromEmail,
+          to: Array.isArray(to) ? to : [to],
+          subject: subject,
+          html: html,
+        });
+        if (retryResult.data) {
+          data = retryResult.data;
+          error = null;
+        } else {
+          error = retryResult.error;
         }
-        return res.status(500).json({ error: userFriendlyError, details: error });
+      }
+
+      if (error) {
+        let msg = error.message || "";
+        let userFriendlyError = msg;
+
+        const isApiKeyError = msg.includes("API key") || msg.includes("api_key") || msg.includes("invalid_api_key") || String(error.name).toLowerCase().includes("api_key");
+        const isDomainOrSandboxError = msg.includes("testing emails") || msg.includes("domain") || msg.includes("verify") || msg.includes("onboarding@resend.dev") || msg.includes("registered") || msg.includes("validation_error");
+
+        if (isApiKeyError) {
+          userFriendlyError = `La clé API Resend configurée est refusée par Resend. Veuillez vérifier votre clé sur resend.com/api-keys (elle doit commencer par re_).`;
+        } else if (isDomainOrSandboxError) {
+          userFriendlyError = `Limite Sandbox / Domaine Resend : En mode de test gratuit Resend, vous pouvez envoyer des e-mails uniquement à votre propre adresse e-mail d'inscription Resend (depuis onboarding@resend.dev). Pour envoyer à d'autres destinataires, validez votre nom de domaine sur https://resend.com/domains.`;
+        }
+        
+        console.error("[Email Service] Resend dispatch error:", error);
+        return res.json({ success: false, error: userFriendlyError, details: error });
       }
 
       res.json({ success: true, data });
     } catch (error: any) {
       console.error("Email error:", error);
-      res.status(500).json({ error: error.message });
+      res.json({ success: false, error: error.message || "Erreur serveur lors de l'envoi de l'email" });
     }
   });
 

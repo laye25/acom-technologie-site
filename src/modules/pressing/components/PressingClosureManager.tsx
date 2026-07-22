@@ -92,20 +92,26 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
   const tickets = useMemo<PressingTicket[]>(() => {
     try {
       const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
+      const parsed = saved ? JSON.parse(saved) : [];
+      console.log('📦 [PressingClosure] Loaded tickets:', parsed.length, 'for date:', closureDate);
+      return parsed;
+    } catch (err) {
+      console.error('Error loading pressing tickets:', err);
       return [];
     }
-  }, [merchant.id, closures]);
+  }, [merchant.id, closures, closureDate]);
 
   const detergentSales = useMemo<any[]>(() => {
     try {
       const saved = localStorage.getItem(`pressing_stock_sales_${merchant.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
+      const parsed = saved ? JSON.parse(saved) : [];
+      console.log('🛒 [PressingClosure] Loaded sales:', parsed.length);
+      return parsed;
+    } catch (err) {
+      console.error('Error loading detergent sales:', err);
       return [];
     }
-  }, [merchant.id, closures]);
+  }, [merchant.id, closures, closureDate]);
 
   // Fetch local expenses using safe useLiveQuery
   const expenses = useLiveQuery(() => 
@@ -126,22 +132,58 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
 
   // Memos for daily stats
   const dailyPressingTickets = useMemo(() => {
-    return tickets.filter(t => t.depositDate === closureDate && t.status !== 'quotation');
+    return tickets.filter(t => {
+      if (t.status === 'quotation') return false;
+      if (!t.depositDate) return false;
+      if (t.depositDate === closureDate || t.depositDate.startsWith(closureDate)) return true;
+      if (t.depositDate.includes('T')) {
+        try {
+          if (format(new Date(t.depositDate), 'yyyy-MM-dd') === closureDate) return true;
+        } catch(e) {}
+      }
+      return false;
+    });
   }, [tickets, closureDate]);
 
   const dailyDepositsRevenue = useMemo(() => {
     return dailyPressingTickets.reduce((sum, t) => {
-      const atDeposit = t.amountPaidAtDeposit !== undefined ? t.amountPaidAtDeposit : (t.amountPaid || 0);
+      let atDeposit = 0;
+      if (t.amountPaidAtDeposit !== undefined && t.amountPaidAtDeposit !== null && !isNaN(parseFloat(String(t.amountPaidAtDeposit)))) {
+        atDeposit = parseFloat(String(t.amountPaidAtDeposit));
+      } else if (t.amountPaid !== undefined && t.amountPaid !== null && !isNaN(parseFloat(String(t.amountPaid)))) {
+        atDeposit = parseFloat(String(t.amountPaid));
+      } else if (t.paymentStatus === 'paid') {
+        atDeposit = parseFloat(String(t.total || 0));
+      } else if (t.paymentStatus === 'partial') {
+        atDeposit = parseFloat(String(t.total || 0)) / 2;
+      } else {
+        atDeposit = t.paymentStatus === 'unpaid' ? 0 : parseFloat(String(t.total || 0));
+      }
+      if (isNaN(atDeposit)) atDeposit = 0;
       return sum + atDeposit;
     }, 0);
   }, [dailyPressingTickets]);
 
   const dailyBalancesCollected = useMemo(() => {
-    return tickets.filter(t => t.balanceCollectedDate === closureDate);
+    return tickets.filter(t => {
+      if (!t.balanceCollectedDate) return false;
+      if (t.balanceCollectedDate === closureDate || t.balanceCollectedDate.startsWith(closureDate)) return true;
+      if (t.balanceCollectedDate.includes('T')) {
+        try {
+          if (format(new Date(t.balanceCollectedDate), 'yyyy-MM-dd') === closureDate) return true;
+        } catch(e) {}
+      }
+      return false;
+    });
   }, [tickets, closureDate]);
 
   const dailyBalancesRevenue = useMemo(() => {
-    return dailyBalancesCollected.reduce((sum, t) => sum + (t.balanceCollectedAmount || 0), 0);
+
+    return dailyBalancesCollected.reduce((sum, t) => {
+      let balance = parseFloat(String(t.balanceCollectedAmount));
+      if (isNaN(balance)) balance = 0;
+      return sum + balance;
+    }, 0);
   }, [dailyBalancesCollected]);
 
   const dailyPressingRevenue = useMemo(() => {
@@ -149,11 +191,24 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
   }, [dailyDepositsRevenue, dailyBalancesRevenue]);
 
   const dailyDetergentSales = useMemo(() => {
-    return detergentSales.filter(s => s.date && s.date.startsWith(closureDate));
+    return detergentSales.filter(s => {
+      if (!s.date) return false;
+      if (s.date.startsWith(closureDate)) return true;
+      if (s.date.includes('T')) {
+        try {
+          if (format(new Date(s.date), 'yyyy-MM-dd') === closureDate) return true;
+        } catch(e) {}
+      }
+      return false;
+    });
   }, [detergentSales, closureDate]);
 
   const dailyDetergentRevenue = useMemo(() => {
-    return dailyDetergentSales.reduce((sum, s) => sum + (s.total || 0), 0);
+    return dailyDetergentSales.reduce((sum, s) => {
+      let total = parseFloat(String(s.total));
+      if (isNaN(total)) total = 0;
+      return sum + total;
+    }, 0);
   }, [dailyDetergentSales]);
 
   // Expenses filter
@@ -173,12 +228,16 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
   }, [expenses, closureDate]);
 
   const dailyExpensesTotal = useMemo(() => {
-    return dailyExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    return dailyExpenses.reduce((sum, e) => {
+      let amount = parseFloat(String(e.amount));
+      if (isNaN(amount)) amount = 0;
+      return sum + amount;
+    }, 0);
   }, [dailyExpenses]);
 
   // Expected cash in hand including expenditures
   const totalTheoreticalRevenue = useMemo(() => {
-    return Math.max(0, dailyPressingRevenue + dailyDetergentRevenue - dailyExpensesTotal);
+    return dailyPressingRevenue + dailyDetergentRevenue - dailyExpensesTotal;
   }, [dailyPressingRevenue, dailyDetergentRevenue, dailyExpensesTotal]);
 
   const getManagerClosureNotificationMessage = useCallback((c: PressingClosure) => {
@@ -330,12 +389,13 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
         defaultFrom: merchant.managerNotifications?.emailFrom
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error('Error dispatching silent manager background mail:', errorData || response.statusText);
-        showAlert("Erreur d'envoi Email (Clôture)", `L'envoi automatique au gérant a échoué. ${errorData?.error || response.statusText}`, "error");
+      const resData = await response.json().catch(() => null);
+      if (response.ok && resData?.success !== false) {
+        return true;
+      } else {
+        console.warn('Error dispatching silent manager background mail:', resData || response.statusText);
+        return false;
       }
-      return response.ok;
     } catch (error) {
       console.error('Error dispatching silent manager background mail:', error);
       return false;
@@ -536,25 +596,9 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                       newClosure.sentToManager = success;
                       toast.dismiss(toastId);
                       if (success) {
-                        showAlert(
-                          'Notification Gérant',
-                          'Ce mail envoyé en arrière-plan avec succès !',
-                          'success',
-                          undefined,
-                          false,
-                          "D'ACCORD",
-                          "ENVOI D'E-MAIL"
-                        );
+                        toast.success('Rapport de clôture envoyé par e-mail au gérant !');
                       } else {
-                        showAlert(
-                          'Notification Échouée',
-                          'Échec de l\'envoi du rapport par email en arrière-plan.',
-                          'error',
-                          undefined,
-                          false,
-                          "D'ACCORD",
-                          "E-MAIL INTROUVABLE"
-                        );
+                        toast.error("Rapport par e-mail non envoyé (clé Resend non configurée ou invalide).");
                       }
                     }
 
@@ -567,6 +611,29 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                     // Reset inputs
                     setActualCash(0);
                     setClosureNotes('');
+
+                    // User feedback
+                    if (hasAttemptedEmail && !sentEmail) {
+                      showAlert(
+                        'Caisse Clôturée avec Succès',
+                        `La caisse du jour (${closureDate}) a été clôturée et verrouillée avec succès !\n\n⚠️ Remarque : Le rapport automatique par e-mail n'a pas pu être délivré au gérant (clé API Resend invalide ou non configurée dans les Paramètres > Notifications Gérant). Vous pouvez partager le rapport via WhatsApp ou Mail direct.`,
+                        'success',
+                        undefined,
+                        false,
+                        "D'ACCORD",
+                        "CLÔTURE EFFECTUÉE"
+                      );
+                    } else {
+                      showAlert(
+                        'Caisse Clôturée avec Succès',
+                        `La caisse du jour (${closureDate}) a été clôturée et verrouillée avec succès !`,
+                        'success',
+                        undefined,
+                        false,
+                        "D'ACCORD",
+                        "CLÔTURE EFFECTUÉE"
+                      );
+                    }
                     
                     if (!hasAttemptedEmail) {
                       showAlert('Clôture Enregistrée', `Clôture du ${closureDate} enregistrée à l'instant avec succès !`, 'success', undefined, false, "D'ACCORD", "COFFRE FORT");

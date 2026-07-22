@@ -6,6 +6,7 @@ import { db } from '../db/db';
 import { dbService } from '../services/dbService';
 import { Merchant, Order, OrderStatus } from '../types';
 import { toast } from 'react-hot-toast';
+import { getSaasClientRoute, logSaasNavigation } from '../utils/saasRoutes';
 import { 
   Store, ShoppingCart, ShieldCheck, Clock, CheckCircle2, XCircle, ArrowRight, Wrench, 
   HardHat, Car, Users, GraduationCap, Stethoscope, Briefcase, Shirt, Sparkles, Filter, 
@@ -312,7 +313,16 @@ export const AcomZoneMerchantPanel: React.FC<AcomZoneMerchantPanelProps> = ({ me
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              to={`/acomzone/${merchant.id}`}
+              to={getSaasClientRoute(merchant.type, merchant.id)}
+              onClick={() => {
+                const targetRoute = getSaasClientRoute(merchant.type, merchant.id);
+                logSaasNavigation(
+                  'Administrateur',
+                  merchant.type || 'boutique',
+                  merchant.name,
+                  targetRoute
+                );
+              }}
               className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest rounded-xl active:scale-95 transition-all shadow-xl shadow-emerald-500/20"
             >
               <Eye className="w-4 h-4" />
@@ -528,7 +538,13 @@ export const AcomZoneMerchantPanel: React.FC<AcomZoneMerchantPanelProps> = ({ me
                         <>
                           <div>
                             <span className="text-gray-400 block mb-0.5">Vêtement(s)</span>
-                            <span className="text-gray-900 font-bold">{selectedOrder.details?.items || 'Articles standards'}</span>
+                            <span className="text-gray-900 font-bold">
+                              {typeof selectedOrder.details?.items === 'string'
+                                ? selectedOrder.details.items
+                                : Array.isArray(selectedOrder.details?.items)
+                                  ? selectedOrder.details.items.map((it: any) => typeof it === 'string' ? it : `${it.name || 'Article'} (x${it.quantity || 1})`).join(', ')
+                                  : 'Articles standards'}
+                            </span>
                           </div>
                           <div>
                             <span className="text-gray-400 block mb-0.5">Mode de Traitement</span>
@@ -662,7 +678,11 @@ export const AcomZoneMerchantPanel: React.FC<AcomZoneMerchantPanelProps> = ({ me
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-gray-900 font-bold block">{selectedOrder.details?.items || 'Articles'}</span>
+                              <span className="text-gray-900 font-bold block">
+                                {typeof selectedOrder.details?.items === 'string'
+                                  ? selectedOrder.details.items
+                                  : 'Articles'}
+                              </span>
                             )}
                           </div>
                           <div>
@@ -777,7 +797,11 @@ function renderShortSpec(order: Order, type: string) {
     case 'pressing':
       return (
         <span className="text-[10px] font-bold text-teal-600 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded w-fit float-left mt-1">
-          🧺 {details.items || "Articles à laver"}
+          🧺 {typeof details.items === 'string'
+            ? details.items
+            : Array.isArray(details.items)
+              ? details.items.map((it: any) => typeof it === 'string' ? it : `${it.name || 'Article'} (x${it.quantity || 1})`).join(', ')
+              : "Articles à laver"}
         </span>
       );
     case 'medical':
@@ -819,7 +843,7 @@ function renderShortSpec(order: Order, type: string) {
     default:
       const itemsLabel = Array.isArray(details.items)
         ? details.items.map((it: any) => `${it.name} (x${it.quantity})`).join(', ')
-        : (details.items || "Commande boutique");
+        : (typeof details.items === 'string' ? details.items : "Commande boutique");
       return (
         <span className="text-[10px] font-bold text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded w-fit float-left mt-1">
           🛍️ Boutique: {itemsLabel}
