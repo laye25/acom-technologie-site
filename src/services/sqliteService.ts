@@ -111,14 +111,37 @@ export const initSQLite = async (logs?: string[]) => {
 
         let wasmBinary: ArrayBuffer | undefined = undefined;
         let loadedUrl = '';
-        const candidates = [
+        const candidates: string[] = [
           '/sqlite3.wasm',
           wasmLoc,
           './sqlite3.wasm',
-          'sqlite3.wasm'
+          'sqlite3.wasm',
+          '/assets/sqlite3.wasm',
+          './assets/sqlite3.wasm',
+          'assets/sqlite3.wasm'
         ];
-        if (typeof window !== 'undefined' && window.location && window.location.origin) {
-          candidates.push(`${window.location.origin}/sqlite3.wasm`);
+
+        try {
+          if (import.meta && import.meta.url) {
+            candidates.unshift(new URL('sqlite3.wasm', import.meta.url).href);
+            candidates.unshift(new URL('./sqlite3.wasm', import.meta.url).href);
+            candidates.unshift(new URL('../sqlite3.wasm', import.meta.url).href);
+            candidates.unshift(new URL('../../sqlite3.wasm', import.meta.url).href);
+          }
+        } catch (metaErr) {}
+
+        if (typeof window !== 'undefined' && window.location) {
+          if (window.location.origin) {
+            candidates.push(`${window.location.origin}/sqlite3.wasm`);
+            candidates.push(`${window.location.origin}/assets/sqlite3.wasm`);
+          }
+          if (window.location.href) {
+            try {
+              candidates.push(new URL('sqlite3.wasm', window.location.href).href);
+              candidates.push(new URL('./sqlite3.wasm', window.location.href).href);
+              candidates.push(new URL('assets/sqlite3.wasm', window.location.href).href);
+            } catch (e) {}
+          }
         }
 
         pushLog('[SQLite] Pré-chargement et audit du binaire WASM...');
@@ -129,10 +152,25 @@ export const initSQLite = async (logs?: string[]) => {
             if (res.ok) {
               const buf = await res.arrayBuffer();
               const u8 = new Uint8Array(buf);
-              // Vérification du Magic Header WASM: 0x00 0x61 0x73 0x6d (\0asm)
-              const isWasmHeader = u8.length >= 4 && u8[0] === 0x00 && u8[1] === 0x61 && u8[2] === 0x73 && u8[3] === 0x6d;
               
-              if (isWasmHeader) {
+              // 1. Audit Header Magic WASM : 0x00 0x61 0x73 0x6d 0x01 0x00 0x00 0x00 (\0asm\1\0\0\0)
+              const isWasmHeader = u8.length >= 8 &&
+                u8[0] === 0x00 && u8[1] === 0x61 && u8[2] === 0x73 && u8[3] === 0x6d &&
+                u8[4] === 0x01 && u8[5] === 0x00 && u8[6] === 0x00 && u8[7] === 0x00;
+
+              // 2. Audit strict du moteur WebAssembly du navigateur (WebAssembly.validate)
+              let isWasmValid = false;
+              if (typeof WebAssembly !== 'undefined' && typeof WebAssembly.validate === 'function') {
+                try {
+                  isWasmValid = WebAssembly.validate(buf);
+                } catch (vErr) {
+                  isWasmValid = false;
+                }
+              } else {
+                isWasmValid = isWasmHeader;
+              }
+
+              if (isWasmValid) {
                 wasmBinary = buf;
                 loadedUrl = candidateUrl;
                 
@@ -154,11 +192,11 @@ export const initSQLite = async (logs?: string[]) => {
                 pushLog(`URL utilisée : ${loadedUrl}`);
                 pushLog(`Octets reçus : ${buf.byteLength}`);
                 pushLog(`SHA-256 : ${sha256Hex}`);
-                pushLog('Validation : OK (Magic bytes \\0asm validés)');
+                pushLog('Validation : OK');
                 pushLog('----------------------------------------');
                 break;
               } else {
-                pushLog(`  -> Échec validation magic bytes sur ${candidateUrl} (${buf.byteLength} octets reçus, header: [${u8.slice(0, 4).join(', ')}]) - Fallback page SPA probable`);
+                pushLog(`  -> Échec WebAssembly.validate() sur ${candidateUrl} (${buf.byteLength} octets reçus, header: [${Array.from(u8.slice(0, 8)).join(', ')}]) - Réponse invalide / Fallback page SPA`);
               }
             }
           } catch (fetchErr: any) {
