@@ -24,19 +24,27 @@ export const debouncedSyncPhysicalFile = () => {
 const sqlitePlugin = new SQLiteConnection(CapacitorSQLite);
 const isNative = Capacitor.isNativePlatform();
 
-export const initSQLite = async () => {
+export const initSQLite = async (logs?: string[]) => {
+  const pushLog = (msg: string) => {
+    console.log(msg);
+    if (logs) logs.push(msg);
+  };
+
   if (db && (isNative || (sqlite3Obj && sqlite3Obj.capi && sqlite3Obj.oo1 && sqlite3Obj.wasm))) {
     return db;
   }
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
+    pushLog('[SQLite] Étape 1 : Début initSQLite() - OK');
+
     if (isNative) {
       try {
-        console.log('Initializing native Capacitor SQLite...');
+        pushLog('[SQLite] Mode Capacitor Native détecté');
         nativeDbConnection = await sqlitePlugin.createConnection('acom_studio', false, 'no-encryption', 1, false);
         await nativeDbConnection.open();
         db = nativeDbConnection;
+        pushLog('[SQLite] Connexion Native ouverte - OK');
         
         // Setup tables for native
         await db.execute(`
@@ -73,30 +81,43 @@ export const initSQLite = async () => {
           );
         `);
         return db;
-      } catch (e) {
-        console.error('Failed to init native SQLite:', e);
+      } catch (e: any) {
+        pushLog(`[SQLite] ERREUR Native: ${e?.message || e}`);
         return null;
       }
     }
 
     // Fallback to WASM
+    pushLog('[SQLite] Étape 2 : Diagnostic de l\'environnement');
+    if (typeof window !== 'undefined') {
+      pushLog(`  - Protocol: ${window.location.protocol}`);
+      pushLog(`  - Href: ${window.location.href}`);
+      pushLog(`  - UserAgent: ${navigator.userAgent}`);
+      const proc = (window as any).process || (typeof process !== 'undefined' ? process : null);
+      if (proc) {
+        pushLog(`  - Electron version: ${proc.versions?.electron || 'Non spécifié'}`);
+        pushLog(`  - ResourcesPath: ${proc.resourcesPath || 'Non spécifié'}`);
+        pushLog(`  - cwd: ${typeof proc.cwd === 'function' ? proc.cwd() : 'N/A'}`);
+      } else {
+        pushLog('  - Process object: Non présent (Navigateur Web standard)');
+      }
+    }
+
     try {
       if (!sqlite3Obj) {
+        const isFileProtocol = typeof window !== 'undefined' && window.location && (window.location.protocol === 'file:' || !window.location.protocol.startsWith('http'));
+        const wasmLoc = isFileProtocol ? './sqlite3.wasm' : '/sqlite3.wasm';
+        pushLog(`[SQLite] Étape 3 : Chargement sqlite3.wasm (Target WASM: ${wasmLoc})`);
+
+        pushLog('[SQLite] Étape 4 : Exécution sqlite3InitModule()...');
         const sqlite3 = await (sqlite3InitModule as any)({
-          print: console.log,
-          printErr: console.error,
+          print: (msg: any) => console.log('[sqlite-wasm]', msg),
+          printErr: (msg: any) => console.error('[sqlite-wasm err]', msg),
           locateFile: (file: string) => {
-            const isDesktop = typeof window !== 'undefined' && (
-              ('__TAURI__' in window) || 
-              (window.process && (window.process as any).type) || 
-              (navigator && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron')) || 
-              (window.location && window.location.protocol && !['http:', 'https:'].includes(window.location.protocol))
-            );
-            if (isDesktop) {
-              if (file.endsWith('.wasm')) {
-                return '/sqlite3.wasm';
+            if (typeof window !== 'undefined' && window.location) {
+              if (window.location.protocol === 'file:' || !window.location.protocol.startsWith('http')) {
+                return `./${file}`;
               }
-              return `/${file}`;
             }
             if (file.endsWith('.wasm')) {
               return '/sqlite3.wasm';
@@ -106,8 +127,43 @@ export const initSQLite = async () => {
         });
 
         sqlite3Obj = sqlite3;
-        console.log('SQLite loaded. Version:', sqlite3.version?.libVersion || 'Inconnue');
+        pushLog(`[SQLite] Étape 4 RÉUSSIE : sqlite3Obj créé. Version: ${sqlite3.version?.libVersion || 'Inconnue'}`);
+      } else {
+        pushLog('[SQLite] Étape 4 : sqlite3Obj déjà existant en mémoire');
       }
+
+      pushLog(`[SQLite] Étape 5 : Validation modules (capi: ${sqlite3Obj?.capi ? 'OK' : 'NULL'}, oo1: ${sqlite3Obj?.oo1 ? 'OK' : 'NULL'}, wasm: ${sqlite3Obj?.wasm ? 'OK' : 'NULL'})`);
+
+      let opfsAvailable = false;
+      pushLog('[SQLite] Étape 6 : Test disponibilité OPFS (navigator.storage.getDirectory)');
+      try {
+        if (typeof navigator !== 'undefined' && navigator.storage && typeof navigator.storage.getDirectory === 'function') {
+          await navigator.storage.getDirectory();
+          opfsAvailable = true;
+          pushLog('[SQLite] Étape 6 : OPFS disponible - OK');
+        } else {
+          pushLog('[SQLite] Étape 6 : OPFS indisponible (API navigator.storage.getDirectory absente) - Fallback');
+        }
+      } catch (opfsCheckErr: any) {
+        pushLog(`[SQLite] Étape 6 : Test OPFS levé une exception (${opfsCheckErr?.message || opfsCheckErr}) - Fallback in-memory`);
+        opfsAvailable = false;
+      }
+
+      pushLog('[SQLite] Étape 7 & 8 : Ouverture acom_studio.sqlite3');
+      if (opfsAvailable && 'opfs' in sqlite3Obj) {
+        try {
+          db = new sqlite3Obj.oo1.OpfsDb('/acom_studio.sqlite3');
+          pushLog('[SQLite] Étape 8 : Succès ouverture OpfsDb (/acom_studio.sqlite3)');
+        } catch (opfsConstructErr: any) {
+          pushLog(`[SQLite] Étape 8 : OpfsDb a échoué (${opfsConstructErr?.message || opfsConstructErr}) -> Fallback vers oo1.DB`);
+          db = new sqlite3Obj.oo1.DB('/acom_studio.sqlite3', 'ct');
+        }
+      } else {
+        db = new sqlite3Obj.oo1.DB('/acom_studio.sqlite3', 'ct');
+        pushLog('[SQLite] Étape 8 : Succès ouverture oo1.DB (In-memory/Transient)');
+      }
+
+      pushLog(`[SQLite] Étape 9 : Instance db créée = ${db ? 'OUI' : 'NON'}`);
 
       // Restauration automatique du fichier de base de données physique sur Desktop (si non fait lors du démarrage initial)
       const electronAPI = (window as any).electronAPI;
@@ -115,40 +171,26 @@ export const initSQLite = async () => {
         const dataRestored = localStorage.getItem('acom_desktop_data_restored');
         if (!dataRestored) {
           try {
-            console.log('SQLite init: Tentative de restauration de la base de données physique de sauvegarde...');
+            pushLog('[SQLite] Desktop: Restauration automatique du fichier physique...');
             const response = await electronAPI.loadPhysicalDbFile();
             if (response && response.success && response.data) {
-              if ('opfs' in sqlite3Obj) {
+              if (opfsAvailable && 'opfs' in sqlite3Obj) {
                 const root = await navigator.storage.getDirectory();
                 const fileHandle = await root.getFileHandle('acom_studio.sqlite3', { create: true });
                 const writable = await (fileHandle as any).createWritable();
                 await writable.write(new Uint8Array(response.data));
                 await writable.close();
-                console.log('SQLite init: Restauration réussie du fichier OPFS depuis la base de données physique.');
+                pushLog('[SQLite] Desktop: Restauration physique OPFS réussie');
                 localStorage.setItem('acom_desktop_data_restored', 'true');
                 localStorage.setItem('acom_desktop_needs_dexie_populate', 'true');
               }
             } else {
-              console.log('SQLite init: Aucun fichier physique de base de données trouvé. Initialisation standard.');
               localStorage.setItem('acom_desktop_data_restored', 'true');
             }
-          } catch (err) {
-            console.error('SQLite init: Erreur durant la restauration automatique du fichier physique:', err);
+          } catch (err: any) {
+            pushLog(`[SQLite] Desktop: Erreur durant restauration physique (${err?.message || err})`);
           }
         }
-      }
-
-      if ('opfs' in sqlite3Obj) {
-        try {
-          db = new sqlite3Obj.oo1.OpfsDb('/acom_studio.sqlite3');
-          console.log('Using OPFS for SQLite persistence');
-        } catch (opfsErr) {
-          console.warn('Failed to construct OpfsDb, falling back to in-memory oo1.DB:', opfsErr);
-          db = new sqlite3Obj.oo1.DB('/acom_studio.sqlite3', 'ct');
-        }
-      } else {
-        db = new sqlite3Obj.oo1.DB('/acom_studio.sqlite3', 'ct');
-        console.log('Using transient/In-memory store (Fallthrough)');
       }
 
       const needsPopulate = localStorage.getItem('acom_desktop_needs_dexie_populate');
@@ -156,9 +198,9 @@ export const initSQLite = async () => {
         localStorage.removeItem('acom_desktop_needs_dexie_populate');
         try {
           await populateDexieFromSQLite();
-          console.log('SQLite init: Successfully populated Dexie from restored SQLite db synchronously.');
-        } catch (err) {
-          console.error('SQLite init: Failed to populate Dexie from restored SQLite db:', err);
+          pushLog('[SQLite] Desktop: Populated Dexie from restored SQLite db');
+        } catch (err: any) {
+          pushLog(`[SQLite] Desktop: Erreur populate Dexie (${err?.message || err})`);
         }
       }
 
@@ -211,7 +253,7 @@ export const initSQLite = async () => {
         try {
           const prodCount = await dexieDb.products.count();
           if (prodCount === 0) {
-            console.log('SQLite init: Dexie is empty on Desktop. Checking if SQLite contains data...');
+            pushLog('[SQLite] Desktop: Dexie est vide. Vérification contenu SQLite...');
             const results: any[] = [];
             db.exec({
               sql: 'SELECT COUNT(*) as count FROM merchant_products',
@@ -221,11 +263,11 @@ export const initSQLite = async () => {
               }
             });
             if (results && results[0] && results[0].count > 0) {
-              console.log(`SQLite init: Found ${results[0].count} products in SQLite. Restoring to Dexie automatically...`);
+              pushLog(`[SQLite] Desktop: ${results[0].count} produits trouvés dans SQLite. Population Dexie...`);
               await populateDexieFromSQLite();
             }
           }
-        } catch (countErr) {
+        } catch (countErr: any) {
           console.warn('SQLite init: Automatic Dexie sanity check failed:', countErr);
         }
       }
@@ -299,15 +341,19 @@ export const initSQLite = async () => {
             });
           });
           hooksRegistered = true;
-          console.log('SQLite: Dexie mirroring hooks registered successfully.');
-        } catch (hookErr) {
+          pushLog('[SQLite] Desktop: Hooks de miroir Dexie -> SQLite enregistrés');
+        } catch (hookErr: any) {
           console.warn('SQLite: Failed to register Dexie mirroring hooks:', hookErr);
         }
       }
 
+      pushLog('[SQLite] Étape 10 : Initialisation SQLite terminée avec SUCCÈS');
       return db;
-    } catch (e) {
-      console.error('Failed to init SQLite:', e);
+    } catch (e: any) {
+      pushLog(`[SQLite] ÉCHEC FATAL initSQLite(): ${e?.name || 'Error'}: ${e?.message || e}`);
+      if (e?.stack) {
+        pushLog(`  Stack: ${e.stack.split('\n').slice(0, 4).join(' | ')}`);
+      }
       return null;
     } finally {
       initPromise = null;
