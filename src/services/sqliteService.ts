@@ -54,8 +54,15 @@ export const initSQLite = async (logs?: string[]) => {
             merchantId TEXT,
             name TEXT,
             price REAL,
+            costPrice REAL,
             category TEXT,
             stock INTEGER,
+            minStockLevel INTEGER,
+            sku TEXT,
+            description TEXT,
+            subCategory TEXT,
+            image TEXT,
+            supplierId TEXT,
             syncStatus TEXT,
             updatedAt TEXT,
             sizes TEXT,
@@ -357,8 +364,15 @@ export const initSQLite = async (logs?: string[]) => {
           merchantId TEXT,
           name TEXT,
           price REAL,
+          costPrice REAL,
           category TEXT,
           stock INTEGER,
+          minStockLevel INTEGER,
+          sku TEXT,
+          description TEXT,
+          subCategory TEXT,
+          image TEXT,
+          supplierId TEXT,
           syncStatus TEXT,
           updatedAt TEXT,
           sizes TEXT,
@@ -386,12 +400,15 @@ export const initSQLite = async (logs?: string[]) => {
       `);
 
       // Run safe migrations for existing desktop databases
-      try {
-        db.exec("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
-      } catch (_) {}
-      try {
-        db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
-      } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN costPrice REAL;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN minStockLevel INTEGER;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN sku TEXT;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN description TEXT;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN subCategory TEXT;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN image TEXT;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN supplierId TEXT;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;"); } catch (_) {}
+      try { db.exec("ALTER TABLE merchant_products ADD COLUMN colors TEXT;"); } catch (_) {}
 
       // Sanity check: if Dexie is completely empty on Electron, but the physical file contains products, populate Dexie automatically
       const isDesktop = typeof window !== 'undefined' && (window as any).electronAPI;
@@ -599,8 +616,15 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
         merchantId TEXT,
         name TEXT,
         price REAL,
+        costPrice REAL,
         category TEXT,
         stock INTEGER,
+        minStockLevel INTEGER,
+        sku TEXT,
+        description TEXT,
+        subCategory TEXT,
+        image TEXT,
+        supplierId TEXT,
         syncStatus TEXT,
         updatedAt TEXT,
         sizes TEXT,
@@ -628,31 +652,43 @@ export const populateSQLiteFromDexie = async (merchantId: string) => {
     `);
 
     // Run safe migrations for existing desktop databases
-    try {
-      await executeSQL("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;");
-    } catch (_) {}
-    try {
-      await executeSQL("ALTER TABLE merchant_products ADD COLUMN colors TEXT;");
-    } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN costPrice REAL;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN minStockLevel INTEGER;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN sku TEXT;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN description TEXT;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN subCategory TEXT;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN image TEXT;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN supplierId TEXT;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN sizes TEXT;"); } catch (_) {}
+    try { await executeSQL("ALTER TABLE merchant_products ADD COLUMN colors TEXT;"); } catch (_) {}
 
     // Insert all into SQLite in a single transaction
     await executeSQL('BEGIN TRANSACTION;');
 
     for (const p of products) {
       const pAny = p as any;
+      const rawCost = pAny.costPrice ?? pAny.cost_price ?? pAny.cost ?? pAny.cump ?? 0;
+      const costPrice = Number(rawCost);
       await executeSQL(
-        'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, costPrice, category, stock, minStockLevel, sku, description, subCategory, image, supplierId, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           pAny.id,
           pAny.merchantId,
           pAny.name,
           pAny.price || 0,
+          costPrice,
           pAny.category || '',
-          pAny.stockQuantity || 0,
+          pAny.stockQuantity !== undefined ? pAny.stockQuantity : (pAny.stock || 0),
+          pAny.minStockLevel || 5,
+          pAny.sku || '',
+          pAny.description || '',
+          pAny.subCategory || '',
+          pAny.image || '',
+          pAny.supplierId || '',
           pAny.syncStatus || 'local-only',
           pAny.updatedAt?.toString() || new Date().toISOString(),
-          pAny.sizes || '',
-          pAny.colors || ''
+          pAny.sizes ? (typeof pAny.sizes === 'string' ? pAny.sizes : JSON.stringify(pAny.sizes)) : null,
+          pAny.colors ? (typeof pAny.colors === 'string' ? pAny.colors : JSON.stringify(pAny.colors)) : null
         ]
       );
     }
@@ -792,13 +828,23 @@ export const populateDexieFromSQLite = async (currentMerchantId?: string) => {
     if (sqliteProducts.length > 0) {
       const mappedProducts = sqliteProducts.map(p => {
         const mId = currentMerchantId || p.merchantId || p.merchant_id || 'default_merchant';
+        const rawCost = p.costPrice ?? p.cost_price ?? p.cost ?? p.cump ?? p.purchasePrice ?? p.purchase_price ?? p.buyingPrice ?? p.buying_price ?? p.prixAchat ?? p.prix_achat ?? 0;
+        const costPrice = Number(rawCost);
+
         return {
           id: String(p.id || p.uuid || Math.random().toString(36).substring(2)),
           merchantId: mId,
           name: p.name || 'Produit sans nom',
           price: Number(p.price || p.base_price || 0),
+          costPrice: costPrice,
           category: p.category || 'Général',
-          stockQuantity: Number(p.stock !== undefined ? p.stock : (p.stockQuantity !== undefined ? p.stockQuantity : 0)),
+          stockQuantity: Number(p.stock !== undefined ? p.stock : (p.stockQuantity !== undefined ? p.stockQuantity : (p.stock_quantity !== undefined ? p.stock_quantity : 0))),
+          minStockLevel: Number(p.minStockLevel !== undefined ? p.minStockLevel : (p.min_stock_level !== undefined ? p.min_stock_level : 5)),
+          sku: p.sku || '',
+          description: p.description || '',
+          subCategory: p.subCategory || p.sub_category || '',
+          image: p.image || '',
+          supplierId: p.supplierId || p.supplier_id || '',
           syncStatus: p.syncStatus || 'local-restored',
           createdAt: p.createdAt || p.updatedAt || new Date().toISOString(),
           updatedAt: p.updatedAt || new Date().toISOString(),
@@ -1407,16 +1453,25 @@ export const syncPhysicalFile = async () => {
 
 export const sqliteHelper = {
   async insertProduct(product: any) {
+    const rawCost = product.costPrice ?? product.cost_price ?? product.cost ?? product.cump ?? 0;
+    const costPrice = Number(rawCost);
     await executeSQL(
-      'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, category, stock, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT OR REPLACE INTO merchant_products (id, merchantId, name, price, costPrice, category, stock, minStockLevel, sku, description, subCategory, image, supplierId, syncStatus, updatedAt, sizes, colors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         product.id,
         product.merchantId || product.merchant_id,
         product.name,
         product.price || product.base_price || 0,
-        product.category,
-        product.stockQuantity || product.stock || 0,
-        product.syncStatus,
+        costPrice,
+        product.category || 'Général',
+        product.stockQuantity !== undefined ? product.stockQuantity : (product.stock || 0),
+        product.minStockLevel || 5,
+        product.sku || '',
+        product.description || '',
+        product.subCategory || '',
+        product.image || '',
+        product.supplierId || '',
+        product.syncStatus || 'local-only',
         product.updatedAt?.toString() || new Date().toISOString(),
         product.sizes ? (typeof product.sizes === 'string' ? product.sizes : JSON.stringify(product.sizes)) : null,
         product.colors ? (typeof product.colors === 'string' ? product.colors : JSON.stringify(product.colors)) : null
