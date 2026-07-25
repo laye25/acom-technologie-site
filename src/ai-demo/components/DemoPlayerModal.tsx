@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, X, Download, FileText, Settings, Subtitles, CheckCircle2, ChevronRight, Sparkles, ChevronDown, Award, Zap, Camera, Video, MonitorPlay } from 'lucide-react';
+import { Play, Pause, X, Download, FileText, Settings, Subtitles, CheckCircle2, ChevronRight, Sparkles, ChevronDown, Award, Zap, Camera, Video, MonitorPlay, Loader2 } from 'lucide-react';
 import { DemoProject, TimelineStep } from '../types';
 import { ExportEngine } from '../services/ExportEngine';
 import { UIAnalyzer } from '../engines/UIAnalyzer';
@@ -26,15 +26,17 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
 
   const steps = project.timelineSteps || [];
 
-  // Try restoring stored video blob from IndexedDB if project doesn't have an active videoBlobUrl
+  // Try restoring stored native video blob from IndexedDB if missing
   useEffect(() => {
+    let isMounted = true;
     if (!project.videoBlobUrl) {
       VideoStorageService.getVideoBlobUrl(project.id).then((storedUrl) => {
-        if (storedUrl) {
+        if (isMounted && storedUrl) {
           setProject(prev => ({ ...prev, videoBlobUrl: storedUrl }));
         }
       });
     }
+    return () => { isMounted = false; };
   }, [project.id, project.videoBlobUrl]);
 
   // Calculate approximate timestamps for steps
@@ -80,7 +82,8 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
     onClose();
     SaiEventBus.publish('sai:trigger_live_demo_capture', {
       moduleName: project.moduleName,
-      pageName: project.pageName
+      pageName: project.pageName,
+      project: project
     });
   };
 
@@ -177,13 +180,13 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
                     />
                   ) : (
                     <div className="text-center p-8 max-w-md mx-auto space-y-4">
-                      <div className="w-16 h-16 bg-slate-800/80 rounded-2xl flex items-center justify-center mx-auto border border-slate-700 shadow-inner">
-                        <Video className="w-8 h-8 text-indigo-400" />
+                      <div className="w-16 h-16 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto border border-amber-500/20 shadow-inner">
+                        <Video className="w-8 h-8 text-amber-400" />
                       </div>
-                      <div className="space-y-1">
-                        <h4 className="text-white font-bold text-lg">Capture Vidéo Réelle (ScreenRec)</h4>
+                      <div className="space-y-1.5">
+                        <h4 className="text-white font-bold text-lg">Capture Vidéo Indisponible</h4>
                         <p className="text-slate-400 text-xs leading-relaxed">
-                          Conformément au principe ScreenRec, la vidéo restitue exactement ce qui est exécuté et affiché à l'écran pendant la démonstration.
+                          Aucun flux vidéo natif (ScreenRec) n'a été enregistré pour cette démonstration.
                         </p>
                       </div>
 
@@ -193,7 +196,7 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
                           className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-emerald-500 via-indigo-600 to-purple-600 hover:from-emerald-600 hover:to-purple-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30 transition-all cursor-pointer"
                         >
                           <Video className="w-4 h-4 text-amber-300 animate-pulse" />
-                          <span>🎥 Démarrer la Capture Vidéo Réelle de l'Écran</span>
+                          <span>🎥 Démarrer l'Enregistrement Direct avec Capture d'Écran</span>
                         </button>
                       </div>
                     </div>

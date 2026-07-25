@@ -31,22 +31,38 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsub = SaiEventBus.subscribe('sai:trigger_live_demo_capture', (payload?: { moduleName?: string; pageName?: string }) => {
+    const unsub = SaiEventBus.subscribe('sai:trigger_live_demo_capture', (payload?: any) => {
       const mod = payload?.moduleName || currentModule;
       const pag = payload?.pageName || currentPage;
+      const project = payload?.project;
       
       startDemoRecording(mod, pag, true).then(() => {
         setIsOpen(false);
         setIsAutoRunning(true);
         const guidanceEngine = new LiveGuidanceEngine();
+        
+        let scenarioObj = undefined;
+        if (project) {
+          scenarioObj = {
+            id: project.id,
+            version: '1.0.0',
+            application: { appName: project.moduleName, moduleName: project.pageName },
+            timeline: project.timelineSteps || [],
+            recordedEvents: project.events || []
+          };
+        }
+
         guidanceEngine.startAutoControlSession(
-          undefined,
+          scenarioObj as any,
           undefined,
           async () => {
             setIsAutoRunning(false);
-            const project = await stopDemoRecording();
-            if (project) {
-              navigate(`/admin/ai-demo?project=${project.id}`);
+            const savedProject = await stopDemoRecording('fr', project);
+            if (savedProject && !project) {
+              navigate(`/admin/ai-demo?project=${savedProject.id}`);
+            } else {
+              // Reload page to reflect new video if we updated an existing project, or trigger an event
+              SaiEventBus.publish('sai:scenario_updated', { scenarioId: project.id, completedAt: Date.now() });
             }
           }
         );

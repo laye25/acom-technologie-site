@@ -71,7 +71,7 @@ export function useDemoRecorder() {
       if (screenOk) {
         toast.success('Capture vidéo HD de l\'écran activée (ScreenRec) !');
       } else {
-        toast('Enregistrement des actions démarré sans capture vidéo.', { icon: 'ℹ️' });
+        toast('Capture vidéo d\'écran non activée. Seules les étapes texte seront enregistrées.', { icon: 'ℹ️' });
       }
     } else {
       setIsScreenCapture(false);
@@ -81,7 +81,7 @@ export function useDemoRecorder() {
     toast.success(`Enregistrement ACOM AI Demo démarré : ${moduleName} - ${pageName}`);
   }, []);
 
-  const stopDemoRecording = useCallback(async (language: DemoLanguage = 'fr'): Promise<DemoProject | null> => {
+  const stopDemoRecording = useCallback(async (language: DemoLanguage = 'fr', existingProject?: DemoProject): Promise<DemoProject | null> => {
     if (!isRecordingRef.current) return null;
 
     const toastId = toast.loading('Analyse de l\'interface et finalisation du tutoriel vidéo...');
@@ -102,43 +102,52 @@ export function useDemoRecorder() {
     setIsScreenCapture(false);
     isScreenCaptureRef.current = false;
 
-    // Analyze current UI structure
-    const uiAnalysis = UIAnalyzer.analyzeCurrentUI(activeModuleRef.current, activePageRef.current);
+    let targetProject: DemoProject;
 
-    // Call AI Engine for synthesis
-    const aiContent = await AiEngine.synthesizeDemoContent(
-      activeModuleRef.current,
-      activePageRef.current,
-      events,
-      uiAnalysis,
-      language
-    );
+    if (existingProject) {
+      // Just update existing project with new video and events
+      targetProject = { ...existingProject };
+      if (videoBlobUrl && capturedBlob) {
+        targetProject.videoBlobUrl = videoBlobUrl;
+        await VideoStorageService.saveVideoBlob(targetProject.id, capturedBlob);
+      }
+    } else {
+      // Analyze current UI structure
+      const uiAnalysis = UIAnalyzer.analyzeCurrentUI(activeModuleRef.current, activePageRef.current);
 
-    // Create & Save project
-    const newProject = DemoManager.createNewProject(
-      activeModuleRef.current,
-      activePageRef.current,
-      aiContent.title,
-      aiContent.description
-    );
+      // Call AI Engine for synthesis
+      const aiContent = await AiEngine.synthesizeDemoContent(
+        activeModuleRef.current,
+        activePageRef.current,
+        events,
+        uiAnalysis,
+        language
+      );
 
-    newProject.events = events;
-    newProject.uiAnalysis = uiAnalysis;
-    newProject.timelineSteps = aiContent.timelineSteps;
-    newProject.documentation = aiContent.documentation;
+      // Create new project
+      targetProject = DemoManager.createNewProject(
+        activeModuleRef.current,
+        activePageRef.current,
+        aiContent.title,
+        aiContent.description
+      );
 
-    if (videoBlobUrl) {
-      newProject.videoBlobUrl = videoBlobUrl;
-      if (capturedBlob) {
-        await VideoStorageService.saveVideoBlob(newProject.id, capturedBlob);
+      targetProject.events = events;
+      targetProject.uiAnalysis = uiAnalysis;
+      targetProject.timelineSteps = aiContent.timelineSteps;
+      targetProject.documentation = aiContent.documentation;
+
+      if (videoBlobUrl && capturedBlob) {
+        targetProject.videoBlobUrl = videoBlobUrl;
+        await VideoStorageService.saveVideoBlob(targetProject.id, capturedBlob);
       }
     }
 
-    DemoManager.saveProject(newProject);
+    DemoManager.saveProject(targetProject);
     toast.dismiss(toastId);
     toast.success('Démonstration vidéo ScreenRec enregistrée avec succès !');
 
-    return newProject;
+    return targetProject;
   }, []);
 
   const recordManualAction = useCallback((action: any, label: string) => {

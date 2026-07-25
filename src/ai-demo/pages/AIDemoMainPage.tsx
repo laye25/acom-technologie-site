@@ -19,6 +19,7 @@ import { TemplateEngine } from '../templates/TemplateEngine';
 import { PlatformControlCenter } from '../components/PlatformControlCenter';
 import { ExperienceWorkspace } from '../components/ExperienceWorkspace';
 import { ProductPlatformStudio } from '../components/ProductPlatformStudio';
+import { SaiEventBus } from '../services/SaiEventBus';
 import { 
   Video, LayoutDashboard, List, PlusCircle, History, Mic, Download, 
   BookOpen, Settings, Layers, Share2, Sparkles, ChevronRight, Home, Cpu, Sparkle, Workflow
@@ -62,6 +63,18 @@ export const AIDemoMainPage: React.FC = () => {
         setActiveProject(found);
       }
     }
+
+    const unsub = SaiEventBus.subscribe('sai:scenario_updated', (payload?: any) => {
+      reloadData();
+      if (payload && payload.scenarioId) {
+        const found = DemoManager.getProjectById(payload.scenarioId);
+        if (found) {
+          setActiveProject(found);
+        }
+      }
+    });
+
+    return () => unsub();
   }, [searchParams]);
 
   const tabs: Array<{ id: AIDemoTab; label: string; icon: React.ReactNode }> = [
