@@ -82,66 +82,26 @@ export class VoiceEngine {
     return this.defaultVoices.filter(v => v.language === lang);
   }
 
-  private static activeAudio: HTMLAudioElement | null = null;
-  private static activeOnEnd: (() => void) | null = null;
-
   public static speakText(text: string, config: VoiceConfig, onEnd?: () => void): void {
-    if (typeof window === 'undefined') {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      console.warn('Speech synthesis not supported');
       if (onEnd) onEnd();
       return;
     }
 
-    this.stopSpeech();
-    this.activeOnEnd = onEnd || null;
-
-    try {
-      const url = `/api/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(config.language)}`;
-      const audio = new Audio(url);
-      
-      audio.volume = config.volume;
-      audio.playbackRate = config.rate;
-      
-      audio.onended = () => {
-        if (this.activeOnEnd) {
-          this.activeOnEnd();
-          this.activeOnEnd = null;
-        }
-      };
-      
-      audio.onerror = () => {
-        console.warn('Network TTS failed, falling back to Web Speech API');
-        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
-      };
-      
-      audio.play().catch(e => {
-        console.warn('Audio play prevented or failed:', e);
-        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
-      });
-      
-      this.activeAudio = audio;
-    } catch (e) {
-      this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
-    }
-  }
-
-  private static fallbackWebSpeech(text: string, config: VoiceConfig, onEnd?: () => void): void {
-    if (!('speechSynthesis' in window)) {
-      if (onEnd) {
-        onEnd();
-        if (this.activeOnEnd === onEnd) this.activeOnEnd = null;
-      }
-      return;
-    }
+    // Cancel current speech
+    window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.pitch = config.pitch;
     utterance.rate = config.rate;
     utterance.volume = config.volume;
 
+    // Try finding matching system voice
     const systemVoices = window.speechSynthesis.getVoices();
     const langCode = this.getLangCode(config.language);
-    const match = systemVoices.find(v => v.lang.startsWith(langCode));
 
+    const match = systemVoices.find(v => v.lang.startsWith(langCode));
     if (match) {
       utterance.voice = match;
     } else {
@@ -149,32 +109,19 @@ export class VoiceEngine {
     }
 
     utterance.onend = () => {
-      if (this.activeOnEnd) {
-        this.activeOnEnd();
-        this.activeOnEnd = null;
-      }
+      if (onEnd) onEnd();
     };
+
     utterance.onerror = () => {
-      if (this.activeOnEnd) {
-        this.activeOnEnd();
-        this.activeOnEnd = null;
-      }
+      if (onEnd) onEnd();
     };
 
     window.speechSynthesis.speak(utterance);
   }
 
   public static stopSpeech(): void {
-    if (this.activeAudio) {
-      this.activeAudio.pause();
-      this.activeAudio = null;
-    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-    }
-    if (this.activeOnEnd) {
-      this.activeOnEnd();
-      this.activeOnEnd = null;
     }
   }
 

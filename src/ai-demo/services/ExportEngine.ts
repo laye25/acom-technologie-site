@@ -2,7 +2,9 @@
 // ExportEngine: Handles file exports for videos, subtitles (SRT/VTT/TXT), Markdown/HTML docs, and PDFs
 
 import { DemoProject } from '../types';
-import { VideoStorageService } from './VideoStorageService';
+import { VideoEngine } from '../video/VideoEngine';
+import { DemoManager } from './DemoManager';
+import { AudioExportEngine } from './AudioExportEngine';
 import toast from 'react-hot-toast';
 
 export class ExportEngine {
@@ -12,34 +14,165 @@ export class ExportEngine {
   ): Promise<void> {
     const filename = `${project.title.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.${format}`;
 
-    // 1. Try active project videoBlobUrl
-    let downloadUrl = project.videoBlobUrl;
-
-    // 2. Fallback to stored blob from IndexedDB if project object lacks the in-memory URL
-    if (!downloadUrl) {
-      downloadUrl = (await VideoStorageService.getVideoBlobUrl(project.id)) || undefined;
-    }
-
-    // 3. Download if a valid native capture exists
-    if (downloadUrl) {
+    // 1. If project already has a stored videoBlobUrl, download it directly
+    if (project.videoBlobUrl) {
       try {
         const link = document.createElement('a');
-        link.href = downloadUrl;
+        link.href = project.videoBlobUrl;
         link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        toast.success(`Téléchargement de la vidéo native (${format.toUpperCase()}) initié !`);
+        toast.success(`Téléchargement de la vidéo ${format.toUpperCase()} initié !`);
         return;
       } catch (err) {
-        console.error('Download failed for native video stream:', err);
+        console.warn('Blob URL download failed, re-rendering canvas:', err);
       }
     }
 
-    // 4. Fail explicitly if no native capture is available (NO synthetic reconstruction)
-    toast.error("Capture vidéo indisponible : Aucun enregistrement écran natif (ScreenRec) n'a été capturé lors de cette démonstration.", {
-      duration: 5000
-    });
+    // 2. Otherwise, render timeline steps to canvas and record to WebM/MP4
+    const toastId = toast.loading(`Génération du fichier vidéo ${format.toUpperCase()} en cours...`);
+
+    try {
+      const steps = project.timelineSteps || [];
+      if (steps.length === 0) {
+        toast.dismiss(toastId);
+        toast.error("Aucune étape dans la démonstration pour générer la vidéo.");
+        return;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 720;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        toast.dismiss(toastId);
+        toast.error("Impossible d'initialiser le moteur de rendu vidéo Canvas.");
+        return;
+      }
+
+      // Initialize AudioExportEngine to generate audio track combined with canvas video track
+      const audioSession = await AudioExportEngine.createExportStream(canvas, 30);
+      const mimeType = AudioExportEngine.getSupportedAudioVideoMimeType();
+
+      const recorder = new MediaRecorder(audioSession.combinedStream, {
+        mimeType,
+        videoBitsPerSecond: 8000000,
+        audioBitsPerSecond: 128000
+      });
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      const recordPromise = new Promise<Blob>((resolve, reject) => {
+        recorder.onstop = () => {
+          const videoBlob = new Blob(chunks, { type: mimeType });
+          audioSession.cleanup();
+          resolve(videoBlob);
+        };
+        recorder.onerror = (e) => {
+          audioSession.cleanup();
+          reject(e);
+        };
+      });
+
+      // Preload step screenshots and TTS audio buffers into memory before starting recording
+      const lang = project.voiceConfig?.language || 'fr';
+      await VideoEngine.preloadStepScreenshots(steps);
+      await AudioExportEngine.preloadAllStepsAudio(audioSession.audioCtx, steps, lang);
+
+      recorder.start();
+
+      // Render frames through canvas - Ultra Fast Optimized Loop
+      const fps = 15; // 15 fps gives ultra-smooth UI step previews at high rendering speed
+      const defaultBranding = {
+        showLogo: true,
+        logoUrl: '',
+        appName: 'ACOM AI Demo',
+        moduleName: project.moduleName || 'SaaS',
+        version: '1.0.0',
+        authorName: 'Acom Technologie',
+        showQRCode: false,
+        qrCodeUrl: '',
+        websiteUrl: 'https://acomtechnologie.com',
+        primaryColor: '#4f46e5',
+        accentColor: '#10b981',
+        showOutroScreen: true
+      };
+      const defaultVideoConfig = {
+        resolution: '1080p' as const,
+        fps: 30 as const,
+        aspectRatio: '16:9' as const,
+        format: format,
+        includeNarration: true,
+        includeSubtitles: true,
+        backgroundMusicVolume: 0.1
+      };
+
+      const totalSteps = steps.length;
+      for (let i = 0; i < totalSteps; i++) {
+        const step = steps[i];
+        const stepText = step.narrationText || step.description || step.title || '';
+        const audioDuration = AudioExportEngine.getAudioDuration(stepText);
+        // Ensure video frame duration matches full spoken audio duration + 0.3s breathing space
+        const stepDurationSec = Math.max(step.durationSec || 2.5, audioDuration > 0 ? audioDuration + 0.3 : 2.5);
+        const totalFrames = Math.max(15, Math.floor(stepDurationSec * fps));
+
+        // Update progress toast
+        const percent = Math.round(((i + 1) / totalSteps) * 100);
+        toast.loading(`Génération vidéo ${format.toUpperCase()} (${percent}%)... Étape ${i + 1}/${totalSteps}`, { id: toastId });
+
+        // Synthesize step audio narration & transition chime into Web Audio destination stream
+        AudioExportEngine.renderStepNarrationAudio(
+          audioSession.audioCtx,
+          audioSession.audioDestination,
+          step.narrationText || step.description || step.title,
+          stepDurationSec,
+          i,
+          lang
+        );
+
+        for (let frame = 0; frame < totalFrames; frame++) {
+          const progress = frame / totalFrames;
+          VideoEngine.renderStepToCanvas(
+            ctx,
+            step,
+            progress,
+            project.brandingConfig || defaultBranding,
+            project.videoConfig || defaultVideoConfig
+          );
+          // 8ms interval per frame for 5x fast rendering engine
+          await new Promise((r) => setTimeout(r, 8));
+        }
+      }
+
+      recorder.stop();
+      const finalBlob = await recordPromise;
+      const blobUrl = URL.createObjectURL(finalBlob);
+
+      // Save generated blob to project memory
+      project.videoBlobUrl = blobUrl;
+      DemoManager.saveProject(project);
+
+      // Trigger file download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.dismiss(toastId);
+      toast.success(`Vidéo ${format.toUpperCase()} téléchargée avec succès !`);
+    } catch (err) {
+      console.error('Failed to export video:', err);
+      toast.dismiss(toastId);
+      toast.error("Erreur lors de la génération du fichier vidéo.");
+    }
   }
 
   public static downloadTextFile(content: string, filename: string, mimeType: string = 'text/plain'): void {

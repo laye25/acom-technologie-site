@@ -14,6 +14,7 @@ import { PlatformObservability, SystemMetricsSnapshot } from '../services/Platfo
 import { IntegrationTestRunner, TestResult } from '../integration-tests/IntegrationTestRunner';
 import { GOLDEN_PRESSING_SCENARIO } from '../integration-tests/pressing-demo/PressingScenario';
 import { ScenarioPlayer } from './ScenarioPlayer';
+import { CanvasVideoRenderer } from '../engines/renderers/CanvasVideoRenderer';
 import {
   Activity,
   CheckCircle2,
@@ -76,12 +77,24 @@ export const PlatformControlCenter: React.FC = () => {
   const handleRenderVideo = async () => {
     setIsRenderingVideo(true);
     setRenderProgress(0);
-    setRenderStatus('Exigence ScreenRec : Le rendu vidéo synthétique est désactivé.');
+    setRenderStatus('Démarrage du rendu Canvas...');
 
     try {
-      throw new Error('Le rendu vidéo artificiel/Canvas est désactivé. Veuillez utiliser l\'enregistreur ScreenRec pour capturer le flux écran réel.');
+      const renderer = new CanvasVideoRenderer();
+      const res = await renderer.render(GOLDEN_PRESSING_SCENARIO, {
+        fps: 30,
+        resolution: '720p',
+        onProgress: (pct, msg) => {
+          setRenderProgress(pct);
+          setRenderStatus(msg);
+        }
+      });
+
+      if (res.blobUrl) {
+        setRenderedVideoUrl(res.blobUrl);
+      }
     } catch (e: any) {
-      setRenderStatus(`Export Refusé: ${e?.message}`);
+      setRenderStatus(`Erreur Rendu: ${e?.message}`);
     } finally {
       setIsRenderingVideo(false);
     }

@@ -9,9 +9,7 @@
 import { ScenarioApplicationIntelligent, SaiTimelineStep } from '../types/sai';
 import { DemoProject } from '../types';
 import { ExportEngine } from './ExportEngine';
-import { DemoManager } from './DemoManager';
 import { SaiEventBus } from './SaiEventBus';
-import { VoiceEngine } from '../voice/VoiceEngine';
 import toast from 'react-hot-toast';
 
 export interface GuidanceSessionState {
@@ -110,7 +108,6 @@ export class LiveGuidanceEngine {
   private isGuidanceActive: boolean = false;
   private isAutoControlActive: boolean = false;
   private autoExecutionTimer: any = null;
-  private currentSessionId: string | null = null;
 
   public startGuidanceSession(scenario: ScenarioApplicationIntelligent): GuidanceSessionState {
     this.activeScenario = scenario;
@@ -310,13 +307,6 @@ export class LiveGuidanceEngine {
     onStateChange?: (state: GuidanceSessionState) => void,
     onVideoComplete?: () => void
   ): Promise<void> {
-    const sessionId = Math.random().toString(36).substring(7);
-    this.currentSessionId = sessionId;
-    
-    if (this.isAutoControlActive) {
-      VoiceEngine.stopSpeech();
-    }
-    
     const activeScenario = scenario || LiveGuidanceEngine.buildFormScenarioForCurrentPage('Acom SaaS', 'Interface Active');
     this.activeScenario = activeScenario;
     this.currentStepIndex = 0;
@@ -330,7 +320,7 @@ export class LiveGuidanceEngine {
     DomVirtualCursor.show();
 
     for (let i = 0; i < totalSteps; i++) {
-      if (!this.isAutoControlActive || !this.activeScenario || this.currentSessionId !== sessionId) break;
+      if (!this.isAutoControlActive || !this.activeScenario) break;
 
       this.currentStepIndex = i;
       const activeStep = activeScenario.timeline[i];
@@ -343,33 +333,15 @@ export class LiveGuidanceEngine {
       // 1. Move cursor, highlight element, and type/click live on DOM
       await LiveGuidanceEngine.executeStepOnDom(activeStep, isLastStep);
 
-      if (this.currentSessionId !== sessionId) break;
-
-      // 2. Pause between steps for natural demonstration rhythm and play TTS audio
+      // 2. Pause between steps for natural demonstration rhythm
       const stepDurationMs = Math.max(1200, (activeStep.durationSec || 2.5) * 1000);
-      const voiceConfig = VoiceEngine.getAvailableVoices('fr')[0];
-      
-      const timerPromise = new Promise<void>(resolve => setTimeout(resolve, stepDurationMs));
-      const audioPromise = new Promise<void>(resolve => {
-        if (activeStep.narrationText) {
-          VoiceEngine.speakText(activeStep.narrationText, voiceConfig, resolve);
-        } else {
-          resolve();
-        }
-      });
-
-      // Wait for both the minimum step duration AND the audio to finish
-      await Promise.all([timerPromise, audioPromise]);
-
-      if (this.currentSessionId !== sessionId) break;
+      await new Promise((resolve) => setTimeout(resolve, stepDurationMs));
 
       if (isLastStep) {
         toast.success("✅ Formulaire complété et validé avec succès en direct !", { icon: '🎉' });
         await new Promise((resolve) => setTimeout(resolve, 800));
       }
     }
-
-    if (this.currentSessionId !== sessionId) return; // aborted
 
     // Hide DOM virtual cursor after completion
     DomVirtualCursor.hide();
@@ -454,7 +426,7 @@ export class LiveGuidanceEngine {
           tags: ['auto-tutorial']
         };
 
-        DemoManager.saveProject(project);
+        await ExportEngine.exportVideo(project, 'mp4');
       }
 
       toast.success("Tutoriel vidéo généré et terminé automatiquement !", { id: 'auto-video-complete' });
@@ -550,23 +522,6 @@ export class LiveGuidanceEngine {
     }
 
     if (!targetEl) return false;
-
-    // Strict UI presence checks
-    const rect = targetEl.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return false;
-
-    const computedStyle = window.getComputedStyle(targetEl);
-    if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden' || computedStyle.opacity === '0') {
-      return false;
-    }
-
-    // Prevent closing the modal: avoid clicking buttons that usually close modals
-    if (targetEl.tagName.toLowerCase() === 'button' || targetEl.getAttribute('role') === 'button') {
-      const text = (targetEl.innerText || targetEl.getAttribute('aria-label') || '').toLowerCase().trim();
-      if (text === 'x' || text.includes('fermer') || text.includes('annuler') || text.includes('cancel') || text.includes('close')) {
-        return false;
-      }
-    }
 
     // Scroll element into view safely
     try {
@@ -696,8 +651,6 @@ export class LiveGuidanceEngine {
       clearTimeout(this.autoExecutionTimer);
       this.autoExecutionTimer = null;
     }
-    this.currentSessionId = null;
-    VoiceEngine.stopSpeech();
     DomVirtualCursor.hide();
     this.activeScenario = null;
     this.currentStepIndex = 0;

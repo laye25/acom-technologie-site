@@ -1,10 +1,12 @@
+// src/ai-demo/hooks/useDemoRecorder.ts
+// React hook providing global recorder state, event capture, screen capture, and auto project generation
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DemoEventRecorder } from '../recorders/DemoEventRecorder';
 import { ScreenRecorder } from '../recorders/ScreenRecorder';
 import { UIAnalyzer } from '../engines/UIAnalyzer';
 import { AiEngine } from '../engines/AiEngine';
 import { DemoManager } from '../services/DemoManager';
-import { VideoStorageService } from '../services/VideoStorageService';
 import { SaiEventBus } from '../services/SaiEventBus';
 import { RecordedEvent, DemoProject, DemoLanguage } from '../types';
 import toast from 'react-hot-toast';
@@ -19,13 +21,7 @@ export function useDemoRecorder() {
   const [activePage, setActivePage] = useState<string>('Accueil');
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [eventsCount, setEventsCount] = useState<number>(0);
-  
   const timerRef = useRef<any>(null);
-  
-  const isRecordingRef = useRef(false);
-  const isScreenCaptureRef = useRef(false);
-  const activeModuleRef = useRef('Acom SaaS');
-  const activePageRef = useRef('Accueil');
 
   useEffect(() => {
     if (isRecording) {
@@ -53,109 +49,86 @@ export function useDemoRecorder() {
   const startDemoRecording = useCallback(async (
     moduleName: string,
     pageName: string,
-    enableScreenCapture: boolean = true
+    enableScreenCapture: boolean = false
   ) => {
     setActiveModule(moduleName);
-    activeModuleRef.current = moduleName;
     setActivePage(pageName);
-    activePageRef.current = pageName;
-    
     eventRecorder.startRecording(moduleName, pageName);
     setIsRecording(true);
-    isRecordingRef.current = true;
 
     if (enableScreenCapture) {
       const screenOk = await screenRecorder.startCapture('1080p', 30);
       setIsScreenCapture(screenOk);
-      isScreenCaptureRef.current = screenOk;
       if (screenOk) {
-        toast.success('Capture vidéo HD de l\'écran activée (ScreenRec) !');
-      } else {
-        toast('Capture vidéo d\'écran non activée. Seules les étapes texte seront enregistrées.', { icon: 'ℹ️' });
+        toast.success('Capture vidéo de l\'écran activée !');
       }
     } else {
       setIsScreenCapture(false);
-      isScreenCaptureRef.current = false;
     }
 
     toast.success(`Enregistrement ACOM AI Demo démarré : ${moduleName} - ${pageName}`);
   }, []);
 
-  const stopDemoRecording = useCallback(async (language: DemoLanguage = 'fr', existingProject?: DemoProject): Promise<DemoProject | null> => {
-    if (!isRecordingRef.current) return null;
+  const stopDemoRecording = useCallback(async (language: DemoLanguage = 'fr'): Promise<DemoProject | null> => {
+    if (!isRecording) return null;
 
-    const toastId = toast.loading('Analyse de l\'interface et finalisation du tutoriel vidéo...');
+    const toastId = toast.loading('Analyse de l\'interface et génération de la démonstration IA...');
 
     const events = eventRecorder.stopRecording();
-    
     let videoBlobUrl: string | undefined = undefined;
-    let capturedBlob: Blob | null = null;
-    if (isScreenCaptureRef.current) {
-      capturedBlob = await screenRecorder.stopCapture();
-      if (capturedBlob && capturedBlob.size > 0) {
-        videoBlobUrl = URL.createObjectURL(capturedBlob);
+
+    if (isScreenCapture) {
+      const blob = await screenRecorder.stopCapture();
+      if (blob) {
+        videoBlobUrl = URL.createObjectURL(blob);
       }
     }
 
     setIsRecording(false);
-    isRecordingRef.current = false;
     setIsScreenCapture(false);
-    isScreenCaptureRef.current = false;
 
-    let targetProject: DemoProject;
+    // Analyze current UI structure
+    const uiAnalysis = UIAnalyzer.analyzeCurrentUI(activeModule, activePage);
 
-    if (existingProject) {
-      // Just update existing project with new video and events
-      targetProject = { ...existingProject };
-      if (videoBlobUrl && capturedBlob) {
-        targetProject.videoBlobUrl = videoBlobUrl;
-        await VideoStorageService.saveVideoBlob(targetProject.id, capturedBlob);
-      }
-    } else {
-      // Analyze current UI structure
-      const uiAnalysis = UIAnalyzer.analyzeCurrentUI(activeModuleRef.current, activePageRef.current);
+    // Call AI Engine for synthesis
+    const aiContent = await AiEngine.synthesizeDemoContent(
+      activeModule,
+      activePage,
+      events,
+      uiAnalysis,
+      language
+    );
 
-      // Call AI Engine for synthesis
-      const aiContent = await AiEngine.synthesizeDemoContent(
-        activeModuleRef.current,
-        activePageRef.current,
-        events,
-        uiAnalysis,
-        language
-      );
+    // Create & Save project
+    const newProject = DemoManager.createNewProject(
+      activeModule,
+      activePage,
+      aiContent.title,
+      aiContent.description
+    );
 
-      // Create new project
-      targetProject = DemoManager.createNewProject(
-        activeModuleRef.current,
-        activePageRef.current,
-        aiContent.title,
-        aiContent.description
-      );
-
-      targetProject.events = events;
-      targetProject.uiAnalysis = uiAnalysis;
-      targetProject.timelineSteps = aiContent.timelineSteps;
-      targetProject.documentation = aiContent.documentation;
-
-      if (videoBlobUrl && capturedBlob) {
-        targetProject.videoBlobUrl = videoBlobUrl;
-        await VideoStorageService.saveVideoBlob(targetProject.id, capturedBlob);
-      }
+    newProject.events = events;
+    newProject.uiAnalysis = uiAnalysis;
+    newProject.timelineSteps = aiContent.timelineSteps;
+    newProject.documentation = aiContent.documentation;
+    if (videoBlobUrl) {
+      newProject.videoBlobUrl = videoBlobUrl;
     }
 
-    DemoManager.saveProject(targetProject);
-    toast.dismiss(toastId);
-    toast.success('Démonstration vidéo ScreenRec enregistrée avec succès !');
+    DemoManager.saveProject(newProject);
 
-    return targetProject;
-  }, []);
+    toast.dismiss(toastId);
+    toast.success('Démonstration IA générée avec succès !');
+
+    return newProject;
+  }, [isRecording, isScreenCapture, activeModule, activePage]);
 
   const recordManualAction = useCallback((action: any, label: string) => {
-    if (isRecordingRef.current) {
+    if (isRecording) {
       eventRecorder.recordCustomEvent(action, label);
       toast('Étape enregistrée : ' + label, { icon: '📍' });
     }
-  }, []);
+  }, [isRecording]);
 
   return {
     isRecording,

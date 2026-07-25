@@ -1,10 +1,9 @@
 // src/ai-demo/components/FloatingDemoRecorderWidget.tsx
 // Universal Floating Widget providing 1-click AI Demo Recording & Live Auto Control across all SaaS modules
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useDemoRecorder } from '../hooks/useDemoRecorder';
 import { LiveGuidanceEngine } from '../services/LiveGuidanceEngine';
-import { SaiEventBus } from '../services/SaiEventBus';
 import { Video, Square, Sparkles, X, Clock, MousePointerClick } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,51 +29,9 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
   const [isAutoRunning, setIsAutoRunning] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const unsub = SaiEventBus.subscribe('sai:trigger_live_demo_capture', (payload?: any) => {
-      const mod = payload?.moduleName || currentModule;
-      const pag = payload?.pageName || currentPage;
-      const project = payload?.project;
-      
-      startDemoRecording(mod, pag, true).then(() => {
-        setIsOpen(false);
-        setIsAutoRunning(true);
-        const guidanceEngine = new LiveGuidanceEngine();
-        
-        let scenarioObj = undefined;
-        if (project) {
-          scenarioObj = {
-            id: project.id,
-            version: '1.0.0',
-            application: { appName: project.moduleName, moduleName: project.pageName },
-            timeline: project.timelineSteps || [],
-            recordedEvents: project.events || []
-          };
-        }
-
-        guidanceEngine.startAutoControlSession(
-          scenarioObj as any,
-          undefined,
-          async () => {
-            setIsAutoRunning(false);
-            const savedProject = await stopDemoRecording('fr', project);
-            if (savedProject && !project) {
-              navigate(`/admin/ai-demo?project=${savedProject.id}`);
-            } else {
-              // Reload page to reflect new video if we updated an existing project, or trigger an event
-              SaiEventBus.publish('sai:scenario_updated', { scenarioId: project.id, completedAt: Date.now() });
-            }
-          }
-        );
-      });
-    });
-
-    return () => unsub();
-  }, [currentModule, currentPage, navigate, startDemoRecording, stopDemoRecording]);
-
   const handleStartAutoDemo = async () => {
     setIsAutoRunning(true);
-    await startDemoRecording(currentModule, currentPage, true); // Force true
+    await startDemoRecording(currentModule, currentPage, withScreen);
     setIsOpen(false);
 
     const guidanceEngine = new LiveGuidanceEngine();
@@ -135,15 +92,18 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
           </div>
 
           <p className="text-xs text-slate-300 leading-relaxed">
-            Le moteur unique IA exécute automatiquement la démonstration en direct et enregistre nativement votre écran pour une fidélité absolue (vidéo 1080p).
+            Le moteur unique IA exécute automatiquement la démonstration en direct (saisie, clics, curseur) et génère le vidéo-tutoriel HD :
           </p>
-          
-          <div className="bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-xl flex gap-2">
-            <Video className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <p className="text-[11px] text-emerald-200/90 leading-tight">
-              Une demande d'autorisation de capture d'écran s'affichera. Veuillez sélectionner l'onglet actuel et cocher "Partager l'audio de l'onglet" pour garantir l'enregistrement de la narration vocale.
-            </p>
-          </div>
+
+          <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/80">
+            <input
+              type="checkbox"
+              checked={withScreen}
+              onChange={(e) => setWithScreen(e.target.checked)}
+              className="rounded text-violet-600 focus:ring-violet-500 bg-slate-700 border-slate-600"
+            />
+            <span>Capturer l'écran vidéo HD (1080p)</span>
+          </label>
 
           <div className="space-y-2">
             <button

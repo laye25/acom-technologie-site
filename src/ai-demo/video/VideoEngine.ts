@@ -14,8 +14,7 @@ export class VideoEngine {
     branding: BrandingConfig,
     videoConfig: VideoConfig,
     canvasWidth: number = 1280,
-    canvasHeight: number = 720,
-    prevStep?: TimelineStep
+    canvasHeight: number = 720
   ): void {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
@@ -94,105 +93,51 @@ export class VideoEngine {
       const clickX = uiX + (step.x / window.innerWidth) * uiWidth;
       const clickY = uiY + (step.y / window.innerHeight) * uiHeight;
 
-      // Easing for cursor movement
-      const cursorProgress = Math.min(progress * 1.5, 1.0); // finishes moving early
-      const easeProgress = 1 - Math.pow(1 - cursorProgress, 3); // cubic out
+      // Concentric Expanding Click Shockwave
+      const rippleProgress = (progress * 3) % 1.0;
+      const rippleRadius = 15 + rippleProgress * 40;
+      const rippleAlpha = 1.0 - rippleProgress;
 
-      let startX = clickX + 150;
-      let startY = clickY + 150;
-      if (prevStep && prevStep.x !== undefined && prevStep.y !== undefined) {
-        startX = uiX + (prevStep.x / window.innerWidth) * uiWidth;
-        startY = uiY + (prevStep.y / window.innerHeight) * uiHeight;
-      }
-
-      const currentX = startX + (clickX - startX) * easeProgress;
-      const currentY = startY + (clickY - startY) * easeProgress;
-
-      // Only show ripple if it's clicking or reached destination
-      if (cursorProgress >= 1.0) {
-        // Concentric Expanding Click Shockwave
-        const rippleProgress = ((progress - 0.66) * 3) % 1.0;
-        if (rippleProgress > 0) {
-          const rippleRadius = 15 + rippleProgress * 40;
-          const rippleAlpha = 1.0 - rippleProgress;
-
-          ctx.strokeStyle = `rgba(16, 185, 129, ${rippleAlpha * 0.8})`; // emerald green
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(clickX, clickY, rippleRadius, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-
-        // Target Crosshair / Corner Bracket Callout
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 2;
-        const bSize = 12;
-        ctx.beginPath(); ctx.moveTo(clickX - 25, clickY - 25 + bSize); ctx.lineTo(clickX - 25, clickY - 25); ctx.lineTo(clickX - 25 + bSize, clickY - 25); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(clickX + 25, clickY + 25 - bSize); ctx.lineTo(clickX + 25, clickY + 25); ctx.lineTo(clickX + 25 - bSize, clickY + 25); ctx.stroke();
-      }
-
-      // Draw modern ACOM AI Cursor (same as LiveGuidanceEngine)
-      ctx.save();
-      ctx.translate(currentX, currentY);
-
-      // Drop shadow for the SVG pointer
-      ctx.shadowColor = 'rgba(92, 33, 151, 0.6)';
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 4;
-
-      // Draw Pointer (path d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z")
-      ctx.scale(1.5, 1.5);
-      
-      ctx.fillStyle = '#8b5cf6';
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.8;
-      ctx.lineJoin = 'round';
-      
+      ctx.strokeStyle = `rgba(99, 102, 241, ${rippleAlpha * 0.8})`;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(3, 3);
-      ctx.lineTo(10.07, 19.97);
-      ctx.lineTo(12.58, 12.58);
-      ctx.lineTo(19.97, 10.07);
-      ctx.closePath();
-      
-      ctx.fill();
+      ctx.arc(clickX, clickY, rippleRadius, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.shadowColor = 'transparent'; // Reset shadow for the label
+      // Glowing Outer Ring Halo
+      ctx.fillStyle = 'rgba(79, 70, 229, 0.25)';
+      ctx.beginPath();
+      ctx.arc(clickX, clickY, 28, 0, Math.PI * 2);
+      ctx.fill();
 
-      // Draw Label Box "Guidage IA Direct"
-      ctx.translate(18, 22);
-      ctx.scale(0.8, 0.8);
+      // Pulsing Inner Target Ring
+      ctx.strokeStyle = '#4f46e5';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(clickX, clickY, 18 + Math.sin(progress * Math.PI * 6) * 4, 0, Math.PI * 2);
+      ctx.stroke();
 
-      const labelText = "Guidage IA Direct";
-      ctx.font = "bold 14px system-ui, sans-serif";
-      const textMetrics = ctx.measureText(labelText);
-      const boxWidth = textMetrics.width + 30;
-      const boxHeight = 24;
-
-      // Draw box background
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+      // Target Crosshair / Corner Bracket Callout
       ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 1.5;
-      
+      ctx.lineWidth = 2;
+      const bSize = 12;
+      // Top-Left corner bracket
+      ctx.beginPath(); ctx.moveTo(clickX - 25, clickY - 25 + bSize); ctx.lineTo(clickX - 25, clickY - 25); ctx.lineTo(clickX - 25 + bSize, clickY - 25); ctx.stroke();
+      // Bottom-Right corner bracket
+      ctx.beginPath(); ctx.moveTo(clickX + 25, clickY + 25 - bSize); ctx.lineTo(clickX + 25, clickY + 25); ctx.lineTo(clickX + 25 - bSize, clickY + 25); ctx.stroke();
+
+      // Large High-Contrast Pointer Cursor Icon
+      ctx.fillStyle = '#4f46e5';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(0, 0, boxWidth, boxHeight, 8);
+      ctx.moveTo(clickX, clickY);
+      ctx.lineTo(clickX + 16, clickY + 20);
+      ctx.lineTo(clickX + 6, clickY + 20);
+      ctx.lineTo(clickX + 2, clickY + 28);
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
-
-      // Draw green dot
-      ctx.fillStyle = '#10b981';
-      ctx.beginPath();
-      ctx.arc(10, boxHeight / 2, 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw text
-      ctx.fillStyle = '#6ee7b7';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(labelText, 20, boxHeight / 2);
-
-      ctx.restore();
     }
 
     ctx.restore(); // Restore camera zoom translate & scale
