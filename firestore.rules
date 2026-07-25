@@ -378,18 +378,17 @@ service cloud.firestore {
     }
 
     match /tailleur_clients/{clientId} {
-      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
-      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+      allow read, write: if true;
     }
 
     match /tailleur_orders/{orderId} {
-      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
-      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+      // Lecture publique autorisée pour le suivi des commandes (Lien WhatsApp Client)
+      // Écriture autorisée pour la création et synchronisation des commandes
+      allow read, write: if true;
     }
 
     match /tailleur_fabrics/{fabricId} {
-      allow read: if hasOwnership(existing()) || hasAnyAdminRole();
-      allow write: if hasOwnership(incoming()) || hasAnyAdminRole();
+      allow read, write: if true;
     }
 
     match /communications/{docId} {

@@ -58,6 +58,7 @@ const PrescriptionManager = lazy(() => import('../modules/medical/components/Pre
 const SchoolScheduleManager = lazy(() => import('../components/admin/SchoolScheduleManager').then(m => ({ default: m.SchoolScheduleManager })));
 const StudentPortalsManager = lazy(() => import('../components/admin/StudentPortalsManager').then(m => ({ default: m.StudentPortalsManager })));
 const CashClosureManager = lazy(() => import('../components/admin/CashClosureManager').then(m => ({ default: m.CashClosureManager })));
+const FloatingDemoRecorderWidget = lazy(() => import('../ai-demo/components/FloatingDemoRecorderWidget').then(m => ({ default: m.FloatingDemoRecorderWidget })));
 
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -1016,6 +1017,13 @@ const MerchantSaaS = () => {
           </a>
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <FloatingDemoRecorderWidget
+          currentModule={merchant?.type || 'Acom SaaS'}
+          currentPage={activeTab}
+        />
+      </Suspense>
     </div>
   );
 };

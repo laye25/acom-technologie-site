@@ -136,46 +136,40 @@ export const NetworkStatusIndicator = ({ position = 'bottom-right', plan }: Netw
   }
 
   const positionClasses = position === 'top-center' 
-    ? 'top-4 left-1/2 -translate-x-1/2 z-50' 
-    : 'bottom-4 right-4 z-50';
+    ? 'top-4 left-1/2 -translate-x-1/2 z-40' 
+    : 'bottom-4 right-4 z-40';
 
   return (
-    <div className={`fixed ${positionClasses} flex flex-col gap-2 items-end`}>
-      {showQuotaExceeded && (
-        <div className="bg-rose-600 text-white px-4 py-2 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 animate-pulse">
-          <CloudOff className="w-3 h-3" />
-          Quota Firestore épuisé - Mode Lecture seule
-        </div>
-      )}
+    <div className={`fixed ${positionClasses} flex flex-col gap-1.5 items-end pointer-events-none`}>
       {pendingCount > 0 && !showQuotaExceeded && (
-        <div className="bg-amber-500 text-white px-4 py-2 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+        <div className="pointer-events-auto bg-amber-500 text-white px-3 py-1.5 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
           <RefreshCw className="w-3 h-3 animate-spin" />
           {pendingCount} modifications locales non synchronisées
         </div>
       )}
-      <div className="flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-600 border border-gray-200 shadow-gray-100/30">
-        <HardDrive className="w-3.5 h-3.5 text-gray-400" />
+      <div className="pointer-events-auto flex items-center gap-1.5 px-3 py-1 rounded-full shadow-sm text-[10px] font-bold uppercase tracking-wider bg-white/90 backdrop-blur-sm text-gray-600 border border-gray-200">
+        <HardDrive className="w-3 h-3 text-gray-400" />
         <span>Dernière écriture disque : {relativeText}</span>
       </div>
-      <div className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-lg text-xs font-bold uppercase tracking-wider transition-all ${showQuotaExceeded ? 'bg-rose-700 text-white' : (isLocalPlan ? 'bg-emerald-600 text-white' : isOnline ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white')}`}>
+      <div className={`pointer-events-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-full shadow-md text-xs font-bold uppercase tracking-wider transition-all ${showQuotaExceeded ? 'bg-rose-600 text-white animate-pulse' : (isLocalPlan ? 'bg-emerald-600 text-white' : isOnline ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white')}`}>
         {showQuotaExceeded ? (
           <>
-            <CloudOff className="w-4 h-4" />
-            <span>Quota Épuisé</span>
+            <CloudOff className="w-3.5 h-3.5" />
+            <span>Quota Firestore Épuisé (Mode Lecture seule)</span>
           </>
         ) : isLocalPlan ? (
           <>
-            <HardDrive className="w-4 h-4" />
+            <HardDrive className="w-3.5 h-3.5" />
             <span>Mode Local</span>
           </>
         ) : isOnline ? (
           <>
-            <Wifi className="w-4 h-4" />
+            <Wifi className="w-3.5 h-3.5" />
             <span>Connecté</span>
           </>
         ) : (
           <>
-            <WifiOff className="w-4 h-4" />
+            <WifiOff className="w-3.5 h-3.5" />
             <span>Mode Hors-ligne</span>
           </>
         )}

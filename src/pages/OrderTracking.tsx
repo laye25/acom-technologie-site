@@ -1,18 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
-  Scissors, Calendar, DollarSign, CheckCircle2, AlertCircle, 
-  ChevronRight, Phone, MessageSquare, MapPin, ClipboardList, Info, Sparkles, ArrowLeft
+  Scissors, Calendar, CheckCircle2, AlertCircle, 
+  Phone, MessageSquare, MapPin, ClipboardList, Info, Sparkles, ArrowLeft, Bug, RefreshCw
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+
+interface OrderTrackingDebugInfo {
+  rawOrderId: string;
+  cleanOrderId: string;
+  searchedLocalStorage: boolean;
+  searchedFirestore: boolean;
+  foundSource: 'localStorage' | 'firestore_doc' | 'firestore_query' | 'none';
+  foundOrder: boolean;
+  trackingId: string | null;
+  trackingStatus: string | null;
+  isPublished: boolean | null;
+  isSynced: boolean | null;
+  firestoreError: string | null;
+  apiResult: string;
+}
 
 interface OrderTrackingState {
   order: any;
   merchant: any;
   loading: boolean;
-  error: string | null;
+  errorType: 'invalid_id' | 'not_found' | 'unpublished' | 'archived' | 'network_error' | null;
+  errorMessage: string | null;
+  debugInfo: OrderTrackingDebugInfo;
 }
 
 const MEASUREMENT_NAMES: Record<string, string> = {
@@ -30,114 +47,262 @@ const MEASUREMENT_NAMES: Record<string, string> = {
 
 export default function OrderTracking() {
   const { orderId } = useParams<{ orderId: string }>();
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
   const [state, setState] = useState<OrderTrackingState>({
     order: null,
     merchant: null,
     loading: true,
-    error: null
+    errorType: null,
+    errorMessage: null,
+    debugInfo: {
+      rawOrderId: orderId || '',
+      cleanOrderId: (orderId || '').replace(/^(ord-|trk-|cmd-)/i, ''),
+      searchedLocalStorage: false,
+      searchedFirestore: false,
+      foundSource: 'none',
+      foundOrder: false,
+      trackingId: null,
+      trackingStatus: null,
+      isPublished: null,
+      isSynced: null,
+      firestoreError: null,
+      apiResult: 'En cours de chargement...'
+    }
   });
 
-  useEffect(() => {
+  const loadData = async () => {
     if (!orderId) {
-      setState(s => ({ ...s, loading: false, error: "Identifiant de commande introuvable." }));
+      setState(s => ({
+        ...s,
+        loading: false,
+        errorType: 'invalid_id',
+        errorMessage: "Identifiant de suivi invalide ou absent du lien.",
+        debugInfo: { ...s.debugInfo, apiResult: "Paramètre URL orderId absent." }
+      }));
       return;
     }
 
-    const loadData = async () => {
+    setState(s => ({ ...s, loading: true }));
+
+    const rawId = orderId.trim();
+    const cleanId = rawId.replace(/^(ord-|trk-|cmd-)/i, '');
+    const prefId = rawId.startsWith('ord-') ? rawId : `ord-${cleanId}`;
+
+    console.log("🔍 [Suivi Client Audit] Tracking lookup started for:", { rawId, cleanId, prefId });
+
+    let foundOrder: any = null;
+    let foundMerchantId: string | null = null;
+    let source: 'localStorage' | 'firestore_doc' | 'firestore_query' | 'none' = 'none';
+
+    // 1. Search LocalStorage across all merchant stores
+    const orderKeys = Object.keys(localStorage).filter(key => key.startsWith('tailleur_orders_'));
+    for (const key of orderKeys) {
       try {
-        // Find the order by scanning all localStorage keys starting with 'tailleur_orders_'
-        const orderKeys = Object.keys(localStorage).filter(key => key.startsWith('tailleur_orders_'));
-        let foundOrder: any = null;
-        let foundMerchantId: string | null = null;
+        const list = JSON.parse(localStorage.getItem(key) || '[]');
+        const match = list.find((o: any) => {
+          if (!o) return false;
+          const oId = String(o.id || '');
+          const oOrderId = String(o.order_id || '');
+          const oTrackId = String(o.tracking_id || o.public_tracking_id || o.trackingToken || '');
+          const oCleanId = oId.replace(/^(ord-|trk-|cmd-)/i, '');
+          const oCleanTrackId = oTrackId.replace(/^(ord-|trk-|cmd-)/i, '');
 
-        for (const key of orderKeys) {
-          const list = JSON.parse(localStorage.getItem(key) || '[]');
-          const match = list.find((o: any) => o.id === orderId);
-          if (match) {
-            foundOrder = match;
-            foundMerchantId = key.replace('tailleur_orders_', '');
-            break;
-          }
-        }
-
-        // Try Firestore fallback if not in current browser's localstorage
-        if (!foundOrder) {
-          try {
-            const docRef = doc(db, 'tailleur_orders', orderId);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              foundOrder = { ...data, id: docSnap.id };
-              foundMerchantId = data.merchantId || null;
-            }
-          } catch (fsErr) {
-            console.error("Firestore fallback failed:", fsErr);
-          }
-        }
-
-        if (!foundOrder) {
-          // Fallback or demo data if none exists in current browser cache
-          // to ensure a stunning preview is always functional.
-          setState(s => ({
-            ...s,
-            loading: false,
-            error: "Désolé, nous n'avons pas pu charger votre suivi de commande. L'atelier n'a pas encore synchronisé cette commande ou le lien est expiré."
-          }));
-          return;
-        }
-
-        // Load associated merchant
-        let foundMerchant: any = null;
-        if (foundMerchantId) {
-          // Look for merchant settings in localStorage
-          const mKey = `merchant_${foundMerchantId}`;
-          const mSaved = localStorage.getItem(mKey) || localStorage.getItem('merchant');
-          if (mSaved) {
-            try {
-              foundMerchant = JSON.parse(mSaved);
-            } catch (e) {
-              console.error(e);
-            }
-          }
-
-          // Try loading merchant details from Firestore if missing from localStorage
-          if (!foundMerchant) {
-            try {
-              const merchDocRef = doc(db, 'merchants', foundMerchantId);
-              const merchDocSnap = await getDoc(merchDocRef);
-              if (merchDocSnap.exists()) {
-                foundMerchant = { ...merchDocSnap.data(), id: merchDocSnap.id };
-              }
-            } catch (merchErr) {
-              console.error("Merchant Firestore load failed:", merchErr);
-            }
-          }
-
-          if (!foundMerchant) {
-            // Attempt to find inside list of merchants if applicable
-            foundMerchant = {
-              id: foundMerchantId,
-              name: "Atelier Haute Couture",
-              phone: "+221 77 000 00 00",
-              address: "Dakar, Sénégal",
-              currency: foundOrder.currency || "FCFA"
-            };
-          }
-        }
-
-        setState({
-          order: foundOrder,
-          merchant: foundMerchant,
-          loading: false,
-          error: null
+          return (
+            oId === rawId ||
+            oId === prefId ||
+            oCleanId === cleanId ||
+            oOrderId === rawId ||
+            oTrackId === rawId ||
+            oTrackId === cleanId ||
+            oCleanTrackId === cleanId ||
+            oId.toLowerCase() === rawId.toLowerCase()
+          );
         });
 
+        if (match) {
+          foundOrder = match;
+          foundMerchantId = key.replace('tailleur_orders_', '');
+          source = 'localStorage';
+          console.log("✅ [Suivi Client Audit] Match found in LocalStorage:", foundOrder);
+          break;
+        }
       } catch (e) {
-        console.error(e);
-        setState(s => ({ ...s, loading: false, error: "Une erreur est survenue lors de la récupération." }));
+        console.error("LocalStorage parse error:", e);
       }
+    }
+
+    let firestoreErrCode: string | null = null;
+
+    // 2. Search Firestore if not found in LocalStorage
+    if (!foundOrder) {
+      try {
+        console.log("🌐 [Suivi Client Audit] Fetching order from Firestore cloud server...");
+        
+        // Direct document ID lookups
+        const possibleDocIds = Array.from(new Set([rawId, prefId, cleanId]));
+        for (const docId of possibleDocIds) {
+          if (foundOrder) break;
+          try {
+            const docRef = doc(db, 'tailleur_orders', docId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              foundOrder = { ...docSnap.data(), id: docSnap.id };
+              foundMerchantId = foundOrder.merchantId || null;
+              source = 'firestore_doc';
+              console.log("✅ [Suivi Client Audit] Firestore doc match:", docId, foundOrder);
+            }
+          } catch (docErr: any) {
+            firestoreErrCode = docErr?.code || docErr?.message || String(docErr);
+            console.warn("Firestore doc lookup error:", docErr);
+          }
+        }
+
+        // Query lookups if doc ID search didn't return
+        if (!foundOrder) {
+          const colRef = collection(db, 'tailleur_orders');
+          const queries = [
+            query(colRef, where('tracking_id', '==', cleanId)),
+            query(colRef, where('tracking_id', '==', rawId)),
+            query(colRef, where('public_tracking_id', '==', cleanId)),
+            query(colRef, where('public_tracking_id', '==', rawId)),
+            query(colRef, where('id', '==', prefId)),
+            query(colRef, where('id', '==', rawId)),
+            query(colRef, where('order_id', '==', prefId)),
+            query(colRef, where('order_id', '==', rawId))
+          ];
+
+          for (const q of queries) {
+            if (foundOrder) break;
+            try {
+              const snap = await getDocs(q);
+              if (!snap.empty) {
+                const docSnap = snap.docs[0];
+                foundOrder = { ...docSnap.data(), id: docSnap.id };
+                foundMerchantId = foundOrder.merchantId || null;
+                source = 'firestore_query';
+                console.log("✅ [Suivi Client Audit] Firestore query match:", foundOrder);
+              }
+            } catch (qErr: any) {
+              firestoreErrCode = qErr?.code || qErr?.message || String(qErr);
+              console.warn("Firestore query error:", qErr);
+            }
+          }
+        }
+      } catch (fsErr: any) {
+        firestoreErrCode = fsErr?.code || fsErr?.message || String(fsErr);
+        console.error("❌ [Suivi Client Audit] Firestore connection error:", fsErr);
+      }
+    }
+
+    // Populate debug info
+    const debugInfo: OrderTrackingDebugInfo = {
+      rawOrderId: rawId,
+      cleanOrderId: cleanId,
+      searchedLocalStorage: true,
+      searchedFirestore: true,
+      foundSource: source,
+      foundOrder: !!foundOrder,
+      trackingId: foundOrder ? (foundOrder.tracking_id || foundOrder.public_tracking_id || cleanId) : null,
+      trackingStatus: foundOrder ? (foundOrder.tracking_status || 'published') : null,
+      isPublished: foundOrder ? (
+        foundOrder.published === true ||
+        foundOrder.is_published === true ||
+        foundOrder.tracking_status === 'published' ||
+        foundOrder.is_published !== false
+      ) : false,
+      isSynced: foundOrder ? (
+        source.startsWith('firestore') || 
+        foundOrder.syncStatus === 'synced' || 
+        Boolean(foundOrder.updatedAt) ||
+        Boolean(foundOrder.created_at || foundOrder.createdAt)
+      ) : false,
+      firestoreError: firestoreErrCode,
+      apiResult: foundOrder 
+        ? `Commande "${foundOrder.model || 'Modèle'}" localisée via ${source} (Statut: ${foundOrder.status})`
+        : (firestoreErrCode ? `Erreur Cloud Firestore : ${firestoreErrCode}` : "Aucune commande trouvée pour cet identifiant dans la base locale ni sur le serveur.")
     };
 
+    // Handle not found
+    if (!foundOrder) {
+      setState({
+        order: null,
+        merchant: null,
+        loading: false,
+        errorType: 'not_found',
+        errorMessage: "Commande introuvable. L'atelier n'a pas encore synchronisé cette commande sur le serveur ou le lien est expiré.",
+        debugInfo
+      });
+      return;
+    }
+
+    // Access checks
+    if (foundOrder.is_tracking_enabled === false) {
+      setState({
+        order: foundOrder,
+        merchant: null,
+        loading: false,
+        errorType: 'unpublished',
+        errorMessage: "Le suivi en ligne pour cette commande a été désactivé par l'atelier.",
+        debugInfo
+      });
+      return;
+    }
+
+    if (foundOrder.tracking_status === 'archived') {
+      setState({
+        order: foundOrder,
+        merchant: null,
+        loading: false,
+        errorType: 'archived',
+        errorMessage: "Cette commande est archivée et ne peut plus être consultée en ligne.",
+        debugInfo
+      });
+      return;
+    }
+
+    // Load Merchant details
+    let foundMerchant: any = null;
+    if (foundMerchantId) {
+      const mKey = `merchant_${foundMerchantId}`;
+      const mSaved = localStorage.getItem(mKey) || localStorage.getItem('merchant');
+      if (mSaved) {
+        try { foundMerchant = JSON.parse(mSaved); } catch (e) { console.error(e); }
+      }
+
+      if (!foundMerchant) {
+        try {
+          const merchDocRef = doc(db, 'merchants', foundMerchantId);
+          const merchDocSnap = await getDoc(merchDocRef);
+          if (merchDocSnap.exists()) {
+            foundMerchant = { ...merchDocSnap.data(), id: merchDocSnap.id };
+          }
+        } catch (merchErr) {
+          console.error("Merchant Firestore load error:", merchErr);
+        }
+      }
+    }
+
+    if (!foundMerchant) {
+      foundMerchant = {
+        id: foundMerchantId || 'default',
+        name: foundOrder.merchantName || "Atelier Haute Couture",
+        phone: foundOrder.merchantPhone || "+221 77 000 00 00",
+        address: foundOrder.merchantAddress || "Dakar, Sénégal",
+        currency: foundOrder.currency || "FCFA"
+      };
+    }
+
+    setState({
+      order: foundOrder,
+      merchant: foundMerchant,
+      loading: false,
+      errorType: null,
+      errorMessage: null,
+      debugInfo
+    });
+  };
+
+  useEffect(() => {
     loadData();
   }, [orderId]);
 
@@ -150,26 +315,66 @@ export default function OrderTracking() {
     );
   }
 
-  if (state.error || !state.order) {
+  if (state.errorType || !state.order) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center text-left">
-        <div className="max-w-md bg-white p-8 rounded-3xl border border-gray-150 shadow-sm space-y-6">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-gray-150 shadow-sm space-y-6 text-left">
           <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto">
             <AlertCircle className="w-8 h-8" />
           </div>
-          <div className="space-y-2">
-            <h2 className="text-lg font-black text-slate-950">Suivi introuvable</h2>
+          <div className="space-y-2 text-center">
+            <h2 className="text-lg font-black text-slate-950">
+              {state.errorType === 'invalid_id' ? 'Identifiant de suivi invalide' :
+               state.errorType === 'unpublished' ? 'Suivi désactivé' :
+               state.errorType === 'archived' ? 'Commande archivée' :
+               'Suivi introuvable'}
+            </h2>
             <p className="text-xs text-gray-500 leading-relaxed">
-              {state.error || "La commande demandée est introuvable ou a été archivée par l'atelier."}
+              {state.errorMessage || "Désolé, nous n'avons pas pu charger votre suivi de commande. L'atelier n'a pas encore synchronisé cette commande ou le lien est expiré."}
             </p>
           </div>
-          <div className="pt-4">
+
+          <div className="pt-2 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={loadData}
+              className="w-full py-2.5 bg-violet-600 text-white rounded-xl font-bold text-xs hover:bg-violet-700 transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" /> Réessayer la synchronisation
+            </button>
             <Link 
               to="/" 
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-violet-600 text-white rounded-xl font-bold text-xs hover:bg-violet-700 transition"
+              className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-xs hover:bg-gray-200 transition flex items-center justify-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" /> Retour à l'accueil
             </Link>
+          </div>
+
+          {/* Diagnostic Debug Mode Toggle on Error Screen */}
+          <div className="pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => setIsDebugOpen(!isDebugOpen)}
+              className="text-[11px] font-mono font-bold text-violet-600 hover:text-violet-800 flex items-center gap-1 mx-auto cursor-pointer"
+            >
+              <Bug className="w-3.5 h-3.5" />
+              {isDebugOpen ? "Masquer le Journal de Diagnostic" : "Afficher le Journal de Diagnostic (Mode Debug)"}
+            </button>
+
+            {isDebugOpen && (
+              <div className="mt-3 bg-slate-900 text-slate-100 p-4 rounded-2xl font-mono text-[10px] space-y-1.5 overflow-x-auto border border-slate-800">
+                <p className="font-bold text-amber-400 border-b border-slate-800 pb-1">🛠️ JOURNAL DE DIAGNOSTIC SUIVI</p>
+                <p><span className="text-slate-400">Commande ID brut :</span> {state.debugInfo.rawOrderId}</p>
+                <p><span className="text-slate-400">Tracking ID nettoyé :</span> {state.debugInfo.cleanOrderId}</p>
+                <p><span className="text-slate-400">Tracking ID résolu :</span> {state.debugInfo.trackingId || 'Aucun'}</p>
+                <p><span className="text-slate-400">Statut Suivi :</span> {state.debugInfo.trackingStatus || 'Inconnu'}</p>
+                <p><span className="text-slate-400">Publié :</span> {state.debugInfo.isPublished ? 'Oui (Published)' : 'Non'}</p>
+                <p><span className="text-slate-400">Synchronisé Cloud :</span> {state.debugInfo.isSynced ? 'Oui' : 'Non'}</p>
+                <p><span className="text-slate-400">Source découverte :</span> {state.debugInfo.foundSource}</p>
+                <p><span className="text-slate-400">Commande trouvée :</span> {state.debugInfo.foundOrder ? 'Oui' : 'Non'}</p>
+                <p className="text-emerald-300 pt-1 border-t border-slate-800"><span className="text-slate-400">Résultat API :</span> {state.debugInfo.apiResult}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -269,7 +474,6 @@ export default function OrderTracking() {
               {STATUSES.map((step, idx) => {
                 const isCompleted = idx < activeIndex;
                 const isActive = idx === activeIndex;
-                const isFuture = idx > activeIndex;
 
                 const StepIcon = step.icon;
 
@@ -426,6 +630,34 @@ export default function OrderTracking() {
               </div>
             </motion.div>
           )}
+
+          {/* Diagnostic Debug Mode Bar at the bottom */}
+          <div className="pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setIsDebugOpen(!isDebugOpen)}
+              className="text-[10px] font-mono font-bold text-violet-600 hover:text-violet-800 inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Bug className="w-3.5 h-3.5" />
+              {isDebugOpen ? "Masquer le Journal de Diagnostic" : "Journal de Diagnostic (Mode Debug)"}
+            </button>
+
+            {isDebugOpen && (
+              <div className="mt-3 text-left max-w-xl mx-auto bg-slate-900 text-slate-100 p-4 rounded-2xl font-mono text-[10px] space-y-1.5 overflow-x-auto border border-slate-800">
+                <p className="font-bold text-amber-400 border-b border-slate-800 pb-1">🛠️ JOURNAL DE DIAGNOSTIC SUIVI</p>
+                <p><span className="text-slate-400">Commande ID brut :</span> {state.debugInfo.rawOrderId}</p>
+                <p><span className="text-slate-400">Tracking ID nettoyé :</span> {state.debugInfo.cleanOrderId}</p>
+                <p><span className="text-slate-400">Tracking ID résolu :</span> {state.debugInfo.trackingId || 'Aucun'}</p>
+                <p><span className="text-slate-400">Statut Suivi :</span> {state.debugInfo.trackingStatus || 'Inconnu'}</p>
+                <p><span className="text-slate-400">Publié :</span> {state.debugInfo.isPublished ? 'Oui (Published)' : 'Non'}</p>
+                <p><span className="text-slate-400">Synchronisé Cloud :</span> {state.debugInfo.isSynced ? 'Oui' : 'Non'}</p>
+                <p><span className="text-slate-400">Erreur Cloud/Firestore :</span> <span className={state.debugInfo.firestoreError ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>{state.debugInfo.firestoreError || 'Aucune (200 OK)'}</span></p>
+                <p><span className="text-slate-400">Source découverte :</span> {state.debugInfo.foundSource}</p>
+                <p><span className="text-slate-400">Commande trouvée :</span> {state.debugInfo.foundOrder ? 'Oui' : 'Non'}</p>
+                <p className="text-emerald-300 pt-1 border-t border-slate-800"><span className="text-slate-400">Résultat API :</span> {state.debugInfo.apiResult}</p>
+              </div>
+            )}
+          </div>
 
           {/* Secure disclaimer */}
           <p className="text-center text-[10px] text-gray-400 font-medium">

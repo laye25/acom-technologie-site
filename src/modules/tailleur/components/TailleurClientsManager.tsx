@@ -8,16 +8,26 @@ import { syncService } from '../../../services/syncService';
 import { 
     Save, X, Loader2, Trash2, Search, 
     User, Phone, MapPin, Calendar,
-    RefreshCw, FileText, Printer, Plus, Scissors, Users, Edit2
+    RefreshCw, FileText, Printer, Plus, Scissors, Users, Edit2,
+    Ruler, Sparkles
 } from 'lucide-react';
+import { SmartMeasurementAssistant } from './SmartMeasurementAssistant';
+import { GarmentProfileCard } from './GarmentProfileCard';
+import { GarmentLibraryService } from '../services/GarmentLibraryService';
+import { GarmentResolverService } from '../services/GarmentResolverService';
+import { TailorCard, TailorDeleteConfirmModal } from './design-system/TailorDesignSystem';
 
 export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => {
   const [clients, setClients] = useState<any[]>([]);
   const [search, setSearch] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentClient, setCurrentClient] = useState<any>(null);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSmartAssistantOpen, setIsSmartAssistantOpen] = useState(false);
+
+  // Modal de confirmation de suppression
+  const [clientToDelete, setClientToDelete] = useState<any | null>(null);
+  const [clientOrdersCount, setClientOrdersCount] = useState<number>(0);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Trigger sync and reload
   const triggerSync = async (force: boolean = false) => {
@@ -49,48 +59,63 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
     localStorage.setItem(`tailleur_clients_${merchant.id}`, JSON.stringify(newClients));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentClient.firstName || !currentClient.lastName) {
-      toast.error('Veuillez saisir le prénom et le nom');
-      return;
+  const handleRequestDelete = (client: any) => {
+    if (!client || !client.id) return;
+    try {
+      const savedOrders = localStorage.getItem(`tailleur_orders_${merchant.id}`);
+      const ordersList = savedOrders ? JSON.parse(savedOrders) : [];
+      const count = ordersList.filter((o: any) => o.clientId === client.id && !o.isDeleted).length;
+      setClientOrdersCount(count);
+    } catch (e) {
+      setClientOrdersCount(0);
     }
-
-    let updated;
-    if (currentClient.id) {
-      updated = clients.map(c => c.id === currentClient.id ? { ...currentClient, syncStatus: 'pending', updatedAt: new Date().toISOString() } : c);
-      toast.success('Fiche client mise à jour');
-    } else {
-      const newCl = {
-        ...currentClient,
-        id: crypto.randomUUID(),
-        syncStatus: 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      updated = [newCl, ...clients];
-      toast.success('Nouveau client enregistré');
-    }
-    saveClients(updated);
-    setIsFormOpen(false);
-    setCurrentClient(null);
-    triggerSync();
+    setClientToDelete(client);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Voulez-vous vraiment supprimer ce client ? Toutes ses mesures seront perdues.')) {
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete) return;
+    setIsDeleting(true);
+    try {
+      const id = clientToDelete.id;
       const target = clients.find(c => c.id === id);
-      let updated;
       if (target) {
+        let updatedClients;
         if (target.syncStatus === 'synced') {
-          updated = clients.map(c => c.id === id ? { ...c, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() } : c);
+          updatedClients = clients.map(c => c.id === id ? { ...c, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() } : c);
         } else {
-          updated = clients.filter(c => c.id !== id);
+          updatedClients = clients.filter(c => c.id !== id);
         }
-        saveClients(updated);
-        toast.success('Fiche client supprimée');
-        triggerSync();
+        saveClients(updatedClients);
+
+        // Nettoyage des commandes associées si nécessaire
+        if (clientOrdersCount > 0) {
+          try {
+            const savedOrders = localStorage.getItem(`tailleur_orders_${merchant.id}`);
+            if (savedOrders) {
+              const ordersList = JSON.parse(savedOrders);
+              const updatedOrders = ordersList.map((o: any) => {
+                if (o.clientId === id) {
+                  return { ...o, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() };
+                }
+                return o;
+              });
+              localStorage.setItem(`tailleur_orders_${merchant.id}`, JSON.stringify(updatedOrders));
+            }
+          } catch (err) {
+            console.error("Erreur lors de la suppression des commandes associées au client :", err);
+          }
+        }
+
+        toast.success(`Client "${target.firstName || ''} ${target.lastName || ''}" supprimé avec succès !`);
+        await triggerSync();
       }
+    } catch (e) {
+      console.error("Erreur suppression client :", e);
+      toast.error("Échec de la suppression du client.");
+    } finally {
+      setIsDeleting(false);
+      setClientToDelete(null);
+      setClientOrdersCount(0);
     }
   };
 
@@ -246,6 +271,10 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
     email: '',
     address: '',
     gender: 'M',
+    preferredGarment: 'Ensemble Africain 2 Pièces (Chemise & Pantalon)',
+    garmentId: 'garment-ensemble-africain',
+    garmentName: 'Ensemble Africain 2 Pièces (Chemise & Pantalon)',
+    category: 'Couture Africaine',
     measurements: {
       cou: '',
       poitrine: '',
@@ -297,10 +326,10 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
 
           <button 
             onClick={() => {
-              setCurrentClient(initialClientState);
-              setIsFormOpen(true);
+              setCurrentClient(null);
+              setIsSmartAssistantOpen(true);
             }}
-            className="flex-1 lg:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-600/20 hover:scale-[1.02] transition"
+            className="flex-1 lg:flex-none flex items-center justify-center space-x-2 px-5 py-2.5 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-600/20 hover:scale-[1.02] transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Ajouter un Client</span>
@@ -324,258 +353,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
         )}
       </div>
 
-      {isFormOpen && currentClient && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-violet-50/55 shrink-0">
-              <div className="text-left">
-                <h3 className="text-xl font-black text-ink">{currentClient.id ? 'Modifier la Fiche Client' : 'Nouvelle Fiche Client'}</h3>
-                <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Enregistrement des détails et mesures</p>
-              </div>
-              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
 
-            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto flex-1 text-left">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Column des inputs */}
-                <div className="lg:col-span-8 space-y-6">
-                  {/* Informations Générales */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-black text-violet-600 uppercase tracking-wider border-b border-violet-100 pb-1">1. Informations Générales</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Prénom *</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={currentClient.firstName}
-                      onChange={e => setCurrentClient({ ...currentClient, firstName: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Nom de Famille *</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={currentClient.lastName}
-                      onChange={e => setCurrentClient({ ...currentClient, lastName: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Genre</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button 
-                        type="button"
-                        onClick={() => setCurrentClient({ ...currentClient, gender: 'M' })}
-                        className={`py-2 px-3 border rounded-xl text-center text-xs font-bold transition-all ${currentClient.gender === 'M' ? 'bg-violet-600 border-violet-600 text-white' : 'border-gray-200 text-gray-600'}`}
-                      >
-                        Homme
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setCurrentClient({ ...currentClient, gender: 'F' })}
-                        className={`py-2 px-3 border rounded-xl text-center text-xs font-bold transition-all ${currentClient.gender === 'F' ? 'bg-violet-600 border-violet-600 text-white' : 'border-gray-200 text-gray-600'}`}
-                      >
-                        Femme
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Téléphone</label>
-                    <input 
-                      type="tel" 
-                      value={currentClient.phone || ''}
-                      onChange={e => setCurrentClient({ ...currentClient, phone: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Adresse E-mail</label>
-                    <input 
-                      type="email" 
-                      value={currentClient.email || ''}
-                      onChange={e => setCurrentClient({ ...currentClient, email: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Adresse Physique</label>
-                    <input 
-                      type="text" 
-                      value={currentClient.address || ''}
-                      onChange={e => setCurrentClient({ ...currentClient, address: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Mesures Couture */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-black text-violet-600 uppercase tracking-wider border-b border-violet-100 pb-1">2. Mesures d'Atelier (en cm)</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                  {Object.keys(MEASUREMENT_LABELS).map((key) => {
-                    const isFocused = focusedField === key;
-                    return (
-                      <div key={key} className="transition-all">
-                        <label className={`block text-[11px] font-bold mb-1 truncate text-ellipsis transition-colors ${isFocused ? 'text-violet-600 font-black scale-105' : 'text-gray-500'}`}>{MEASUREMENT_LABELS[key]}</label>
-                        <input 
-                          type="number" 
-                          step="0.5"
-                          placeholder="Néant"
-                          value={currentClient.measurements?.[key] || ''}
-                          onFocus={() => setFocusedField(key)}
-                          onBlur={() => setFocusedField(null)}
-                          onChange={e => setCurrentClient({
-                            ...currentClient,
-                            measurements: {
-                              ...currentClient.measurements,
-                              [key]: e.target.value
-                            }
-                          })}
-                          className={`w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-mono font-bold text-center text-sm transition-all ${isFocused ? 'border-violet-500 ring-2 ring-violet-500/20 bg-violet-50/50 scale-105' : 'border-slate-200 bg-white'}`}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Notes complémentaires */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-600">Notes & Exigences Particulières (Styles préférés, allergies de tissu, etc.)</label>
-                <textarea 
-                  rows={3}
-                  value={currentClient.notes || ''}
-                  onChange={e => setCurrentClient({ ...currentClient, notes: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                  placeholder="Ex : Préfère des ourlets invisibles, aime les coupes cintrées, etc."
-                />
-              </div>
-            </div>
-
-            {/* Mannequin Interactif et Visualisation de Mesure */}
-            <div className="lg:col-span-4 bg-slate-50/70 border border-slate-100 rounded-3xl p-6 flex flex-col justify-between space-y-6">
-              <div className="space-y-4">
-                <div className="border-b border-violet-100 pb-2">
-                  <h4 className="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-1.5">
-                    <Scissors className="w-3.5 h-3.5" /> Guide des Mesures
-                  </h4>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Silhouette d'atelier dynamique ({currentClient.gender === 'F' ? 'Femme' : 'Homme'})</p>
-                </div>
-
-                <div className="relative w-full h-[280px] bg-white rounded-2xl border border-slate-100 flex items-center justify-center p-4 overflow-hidden shadow-sm">
-                  {/* SVG Silhouette */}
-                  <svg viewBox="0 0 200 300" className="w-full h-full max-w-[160px] text-slate-300 transition-all duration-300">
-                    {/* Head & Neck */}
-                    <circle cx="100" cy="30" r="14" fill="none" stroke="currentColor" strokeWidth="2" />
-                    <path d="M96 44 L96 52 M104 44 L104 52" stroke="currentColor" strokeWidth="2" />
-                    
-                    {/* Body Silhouette */}
-                    {currentClient.gender === 'F' ? (
-                      <path d="M80 55 C80 55, 65 65, 65 80 C65 95, 75 110, 75 125 C75 135, 70 145, 70 160 L78 260 L92 260 L96 170 L104 170 L108 260 L122 260 L130 160 C130 145, 125 135, 125 125 C125 110, 135 95, 135 80 C135 65, 120 55, 120 55 Z" fill="none" stroke="currentColor" strokeWidth="2" />
-                    ) : (
-                      <path d="M72 55 C72 55, 60 62, 60 80 C60 100, 70 120, 70 135 C70 145, 68 155, 68 175 L76 260 L92 260 L96 170 L104 170 L108 260 L124 260 L132 175 C132 155, 130 145, 130 135 C130 120, 140 100, 140 80 C140 62, 128 55, 128 55 Z" fill="none" stroke="currentColor" strokeWidth="2" />
-                    )}
-
-                    {/* Arms */}
-                    <path d="M65 80 L52 140" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <path d="M135 80 L148 140" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-
-                    {/* Highlighted lines or hotspots */}
-                    {/* Tour de Cou */}
-                    <ellipse cx="100" cy="49" rx="8" ry="3" fill="none" stroke={focusedField === 'cou' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
-                    {focusedField === 'cou' && <circle cx="100" cy="49" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Épaule à Épaule */}
-                    <path d="M72 56 L128 56" stroke={focusedField === 'epaule' ? '#7c3aed' : 'transparent'} strokeWidth="3" className="transition-all" strokeLinecap="round" />
-                    {focusedField === 'epaule' && <circle cx="100" cy="56" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Tour de Poitrine */}
-                    <ellipse cx="100" cy="80" rx="28" ry="6" fill="none" stroke={focusedField === 'poitrine' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
-                    {focusedField === 'poitrine' && <circle cx="100" cy="80" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Longueur Manche */}
-                    <path d="M135 80 L148 140" stroke={focusedField === 'manche' ? '#7c3aed' : 'transparent'} strokeWidth="3.5" className="transition-all" strokeLinecap="round" />
-                    {focusedField === 'manche' && <circle cx="141" cy="110" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Tour de Bras */}
-                    <ellipse cx="140" cy="98" rx="8" ry="4" fill="none" stroke={focusedField === 'tourBras' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" transform="rotate(-15 140 98)" />
-                    {focusedField === 'tourBras' && <circle cx="140" cy="98" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Tour de Taille */}
-                    <ellipse cx="100" cy="120" rx="24" ry="5" fill="none" stroke={focusedField === 'taille' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
-                    {focusedField === 'taille' && <circle cx="100" cy="120" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Tour de Hanches */}
-                    <ellipse cx="100" cy="142" rx="27" ry="5.5" fill="none" stroke={focusedField === 'hanches' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
-                    {focusedField === 'hanches' && <circle cx="100" cy="142" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Longueur Pantalon */}
-                    <path d="M115 145 L115 250" stroke={focusedField === 'pantalon' ? '#7c3aed' : 'transparent'} strokeWidth="3" className="transition-all" strokeLinecap="round" />
-                    {focusedField === 'pantalon' && <circle cx="115" cy="195" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Tour de Cuisse */}
-                    <ellipse cx="85" cy="170" rx="11" ry="4" fill="none" stroke={focusedField === 'cuisse' ? '#7c3aed' : 'transparent'} strokeWidth="2.5" className="transition-all" />
-                    {focusedField === 'cuisse' && <circle cx="85" cy="170" r="4" className="fill-violet-600 animate-ping" />}
-
-                    {/* Longueur Grand Boubou */}
-                    <path d="M100 55 L100 255" stroke={focusedField === 'boubou' ? '#7c3aed' : 'transparent'} strokeWidth="3" className="transition-all" strokeLinecap="round" strokeDasharray="3 3" />
-                    {focusedField === 'boubou' && <circle cx="100" cy="155" r="4" className="fill-violet-600 animate-ping" />}
-                  </svg>
-                </div>
-
-                <div className="bg-white p-4 rounded-2xl border border-slate-100 min-h-[90px] flex flex-col justify-center text-left">
-                  <span className="text-[10px] font-mono font-bold text-violet-600 uppercase tracking-widest mb-1">
-                    {focusedField ? MEASUREMENT_LABELS[focusedField] : "Sélectionnez une mesure"}
-                  </span>
-                  <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                    {focusedField === 'cou' && "Mesurez la circonférence de la base du cou sans trop serrer."}
-                    {focusedField === 'poitrine' && "Mesurez horizontalement au niveau le plus large du torse ou de la poitrine."}
-                    {focusedField === 'epaule' && "Mesurez dans le dos, d'un os saillant de l'épaule à l'autre."}
-                    {focusedField === 'manche' && "Longueur du haut de l'épaule jusqu'à la limite souhaitée de la manche."}
-                    {focusedField === 'tourBras' && "Circonférence du biceps au point le plus volumineux."}
-                    {focusedField === 'taille' && "Mesurez la circonférence de la taille naturelle (environ 2 cm au-dessus du nombril)."}
-                    {focusedField === 'hanches' && "Mesurez la circonférence au niveau le plus large du fessier."}
-                    {focusedField === 'pantalon' && "Longueur de la taille jusqu'à l'ourlet du bas de la cheville."}
-                    {focusedField === 'cuisse' && "Tour de la cuisse à l'endroit le plus fort, sous l'entrejambe."}
-                    {focusedField === 'boubou' && "Longueur totale pour un grand boubou, mesurée du haut de l'épaule jusqu'au sol."}
-                    {!focusedField && "Cliquez sur l'un des champs de mesure pour voir l'aide d'atelier s'afficher ici."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-violet-50/50 p-4 rounded-2xl border border-violet-100/50 text-left">
-                <span className="text-[9px] font-black text-violet-600 uppercase tracking-widest block mb-1">Rappel de Coupe</span>
-                <p className="text-[10px] text-violet-700/80 leading-normal font-medium">Pour les tissus non extensibles (Bazin, Wax), prévoyez une marge d'aisance standard de 4 à 6 cm pour les vêtements amples.</p>
-              </div>
-            </div>
-          </div>
-
-              {/* Footer Actions */}
-              <div className="border-t border-gray-100 pt-6 flex justify-end gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setIsFormOpen(false)}
-                  className="px-5 py-2.5 bg-gray-150 hover:bg-gray-200 text-ink rounded-xl font-bold text-sm transition-colors cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md cursor-pointer"
-                >
-                  <Save className="w-4 h-4" /> Enregistrer le Client
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </div>
-      )}
 
       {/* Liste des Clients */}
       {filteredClients.length === 0 ? (
@@ -589,7 +367,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
           {filteredClients.map((client) => (
-            <div key={client.id} className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <TailorCard key={client.id}>
               <div>
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
@@ -605,18 +383,30 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
                   <div className="flex gap-1.5 bg-slate-50 p-1 rounded-xl">
                     <button 
                       onClick={() => {
-                        setCurrentClient(client);
-                        setIsFormOpen(true);
+                        const resolved = GarmentResolverService.resolveClientGarment(client, merchant.id);
+                        setCurrentClient({
+                          ...client,
+                          preferredGarment: resolved.garmentName,
+                          garmentId: resolved.definition.id,
+                          garmentName: resolved.garmentName,
+                          category: resolved.definition.category
+                        });
+                        setIsSmartAssistantOpen(true);
                       }}
-                      className="p-1.5 hover:bg-white hover:text-violet-600 hover:shadow-sm text-gray-500 rounded-lg transition-transform"
-                      title="Modifier"
+                      className="p-1.5 hover:bg-white hover:text-violet-600 hover:shadow-sm text-gray-500 rounded-lg transition-transform cursor-pointer"
+                      title="Modifier la Fiche Client"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button 
-                      onClick={() => handleDelete(client.id)}
-                      className="p-1.5 hover:bg-white hover:text-red-600 hover:shadow-sm text-gray-500 rounded-lg transition-transform"
-                      title="Supprimer"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleRequestDelete(client);
+                      }}
+                      className="p-1.5 hover:bg-rose-50 hover:text-red-600 hover:shadow-sm text-gray-500 rounded-lg transition-transform cursor-pointer relative z-10"
+                      title="Supprimer la fiche client"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -638,24 +428,63 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
                   )}
                 </div>
 
-                <div className="mt-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                    <Scissors className="w-3 h-3 text-violet-500" /> Principales Mesures
-                  </h4>
-                  <div className="grid grid-cols-3 gap-2">
-                    {Object.keys(MEASUREMENT_LABELS).slice(0, 6).map((key) => (
-                      <div key={key} className="bg-white p-2 rounded-xl text-center border border-black/[0.02]">
-                        <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest">{key}</span>
-                        <span className="font-mono text-xs font-black text-ink">{client.measurements?.[key] ? `${client.measurements[key]} cm` : '—'}</span>
-                      </div>
-                    ))}
-                  </div>
+                <div className="mt-4">
+                  <GarmentProfileCard
+                    clientData={client}
+                    merchantId={merchant.id}
+                    onOpenSmartAssistant={() => {
+                      setCurrentClient(client);
+                      setIsSmartAssistantOpen(true);
+                    }}
+                  />
                 </div>
               </div>
-            </div>
+            </TailorCard>
           ))}
         </div>
       )}
+
+      {/* Modal Assistant de Mesures Intelligent - Processus unifié 5 Étapes */}
+      {isSmartAssistantOpen && (
+        <SmartMeasurementAssistant
+          merchantId={merchant.id}
+          initialClientData={currentClient}
+          isOpen={isSmartAssistantOpen}
+          onClose={() => {
+            setIsSmartAssistantOpen(false);
+            setCurrentClient(null);
+          }}
+          onSaveClient={(savedClient) => {
+            let updatedList = [...clients];
+            const existingIndex = updatedList.findIndex((c) => c.id === savedClient.id);
+            if (existingIndex >= 0) {
+              updatedList[existingIndex] = savedClient;
+            } else {
+              updatedList = [savedClient, ...updatedList];
+            }
+            setClients(updatedList);
+            saveClients(updatedList);
+            setIsSmartAssistantOpen(false);
+            setCurrentClient(null);
+            toast.success('Fiche client et mesures enregistrées avec succès ! 🧵✨');
+          }}
+        />
+      )}
+
+      {/* Modal de confirmation de suppression moderne */}
+      <TailorDeleteConfirmModal
+        isOpen={!!clientToDelete}
+        onClose={() => {
+          setClientToDelete(null);
+          setClientOrdersCount(0);
+        }}
+        onConfirm={confirmDeleteClient}
+        title="Supprimer la fiche client ?"
+        entityName={clientToDelete ? `${clientToDelete.firstName || ''} ${clientToDelete.lastName || ''}`.trim() : ''}
+        activeOrdersCount={clientOrdersCount}
+        warningText="Cette action est irréversible. Toutes les mesures enregistrées seront supprimées."
+        isDeleting={isDeleting}
+      />
     </motion.div>
   );
 };

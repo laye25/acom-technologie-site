@@ -1,6 +1,7 @@
 import { Activity } from '../data/repositories/activity.repository';
 import { db, setRemoteSyncState } from '../db/db';
 import { where, limit, orderBy } from 'firebase/firestore';
+import { sanitizeFirestoreData } from '../utils/firestoreUtils';
 import { merchantSaleRepository } from '../data/repositories/merchant-sale.repository';
 import { merchantExpenseRepository } from '../data/repositories/merchant-expense.repository';
 import { merchantProductRepository } from '../data/repositories/merchant-product.repository';
@@ -1176,11 +1177,11 @@ export const syncService = {
             batch.delete(docRef);
           } else {
             const { syncStatus, ...cleanData } = item;
-            batch.set(docRef, {
+            batch.set(docRef, sanitizeFirestoreData({
               ...cleanData,
               merchantId,
               updatedAt: item.updatedAt || new Date().toISOString()
-            });
+            }));
           }
         }
         await batch.commit();

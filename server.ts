@@ -209,6 +209,40 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // TTS Proxy route for clear human spoken narration audio during video export
+  app.get("/api/tts", async (req, res) => {
+    try {
+      const text = (req.query.text as string) || "Démonstration";
+      const lang = (req.query.lang as string) || "fr";
+      
+      // Clean and truncate text for optimal TTS delivery
+      const cleanText = text.replace(/<[^>]*>/g, '').trim().substring(0, 300);
+      if (!cleanText) {
+        return res.status(400).json({ error: "Empty text" });
+      }
+
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(cleanText)}`;
+      
+      const ttsRes = await fetch(ttsUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+
+      if (!ttsRes.ok) {
+        throw new Error(`TTS upstream HTTP ${ttsRes.status}`);
+      }
+
+      const arrayBuffer = await ttsRes.arrayBuffer();
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.send(Buffer.from(arrayBuffer));
+    } catch (err: any) {
+      console.error("[TTS API Proxy] Error generating TTS speech:", err);
+      return res.status(500).json({ error: err.message || "Failed to generate TTS audio" });
+    }
+  });
+
 
   // Helper to sanitize API keys (removes quotes and whitespace)
   function sanitizeApiKey(key: any): string | null {

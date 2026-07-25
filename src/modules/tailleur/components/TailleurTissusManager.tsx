@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Palette, Plus, Search, Filter, Edit, Trash2, Sliders, RefreshCw, 
-  ChevronRight, Sparkles, ShoppingCart, Info, TrendingUp, AlertTriangle, 
-  FileSpreadsheet, ArrowUpDown, Tag, Layers, CheckCircle, Package, ArrowRight, X
+  ChevronRight, ChevronLeft, Check, Sparkles, ShoppingCart, Info, TrendingUp, AlertTriangle, 
+  FileSpreadsheet, ArrowUpDown, Tag, Layers, CheckCircle, Package, ArrowRight, X, Hash
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { syncService } from '../../../services/syncService';
+import { ModalStickyFooter } from './design-system/TailorDesignSystem';
+import { 
+  FABRIC_COLOR_PALETTE, 
+  FABRIC_PATTERNS, 
+  FABRIC_COLOR_FAMILIES, 
+  findColorInfo, 
+  FabricColor 
+} from '../data/fabricColors';
 
 interface Merchant {
   id: string;
@@ -14,7 +22,7 @@ interface Merchant {
   currency?: string;
 }
 
-interface Tissu {
+export interface Tissu {
   id: string;
   name: string;
   category: string;
@@ -22,10 +30,14 @@ interface Tissu {
   price?: number; // per meter fallback
   pricePerMeter?: number; // selling price per meter
   costPricePerMeter?: number; // cost price per meter
-  color?: string; // custom color/motif name
+  color?: string; // Couleur principale
+  secondaryColor?: string; // Couleur secondaire
+  pattern?: string; // Motif (Uni, Fleuri, Brodé, Bogolan, etc.)
+  internalRef?: string; // Référence interne
+  colorHex?: string; // Code couleur HEX
   supplier?: string;
   notes?: string;
-  colorTheme?: string; // Tailwind color name like 'amber', 'purple', 'emerald', 'blue', 'rose', 'indigo'
+  colorTheme?: string; // Tailwind color theme
   syncStatus?: 'pending' | 'synced';
   createdAt: string;
   updatedAt: string;
@@ -36,14 +48,16 @@ interface TailleurTissusManagerProps {
 }
 
 const CATEGORIES = [
-  'Wax',
   'Bazin',
+  'Wax',
   'Broderie',
   'Soie',
   'Linen (Lin)',
   'Coton',
   'Velours',
   'Satin',
+  'Dentelle',
+  'Jacquard',
   'Autre'
 ];
 
@@ -75,18 +89,307 @@ const COLOR_THEMES = [
   { name: 'rose', bg: 'bg-rose-500', text: 'text-rose-500', hover: 'hover:bg-rose-50', border: 'border-rose-100', glow: 'shadow-rose-100' },
 ];
 
+interface FabricColorSelectorProps {
+  currentColor?: string;
+  currentColorHex?: string;
+  secondaryColor?: string;
+  onChangeColor: (colorName: string, colorHex: string) => void;
+  onChangeSecondaryColor?: (secondaryColor: string) => void;
+  onChangeHex?: (colorHex: string) => void;
+  onChangeCustomName?: (colorName: string) => void;
+}
+
+const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
+  currentColor = '',
+  currentColorHex = '#50C878',
+  secondaryColor = '',
+  onChangeColor,
+  onChangeSecondaryColor,
+  onChangeHex,
+  onChangeCustomName,
+}) => {
+  const [selectedFamily, setSelectedFamily] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const categoryNavRef = React.useRef<HTMLDivElement>(null);
+
+  // Scroll category bar left or right
+  const scrollCategories = (direction: 'left' | 'right') => {
+    if (categoryNavRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220;
+      categoryNavRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  // Wheel event for horizontal scrolling
+  const handleCategoryWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (categoryNavRef.current && e.deltaY !== 0) {
+      categoryNavRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  // Filter swatches
+  const filteredSwatches = useMemo(() => {
+    return FABRIC_COLOR_PALETTE.filter(c => {
+      const matchesFamily = selectedFamily === 'all' || c.family === selectedFamily;
+      const q = searchQuery.trim().toLowerCase();
+      const matchesQuery = !q || 
+        c.name.toLowerCase().includes(q) || 
+        c.family.toLowerCase().includes(q) || 
+        c.hex.toLowerCase().includes(q);
+      return matchesFamily && matchesQuery;
+    });
+  }, [selectedFamily, searchQuery]);
+
+  // Active color lookup
+  const activeColorInfo = useMemo(() => {
+    return findColorInfo(currentColor);
+  }, [currentColor]);
+
+  const activeFamilyName = useMemo(() => {
+    const famObj = FABRIC_COLOR_FAMILIES.find(f => f.id === activeColorInfo.family);
+    return famObj ? famObj.name : 'Couture';
+  }, [activeColorInfo]);
+
+  return (
+    <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
+      {/* Header & Active Selected Color Summary Badge */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-2.5">
+        <div>
+          <label className="block text-xs font-black text-slate-800 uppercase tracking-wider">
+            COULEUR PRINCIPALE *
+          </label>
+          <span className="text-[10px] text-violet-600 font-bold">Bibliothèque de Couleurs Couture</span>
+        </div>
+
+        {/* Selected Color Badge Preview */}
+        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
+          <span 
+            className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs"
+            style={{ backgroundColor: currentColorHex || activeColorInfo.hex || '#50C878' }}
+          />
+          <div className="min-w-0">
+            <span className="block text-xs font-black text-slate-800 truncate">
+              {currentColor || 'Non spécifiée'}
+            </span>
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <span className="font-mono font-bold text-violet-700">
+                {currentColorHex || activeColorInfo.hex}
+              </span>
+              {currentColor && (
+                <span className="text-slate-400">• {activeFamilyName}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Category Scroll Navigation Bar */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1">
+          {/* Left Scroll Button */}
+          <button
+            type="button"
+            onClick={() => scrollCategories('left')}
+            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-violet-600 transition cursor-pointer shrink-0 shadow-2xs"
+            title="Défiler les catégories vers la gauche"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          {/* Scrollable Container */}
+          <div
+            ref={categoryNavRef}
+            onWheel={handleCategoryWheel}
+            className="flex-1 flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none scroll-smooth touch-pan-x"
+          >
+            {FABRIC_COLOR_FAMILIES.map(fam => {
+              const isActive = selectedFamily === fam.id;
+              return (
+                <button
+                  key={fam.id}
+                  type="button"
+                  onClick={(e) => {
+                    setSelectedFamily(fam.id);
+                    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                    isActive 
+                      ? 'bg-violet-600 text-white border-violet-600 shadow-xs' 
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  {fam.name}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right Scroll Button */}
+          <button
+            type="button"
+            onClick={() => scrollCategories('right')}
+            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-violet-600 transition cursor-pointer shrink-0 shadow-2xs"
+            title="Défiler les catégories vers la droite"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Search Input Bar */}
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="🔍 Rechercher une couleur (ex: Bleu Roi, Bordeaux, Ivoire, Noir...)"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-8 py-1.5 bg-white border border-slate-200/90 text-xs font-semibold rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 outline-none transition"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Grid of Color Swatches */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1.5 max-h-52 sm:max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200/90 shadow-2inner">
+        {filteredSwatches.length === 0 ? (
+          <div className="col-span-full py-6 text-center text-xs text-slate-400 font-medium">
+            Aucune couleur trouvée pour "{searchQuery}"
+          </div>
+        ) : (
+          filteredSwatches.map(c => {
+            const isSelected = currentColor.trim().toLowerCase() === c.name.toLowerCase();
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onChangeColor(c.name, c.hex)}
+                title={`${c.name} (${c.hex}) - Famille: ${c.family}`}
+                className={`relative p-1.5 rounded-xl border transition-all duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer text-center group focus:outline-none focus:ring-2 focus:ring-violet-500/50 ${
+                  isSelected 
+                    ? 'bg-violet-50 border-violet-600 ring-2 ring-violet-500/20 shadow-xs' 
+                    : 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50/80 text-slate-700'
+                }`}
+              >
+                <div className="relative flex items-center justify-center">
+                  <span 
+                    className="w-4 h-4 rounded-full border border-black/15 shadow-2xs group-hover:scale-110 transition-transform"
+                    style={{ backgroundColor: c.hex }}
+                  />
+                  {isSelected && (
+                    <span className="absolute -top-1 -right-1 bg-violet-600 text-white rounded-full p-0.5 shadow-xs">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[10px] leading-tight font-bold truncate max-w-full ${
+                  isSelected ? 'text-violet-950 font-black' : 'text-slate-700'
+                }`}>
+                  {c.name}
+                </span>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* Manual Inputs: Custom Color Name, Hex Picker, Secondary Color */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+        {/* Custom Name */}
+        <div>
+          <span className="block text-[10px] text-slate-500 font-bold mb-1">Nom personnalisé :</span>
+          <input
+            type="text"
+            required
+            placeholder="Ex: Bleu Nuit, Blanc Cassé, Violet Impérial..."
+            value={currentColor}
+            onChange={e => {
+              const val = e.target.value;
+              if (onChangeCustomName) {
+                onChangeCustomName(val);
+              } else {
+                const found = findColorInfo(val);
+                onChangeColor(val, found.hex !== '#94A3B8' ? found.hex : currentColorHex);
+              }
+            }}
+            className="w-full px-3 py-2 bg-white border border-slate-200 focus:ring-2 focus:ring-violet-500/20 text-xs font-bold rounded-xl outline-none"
+          />
+        </div>
+
+        {/* Hex Nuanceur */}
+        <div>
+          <span className="block text-[10px] text-slate-500 font-bold mb-1 font-mono">Nuanceur HEX :</span>
+          <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-xl border border-slate-200">
+            <input
+              type="color"
+              value={currentColorHex || '#50C878'}
+              onChange={e => {
+                if (onChangeHex) {
+                  onChangeHex(e.target.value);
+                } else {
+                  onChangeColor(currentColor, e.target.value);
+                }
+              }}
+              className="w-6 h-6 rounded-md border-0 cursor-pointer p-0 bg-transparent shrink-0"
+            />
+            <input
+              type="text"
+              value={currentColorHex || '#50C878'}
+              onChange={e => {
+                if (onChangeHex) {
+                  onChangeHex(e.target.value);
+                }
+              }}
+              className="w-full text-xs font-mono font-bold uppercase text-slate-700 bg-transparent outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Secondary Color */}
+        <div>
+          <span className="block text-[10px] text-slate-500 font-bold mb-1">Couleur 2 (Option) :</span>
+          <input
+            type="text"
+            placeholder="Ex: Doré, Argent..."
+            value={secondaryColor}
+            onChange={e => {
+              if (onChangeSecondaryColor) {
+                onChangeSecondaryColor(e.target.value);
+              }
+            }}
+            className="w-full px-3 py-2 bg-white border border-slate-200 focus:ring-2 focus:ring-violet-500/20 text-xs font-semibold rounded-xl outline-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) => {
   const currency = merchant.currency || 'FCFA';
 
   const [tissus, setTissus] = useState<Tissu[]>([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedColorFamily, setSelectedColorFamily] = useState<string>('all');
+  const [selectedPattern, setSelectedPattern] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'instock' | 'out'>('all');
   const [sortBy, setSortBy] = useState<'name' | 'quantity' | 'price' | 'newest'>('newest');
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentTissu, setCurrentTissu] = useState<Partial<Tissu> | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const [paletteFamilyFilter, setPaletteFamilyFilter] = useState<string>('all');
 
   const [dynamicCategories, setDynamicCategories] = useState<string[]>(CATEGORIES);
   const [isNewCategory, setIsNewCategory] = useState(false);
@@ -239,64 +542,82 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
   };
 
   // Submit Handler for Form (Add/Edit)
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isSubmitting) return;
+
     const category = isNewCategory ? newCategoryName.trim() : currentTissu?.category;
     if (!currentTissu?.name || !category) {
       toast.error('Veuillez renseigner le nom et la catégorie du tissu');
       return;
     }
 
-    const pricePerMeter = Number(currentTissu.pricePerMeter) || Number(currentTissu.price) || 0;
-    const costPricePerMeter = Number(currentTissu.costPricePerMeter) || 0;
-    const price = pricePerMeter; // backward compatibility
-    const quantity = Number(currentTissu.quantity) || 0;
+    setIsSubmitting(true);
+    setIsSuccess(false);
 
-    let updatedList: Tissu[];
-    if (currentTissu.id) {
-      // Edit
-      updatedList = tissus.map(t => t.id === currentTissu.id 
-        ? { 
-            ...(currentTissu as Tissu), 
-            category,
-            price, 
-            pricePerMeter,
-            costPricePerMeter,
-            quantity, 
-            syncStatus: 'pending', 
-            updatedAt: new Date().toISOString() 
-          } 
-        : t
-      );
-      toast.success('Tissu mis à jour avec succès');
-    } else {
-      // Add
-      const newTissu: Tissu = {
-        id: generateUUID(),
-        name: currentTissu.name,
-        category,
-        quantity,
-        price,
-        pricePerMeter,
-        costPricePerMeter,
-        color: currentTissu.color || '',
-        supplier: currentTissu.supplier || '',
-        notes: currentTissu.notes || '',
-        colorTheme: currentTissu.colorTheme || COLOR_THEMES[Math.floor(Math.random() * COLOR_THEMES.length)].name,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        syncStatus: 'pending'
-      };
-      updatedList = [...tissus, newTissu];
-      toast.success('Nouveau tissu enregistré');
+    try {
+      const pricePerMeter = Number(currentTissu.pricePerMeter) || Number(currentTissu.price) || 0;
+      const costPricePerMeter = Number(currentTissu.costPricePerMeter) || 0;
+      const price = pricePerMeter; // backward compatibility
+      const quantity = Number(currentTissu.quantity) || 0;
+
+      let updatedList: Tissu[];
+      if (currentTissu.id) {
+        // Edit
+        updatedList = tissus.map(t => t.id === currentTissu.id 
+          ? { 
+              ...(currentTissu as Tissu), 
+              category,
+              price, 
+              pricePerMeter,
+              costPricePerMeter,
+              quantity, 
+              syncStatus: 'pending', 
+              updatedAt: new Date().toISOString() 
+            } 
+          : t
+        );
+        toast.success('Tissu mis à jour avec succès');
+      } else {
+        // Add
+        const newTissu: Tissu = {
+          id: generateUUID(),
+          name: currentTissu.name,
+          category,
+          quantity,
+          price,
+          pricePerMeter,
+          costPricePerMeter,
+          color: currentTissu.color || '',
+          supplier: currentTissu.supplier || '',
+          notes: currentTissu.notes || '',
+          colorTheme: currentTissu.colorTheme || COLOR_THEMES[Math.floor(Math.random() * COLOR_THEMES.length)].name,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'pending'
+        };
+        updatedList = [...tissus, newTissu];
+        toast.success('Nouveau tissu enregistré');
+      }
+
+      saveFabrics(updatedList);
+      setIsSuccess(true);
+
+      setTimeout(() => {
+        setIsFormOpen(false);
+        setCurrentTissu(null);
+        setIsNewCategory(false);
+        setNewCategoryName('');
+        setIsSuccess(false);
+        setIsSubmitting(false);
+      }, 500);
+
+      triggerSync();
+    } catch (err) {
+      console.error('Error saving fabric:', err);
+      toast.error("Impossible d'enregistrer le tissu");
+      setIsSubmitting(false);
     }
-
-    saveFabrics(updatedList);
-    setIsFormOpen(false);
-    setCurrentTissu(null);
-    setIsNewCategory(false);
-    setNewCategoryName('');
-    triggerSync();
   };
 
   // Delete Tissu
@@ -353,12 +674,22 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
   const filteredTissus = useMemo(() => {
     return tissus
       .filter(t => {
-        const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase()) || 
-                              (t.supplier && t.supplier.toLowerCase().includes(search.toLowerCase())) ||
-                              (t.color && t.color.toLowerCase().includes(search.toLowerCase())) ||
-                              (t.notes && t.notes.toLowerCase().includes(search.toLowerCase()));
+        const query = search.toLowerCase().trim();
+        const matchesSearch = !query || 
+                              t.name.toLowerCase().includes(query) || 
+                              (t.supplier && t.supplier.toLowerCase().includes(query)) ||
+                              (t.color && t.color.toLowerCase().includes(query)) ||
+                              (t.secondaryColor && t.secondaryColor.toLowerCase().includes(query)) ||
+                              (t.pattern && t.pattern.toLowerCase().includes(query)) ||
+                              (t.internalRef && t.internalRef.toLowerCase().includes(query)) ||
+                              (t.notes && t.notes.toLowerCase().includes(query));
         
         const matchesCategory = selectedCategory === 'All' || t.category === selectedCategory;
+
+        const colorInfo = findColorInfo(t.color);
+        const matchesColorFamily = selectedColorFamily === 'all' || colorInfo.family === selectedColorFamily;
+
+        const matchesPattern = selectedPattern === 'all' || (t.pattern && t.pattern.toLowerCase() === selectedPattern.toLowerCase());
 
         const qty = t.quantity ?? 0;
         const matchesStock = 
@@ -367,7 +698,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
           stockFilter === 'instock' ? (qty > 2) :
           stockFilter === 'out' ? (qty === 0) : true;
 
-        return matchesSearch && matchesCategory && matchesStock;
+        return matchesSearch && matchesCategory && matchesColorFamily && matchesPattern && matchesStock;
       })
       .sort((a, b) => {
         if (sortBy === 'name') return a.name.localeCompare(b.name);
@@ -377,7 +708,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
         if (sortBy === 'price') return priceB - priceA;
         return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime(); // newest
       });
-  }, [tissus, search, selectedCategory, stockFilter, sortBy]);
+  }, [tissus, search, selectedCategory, selectedColorFamily, selectedPattern, stockFilter, sortBy]);
 
   return (
     <div className="w-full space-y-6" id="tailleur_tissus_container">
@@ -479,14 +810,14 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-4">
+      <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-3">
         <div className="flex flex-col lg:flex-row gap-3">
           {/* Search bar */}
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Rechercher par nom de tissu, fournisseur, couleur..."
+              placeholder="Rechercher par nom, couleur (bleu, bordeaux...), motif (brodé...), réf, fournisseur..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-medium rounded-xl transition-all outline-none"
@@ -499,7 +830,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
-              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3.5 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
             >
               <option value="All">Toutes catégories</option>
               {dynamicCategories.map(cat => (
@@ -507,11 +838,35 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
               ))}
             </select>
 
+            {/* Color Family Filter */}
+            <select
+              value={selectedColorFamily}
+              onChange={e => setSelectedColorFamily(e.target.value)}
+              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
+            >
+              <option value="all">Toutes les couleurs</option>
+              {FABRIC_COLOR_FAMILIES.map(fam => (
+                <option key={fam.id} value={fam.id}>{fam.name}</option>
+              ))}
+            </select>
+
+            {/* Pattern Filter */}
+            <select
+              value={selectedPattern}
+              onChange={e => setSelectedPattern(e.target.value)}
+              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
+            >
+              <option value="all">Tous les motifs</option>
+              {FABRIC_PATTERNS.map(pat => (
+                <option key={pat.id} value={pat.name}>{pat.icon ? `${pat.icon} ` : ''}{pat.name}</option>
+              ))}
+            </select>
+
             {/* Stock Level Filter */}
             <select
               value={stockFilter}
               onChange={e => setStockFilter(e.target.value as any)}
-              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3.5 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
             >
               <option value="all">Tous les stocks</option>
               <option value="instock">En stock (&gt; 2m)</option>
@@ -523,11 +878,11 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
-              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3.5 rounded-xl text-slate-600 outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
             >
-              <option value="newest">Plus récent d'abord</option>
+              <option value="newest">Plus récents</option>
               <option value="name">Nom alphabétique</option>
-              <option value="quantity">Quantité (Décroissant)</option>
+              <option value="quantity">Stock (Décroissant)</option>
               <option value="price">Prix (Décroissant)</option>
             </select>
           </div>
@@ -552,7 +907,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             <p className="text-xs text-slate-400 font-medium leading-relaxed">
               {tissus.length === 0 
                 ? "Vous n'avez pas encore enregistré de tissus dans votre inventaire. Ajoutez-en un manuellement ou générez des exemples pour tester !"
-                : "Aucun tissu ne correspond à vos filtres de recherche actuels. Réessayez avec d'autres critères."}
+                : "Aucun tissu ne correspond à vos filtres de recherche actuels. Réessayez avec d'autres critères de couleur ou de catégorie."}
             </p>
           </div>
           {tissus.length === 0 && (
@@ -568,31 +923,43 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTissus.map(tissu => {
+            const colorInfo = findColorInfo(tissu.color);
             const matchedTheme = COLOR_THEMES.find(c => c.name === tissu.colorTheme) || COLOR_THEMES[0];
             const quantity = tissu.quantity ?? 0;
             const isCrit = quantity <= 2 && quantity > 0;
             const isOut = quantity === 0;
 
+            const displayColor = tissu.color || 'Couleur non spécifiée';
+            const displayHex = tissu.colorHex || colorInfo.hex;
+
             return (
               <div
                 key={tissu.id}
-                className={`rounded-2xl border ${isCrit ? 'border-amber-300 bg-amber-50' : isOut ? 'border-red-200 bg-red-50' : 'border-slate-200 bg-white'} overflow-hidden shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 flex flex-col group hover:scale-[1.01]`}
+                className={`rounded-2xl border ${isCrit ? 'border-amber-300 bg-amber-50/60' : isOut ? 'border-red-200 bg-red-50/60' : 'border-slate-200 bg-white'} overflow-hidden shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 flex flex-col group hover:scale-[1.01]`}
               >
                   {/* Fabric Banner Pattern Accent */}
-                  <div className={`h-24 relative overflow-hidden ${matchedTheme.bg} flex items-end p-3 z-0`}>
-                    {/* Gradient overlay to ensure solid text background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-transparent to-black/15 z-0" />
+                  <div className={`h-28 relative overflow-hidden ${matchedTheme.bg} flex items-end p-3.5 z-0`}>
+                    {/* Background swatch preview if hex available */}
+                    {displayHex && displayHex !== '#94A3B8' && (
+                      <div 
+                        className="absolute inset-0 opacity-40 z-0 transition-opacity group-hover:opacity-60" 
+                        style={{ backgroundColor: displayHex }} 
+                      />
+                    )}
                     
-                    {/* Abstract design vector simulation */}
-                    <div className="absolute inset-0 opacity-20 mix-blend-overlay z-0">
-                      <div className="absolute top-0 left-0 w-24 h-24 rounded-full border-4 border-white transform -translate-x-6 -translate-y-6"></div>
-                      <div className="absolute bottom-0 right-0 w-32 h-32 rounded-full border-8 border-white transform translate-x-10 translate-y-10"></div>
-                      <div className="absolute inset-x-0 top-1/2 h-0.5 bg-white transform rotate-12"></div>
-                      <div className="absolute inset-y-0 left-1/3 w-0.5 bg-white transform -rotate-45"></div>
-                    </div>
+                    {/* Gradient overlay to ensure solid text background */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-black/20 z-0" />
 
-                    <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-sm border border-white/35 text-[9px] font-black tracking-widest text-white uppercase z-10">
-                      {tissu.category}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                      <span className="px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-md border border-white/35 text-[9px] font-black tracking-widest text-white uppercase">
+                        {tissu.category}
+                      </span>
+                      {tissu.internalRef && (
+                        <span className="px-2 py-0.5 rounded-md bg-black/40 backdrop-blur-md text-[9px] font-mono font-bold text-slate-200 flex items-center gap-0.5">
+                          <Hash className="w-2.5 h-2.5" />
+                          {tissu.internalRef}
+                        </span>
+                      )}
                     </div>
 
                     {tissu.syncStatus === 'pending' && (
@@ -603,33 +970,65 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     )}
 
                     <div className="text-white w-full flex items-center justify-between z-10">
-                      <span className="font-mono text-xs font-black tracking-wider drop-shadow-sm bg-black/15 px-2 py-0.5 rounded-md">
+                      <span className="font-mono text-xs font-black tracking-wider drop-shadow-sm bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-white/20">
                         {(tissu.pricePerMeter ?? tissu.price ?? 0).toLocaleString()} {currency} /m
+                      </span>
+
+                      {/* Stock Quantity Badge on Header */}
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 ${
+                        isOut ? 'bg-red-600 text-white' : isCrit ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'
+                      }`}>
+                        {quantity} m
                       </span>
                     </div>
                   </div>
 
                   {/* Body Content */}
-                  <div className="p-4 flex-1 flex flex-col justify-between">
-                    <div className="space-y-3">
+                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                    <div className="space-y-2.5">
+                      {/* Name */}
                       <div>
                         <h3 className="text-sm font-black text-slate-900 line-clamp-2 leading-snug group-hover:text-violet-700 transition-colors">
                           {tissu.name}
                         </h3>
-                        {tissu.color && (
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-                            Couleur / Motif : {tissu.color}
-                          </p>
+                      </div>
+
+                      {/* Color & Pattern Badge Row */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        {/* Main Color Pill with Hex Circle */}
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs">
+                          <span 
+                            className="w-3.5 h-3.5 rounded-full border border-black/20 shadow-inner flex-shrink-0" 
+                            style={{ backgroundColor: displayHex }}
+                          />
+                          <span className="truncate max-w-[130px]">
+                            {colorInfo.badgeEmoji} {displayColor}
+                          </span>
+                        </div>
+
+                        {/* Secondary Color if exists */}
+                        {tissu.secondaryColor && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
+                            + {tissu.secondaryColor}
+                          </span>
+                        )}
+
+                        {/* Pattern Pill */}
+                        {tissu.pattern && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-100">
+                            🎨 {tissu.pattern}
+                          </span>
                         )}
                       </div>
 
+                      {/* Price breakdown */}
                       <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
                         <div>
-                          <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">REV_COÛT</span>
-                          <span className="font-mono font-black text-slate-900">{(tissu.costPricePerMeter ?? 0).toLocaleString()} {currency}/m</span>
+                          <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">COÛT ACHAT</span>
+                          <span className="font-mono font-black text-slate-800">{(tissu.costPricePerMeter ?? 0).toLocaleString()} {currency}/m</span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">VENTE_CONSEILLÉ</span>
+                          <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">PRIX VENTE</span>
                           <span className="font-mono font-black text-violet-700">{(tissu.pricePerMeter ?? tissu.price ?? 0).toLocaleString()} {currency}/m</span>
                         </div>
                       </div>
@@ -649,297 +1048,334 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     </div>
 
                     {/* Stock indicator and controls */}
-                    <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
+                    <div className="pt-3 border-t border-slate-100 space-y-3">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[9px] text-slate-500 block font-black uppercase tracking-widest">STOCK DISPONIBLE</span>
-                          <span className={`text-base font-black ${isOut ? 'text-red-600' : isCrit ? 'text-amber-600' : 'text-emerald-700'}`}>
-                            {quantity} mètre{quantity > 1 ? 's' : ''}
-                          </span>
-                        </div>
-
-                        {/* Quick stock adjustment buttons */}
-                        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                          <button
-                            onClick={() => handleAdjustQuantity(tissu.id, -1)}
-                            disabled={quantity <= 0}
-                            className="w-7 h-7 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 font-black rounded-lg text-xs flex items-center justify-center active:scale-95 transition-all shadow-sm border border-slate-200/50"
-                            title="Retirer 1 mètre"
-                          >
-                            -1m
-                          </button>
-                          <button
-                            onClick={() => handleAdjustQuantity(tissu.id, 1)}
-                            className="w-7 h-7 bg-white hover:bg-slate-50 text-slate-700 font-black rounded-lg text-xs flex items-center justify-center active:scale-95 transition-all shadow-sm border border-slate-200/50"
-                            title="Ajouter 1 mètre"
-                          >
-                            +1m
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Progress Bar of Stock Level */}
-                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-300 ${isOut ? 'bg-red-500' : isCrit ? 'bg-amber-500' : 'bg-emerald-600'}`}
-                          style={{ width: `${Math.min(100, (quantity / 20) * 100)}%` }}
-                        ></div>
-                      </div>
-
-                      {/* Card Footer Actions */}
-                      <div className="flex items-center justify-between pt-1">
-                        <span className="text-[9px] text-slate-400 font-mono">
-                          Màj {new Date(tissu.updatedAt).toLocaleDateString('fr-FR')}
+                        <span className="text-xs font-bold text-slate-500">
+                          Métrage disponible :
                         </span>
+                        <span className={`text-xs font-black ${isOut ? 'text-red-600' : isCrit ? 'text-amber-600' : 'text-slate-800'}`}>
+                          {quantity} m
+                        </span>
+                      </div>
 
-                        <div className="flex items-center gap-2">
+                      {/* Progress Bar */}
+                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            isOut ? 'bg-red-500' : isCrit ? 'bg-amber-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.min(100, (quantity / 20) * 100)}%` }}
+                        />
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => {
-                              setCurrentTissu(tissu);
+                              setCurrentTissu({ ...tissu });
                               setIsNewCategory(false);
-                              setNewCategoryName('');
                               setIsFormOpen(true);
                             }}
-                            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="p-2 hover:bg-slate-100 text-slate-600 rounded-xl transition-all"
                             title="Modifier"
                           >
-                            <Edit className="w-3.5 h-3.5" />
+                            <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(tissu.id)}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all"
                             title="Supprimer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+
+                        <button
+                          onClick={() => {
+                            setCurrentTissu({ ...tissu });
+                            setIsNewCategory(false);
+                            setIsFormOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1"
+                        >
+                          Ajuster stock
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
+                </div>
+              );
+            })}
+          </div>
+        )}
       {/* Fabric Drawer Form Dialog (Modal) */}
       <AnimatePresence>
         {isFormOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl border border-slate-100"
+              className="bg-white rounded-[2rem] w-full max-w-xl shadow-2xl border border-slate-100 max-h-[92vh] flex flex-col overflow-hidden text-left"
             >
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-violet-50/40">
-                <div className="flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-violet-600" />
-                  <h2 className="text-base font-black text-slate-800 font-sans tracking-tight">
-                    {currentTissu?.id ? 'Modifier le Tissu' : 'Enregistrer un nouveau Tissu'}
-                  </h2>
+              {/* Modal Header (Fixed) */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-violet-50/40 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 bg-violet-100 text-violet-700 rounded-xl">
+                    <Palette className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-black text-slate-800 font-sans tracking-tight">
+                      {currentTissu?.id ? 'Modifier le Tissu' : 'Enregistrer un nouveau Tissu en Stock'}
+                    </h2>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {currentTissu?.id ? 'Ajustez les détails du coupon ou rouleau' : 'Remplissez la fiche technique du tissu'}
+                    </p>
+                  </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="p-1.5 hover:bg-slate-150 rounded-xl text-slate-400 hover:text-slate-600 transition-colors"
+                  disabled={isSubmitting}
+                  className="p-2 hover:bg-slate-200/60 rounded-xl text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {/* Name */}
-                <div>
-                  <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">NOM DU TISSU / MOTIF</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ex: Wax Hollandais Motif Soleil d'Afrique"
-                    value={currentTissu?.name || ''}
-                    onChange={e => setCurrentTissu({ ...currentTissu, name: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Category */}
+              {/* Modal Form wrapping Scrollable Content + Sticky Footer */}
+              <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                {/* Scrollable Form Body */}
+                <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 text-slate-800 pb-8">
+                  {/* Name */}
                   <div>
-                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">CATÉGORIE</label>
-                    {isNewCategory ? (
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ex: Satin de soie, Brocart..."
-                          value={newCategoryName}
-                          onChange={e => setNewCategoryName(e.target.value)}
-                          className="flex-1 px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsNewCategory(false);
-                            setNewCategoryName('');
-                          }}
-                          className="px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
-                        >
-                          X
-                        </button>
-                      </div>
-                    ) : (
-                      <select
-                        value={currentTissu?.category || 'Wax'}
-                        onChange={e => {
-                          if (e.target.value === 'ADD_NEW') {
-                            setIsNewCategory(true);
-                            setNewCategoryName('');
-                          } else {
-                            setCurrentTissu({ ...currentTissu, category: e.target.value });
-                          }
-                        }}
-                        className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
-                      >
-                        {dynamicCategories.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                        <option value="ADD_NEW" className="text-violet-600 font-bold">+ Nouvelle catégorie...</option>
-                      </select>
-                    )}
-                  </div>
-
-                  {/* Color theme visual representation */}
-                  <div>
-                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5 font-sans">THÈME VISUEL</label>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      {COLOR_THEMES.map(theme => {
-                        const isNone = theme.name === 'none';
-                        const isSelected = currentTissu?.colorTheme === theme.name || (!currentTissu?.colorTheme && isNone);
-                        return (
-                          <button
-                            key={theme.name}
-                            type="button"
-                            onClick={() => setCurrentTissu({ ...currentTissu, colorTheme: theme.name })}
-                            className={`w-6 h-6 rounded-full relative overflow-hidden flex items-center justify-center border-2 ${
-                              isSelected ? 'border-slate-800 scale-115 shadow-md shadow-black/15 z-10' : 'border-transparent hover:scale-110'
-                            } transition-all`}
-                            title={isNone ? 'Aucun thème (Gris neutre)' : `Thème ${theme.name}`}
-                          >
-                            {isNone ? (
-                              <div className="absolute inset-0 bg-slate-100 flex items-center justify-center">
-                                {/* Diagonal red slash representing "None" */}
-                                <div className="w-full h-0.5 bg-red-500/80 transform rotate-45 absolute"></div>
-                                <span className="text-[8px] font-bold text-slate-500 absolute">Ø</span>
-                              </div>
-                            ) : (
-                              <div className={`w-full h-full ${theme.bg}`} />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Color / Pattern */}
-                  <div>
-                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">COULEUR / MOTIF</label>
+                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                      NOM DU TISSU / MODÈLE *
+                    </label>
                     <input
                       type="text"
-                      placeholder="Ex: Bleu indigo, Doré..."
-                      value={currentTissu?.color || ''}
-                      onChange={e => setCurrentTissu({ ...currentTissu, color: e.target.value })}
+                      required
+                      placeholder="Ex: Bazin Getzner VIP, Wax Hollandais Soleil, Lin Pur..."
+                      value={currentTissu?.name || ''}
+                      onChange={e => setCurrentTissu({ ...currentTissu, name: e.target.value })}
                       className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
                     />
                   </div>
 
-                  {/* Quantity */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Category */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">CATÉGORIE *</label>
+                      {isNewCategory ? (
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: Brocart, Jacquard..."
+                            value={newCategoryName}
+                            onChange={e => setNewCategoryName(e.target.value)}
+                            className="flex-1 px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsNewCategory(false);
+                              setNewCategoryName('');
+                            }}
+                            className="px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={currentTissu?.category || 'Bazin'}
+                          onChange={e => {
+                            if (e.target.value === 'ADD_NEW') {
+                              setIsNewCategory(true);
+                              setNewCategoryName('');
+                            } else {
+                              setCurrentTissu({ ...currentTissu, category: e.target.value });
+                            }
+                          }}
+                          className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
+                        >
+                          {dynamicCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                          <option value="ADD_NEW" className="text-violet-600 font-bold">+ Nouvelle catégorie...</option>
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Internal Ref */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                        RÉFÉRENCE INTERNE (ROULEAU)
+                      </label>
+                      <div className="relative">
+                        <Hash className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Ex: REF-BG-01, TIROIR-B"
+                          value={currentTissu?.internalRef || ''}
+                          onChange={e => setCurrentTissu({ ...currentTissu, internalRef: e.target.value })}
+                          className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-mono font-semibold rounded-xl transition-all outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Color Selector Section */}
+                  <FabricColorSelector
+                    currentColor={currentTissu?.color || ''}
+                    currentColorHex={currentTissu?.colorHex || '#50C878'}
+                    secondaryColor={currentTissu?.secondaryColor || ''}
+                    onChangeColor={(colorName, colorHex) => {
+                      setCurrentTissu({
+                        ...currentTissu,
+                        color: colorName,
+                        colorHex: colorHex
+                      });
+                    }}
+                    onChangeSecondaryColor={(secColor) => {
+                      setCurrentTissu({
+                        ...currentTissu,
+                        secondaryColor: secColor
+                      });
+                    }}
+                    onChangeHex={(hex) => {
+                      setCurrentTissu({
+                        ...currentTissu,
+                        colorHex: hex
+                      });
+                    }}
+                    onChangeCustomName={(name) => {
+                      const found = findColorInfo(name);
+                      setCurrentTissu({
+                        ...currentTissu,
+                        color: name,
+                        colorHex: found.hex !== '#94A3B8' ? found.hex : (currentTissu?.colorHex || '#50C878')
+                      });
+                    }}
+                  />
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Pattern / Motif */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                        MOTIF / STYLE
+                      </label>
+                      <select
+                        value={currentTissu?.pattern || 'Uni'}
+                        onChange={e => setCurrentTissu({ ...currentTissu, pattern: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
+                      >
+                        {FABRIC_PATTERNS.map(pat => (
+                          <option key={pat.id} value={pat.name}>{pat.icon ? `${pat.icon} ` : ''}{pat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                        QUANTITÉ EN STOCK (MÈTRES) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        placeholder="Ex: 12.5"
+                        value={currentTissu?.quantity ?? ''}
+                        onChange={e => setCurrentTissu({ ...currentTissu, quantity: e.target.value === '' ? '' as any : Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-black text-violet-700 rounded-xl transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Cost Price */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5 font-mono">
+                        COÛT ACHAT / M ({currency}) *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        placeholder="Ex: 3000"
+                        value={currentTissu?.costPricePerMeter ?? currentTissu?.price ?? ''}
+                        onChange={e => setCurrentTissu({ ...currentTissu, costPricePerMeter: e.target.value === '' ? '' as any : Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none font-mono"
+                      />
+                    </div>
+
+                    {/* Selling Price */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5 font-mono">
+                        PRIX VENTE CONSEILLÉ / M ({currency}) *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        placeholder="Ex: 4500"
+                        value={currentTissu?.pricePerMeter ?? currentTissu?.price ?? ''}
+                        onChange={e => setCurrentTissu({ ...currentTissu, pricePerMeter: e.target.value === '' ? '' as any : Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Supplier */}
                   <div>
-                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">QUANTITÉ (MÈTRES) *</label>
+                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                      FOURNISSEUR / BOUTIQUE (OPTIONNEL)
+                    </label>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      placeholder="Ex: 6"
-                      value={currentTissu?.quantity ?? ''}
-                      onChange={e => setCurrentTissu({ ...currentTissu, quantity: e.target.value === '' ? '' as any : Number(e.target.value) })}
+                      type="text"
+                      placeholder="Ex: Maison Getzner Dakar, Boutique Amy Sandaga"
+                      value={currentTissu?.supplier || ''}
+                      onChange={e => setCurrentTissu({ ...currentTissu, supplier: e.target.value })}
                       className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Cost Price */}
+                  {/* Notes */}
                   <div>
-                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5 font-mono">PRIX DE REVIENT / M ({currency}) *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      placeholder="Ex: 3000"
-                      value={currentTissu?.costPricePerMeter ?? currentTissu?.price ?? ''}
-                      onChange={e => setCurrentTissu({ ...currentTissu, costPricePerMeter: e.target.value === '' ? '' as any : Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none font-mono"
-                    />
-                  </div>
-
-                  {/* Selling Price */}
-                  <div>
-                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5 font-mono">PRIX CONSEILLÉ / M ({currency}) *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      placeholder="Ex: 4500"
-                      value={currentTissu?.pricePerMeter ?? currentTissu?.price ?? ''}
-                      onChange={e => setCurrentTissu({ ...currentTissu, pricePerMeter: e.target.value === '' ? '' as any : Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none font-mono"
+                    <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                      NOTES & EMPLACEMENT D'ENTREPOSAGE
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Emplacement en atelier (ex: Étagère 3), texture, brillance..."
+                      value={currentTissu?.notes || ''}
+                      onChange={e => setCurrentTissu({ ...currentTissu, notes: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-medium rounded-xl transition-all outline-none resize-none"
                     />
                   </div>
                 </div>
 
-                {/* Supplier */}
-                <div>
-                  <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">FOURNISSEUR (OPTIONNEL)</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Boutique Amy, Marché Sandaga"
-                    value={currentTissu?.supplier || ''}
-                    onChange={e => setCurrentTissu({ ...currentTissu, supplier: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
-                  />
-                </div>
-
-                {/* Notes */}
-                <div>
-                  <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">NOTES / DESCRIPTION DU MOTIF</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Couleurs principales, rangement (ex: Tiroir B), spécificités d'entretien..."
-                    value={currentTissu?.notes || ''}
-                    onChange={e => setCurrentTissu({ ...currentTissu, notes: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none resize-none"
-                  />
-                </div>
-
-                {/* Save controls */}
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsFormOpen(false)}
-                    className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl transition-colors"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-violet-100 transition-colors flex items-center gap-1"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Enregistrer
-                  </button>
-                </div>
+                {/* Sticky Modal Footer */}
+                <ModalStickyFooter
+                  onCancel={() => setIsFormOpen(false)}
+                  cancelLabel="Annuler"
+                  submitLabel={currentTissu?.id ? "Mettre à jour le Tissu" : "Enregistrer le Tissu"}
+                  isSubmitting={isSubmitting}
+                  isSuccess={isSuccess}
+                  disabled={!currentTissu?.name || currentTissu?.quantity === undefined || currentTissu?.quantity === null || currentTissu?.quantity === ('' as any)}
+                  disabledReason={
+                    !currentTissu?.name 
+                      ? "Veuillez renseigner le nom du tissu" 
+                      : (currentTissu?.quantity === undefined || currentTissu?.quantity === null || currentTissu?.quantity === ('' as any)
+                          ? "Veuillez indiquer la quantité en stock" 
+                          : undefined)
+                  }
+                />
               </form>
             </motion.div>
           </div>

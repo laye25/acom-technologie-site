@@ -34,6 +34,7 @@ const TeacherPortal = React.lazy(() => import('./pages/TeacherPortal'));
 const StudentPortal = React.lazy(() => import('./pages/StudentPortal'));
 const ParentPortal = React.lazy(() => import('./pages/ParentPortal'));
 const OrderTracking = React.lazy(() => import('./pages/OrderTracking'));
+const AIDemoMainPage = React.lazy(() => import('./ai-demo/pages/AIDemoMainPage').then(m => ({ default: m.AIDemoMainPage })));
 // Removed direct imports for lazy loading
 
 const Pricing = React.lazy(() => import('./pages/Pricing'));
@@ -122,6 +123,8 @@ function AppContent() {
             <Route path="/quote-request" element={<ProtectedRoute><QuoteRequest /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
+            <Route path="/admin/ai-demo" element={<ProtectedRoute><AIDemoMainPage /></ProtectedRoute>} />
+            <Route path="/ai-demo" element={<ProtectedRoute><AIDemoMainPage /></ProtectedRoute>} />
             <Route path="/admin/email-preview" element={<ProtectedRoute adminOnly><EmailPreview /></ProtectedRoute>} />
             <Route path="/manager/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
             <Route path="/merchant/saas" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />

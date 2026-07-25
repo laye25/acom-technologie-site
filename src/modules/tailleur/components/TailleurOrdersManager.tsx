@@ -6,11 +6,29 @@ import { motion } from 'motion/react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { syncService } from '../../../services/syncService';
+import { sanitizeFirestoreData } from '../../../utils/firestoreUtils';
 import { 
     Save, X, Loader2, Trash2, Search, 
     User, Phone, MapPin, Calendar,
-    AlertCircle, Clock, MessageSquare, Printer, FileText, Edit2, RefreshCw, Plus, Scissors, Banknote, Check
+    AlertCircle, Clock, MessageSquare, Printer, FileText, Edit2, RefreshCw, Plus, Scissors, Banknote, Check, Share2, Users,
+    Ruler, Sparkles, CheckCircle2, RotateCcw, ShieldCheck, History, Info
 } from 'lucide-react';
+import { WhatsAppShareModal } from './WhatsAppShareModal';
+import { ClientProfileService } from '../services/ClientProfileService';
+import { OrderSynchronizationService, PreparedOrderContext } from '../services/OrderSynchronizationService';
+import { GarmentLibraryService } from '../services/GarmentLibraryService';
+import { MeasurementLibraryService } from '../services/MeasurementLibraryService';
+import { MercerieAttributeService } from '../services/MercerieAttributeService';
+import { MercerieCategoryService } from '../services/MercerieCategoryService';
+import { GarmentVectorIcon } from './GarmentVectorIcon';
+import { 
+  TailorCard, 
+  TailorHeroGarmentBlock, 
+  TailorFinancialCard, 
+  TailorStatusBadge, 
+  TailorActionButton,
+  TailorDeleteConfirmModal
+} from './design-system/TailorDesignSystem';
 
 export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -20,6 +38,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
   const [costSheets, setCostSheets] = useState<any[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<any>(null);
+  const [preparedContext, setPreparedContext] = useState<PreparedOrderContext | null>(null);
+  const [updateClientGlobalMeasurements, setUpdateClientGlobalMeasurements] = useState<boolean>(true);
+  const [availableGarments, setAvailableGarments] = useState<any[]>([]);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(false);
   const [focusedMeasurement, setFocusedMeasurement] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -33,6 +55,19 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
   const [encaisserOrder, setEncaisserOrder] = useState<any>(null);
   const [encaisserAmount, setEncaisserAmount] = useState('');
 
+  // Partage WhatsApp aux Artisans & Équipes
+  const [isWhatsAppShareModalOpen, setIsWhatsAppShareModalOpen] = useState(false);
+  const [selectedShareOrder, setSelectedShareOrder] = useState<any>(null);
+
+  // Modal de confirmation de suppression de commande
+  const [orderToDelete, setOrderToDelete] = useState<any | null>(null);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+
+  const handleOpenWhatsAppShare = (order: any) => {
+    setSelectedShareOrder(order);
+    setIsWhatsAppShareModalOpen(true);
+  };
+
   // Campagnes de Fidélisation & Fêtes
   const [selectedCampaignHoliday, setSelectedCampaignHoliday] = useState<string>('tabaski');
   const [campaignCustomText, setCampaignCustomText] = useState<string>('');
@@ -44,7 +79,8 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     const price = Number(orderObj.price || 0);
     const advance = Number(orderObj.advance || 0);
     const rest = Math.max(0, price - advance);
-    const trackingUrl = `${window.location.origin}/suivi-commande/${orderObj.id}`;
+    const trackingId = orderObj.tracking_id || orderObj.public_tracking_id || (orderObj.id ? orderObj.id.replace(/^ord-/i, '') : orderObj.id);
+    const trackingUrl = `${window.location.origin}/suivi-commande/${trackingId}`;
     
     let statusText = 'Enregistrée';
     if (orderObj.status === 'mesures') statusText = 'Prise de mesures validée 📏';
@@ -65,11 +101,124 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     setWhatsappTemplateType(type);
   };
 
-  const handleOpenWhatsapp = (order: any) => {
-    setWhatsappOrder(order);
-    setWhatsappClientPhone(order.clientPhone || '');
-    updateWhatsappMessageTemplate(order, 'status');
+  const handleOpenWhatsapp = async (order: any) => {
+    if (!order) return;
+    const cleanUuid = (order.id || '').replace(/^ord-/i, '');
+    const trackingId = order.tracking_id || order.public_tracking_id || cleanUuid || order.id;
+
+    // [1] Commande sélectionnée
+    console.log("🔍 [1] Commande sélectionnée", {
+      "Order ID": order.id,
+      "Tracking ID": trackingId
+    });
+
+    if (!order.id || !trackingId) {
+      toast.error("Impossible d'envoyer le lien de suivi tant que la commande n'est pas initialisée avec un tracking_id.");
+      return;
+    }
+
+    // Assurer que la commande a tous ses champs de suivi publiés
+    const updatedOrder = {
+      ...order,
+      order_id: order.id,
+      client_id: order.clientId || order.client_id || '',
+      tracking_id: trackingId,
+      public_tracking_id: trackingId,
+      tracking_token: trackingId,
+      tracking_status: 'published',
+      is_published: true,
+      published: true,
+      is_tracking_enabled: true,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'pending'
+    };
+
+    // [2] Publication
+    console.log("📢 [2] Publication", {
+      published: updatedOrder.published,
+      is_published: updatedOrder.is_published,
+      tracking_status: updatedOrder.tracking_status
+    });
+
+    // Mettre à jour localement
+    const updatedOrders = orders.map(o => o.id === order.id ? updatedOrder : o);
+    setOrders(updatedOrders);
+    saveOrders(updatedOrders);
+
+    let firestoreSuccess = false;
+    let firestoreErrorDetails: string | null = null;
+
+    // [3] Écriture Firestore & [4] Synchronisation Cloud
+    try {
+      const { db: firestore } = await import('../../../firebase');
+      const { doc, setDoc, getDoc } = await import('firebase/firestore');
+      const { syncStatus, ...cleanData } = updatedOrder;
+      const payload = sanitizeFirestoreData({
+        ...cleanData,
+        merchantId: merchant.id,
+        updatedAt: cleanData.updatedAt || new Date().toISOString()
+      });
+      
+      const primaryDocRef = doc(firestore, 'tailleur_orders', order.id);
+      await setDoc(primaryDocRef, payload, { merge: true });
+
+      if (trackingId && trackingId !== order.id) {
+        const aliasDocRef = doc(firestore, 'tailleur_orders', trackingId);
+        await setDoc(aliasDocRef, payload, { merge: true });
+      }
+
+      console.log("💾 [3] Écriture Firestore", {
+        Collection: 'tailleur_orders',
+        Document: order.id,
+        AliasDocument: trackingId,
+        Résultat: "Succès (Written to Cloud)",
+        Erreur: null
+      });
+
+      console.log("☁️ [4] Synchronisation Cloud", { Statut: "Succès" });
+      firestoreSuccess = true;
+
+      // [5] Génération du lien
+      const trackingUrl = `${window.location.origin}/suivi-commande/${trackingId}`;
+      console.log("🔗 [5] Génération du lien", { "Lien généré": trackingUrl });
+
+      // [6] Recherche API (Validation de pré-envoi)
+      console.log("🔎 [6] Recherche API - Test de vérification du lien...");
+      const verifyDocRef = doc(firestore, 'tailleur_orders', trackingId);
+      const verifySnap = await getDoc(verifyDocRef);
+
+      const foundOnCloud = verifySnap.exists();
+      console.log("🔎 [6] Recherche API", {
+        "Tracking recherché": trackingId,
+        "Commande trouvée": foundOnCloud ? "Oui (200 OK)" : "Non (Not Found)"
+      });
+
+      if (!foundOnCloud) {
+        toast.error("Attention : La commande a été écrite sur Firestore mais n'a pas pu être immédiatement relue. Vérifiez vos règles de sécurité.");
+      }
+
+    } catch (fsErr: any) {
+      firestoreErrorDetails = fsErr?.code || fsErr?.message || String(fsErr);
+      console.error("❌ [3] Écriture Firestore - Erreur :", {
+        Collection: 'tailleur_orders',
+        Document: order.id,
+        ErreurCode: fsErr?.code,
+        ErreurMessage: fsErr?.message,
+        ErreurObjet: fsErr
+      });
+      console.error("❌ [4] Synchronisation Cloud", { Statut: "Échec", Erreur: firestoreErrorDetails });
+
+      toast.error(`Impossible d'envoyer le lien : la commande n'a pas pu être synchronisée sur le serveur (${firestoreErrorDetails}).`);
+      return; // Stop execution if cloud sync failed completely!
+    }
+
+    // Process WhatsApp modal
+    setWhatsappOrder(updatedOrder);
+    setWhatsappClientPhone(updatedOrder.clientPhone || '');
+    updateWhatsappMessageTemplate(updatedOrder, 'status');
     setIsWhatsappModalOpen(true);
+
+    triggerSync(true);
   };
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -88,7 +237,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     }
   };
 
-  // Load clients, orders and fabrics
+  // Load clients, orders, fabrics and available garments
   useEffect(() => {
     try {
       const savedClients = localStorage.getItem(`tailleur_clients_${merchant.id}`);
@@ -105,6 +254,35 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
       const savedCosts = localStorage.getItem(`tailleur_costs_${merchant.id}`);
       if (savedCosts) setCostSheets(JSON.parse(savedCosts));
+
+      const garments = GarmentLibraryService.getGarmentsForMerchant(merchant.id);
+      setAvailableGarments(garments);
+
+      // Vérifier s'il y a un client en attente de création de commande
+      const pendingClientId = localStorage.getItem(`tailleur_pending_order_client_${merchant.id}`);
+      if (pendingClientId) {
+        localStorage.removeItem(`tailleur_pending_order_client_${merchant.id}`);
+        const prep = OrderSynchronizationService.prepareOrderFromClient(merchant.id, pendingClientId);
+        if (prep) {
+          setPreparedContext(prep);
+          setCurrentOrder({
+            clientId: prep.client.id,
+            clientName: `${prep.client.firstName} ${prep.client.lastName}`.trim(),
+            clientPhone: prep.client.phone || '',
+            clientAddress: prep.client.address || '',
+            gender: prep.client.gender,
+            garmentId: prep.garment.id,
+            model: prep.garment.name,
+            clientMeasurements: prep.measurements,
+            price: prep.pricingProposal.basePrice,
+            advance: '',
+            status: prep.canBypassMeasurementStep ? 'coupe' : 'mesures',
+            deliveryDate: '',
+            notes: prep.sewingSpecs.defaultDescription
+          });
+          setIsFormOpen(true);
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -133,19 +311,52 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       notes: ''
     };
     setCurrentOrder(initialOrder);
+    setPreparedContext(null);
     setIsFormOpen(true);
   };
 
   const handleSelectClient = (clientId: string) => {
-    const selected = clients.find(c => c.id === clientId);
-    if (selected) {
+    if (!clientId) {
+      setCurrentOrder({ ...currentOrder, clientId: '' });
+      setPreparedContext(null);
+      return;
+    }
+
+    const prep = OrderSynchronizationService.prepareOrderFromClient(merchant.id, clientId);
+    if (prep) {
+      setPreparedContext(prep);
       setCurrentOrder({
         ...currentOrder,
-        clientId,
-        clientName: `${selected.firstName} ${selected.lastName}`,
-        clientPhone: selected.phone || '',
-        clientMeasurements: selected.measurements || {}
+        clientId: prep.client.id,
+        clientName: `${prep.client.firstName} ${prep.client.lastName}`.trim(),
+        clientPhone: prep.client.phone || '',
+        clientAddress: prep.client.address || '',
+        gender: prep.client.gender,
+        garmentId: prep.garment.id,
+        model: prep.garment.name,
+        clientMeasurements: { ...prep.measurements },
+        price: prep.pricingProposal.basePrice,
+        notes: prep.sewingSpecs.defaultDescription,
+        status: prep.canBypassMeasurementStep ? 'coupe' : 'mesures'
       });
+    }
+  };
+
+  const handleChangeGarmentModel = (newGarmentId: string) => {
+    if (!currentOrder?.clientId) return;
+    const prep = OrderSynchronizationService.prepareOrderFromClient(merchant.id, currentOrder.clientId, newGarmentId);
+    if (prep) {
+      setPreparedContext(prep);
+      setCurrentOrder({
+        ...currentOrder,
+        garmentId: prep.garment.id,
+        model: prep.garment.name,
+        clientMeasurements: { ...prep.measurements },
+        price: prep.pricingProposal.basePrice,
+        notes: prep.sewingSpecs.defaultDescription,
+        status: prep.canBypassMeasurementStep ? 'coupe' : 'mesures'
+      });
+      toast.success(`Modèle sélectionné : "${prep.garment.name}". Profil de mesures & recommandations mis à jour.`);
     }
   };
 
@@ -160,89 +371,70 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       return;
     }
 
-    let finalOrder = { ...currentOrder };
-
-    // Déduction automatique du tissu du stock si sélectionné
-    if (currentOrder.selectedTissuId && currentOrder.tissuLengthUsed) {
-      const lengthUsed = Number(currentOrder.tissuLengthUsed);
-      if (lengthUsed > 0) {
-        const targetTissu = tissus.find(t => t.id === currentOrder.selectedTissuId);
-        if (targetTissu) {
-          const currentQty = Number(targetTissu.quantity || 0);
-          if (currentQty < lengthUsed) {
-            toast.error(`Stock insuffisant pour ${targetTissu.name}. Disponible : ${currentQty}m, Requis : ${lengthUsed}m`);
-          }
-          const newQty = Math.max(0, currentQty - lengthUsed);
-          const updatedTissus = tissus.map(t => t.id === targetTissu.id ? { ...t, quantity: newQty, syncStatus: 'pending', updatedAt: new Date().toISOString() } : t);
-          setTissus(updatedTissus);
-          localStorage.setItem(`tailleur_tissus_${merchant.id}`, JSON.stringify(updatedTissus));
-          
-          // Mettre à jour le tissu utilisé
-          finalOrder.tissuUsed = `${targetTissu.name} (${lengthUsed}m)`;
-          
-          // Optionnel: Déclencher aussi la synchronisation des tissus
-          syncService.syncTailoringCollection(merchant.id, 'tissus');
-        }
+    // Synchronisation automatique et création de commande via service
+    const savedOrder = OrderSynchronizationService.syncOrderToClient(
+      merchant.id,
+      currentOrder,
+      {
+        updateClientGlobalMeasurements,
+        selectedFabricId: currentOrder.selectedTissuId,
+        metersUsed: currentOrder.tissuLengthUsed ? Number(currentOrder.tissuLengthUsed) : undefined,
+        mercerieItemsUsed: currentOrder.selectedMercerieItems
       }
-    }
+    );
 
-    // Déduction automatique des articles de mercerie du stock
-    if (currentOrder.selectedMercerieItems && currentOrder.selectedMercerieItems.length > 0) {
-      let updatedMercerie = [...mercerieItems];
-      let hasMercerieUpdate = false;
-      let mercerieNames: string[] = [];
-
-      currentOrder.selectedMercerieItems.forEach((usedItem: any) => {
-        const qtyUsed = Number(usedItem.quantityUsed);
-        if (qtyUsed > 0) {
-          const targetIndex = updatedMercerie.findIndex(m => m.id === usedItem.mercerieId);
-          if (targetIndex >= 0) {
-            const targetItem = { ...updatedMercerie[targetIndex] };
-            const currentQty = Number(targetItem.quantity || 0);
-            if (currentQty < qtyUsed) {
-              toast.error(`Stock insuffisant pour ${targetItem.name}. Disponible : ${currentQty}, Requis : ${qtyUsed}`);
-            }
-            const newQty = Math.max(0, currentQty - qtyUsed);
-            targetItem.quantity = newQty;
-            targetItem.syncStatus = 'pending';
-            targetItem.updatedAt = new Date().toISOString();
-            updatedMercerie[targetIndex] = targetItem;
-            hasMercerieUpdate = true;
-            mercerieNames.push(`${targetItem.name} (x${qtyUsed})`);
-          }
-        }
+    // Publication immédiate sur Firestore sous les deux index
+    try {
+      const { db: firestore } = await import('../../../firebase');
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { syncStatus, ...cleanData } = savedOrder;
+      const payload = sanitizeFirestoreData({
+        ...cleanData,
+        merchantId: merchant.id,
+        updatedAt: cleanData.updatedAt || new Date().toISOString()
       });
+      
+      const primaryDocRef = doc(firestore, 'tailleur_orders', savedOrder.id);
+      await setDoc(primaryDocRef, payload, { merge: true });
 
-      if (hasMercerieUpdate) {
-        setMercerieItems(updatedMercerie);
-        localStorage.setItem(`tailleur_mercerie_${merchant.id}`, JSON.stringify(updatedMercerie));
-        
-        // Ajouter aux notes ou champ mercerie
-        const mercerieText = `Mercerie: ${mercerieNames.join(', ')}`;
-        finalOrder.notes = finalOrder.notes ? `${finalOrder.notes}\n${mercerieText}` : mercerieText;
-        
-        syncService.syncTailoringCollection(merchant.id, 'mercerie' as any);
+      if (savedOrder.tracking_id && savedOrder.tracking_id !== savedOrder.id) {
+        const aliasDocRef = doc(firestore, 'tailleur_orders', savedOrder.tracking_id);
+        await setDoc(aliasDocRef, payload, { merge: true });
       }
+
+      console.log("🌐 [Création Directe Firestore] Commande publiée sur Firestore :", {
+        OrderID: savedOrder.id,
+        TrackingID: savedOrder.tracking_id,
+        Résultat: "200 OK (Enregistré sur Cloud)"
+      });
+    } catch (fsErr: any) {
+      const errDetail = fsErr?.code || fsErr?.message || String(fsErr);
+      console.error("❌ [Création Directe Firestore] Échec de la publication directe :", {
+        Code: fsErr?.code,
+        Message: fsErr?.message,
+        Erreur: fsErr
+      });
+      toast.error(`Avertissement : La commande est sauvegardée localement mais la synchronisation Cloud a échoué (${errDetail}).`);
     }
 
-    let updated;
-    if (finalOrder.id) {
-      updated = orders.map(o => o.id === finalOrder.id ? { ...finalOrder, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
-      toast.success('Commande modifiée avec succès');
-    } else {
-      const newOrd = {
-        ...finalOrder,
-        id: crypto.randomUUID(),
-        syncStatus: 'pending',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      updated = [newOrd, ...orders];
-      toast.success('Nouvelle commande enregistrée');
-    }
-    saveOrders(updated);
+    toast.success('Commande enregistrée et synchronisée avec la fiche client ! 🧵✨');
+
+    // Rechargement des listes locales
+    const savedOrders = localStorage.getItem(`tailleur_orders_${merchant.id}`);
+    if (savedOrders) setOrders(JSON.parse(savedOrders));
+
+    const savedClients = localStorage.getItem(`tailleur_clients_${merchant.id}`);
+    if (savedClients) setClients(JSON.parse(savedClients));
+
+    const savedTissus = localStorage.getItem(`tailleur_tissus_${merchant.id}`);
+    if (savedTissus) setTissus(JSON.parse(savedTissus));
+
+    const savedMercerie = localStorage.getItem(`tailleur_mercerie_${merchant.id}`);
+    if (savedMercerie) setMercerieItems(JSON.parse(savedMercerie));
+
     setIsFormOpen(false);
     setCurrentOrder(null);
+    setPreparedContext(null);
     triggerSync();
   };
 
@@ -309,20 +501,34 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     setEncaisserAmount('');
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Voulez-vous supprimer cette commande ?')) {
+  const handleRequestDeleteOrder = (order: any) => {
+    if (!order || !order.id) return;
+    setOrderToDelete(order);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    setIsDeletingOrder(true);
+    try {
+      const id = orderToDelete.id;
       const target = orders.find(o => o.id === id);
-      let updated;
       if (target) {
+        let updatedOrders;
         if (target.syncStatus === 'synced') {
-          updated = orders.map(o => o.id === id ? { ...o, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
+          updatedOrders = orders.map(o => o.id === id ? { ...o, isDeleted: true, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
         } else {
-          updated = orders.filter(o => o.id !== id);
+          updatedOrders = orders.filter(o => o.id !== id);
         }
-        saveOrders(updated);
-        toast.success('Commande supprimée');
-        triggerSync();
+        saveOrders(updatedOrders);
+        toast.success(`Commande CMD-${id.slice(0, 5).toUpperCase()} (${target.clientName || ''}) supprimée avec succès !`);
+        await triggerSync();
       }
+    } catch (e) {
+      console.error("Erreur suppression commande :", e);
+      toast.error("Échec de la suppression de la commande.");
+    } finally {
+      setIsDeletingOrder(false);
+      setOrderToDelete(null);
     }
   };
 
@@ -929,9 +1135,17 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
             <Clock className="w-3 h-3" />
           </button>
           <button
+            onClick={() => handleOpenWhatsAppShare(order)}
+            className="p-1.5 border border-emerald-200 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg hover:scale-105 transition-all cursor-pointer flex items-center gap-1 text-[9px] font-bold"
+            title="Partager la commande aux artisans via WhatsApp"
+          >
+            <MessageSquare className="w-3 h-3" />
+            <span>Artisans</span>
+          </button>
+          <button
             onClick={() => handleOpenWhatsapp(order)}
             className="p-1.5 border border-emerald-100 bg-emerald-50/55 text-emerald-600 rounded-lg hover:scale-105 transition-transform cursor-pointer"
-            title="Aviser WhatsApp"
+            title="Aviser le client via WhatsApp"
           >
             <MessageSquare className="w-3 h-3" />
           </button>
@@ -958,6 +1172,18 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
             title="Éditer"
           >
             <Edit2 className="w-3 h-3" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              handleRequestDeleteOrder(order);
+            }}
+            className="p-1.5 border border-slate-100 text-gray-400 hover:bg-rose-50 hover:text-red-600 hover:border-rose-200 rounded-lg transition-colors cursor-pointer relative z-10"
+            title="Supprimer la commande"
+          >
+            <Trash2 className="w-3 h-3" />
           </button>
         </div>
       </div>
@@ -1064,34 +1290,100 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       {/* Form Dialog */}
       {isFormOpen && currentOrder && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="px-8 py-6 border-b border-gray-100 bg-violet-50/50 flex justify-between items-center shrink-0">
+          <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+            <div className="px-8 py-5 border-b border-gray-100 bg-violet-50/50 flex justify-between items-center shrink-0">
               <div className="text-left">
                 <h3 className="text-xl font-black text-ink">{currentOrder.id ? 'Modifier la Commande' : 'Créer une Fiche Commande'}</h3>
-                <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Enregistrement d'une création sur mesure</p>
+                <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Synchronisation automatique avec le dossier client couture</p>
               </div>
-              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
+              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors cursor-pointer">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto space-y-6 flex-1 text-left">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Sélectionner le Client *</label>
-                  <select
-                    value={currentOrder.clientId}
-                    onChange={(e) => handleSelectClient(e.target.value)}
-                    required
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm bg-white cursor-pointer"
-                  >
-                    <option value="">-- Choisissez un client couture --</option>
-                    {clients.map(c => (
-                      <option key={c.id} value={c.id}>{c.firstName} {c.lastName} ({c.phone || 'Pas de numéro'})</option>
-                    ))}
-                  </select>
-                </div>
+            <form onSubmit={handleSubmit} className="p-6 md:p-8 overflow-y-auto space-y-6 flex-1 text-left">
+              {/* 1. SELECTION CLIENT */}
+              <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">👤 Client Couture *</label>
+                <select
+                  value={currentOrder.clientId}
+                  onChange={(e) => handleSelectClient(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm bg-white cursor-pointer shadow-sm"
+                >
+                  <option value="">-- Sélectionnez un client dans le fichier --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.firstName} {c.lastName} ({c.phone || 'Pas de téléphone'})</option>
+                  ))}
+                </select>
 
+                {preparedContext && (
+                  <div className="p-3 bg-white rounded-xl border border-violet-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${preparedContext.client.gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {preparedContext.client.gender === 'F' ? '🚺' : '🚹'}
+                      </div>
+                      <div>
+                        <div className="font-black text-slate-800">{preparedContext.client.firstName} {preparedContext.client.lastName}</div>
+                        <div className="text-[10px] text-gray-500">{preparedContext.client.phone || 'Pas de numéro'} {preparedContext.client.address ? `• ${preparedContext.client.address}` : ''}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="px-2.5 py-1 bg-violet-50 text-violet-700 rounded-lg font-bold border border-violet-100 flex items-center gap-1">
+                        <History className="w-3 h-3" /> {preparedContext.orderHistory.length} commande(s) passée(s)
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. MODELE & VETEMENT A CONFECTIONNER */}
+              {preparedContext && (
+                <div className="space-y-3 bg-violet-50/30 p-4 rounded-2xl border border-violet-100">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-xs font-black text-violet-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Scissors className="w-4 h-4 text-violet-600" />
+                      🧵 Modèle / Vêtement à Confectionner
+                    </label>
+
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-violet-600 bg-violet-100 px-2 py-0.5 rounded-md">
+                        {preparedContext.garment.category}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-3 items-center bg-white p-3 rounded-xl border border-violet-200/80 shadow-sm">
+                    <div className="p-2.5 bg-violet-100 rounded-xl flex items-center justify-center shrink-0">
+                      <GarmentVectorIcon category={preparedContext.garment.category} className="w-7 h-7 text-violet-700" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="font-black text-slate-900 text-base">{preparedContext.garment.name}</div>
+                      <p className="text-xs text-slate-500">{preparedContext.sewingSpecs.defaultDescription}</p>
+                    </div>
+                  </div>
+
+                  {/* CHANGER DE MODELE */}
+                  <div className="pt-1">
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Changer le modèle pour cette commande :</label>
+                    <select
+                      value={preparedContext.garment.id}
+                      onChange={(e) => handleChangeGarmentModel(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 focus:ring-2 focus:ring-violet-500 outline-none cursor-pointer"
+                    >
+                      {availableGarments.map(g => (
+                        <option key={g.id} value={g.id}>
+                          {g.name} ({g.gender === 'F' ? 'Femme' : g.gender === 'M' ? 'Homme' : 'Mixte'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* DESCRIPTION MANUELLE DU MODEL SI SANS CONTEXTE PREPARE */}
+              {!preparedContext && (
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Description du Modèle Commandé *</label>
                   <input
@@ -1103,16 +1395,125 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
                   />
                 </div>
+              )}
 
+              {/* 3. PROFIL DE MESURES AUTOMATIQUE & SYNCHRONISATION */}
+              {preparedContext && (
+                <div className="space-y-4 bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Ruler className="w-4 h-4 text-emerald-600" />
+                      <h4 className="text-xs font-black text-emerald-950 uppercase tracking-wider">
+                        Profil de Mesures ({preparedContext.requiredMeasurementKeys.length} mesures requises)
+                      </h4>
+                    </div>
+
+                    {preparedContext.isComplete ? (
+                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px] flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Mesures 100% disponibles (Pas de saisie requise)
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full font-bold text-[10px] flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                        {preparedContext.missingMandatoryKeys.length} mesure(s) obligatoire(s) manquante(s)
+                      </span>
+                    )}
+                  </div>
+
+                  {preparedContext.canBypassMeasurementStep && (
+                    <div className="p-3 bg-emerald-100/60 rounded-xl border border-emerald-200 flex items-center justify-between text-xs text-emerald-900">
+                      <span>💡 Toutes les mesures sont enregistrées sur la fiche de ce client.</span>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentOrder({ ...currentOrder, status: 'coupe' })}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] shadow-sm transition cursor-pointer"
+                      >
+                        ⚡ Statut Coupe & Couture
+                      </button>
+                    </div>
+                  )}
+
+                  {/* GRILLE DES MESURES CLIENT DYNAMIQUES */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 pt-1">
+                    {preparedContext.requiredMeasurementKeys.map((key) => {
+                      const def = MeasurementLibraryService.getDefinition(key);
+                      const isMandatory = preparedContext.garment.mandatoryMeasurements?.includes(key);
+                      const val = currentOrder.clientMeasurements?.[key] || '';
+                      const isMissing = isMandatory && !val;
+
+                      return (
+                        <div 
+                          key={key} 
+                          className={`p-2 rounded-xl border text-left transition-all ${
+                            isMissing 
+                              ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-200/50' 
+                              : val 
+                              ? 'bg-white border-emerald-200' 
+                              : 'bg-gray-50 border-gray-200'
+                          }`}
+                        >
+                          <label className="block text-[10px] font-black uppercase text-slate-500 truncate mb-1">
+                            {def?.label || key} {isMandatory && <span className="text-red-500">*</span>}
+                          </label>
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              step="0.5"
+                              value={val}
+                              placeholder="cm"
+                              onChange={(e) => {
+                                const newMeas = { ...currentOrder.clientMeasurements, [key]: e.target.value };
+                                setCurrentOrder({ ...currentOrder, clientMeasurements: newMeas });
+                              }}
+                              className="w-full px-2 py-1 text-xs font-black text-slate-900 bg-transparent outline-none border-b border-gray-300 focus:border-violet-600 font-mono"
+                            />
+                            <span className="text-[10px] font-bold text-gray-400 ml-1">cm</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* CHECKBOX SYNCHRONISATION PERMANENTE */}
+                  <div className="pt-2 border-t border-emerald-200/60">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={updateClientGlobalMeasurements}
+                        onChange={(e) => setUpdateClientGlobalMeasurements(e.target.checked)}
+                        className="w-4 h-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-bold text-slate-700">
+                        🔄 Mettre à jour la fiche permanente du client (Sauvegarder ces mesures pour les futures commandes)
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. DETAILS FINANCIERS & DATES */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Prix de la Confection ({merchant.currency}) *</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-bold text-gray-600">Prix de la Confection ({merchant.currency}) *</label>
+                    {preparedContext && preparedContext.pricingProposal.basePrice > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setCurrentOrder({ ...currentOrder, price: preparedContext.pricingProposal.basePrice })}
+                        className="text-[10px] font-bold text-violet-600 hover:underline flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3 h-3" /> Proposer {preparedContext.pricingProposal.basePrice.toLocaleString()} {merchant.currency}
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="number"
                     required
                     value={currentOrder.price || ''}
                     placeholder="Ex: 50000"
                     onChange={e => setCurrentOrder({ ...currentOrder, price: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm"
                   />
                 </div>
 
@@ -1139,7 +1540,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Statut Initial *</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Statut de Fabrication *</label>
                   <select
                     value={currentOrder.status || 'mesures'}
                     onChange={e => setCurrentOrder({ ...currentOrder, status: e.target.value })}
@@ -1152,145 +1553,322 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     <option value="livre">🤝 Livré</option>
                   </select>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="isUrgent"
-                      checked={!!currentOrder.isUrgent}
-                      onChange={e => setCurrentOrder({ ...currentOrder, isUrgent: e.target.checked, isLater: e.target.checked ? false : currentOrder.isLater })}
-                      className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                    />
-                    <label htmlFor="isUrgent" className="text-xs font-black text-rose-600 cursor-pointer flex items-center gap-1 uppercase select-none">
-                      🚨 Marquer Urgent
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="isLater"
-                      checked={!!currentOrder.isLater}
-                      onChange={e => setCurrentOrder({ ...currentOrder, isLater: e.target.checked, isUrgent: e.target.checked ? false : currentOrder.isUrgent })}
-                      className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 cursor-pointer"
-                    />
-                    <label htmlFor="isLater" className="text-xs font-black text-amber-600 cursor-pointer flex items-center gap-1 uppercase select-none">
-                      <Clock className="w-3 h-3" />
-                      Planifier plus tard
-                    </label>
-                  </div>
+              <div className="flex items-center gap-6 py-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isUrgent"
+                    checked={!!currentOrder.isUrgent}
+                    onChange={e => setCurrentOrder({ ...currentOrder, isUrgent: e.target.checked, isLater: e.target.checked ? false : currentOrder.isLater })}
+                    className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                  <label htmlFor="isUrgent" className="text-xs font-black text-rose-600 cursor-pointer flex items-center gap-1 uppercase select-none">
+                    🚨 Marquer Urgent
+                  </label>
                 </div>
-
-                <div className="col-span-2 border-t border-dashed border-gray-150 pt-4 space-y-4">
-                  <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">Achat / Consommation de Tissu (Optionnel)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Tissu de l'atelier utilisé</label>
-                      <select
-                        value={currentOrder.selectedTissuId || ''}
-                        onChange={e => setCurrentOrder({ ...currentOrder, selectedTissuId: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm bg-white cursor-pointer"
-                      >
-                        <option value="">-- Ne pas prélever de tissu --</option>
-                        {tissus.map(t => (
-                          <option key={t.id} value={t.id}>{t.name} (Reste {t.quantity}m)</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Longueur nécessaire (mètres)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={currentOrder.tissuLengthUsed || ''}
-                        placeholder="Ex: 3.5"
-                        onChange={e => setCurrentOrder({ ...currentOrder, tissuLengthUsed: Number(e.target.value) })}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="col-span-2 border-t border-dashed border-gray-150 pt-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">Articles de Mercerie (Optionnel)</h4>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const current = currentOrder.selectedMercerieItems || [];
-                        setCurrentOrder({ ...currentOrder, selectedMercerieItems: [...current, { mercerieId: '', quantityUsed: 1 }] });
-                      }}
-                      className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" /> Ajouter un article
-                    </button>
-                  </div>
-                  
-                  {currentOrder.selectedMercerieItems && currentOrder.selectedMercerieItems.map((item: any, index: number) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-3 items-end bg-gray-50 p-3 rounded-xl border border-gray-100">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Article</label>
-                        <select
-                          value={item.mercerieId}
-                          onChange={e => {
-                            const newItems = [...currentOrder.selectedMercerieItems];
-                            newItems[index].mercerieId = e.target.value;
-                            setCurrentOrder({ ...currentOrder, selectedMercerieItems: newItems });
-                          }}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm bg-white cursor-pointer"
-                        >
-                          <option value="">-- Choisir --</option>
-                          {mercerieItems.map(m => (
-                            <option key={m.id} value={m.id}>{m.name} (Stock: {m.quantity})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quantité</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantityUsed || ''}
-                          onChange={e => {
-                            const newItems = [...currentOrder.selectedMercerieItems];
-                            newItems[index].quantityUsed = Number(e.target.value);
-                            setCurrentOrder({ ...currentOrder, selectedMercerieItems: newItems });
-                          }}
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newItems = currentOrder.selectedMercerieItems.filter((_: any, i: number) => i !== index);
-                          setCurrentOrder({ ...currentOrder, selectedMercerieItems: newItems });
-                        }}
-                        className="p-2.5 bg-white text-rose-500 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  {(!currentOrder.selectedMercerieItems || currentOrder.selectedMercerieItems.length === 0) && (
-                    <p className="text-xs text-gray-400 italic">Aucun article de mercerie ajouté à cette commande.</p>
-                  )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isLater"
+                    checked={!!currentOrder.isLater}
+                    onChange={e => setCurrentOrder({ ...currentOrder, isLater: e.target.checked, isUrgent: e.target.checked ? false : currentOrder.isUrgent })}
+                    className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <label htmlFor="isLater" className="text-xs font-black text-amber-600 cursor-pointer flex items-center gap-1 uppercase select-none">
+                    <Clock className="w-3 h-3" />
+                    Planifier plus tard
+                  </label>
                 </div>
               </div>
 
+              {/* 5. TISSU DU STOCK ATELIER */}
+              <div className="border-t border-dashed border-gray-200 pt-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    🧵 Consommation Tissu Stock Atelier (Optionnel)
+                  </h4>
+                  {preparedContext && preparedContext.sewingSpecs.recommendedFabricMeters > 0 && (
+                    <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded">
+                      Recommandation modèle : {preparedContext.sewingSpecs.recommendedFabricMeters}m
+                    </span>
+                  )}
+                </div>
+
+                {preparedContext && preparedContext.compatibleFabrics.length > 0 && (
+                  <div className="p-3.5 bg-violet-50/60 rounded-2xl border border-violet-100 space-y-2.5">
+                    <div className="text-[10px] font-black text-violet-800 uppercase tracking-wider flex items-center justify-between">
+                      <span>Tissus compatibles en stock :</span>
+                      <span className="text-[9px] text-violet-600 font-semibold">Triés par correspondance modèle</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {preparedContext.compatibleFabrics.map(fab => {
+                        const isSelected = currentOrder.selectedTissuId === fab.id;
+                        return (
+                          <button
+                            key={fab.id}
+                            type="button"
+                            onClick={() => {
+                              setCurrentOrder({
+                                ...currentOrder,
+                                selectedTissuId: fab.id,
+                                tissuLengthUsed: preparedContext.sewingSpecs.recommendedFabricMeters
+                              });
+                              toast.success(`Tissu ${fab.name} (${fab.color || ''}) sélectionné (${preparedContext.sewingSpecs.recommendedFabricMeters}m)`);
+                            }}
+                            className={`p-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-2 text-left cursor-pointer border ${
+                              isSelected 
+                                ? 'bg-violet-600 text-white border-violet-600 shadow-md ring-2 ring-violet-400/30' 
+                                : 'bg-white hover:bg-violet-100/60 text-slate-800 border-violet-200/80 shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span 
+                                className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs" 
+                                style={{ backgroundColor: fab.colorHex || '#a855f7' }}
+                                title={fab.color || 'Couleur'}
+                              />
+                              <div className="min-w-0">
+                                <div className="font-black text-xs truncate leading-tight">{fab.name}</div>
+                                <div className={`text-[10px] truncate ${isSelected ? 'text-violet-100' : 'text-slate-500'}`}>
+                                  {fab.color ? <strong className="font-bold">{fab.color}</strong> : 'Sans couleur'}
+                                  {fab.pattern && fab.pattern !== 'Uni' ? ` • ${fab.pattern}` : ''}
+                                  {fab.internalRef ? ` • Réf: ${fab.internalRef}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-md shrink-0 font-mono font-black ${
+                              isSelected ? 'bg-violet-800 text-white' : 'bg-violet-100 text-violet-800'
+                            }`}>
+                              {fab.quantity}m disp.
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Tissu sélectionné</label>
+                    <select
+                      value={currentOrder.selectedTissuId || ''}
+                      onChange={e => setCurrentOrder({ ...currentOrder, selectedTissuId: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-semibold text-xs bg-white cursor-pointer"
+                    >
+                      <option value="">-- Ne pas prélever de tissu --</option>
+                      {tissus.map(t => {
+                        const infoParts = [
+                          t.color ? `Couleur: ${t.color}` : null,
+                          t.pattern && t.pattern !== 'Uni' ? `Motif: ${t.pattern}` : null,
+                          t.internalRef ? `Réf: ${t.internalRef}` : null,
+                          `Stock: ${t.quantity}m`
+                        ].filter(Boolean);
+                        return (
+                          <option key={t.id} value={t.id}>
+                            {t.name} ({infoParts.join(' | ')})
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {/* Preview Badge of Selected Fabric */}
+                    {currentOrder?.selectedTissuId && (() => {
+                      const selFab = tissus.find(t => t.id === currentOrder.selectedTissuId);
+                      if (!selFab) return null;
+                      return (
+                        <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs" 
+                              style={{ backgroundColor: selFab.colorHex || '#a855f7' }}
+                            />
+                            <div>
+                              <span className="font-bold text-slate-800">{selFab.name}</span>
+                              <div className="text-[10px] text-slate-500">
+                                {[selFab.color, selFab.pattern && selFab.pattern !== 'Uni' ? selFab.pattern : null, selFab.internalRef ? `Réf: ${selFab.internalRef}` : null].filter(Boolean).join(' • ')}
+                              </div>
+                            </div>
+                          </div>
+                          <span className="font-mono font-bold text-violet-700 text-[11px] bg-violet-50 px-2 py-0.5 rounded border border-violet-100">
+                            Stock : {selFab.quantity}m
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Mètres à déduire du stock</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={currentOrder.tissuLengthUsed || ''}
+                      placeholder="Ex: 3.5"
+                      onChange={e => setCurrentOrder({ ...currentOrder, tissuLengthUsed: Number(e.target.value) })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. MERCERIE RECOMMANDEE */}
+              <div className="border-t border-dashed border-gray-200 pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                    🪡 Consommation Mercerie (Optionnel)
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = currentOrder.selectedMercerieItems || [];
+                      setCurrentOrder({ ...currentOrder, selectedMercerieItems: [...current, { mercerieId: '', quantityUsed: 1 }] });
+                    }}
+                    className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" /> Ajouter un article
+                  </button>
+                </div>
+
+                {preparedContext && preparedContext.recommendedMercerie.length > 0 && (
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                    <div className="text-[10px] font-bold text-slate-600 uppercase">Mercerie recommandée en stock pour ce modèle :</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {preparedContext.recommendedMercerie.map(({ item, recommendedQty }) => {
+                        const mItem = item as any;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              const current = currentOrder.selectedMercerieItems || [];
+                              if (!current.some((i: any) => i.mercerieId === item.id)) {
+                                setCurrentOrder({
+                                  ...currentOrder,
+                                  selectedMercerieItems: [...current, { mercerieId: item.id, quantityUsed: recommendedQty || 1 }]
+                                });
+                                toast.success(`Article mercerie "${item.name}" ajouté à la commande`);
+                              }
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-800 rounded-lg text-xs font-bold border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            {mItem.colorHex && (
+                              <span className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0" style={{ backgroundColor: mItem.colorHex }} />
+                            )}
+                            <Plus className="w-3 h-3 text-emerald-600" />
+                            <span>{item.name}</span>
+                            {mItem.color && <span className="text-[10px] text-violet-700 bg-violet-50 px-1.5 py-0.2 rounded font-semibold">{mItem.color}</span>}
+                            {mItem.size && <span className="text-[10px] text-slate-500 font-mono">{mItem.size}</span>}
+                            <span className="text-[10px] text-gray-400 font-bold">(Stock: {item.quantity})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {currentOrder.selectedMercerieItems && currentOrder.selectedMercerieItems.map((item: any, index: number) => (
+                  <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-3 items-end bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Article de Mercerie</label>
+                      <select
+                        value={item.mercerieId}
+                        onChange={e => {
+                          const newItems = [...currentOrder.selectedMercerieItems];
+                          newItems[index].mercerieId = e.target.value;
+                          setCurrentOrder({ ...currentOrder, selectedMercerieItems: newItems });
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none font-medium text-xs bg-white cursor-pointer"
+                      >
+                        <option value="">-- Choisir dans le stock --</option>
+                        {mercerieItems.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {MercerieAttributeService.formatItemFullLabel(m, merchant.id)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Quantité</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantityUsed || ''}
+                        onChange={e => {
+                          const newItems = [...currentOrder.selectedMercerieItems];
+                          newItems[index].quantityUsed = Number(e.target.value);
+                          setCurrentOrder({ ...currentOrder, selectedMercerieItems: newItems });
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none font-medium text-sm"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItems = currentOrder.selectedMercerieItems.filter((_: any, i: number) => i !== index);
+                        setCurrentOrder({ ...currentOrder, selectedMercerieItems: newItems });
+                      }}
+                      className="p-2.5 bg-white text-rose-500 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* 7. HISTORIQUE DES COMMANDES PRECEDENTES DU CLIENT */}
+              {preparedContext && preparedContext.orderHistory.length > 0 && (
+                <div className="border-t border-gray-200 pt-4 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                    className="flex items-center justify-between w-full text-xs font-black text-slate-700 uppercase tracking-wider py-1 cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <History className="w-4 h-4 text-violet-600" />
+                      Historique des Confections Précédentes ({preparedContext.orderHistory.length})
+                    </span>
+                    <span className="text-violet-600">{isHistoryExpanded ? 'Masquer ▲' : 'Voir tout ▼'}</span>
+                  </button>
+
+                  {isHistoryExpanded && (
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {preparedContext.orderHistory.map(ord => (
+                        <div key={ord.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs flex justify-between items-center">
+                          <div>
+                            <div className="font-bold text-slate-900">{ord.model}</div>
+                            <div className="text-[10px] text-gray-500">
+                              Livré le {ord.deliveryDate ? format(new Date(ord.deliveryDate), 'dd/MM/yyyy') : 'N/A'} • {ord.price} {merchant.currency}
+                            </div>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ord.status === 'livre' ? 'bg-emerald-100 text-emerald-800' : 'bg-violet-100 text-violet-800'}`}>
+                            {ord.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* BOUTONS D'ACTION */}
               <div className="border-t border-gray-150 pt-6 flex justify-end gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
-                  className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-black uppercase tracking-wider transition cursor-pointer"
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
                 >
                   Annuler
                 </button>
+
                 <button
                   type="submit"
-                  className="px-8 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-600/20 transition cursor-pointer"
+                  className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-violet-600/20 transition cursor-pointer flex items-center gap-2"
                 >
-                  Confirmer la Commande 🚀
+                  <Save className="w-4 h-4" />
+                  <span>Enregistrer & Synchroniser</span>
                 </button>
               </div>
             </form>
@@ -1580,167 +2158,207 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
             const advance = Number(order.advance || 0);
             const rest = Math.max(0, price - advance);
             const linkedCostSheet = costSheets.find(cs => cs.orderId === order.id);
+            const filledMeasurementsCount = order.measurements 
+              ? Object.keys(order.measurements).filter(k => order.measurements[k] && order.measurements[k] !== '').length 
+              : 8;
+
             return (
-              <div key={order.id} className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <TailorCard key={order.id}>
                 <div>
+                  {/* Card Header: CMD ID, Client Name, Update Date & Quick Actions */}
                   <div className="flex justify-between items-start mb-4 gap-2">
-                    <div className="flex gap-3 items-start min-w-0 flex-1">
-                      {order.inspirationImage && (
-                        <img 
-                          src={order.inspirationImage} 
-                          alt="Style Inspiration" 
-                          className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-sm shrink-0"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center font-black text-violet-600 text-lg shrink-0 shadow-xs">
+                        🧵
+                      </div>
                       <div className="min-w-0 flex-1">
-                        <span className="text-[9px] font-mono font-black text-violet-600 bg-violet-50 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                          CMD-{order.id?.slice(0, 5).toUpperCase()}
-                        </span>
-                        <h3 className="font-extrabold text-ink text-lg mt-1 leading-snug truncate">{order.clientName}</h3>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <p className="text-xs text-violet-600 font-bold font-sans truncate">{order.model}</p>
-                          <div className="flex items-center gap-1.5 ml-auto md:ml-2">
-                            <button
-                              onClick={() => {
-                                const updated = orders.map(o => o.id === order.id ? { ...o, isUrgent: !o.isUrgent, isLater: !o.isUrgent ? false : o.isLater, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
-                                saveOrders(updated);
-                                toast.success(order.isUrgent ? "Urgence retirée." : "Commande marquée comme URGENTE ! 🚨");
-                                triggerSync();
-                              }}
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shrink-0 border ${
-                                order.isUrgent ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-                              }`}
-                              title={order.isUrgent ? "Retirer l'urgence" : "Marquer comme urgent"}
-                            >
-                              <AlertCircle className="w-2.5 h-2.5" />
-                              Urgent
-                            </button>
-                            <button
-                              onClick={() => {
-                                const updated = orders.map(o => o.id === order.id ? { ...o, isLater: !o.isLater, isUrgent: !o.isLater ? false : o.isUrgent, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
-                                saveOrders(updated);
-                                toast.success(order.isLater ? "Retiré des planifiés plus tard." : "Commande planifiée pour plus tard. 🕒");
-                                triggerSync();
-                              }}
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shrink-0 border ${
-                                order.isLater ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-                              }`}
-                              title={order.isLater ? "Retirer planifié plus tard" : "Planifier plus tard"}
-                            >
-                              <Clock className="w-2.5 h-2.5" />
-                              Plus tard
-                            </button>
-                          </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[9px] font-mono font-black text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md uppercase tracking-wider border border-violet-100">
+                            CMD-{order.id?.slice(0, 5).toUpperCase()}
+                          </span>
+                          <span className="text-[10px] text-gray-400 font-medium font-mono">
+                            Modifié le {format(new Date(order.updatedAt || order.createdAt || Date.now()), 'dd/MM/yyyy')}
+                          </span>
                         </div>
+                        <h3 className="font-extrabold text-ink text-lg mt-0.5 leading-snug truncate">
+                          {order.clientName}
+                        </h3>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-wider bg-white cursor-pointer ${
-                          order.status === 'livre' ? 'text-emerald-600 border-emerald-100 bg-emerald-50/50' :
-                          order.status === 'pret' ? 'text-blue-600 border-blue-100 bg-blue-50/50' :
-                          'text-amber-600 border-amber-100 bg-amber-50/50'
+                    {/* Header Quick Actions */}
+                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 shrink-0">
+                      <button
+                        onClick={() => {
+                          const updated = orders.map(o => o.id === order.id ? { ...o, isUrgent: !o.isUrgent, isLater: !o.isUrgent ? false : o.isLater, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
+                          saveOrders(updated);
+                          toast.success(order.isUrgent ? "Urgence retirée." : "Commande marquée comme URGENTE ! 🚨");
+                          triggerSync();
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shrink-0 border ${
+                          order.isUrgent ? 'bg-rose-50 border-rose-200 text-rose-600 shadow-2xs' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'
                         }`}
+                        title={order.isUrgent ? "Retirer l'urgence" : "Marquer comme urgent"}
                       >
-                        <option value="mesures">🧵 Mesures</option>
-                        <option value="coupe">✂️ Couture</option>
-                        <option value="retouche">✏️ Retouche</option>
-                        <option value="pret">👗 Prêt / Essai</option>
-                        <option value="livre">🤝 Livré</option>
-                      </select>
+                        <AlertCircle className="w-3 h-3" />
+                        <span className="hidden sm:inline">Urgent</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          const updated = orders.map(o => o.id === order.id ? { ...o, isLater: !o.isLater, isUrgent: !o.isLater ? false : o.isUrgent, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
+                          saveOrders(updated);
+                          toast.success(order.isLater ? "Retiré des planifiés plus tard." : "Commande planifiée pour plus tard. 🕒");
+                          triggerSync();
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shrink-0 border ${
+                          order.isLater ? 'bg-amber-50 border-amber-200 text-amber-600 shadow-2xs' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'
+                        }`}
+                        title={order.isLater ? "Retirer planifié plus tard" : "Planifier plus tard"}
+                      >
+                        <Clock className="w-3 h-3" />
+                        <span className="hidden sm:inline">Plus tard</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setCurrentOrder(order);
+                          setIsFormOpen(true);
+                        }}
+                        className="p-1.5 hover:bg-white hover:text-violet-600 hover:shadow-xs text-gray-500 rounded-lg transition-transform cursor-pointer"
+                        title="Détails / Modifier"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleRequestDeleteOrder(order);
+                        }}
+                        className="p-1.5 hover:bg-rose-50 hover:text-red-600 hover:shadow-xs text-gray-500 rounded-lg transition-transform cursor-pointer relative z-10"
+                        title="Supprimer la commande"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="space-y-2 border-t border-gray-150 pt-3">
-                    <div className="flex justify-between text-xs font-bold text-gray-500">
-                      <span>Prix convenu :</span>
-                      <span className="font-mono text-ink">{price.toLocaleString()} {merchant.currency}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-emerald-600">
-                      <span>Acompte versé :</span>
-                      <span className="font-mono">{advance.toLocaleString()} {merchant.currency}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-rose-500 pb-1 border-b border-gray-100">
-                      <span>Reste à payer :</span>
-                      <span className="font-mono">{rest.toLocaleString()} {merchant.currency}</span>
-                    </div>
+                  {/* Main Hero Dark Banner Block (Identique à Clients Couture) */}
+                  <TailorHeroGarmentBlock
+                    title="Commande à Confectionner"
+                    garmentName={order.model || 'Création Sur-Mesure'}
+                    garmentId={order.garmentId || 'garment-default'}
+                    category={order.category || 'Couture Africaine'}
+                    gender={order.gender || 'M'}
+                    filledMeasurementsCount={filledMeasurementsCount}
+                    isProfileSynced={true}
+                    inspirationImage={order.inspirationImage}
+                  />
 
-                    <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold pt-2">
-                      <span className="flex items-center gap-1">
+                  {/* Delivery, Fabric & Workflow Status Row */}
+                  <div className="mt-3.5 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-violet-50 text-violet-600 rounded-xl border border-violet-100 shrink-0">
                         <Calendar className="w-3.5 h-3.5" />
-                        Livraison : {order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : 'Indéterminée'}
-                      </span>
-                      {order.tissuUsed && (
-                        <span className="bg-slate-50 px-2.5 py-1 rounded-lg truncate max-w-[150px] font-medium border border-slate-100 text-slate-500">
-                          {order.tissuUsed}
+                      </div>
+                      <div>
+                        <span className="block text-[8px] font-mono font-bold text-slate-400 uppercase">Livraison</span>
+                        <span className="font-extrabold text-xs text-slate-800">
+                          {order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : 'Indéterminée'}
                         </span>
-                      )}
+                      </div>
                     </div>
 
-                    {linkedCostSheet && (
-                      <div className="mt-3 p-2.5 bg-violet-50/55 border border-violet-100 rounded-xl flex items-center justify-between text-xs font-black text-violet-700">
-                        <span className="flex items-center gap-1">📊 Bénéfice Estimé :</span>
-                        <span className="font-mono text-violet-700 font-extrabold">+{linkedCostSheet.profit.toLocaleString()} {merchant.currency} ({linkedCostSheet.marginPercent.toFixed(0)}%)</span>
-                      </div>
+                    {order.tissuUsed && (
+                      <span className="bg-white px-2.5 py-1 rounded-xl text-xs font-extrabold border border-slate-200/80 text-slate-700 shadow-2xs truncate max-w-[150px]">
+                        🧵 {order.tissuUsed}
+                      </span>
                     )}
+
+                    <select
+                      value={order.status}
+                      onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-wider bg-white shadow-2xs cursor-pointer outline-none focus:ring-2 focus:ring-violet-500 ${
+                        order.status === 'livre' ? 'text-emerald-700 border-emerald-200 bg-emerald-50' :
+                        order.status === 'pret' ? 'text-teal-700 border-teal-200 bg-teal-50' :
+                        order.status === 'coupe' ? 'text-violet-700 border-violet-200 bg-violet-50' :
+                        'text-amber-700 border-amber-200 bg-amber-50'
+                      }`}
+                    >
+                      <option value="mesures">🧵 Mesures</option>
+                      <option value="coupe">✂️ Couture</option>
+                      <option value="retouche">✏️ Retouche</option>
+                      <option value="pret">👗 Prêt / Essai</option>
+                      <option value="livre">🤝 Livré</option>
+                    </select>
+                  </div>
+
+                  {/* Financial Summary Block */}
+                  <div className="mt-3.5">
+                    <TailorFinancialCard
+                      price={price}
+                      advance={advance}
+                      currency={merchant.currency}
+                      linkedProfit={linkedCostSheet?.profit}
+                      marginPercent={linkedCostSheet?.marginPercent}
+                    />
                   </div>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-gray-100 flex flex-col gap-2">
+                {/* Bottom Action Bar */}
+                <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
+                  <TailorActionButton
+                    variant="whatsapp"
+                    onClick={() => handleOpenWhatsAppShare(order)}
+                    title="Partager la commande aux artisans & équipes via WhatsApp"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Partager aux Artisans via WhatsApp</span>
+                  </TailorActionButton>
+
                   {rest > 0 && (
-                    <button
+                    <TailorActionButton
+                      variant="encaisser"
                       onClick={() => handleEncaisser(order.id)}
-                      className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-transform cursor-pointer border border-emerald-200"
                     >
-                      <Banknote className="w-4 h-4" /> Encaisser le reste ({rest.toLocaleString()} {merchant.currency})
-                    </button>
+                      <Banknote className="w-4 h-4" />
+                      <span>Encaisser le reste ({rest.toLocaleString()} {merchant.currency})</span>
+                    </TailorActionButton>
                   )}
-                  <div className="flex gap-2">
-                    <button
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <TailorActionButton
+                      variant="pdf"
                       onClick={() => printOrderForm(order)}
-                      className="flex-1 py-2 border border-violet-100 hover:bg-violet-50 text-violet-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-transform cursor-pointer"
-                      title="Imprimer Fiche de Mesures"
+                      title="Imprimer Fiche A4"
                     >
-                      <Printer className="w-3.5 h-3.5" /> Fiche A4
-                    </button>
-                    <button
+                      <Printer className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Fiche A4</span>
+                    </TailorActionButton>
+
+                    <TailorActionButton
+                      variant="ticket"
                       onClick={() => printThermalReceipt(order)}
-                      className="px-3 py-2 border border-amber-100 bg-amber-50/30 hover:bg-amber-50 text-amber-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-transform cursor-pointer"
-                      title="Reçu Thermique 80mm"
+                      title="Ticket Thermique 80mm"
                     >
-                      <FileText className="w-3.5 h-3.5" /> Ticket 80mm
-                    </button>
-                    <button
+                      <FileText className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Ticket 80mm</span>
+                    </TailorActionButton>
+
+                    <TailorActionButton
+                      variant="whatsapp"
                       onClick={() => handleOpenWhatsapp(order)}
-                      className="p-2 border border-emerald-150 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-600 rounded-xl hover:scale-105 transition-transform cursor-pointer flex items-center justify-center"
                       title="Aviser le client via WhatsApp"
                     >
-                      <MessageSquare className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCurrentOrder(order);
-                        setIsFormOpen(true);
-                      }}
-                      className="p-2 border border-slate-100 hover:bg-slate-50 text-gray-500 rounded-xl hover:scale-105 transition-transform cursor-pointer"
-                      title="Détails"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(order.id)}
-                      className="p-2 border border-slate-100 hover:bg-rose-50 text-gray-400 hover:text-red-600 rounded-xl hover:scale-105 transition-transform cursor-pointer"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Client</span>
+                    </TailorActionButton>
                   </div>
                 </div>
-              </div>
+              </TailorCard>
             );
           })}
         </div>
@@ -1910,6 +2528,34 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </motion.div>
         </div>
       )}
+
+      {/* Modal de Partage WhatsApp aux Artisans & Équipes */}
+      {isWhatsAppShareModalOpen && selectedShareOrder && (
+        <WhatsAppShareModal
+          order={selectedShareOrder}
+          merchant={merchant}
+          currentUser={merchant.name}
+          isOpen={isWhatsAppShareModalOpen}
+          onClose={() => {
+            setIsWhatsAppShareModalOpen(false);
+            setSelectedShareOrder(null);
+          }}
+          onSuccess={() => {
+            triggerSync();
+          }}
+        />
+      )}
+
+      {/* Modal de confirmation de suppression de commande */}
+      <TailorDeleteConfirmModal
+        isOpen={!!orderToDelete}
+        onClose={() => setOrderToDelete(null)}
+        onConfirm={confirmDeleteOrder}
+        title="Supprimer la commande ?"
+        entityName={orderToDelete ? `CMD-${orderToDelete.id?.slice(0, 5).toUpperCase()} - ${orderToDelete.clientName} (${orderToDelete.model || 'Création'})` : ''}
+        warningText="Cette action est irréversible. La commande sera supprimée de votre atelier."
+        isDeleting={isDeletingOrder}
+      />
     </motion.div>
   );
 };
