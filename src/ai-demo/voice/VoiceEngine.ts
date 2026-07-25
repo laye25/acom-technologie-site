@@ -82,7 +82,8 @@ export class VoiceEngine {
     return this.defaultVoices.filter(v => v.language === lang);
   }
 
-private static activeAudio: HTMLAudioElement | null = null;
+  private static activeAudio: HTMLAudioElement | null = null;
+  private static activeOnEnd: (() => void) | null = null;
 
   public static speakText(text: string, config: VoiceConfig, onEnd?: () => void): void {
     if (typeof window === 'undefined') {
@@ -91,6 +92,7 @@ private static activeAudio: HTMLAudioElement | null = null;
     }
 
     this.stopSpeech();
+    this.activeOnEnd = onEnd || null;
 
     try {
       const url = `/api/tts?text=${encodeURIComponent(text)}&lang=${encodeURIComponent(config.language)}`;
@@ -100,28 +102,34 @@ private static activeAudio: HTMLAudioElement | null = null;
       audio.playbackRate = config.rate;
       
       audio.onended = () => {
-        if (onEnd) onEnd();
+        if (this.activeOnEnd) {
+          this.activeOnEnd();
+          this.activeOnEnd = null;
+        }
       };
       
       audio.onerror = () => {
         console.warn('Network TTS failed, falling back to Web Speech API');
-        this.fallbackWebSpeech(text, config, onEnd);
+        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
       };
       
       audio.play().catch(e => {
         console.warn('Audio play prevented or failed:', e);
-        this.fallbackWebSpeech(text, config, onEnd);
+        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
       });
       
       this.activeAudio = audio;
     } catch (e) {
-      this.fallbackWebSpeech(text, config, onEnd);
+      this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
     }
   }
 
   private static fallbackWebSpeech(text: string, config: VoiceConfig, onEnd?: () => void): void {
     if (!('speechSynthesis' in window)) {
-      if (onEnd) onEnd();
+      if (onEnd) {
+        onEnd();
+        if (this.activeOnEnd === onEnd) this.activeOnEnd = null;
+      }
       return;
     }
 
@@ -141,10 +149,16 @@ private static activeAudio: HTMLAudioElement | null = null;
     }
 
     utterance.onend = () => {
-      if (onEnd) onEnd();
+      if (this.activeOnEnd) {
+        this.activeOnEnd();
+        this.activeOnEnd = null;
+      }
     };
     utterance.onerror = () => {
-      if (onEnd) onEnd();
+      if (this.activeOnEnd) {
+        this.activeOnEnd();
+        this.activeOnEnd = null;
+      }
     };
 
     window.speechSynthesis.speak(utterance);
@@ -157,6 +171,10 @@ private static activeAudio: HTMLAudioElement | null = null;
     }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+    }
+    if (this.activeOnEnd) {
+      this.activeOnEnd();
+      this.activeOnEnd = null;
     }
   }
 
