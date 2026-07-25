@@ -16,7 +16,8 @@ export type SaiEventTopic =
   | 'sai:knowledge_enriched'
   | 'sai:privacy_masked'
   | 'sai:diagnostic_completed'
-  | 'sai:repository_saved';
+  | 'sai:repository_saved'
+  | 'sai:trigger_live_demo_capture';
 
 export type SaiEventCallback<T = any> = (payload: T) => void;
 

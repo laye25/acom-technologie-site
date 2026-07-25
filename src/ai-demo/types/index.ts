@@ -69,6 +69,8 @@ export interface TimelineStep {
   description: string;
   narrationText: string;
   actionType: EventActionType;
+  targetSelector?: string;
+  targetValue?: string;
   x?: number;
   y?: number;
   zoomLevel: number; // e.g. 1.0 to 1.8

@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+const fs = require('fs');
+const file = 'src/ai-demo/hooks/useDemoRecorder.ts';
+let code = fs.readFileSync(file, 'utf8');
+
+// The patch inserted it multiple times.
+// Let's just fix it manually.
+const fixed = `import { useState, useEffect, useCallback, useRef } from 'react';
 import { DemoEventRecorder } from '../recorders/DemoEventRecorder';
 import { ScreenRecorder } from '../recorders/ScreenRecorder';
 import { UIAnalyzer } from '../engines/UIAnalyzer';
 import { AiEngine } from '../engines/AiEngine';
 import { DemoManager } from '../services/DemoManager';
-import { VideoStorageService } from '../services/VideoStorageService';
 import { SaiEventBus } from '../services/SaiEventBus';
 import { RecordedEvent, DemoProject, DemoLanguage } from '../types';
 import toast from 'react-hot-toast';
@@ -53,7 +58,7 @@ export function useDemoRecorder() {
   const startDemoRecording = useCallback(async (
     moduleName: string,
     pageName: string,
-    enableScreenCapture: boolean = true
+    enableScreenCapture: boolean = false
   ) => {
     setActiveModule(moduleName);
     activeModuleRef.current = moduleName;
@@ -69,31 +74,28 @@ export function useDemoRecorder() {
       setIsScreenCapture(screenOk);
       isScreenCaptureRef.current = screenOk;
       if (screenOk) {
-        toast.success('Capture vidéo HD de l\'écran activée (ScreenRec) !');
-      } else {
-        toast('Enregistrement des actions démarré sans capture vidéo.', { icon: 'ℹ️' });
+        toast.success('Capture vidéo de l\\'écran activée !');
       }
     } else {
       setIsScreenCapture(false);
       isScreenCaptureRef.current = false;
     }
 
-    toast.success(`Enregistrement ACOM AI Demo démarré : ${moduleName} - ${pageName}`);
+    toast.success(\`Enregistrement ACOM AI Demo démarré : \${moduleName} - \${pageName}\`);
   }, []);
 
   const stopDemoRecording = useCallback(async (language: DemoLanguage = 'fr'): Promise<DemoProject | null> => {
     if (!isRecordingRef.current) return null;
 
-    const toastId = toast.loading('Analyse de l\'interface et finalisation du tutoriel vidéo...');
+    const toastId = toast.loading('Analyse de l\\'interface et génération de la démonstration IA...');
 
     const events = eventRecorder.stopRecording();
     
     let videoBlobUrl: string | undefined = undefined;
-    let capturedBlob: Blob | null = null;
     if (isScreenCaptureRef.current) {
-      capturedBlob = await screenRecorder.stopCapture();
-      if (capturedBlob && capturedBlob.size > 0) {
-        videoBlobUrl = URL.createObjectURL(capturedBlob);
+      const blob = await screenRecorder.stopCapture();
+      if (blob) {
+        videoBlobUrl = URL.createObjectURL(blob);
       }
     }
 
@@ -129,14 +131,11 @@ export function useDemoRecorder() {
 
     if (videoBlobUrl) {
       newProject.videoBlobUrl = videoBlobUrl;
-      if (capturedBlob) {
-        await VideoStorageService.saveVideoBlob(newProject.id, capturedBlob);
-      }
     }
 
     DemoManager.saveProject(newProject);
     toast.dismiss(toastId);
-    toast.success('Démonstration vidéo ScreenRec enregistrée avec succès !');
+    toast.success('Démonstration IA générée avec succès !');
 
     return newProject;
   }, []);
@@ -160,3 +159,6 @@ export function useDemoRecorder() {
     recordManualAction
   };
 }
+`;
+
+fs.writeFileSync(file, fixed);

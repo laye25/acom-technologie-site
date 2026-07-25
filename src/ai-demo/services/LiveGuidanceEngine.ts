@@ -10,6 +10,7 @@ import { ScenarioApplicationIntelligent, SaiTimelineStep } from '../types/sai';
 import { DemoProject } from '../types';
 import { ExportEngine } from './ExportEngine';
 import { SaiEventBus } from './SaiEventBus';
+import { VoiceEngine } from '../voice/VoiceEngine';
 import toast from 'react-hot-toast';
 
 export interface GuidanceSessionState {
@@ -333,9 +334,21 @@ export class LiveGuidanceEngine {
       // 1. Move cursor, highlight element, and type/click live on DOM
       await LiveGuidanceEngine.executeStepOnDom(activeStep, isLastStep);
 
-      // 2. Pause between steps for natural demonstration rhythm
+      // 2. Pause between steps for natural demonstration rhythm and play TTS audio
       const stepDurationMs = Math.max(1200, (activeStep.durationSec || 2.5) * 1000);
-      await new Promise((resolve) => setTimeout(resolve, stepDurationMs));
+      const voiceConfig = VoiceEngine.getAvailableVoices('fr')[0];
+      
+      const timerPromise = new Promise<void>(resolve => setTimeout(resolve, stepDurationMs));
+      const audioPromise = new Promise<void>(resolve => {
+        if (activeStep.narrationText) {
+          VoiceEngine.speakText(activeStep.narrationText, voiceConfig, resolve);
+        } else {
+          resolve();
+        }
+      });
+
+      // Wait for both the minimum step duration AND the audio to finish
+      await Promise.all([timerPromise, audioPromise]);
 
       if (isLastStep) {
         toast.success("✅ Formulaire complété et validé avec succès en direct !", { icon: '🎉' });

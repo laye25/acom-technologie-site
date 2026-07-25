@@ -1,14 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, X, Download, FileText, Settings, Subtitles, CheckCircle2, ChevronRight, Sparkles, ChevronDown, Award, Zap, Camera, Video, MonitorPlay } from 'lucide-react';
-import { DemoProject, TimelineStep } from '../types';
+const fs = require('fs');
+
+const code = `import React, { useState, useRef, useEffect } from 'react';
+import { Play, Pause, X, Download, FileText, Settings, Subtitles, CheckCircle2, ChevronRight, Sparkles, ChevronDown, Award, Zap, Camera } from 'lucide-react';
+import { DemoProject, DemoStep } from '../types';
 import { ExportEngine } from '../services/ExportEngine';
-import { UIAnalyzer } from '../engines/UIAnalyzer';
-import { AiEngine } from '../engines/AiEngine';
+import { UIAnalyzer } from '../services/UIAnalyzer';
 import { SaiMigrationService } from '../services/SaiMigrationService';
-import { SaiInspectorModal } from '../inspector/SaiInspectorModal';
-import { VideoStorageService } from '../services/VideoStorageService';
-import { SaiEventBus } from '../services/SaiEventBus';
-import toast from 'react-hot-toast';
+import { SaiInspectorModal } from './SaiInspectorModal';
 
 interface DemoPlayerModalProps {
   project: DemoProject;
@@ -17,26 +15,14 @@ interface DemoPlayerModalProps {
 
 export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initialProject, onClose }) => {
   const [project, setProject] = useState<DemoProject>(initialProject);
-  const [activeTab, setActiveTab] = useState<'video' | 'doc' | 'subtitles'>('video');
+  const [activeTab, setActiveTab] = useState<'video' | 'audit' | 'doc' | 'subtitles'>('video');
   const [showSaiInspector, setShowSaiInspector] = useState(false);
-  const [simStepIndex, setSimStepIndex] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
-  const steps = project.timelineSteps || [];
-
-  // Try restoring stored video blob from IndexedDB if project doesn't have an active videoBlobUrl
-  useEffect(() => {
-    if (!project.videoBlobUrl) {
-      VideoStorageService.getVideoBlobUrl(project.id).then((storedUrl) => {
-        if (storedUrl) {
-          setProject(prev => ({ ...prev, videoBlobUrl: storedUrl }));
-        }
-      });
-    }
-  }, [project.id, project.videoBlobUrl]);
-
+  const steps = project.scenario?.steps || [];
+  
   // Calculate approximate timestamps for steps
   const stepTimestamps = steps.map((s, i) => {
     let t = 0;
@@ -64,7 +50,6 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
   }, []);
 
   const jumpToStep = (index: number) => {
-    setSimStepIndex(index);
     if (videoRef.current && stepTimestamps[index] !== undefined) {
       videoRef.current.currentTime = stepTimestamps[index];
       videoRef.current.play().catch(e => console.warn('Play prevented:', e));
@@ -72,16 +57,11 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
   };
 
   const handleAutoOptimize = () => {
-    const p = AiEngine.autoOptimizeProject(project);
+    const p = { ...project };
+    if (!p.scenario) return;
+    p.scenario.steps = UIAnalyzer.optimizePedagogy(p.scenario.steps);
+    p.scenario.steps = UIAnalyzer.identifyDeadTimes(p.scenario.steps);
     setProject(p);
-  };
-
-  const handleTriggerNativeCapture = () => {
-    onClose();
-    SaiEventBus.publish('sai:trigger_live_demo_capture', {
-      moduleName: project.moduleName,
-      pageName: project.pageName
-    });
   };
 
   return (
@@ -92,7 +72,7 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
         <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-950 relative">
           <div className="flex items-center gap-3">
             <span className="p-2 bg-indigo-500/20 text-indigo-400 rounded-xl">
-              <Video className="w-5 h-5" />
+              <Camera className="w-5 h-5" />
             </span>
             <div>
               <h3 className="font-bold text-lg text-white">{project.title}</h3>
@@ -119,35 +99,32 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
                 onClick={() => {
                   const a = document.createElement('a');
                   a.href = project.videoBlobUrl!;
-                  a.download = `${project.title.replace(/\s+/g, '_')}.webm`;
+                  a.download = \`\${project.title.replace(/\\s+/g, '_')}.webm\`;
                   a.click();
                 }}
                 className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
               >
                 <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Télécharger Vidéo HD</span>
+                <span className="hidden sm:inline">Télécharger</span>
               </button>
             )}
 
             <div className="flex bg-slate-800 p-1 rounded-xl text-xs font-bold text-slate-300 border border-slate-700">
               <button
                 onClick={() => setActiveTab('video')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${activeTab === 'video' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'}`}
+                className={\`px-3 py-1.5 rounded-lg transition-all cursor-pointer \${activeTab === 'video' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'}\`}
               >
-                <Video className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Vidéo Capture Réelle (ScreenRec)</span>
+                Vidéo Native
               </button>
-
               <button
                 onClick={() => setActiveTab('doc')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === 'doc' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'}`}
+                className={\`px-3 py-1.5 rounded-lg transition-all cursor-pointer \${activeTab === 'doc' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'}\`}
               >
                 Guide PDF
               </button>
-
               <button
                 onClick={() => setActiveTab('subtitles')}
-                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === 'subtitles' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'}`}
+                className={\`px-3 py-1.5 rounded-lg transition-all cursor-pointer \${activeTab === 'subtitles' ? 'bg-indigo-600 text-white shadow-sm' : 'hover:text-white'}\`}
               >
                 Sous-titres
               </button>
@@ -165,37 +142,23 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
               {/* Native Video Player Column */}
               <div className="lg:col-span-2 space-y-4 flex flex-col">
-                <div className="relative flex-1 bg-black rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center min-h-[400px]">
+                <div className="relative flex-1 bg-black rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center">
                   {project.videoBlobUrl ? (
                     <video 
                       ref={videoRef} 
                       src={project.videoBlobUrl} 
                       controls 
                       autoPlay
-                      playsInline
                       className="w-full h-full object-contain" 
                     />
                   ) : (
-                    <div className="text-center p-8 max-w-md mx-auto space-y-4">
-                      <div className="w-16 h-16 bg-slate-800/80 rounded-2xl flex items-center justify-center mx-auto border border-slate-700 shadow-inner">
-                        <Video className="w-8 h-8 text-indigo-400" />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-white font-bold text-lg">Capture Vidéo Réelle (ScreenRec)</h4>
-                        <p className="text-slate-400 text-xs leading-relaxed">
-                          Conformément au principe ScreenRec, la vidéo restitue exactement ce qui est exécuté et affiché à l'écran pendant la démonstration.
-                        </p>
-                      </div>
-
-                      <div className="pt-2">
-                        <button
-                          onClick={handleTriggerNativeCapture}
-                          className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-emerald-500 via-indigo-600 to-purple-600 hover:from-emerald-600 hover:to-purple-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/30 transition-all cursor-pointer"
-                        >
-                          <Video className="w-4 h-4 text-amber-300 animate-pulse" />
-                          <span>🎥 Démarrer la Capture Vidéo Réelle de l'Écran</span>
-                        </button>
-                      </div>
+                    <div className="text-center p-8">
+                      <Camera className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                      <h4 className="text-white font-bold text-lg">Aucun enregistrement natif</h4>
+                      <p className="text-slate-400 text-sm mt-2">
+                        Cette démonstration n'a pas été enregistrée en mode natif. 
+                        Relancez la démonstration pour capturer une vidéo fidèle.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -211,11 +174,11 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
                         </span>
                         
                         {/* Type Badge */}
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                        <span className={\`px-2 py-0.5 rounded text-[9px] font-black uppercase \${
                           activeStep.actionType === 'click' ? 'bg-blue-500/20 text-blue-400' :
-                          activeStep.actionType === 'input' ? 'bg-amber-500/20 text-amber-400' :
+                          activeStep.actionType === 'type' ? 'bg-amber-500/20 text-amber-400' :
                           'bg-emerald-500/20 text-emerald-400'
-                        }`}>
+                        }\`}>
                           {activeStep.actionType}
                         </span>
                       </div>
@@ -250,24 +213,24 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
                       <div 
                         key={step.id || index}
                         onClick={() => jumpToStep(index)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                        className={\`p-3 rounded-xl border transition-all cursor-pointer \${
                           isActive 
                             ? 'bg-indigo-900/40 border-indigo-500/50 shadow-lg shadow-indigo-500/10' 
                             : isPast
                               ? 'bg-slate-900/40 border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-600'
                               : 'bg-slate-900 border-slate-800 hover:border-slate-700'
-                        }`}
+                        }\`}
                       >
                         <div className="flex items-start gap-3">
-                          <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                          <div className={\`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold \${
                             isActive ? 'bg-indigo-500 text-white' : 
                             isPast ? 'bg-slate-800 text-slate-400' : 
                             'bg-slate-800 text-slate-400'
-                          }`}>
+                          }\`}>
                             {index + 1}
                           </div>
                           <div className="space-y-1 overflow-hidden">
-                            <h5 className={`font-bold text-xs truncate ${isActive ? 'text-indigo-300' : 'text-slate-300'}`}>
+                            <h5 className={\`font-bold text-xs truncate \${isActive ? 'text-indigo-300' : 'text-slate-300'}\`}>
                               {step.title}
                             </h5>
                             <p className="text-[10px] text-slate-500 truncate">{step.description}</p>
@@ -334,3 +297,6 @@ export const DemoPlayerModal: React.FC<DemoPlayerModalProps> = ({ project: initi
     </div>
   );
 };
+`;
+
+fs.writeFileSync('src/ai-demo/components/DemoPlayerModal.tsx', code);

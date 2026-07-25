@@ -116,6 +116,7 @@ export class ExportEngine {
       const totalSteps = steps.length;
       for (let i = 0; i < totalSteps; i++) {
         const step = steps[i];
+        const prevStep = i > 0 ? steps[i - 1] : undefined;
         const stepText = step.narrationText || step.description || step.title || '';
         const audioDuration = AudioExportEngine.getAudioDuration(stepText);
         // Ensure video frame duration matches full spoken audio duration + 0.3s breathing space
@@ -143,7 +144,10 @@ export class ExportEngine {
             step,
             progress,
             project.brandingConfig || defaultBranding,
-            project.videoConfig || defaultVideoConfig
+            project.videoConfig || defaultVideoConfig,
+            1280,
+            720,
+            prevStep
           );
           // 8ms interval per frame for 5x fast rendering engine
           await new Promise((r) => setTimeout(r, 8));
