@@ -53,7 +53,8 @@ export function useDemoRecorder() {
   const startDemoRecording = useCallback(async (
     moduleName: string,
     pageName: string,
-    enableScreenCapture: boolean = true
+    enableScreenCapture: boolean = true,
+    isSilent: boolean = false
   ) => {
     setActiveModule(moduleName);
     activeModuleRef.current = moduleName;
@@ -68,26 +69,26 @@ export function useDemoRecorder() {
       const screenOk = await screenRecorder.startCapture('1080p', 30);
       setIsScreenCapture(screenOk);
       isScreenCaptureRef.current = screenOk;
-      if (screenOk) {
-        toast.success('Capture vidéo HD de l\'écran activée (ScreenRec) !');
-      } else {
-        toast('Capture vidéo d\'écran non activée. Seules les étapes texte seront enregistrées.', { icon: 'ℹ️' });
+      if (!isSilent) {
+        if (screenOk) {
+          toast.success('Capture vidéo HD de l\'écran activée (ScreenRec) !');
+        } else {
+          toast('Capture vidéo d\'écran non activée. Seules les étapes texte seront enregistrées.', { icon: 'ℹ️' });
+        }
       }
     } else {
       setIsScreenCapture(false);
       isScreenCaptureRef.current = false;
     }
 
-    toast.success(`Enregistrement ACOM AI Demo démarré : ${moduleName} - ${pageName}`);
+    if (!isSilent) {
+      toast.success(`Enregistrement ACOM AI Demo démarré : ${moduleName} - ${pageName}`);
+    }
   }, []);
 
   const stopDemoRecording = useCallback(async (language: DemoLanguage = 'fr', existingProject?: DemoProject): Promise<DemoProject | null> => {
     if (!isRecordingRef.current) return null;
 
-    const toastId = toast.loading('Analyse de l\'interface et finalisation du tutoriel vidéo...');
-
-    const events = eventRecorder.stopRecording();
-    
     let videoBlobUrl: string | undefined = undefined;
     let capturedBlob: Blob | null = null;
     if (isScreenCaptureRef.current) {
@@ -96,6 +97,11 @@ export function useDemoRecorder() {
         videoBlobUrl = URL.createObjectURL(capturedBlob);
       }
     }
+
+    const toastId = toast.loading('Analyse de l\'interface et finalisation du tutoriel vidéo...');
+
+    const events = eventRecorder.stopRecording();
+
 
     setIsRecording(false);
     isRecordingRef.current = false;

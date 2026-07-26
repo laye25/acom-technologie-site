@@ -21,13 +21,21 @@ export class ScreenRecorder {
     try {
       const dim = this.getResolutionDimensions(resolution);
 
-      const displayMediaOptions: DisplayMediaStreamOptions = {
+      const displayMediaOptions: any = {
         video: {
           width: { ideal: dim.width, max: dim.width },
           height: { ideal: dim.height, max: dim.height },
           frameRate: { ideal: fps, max: fps }
         },
-        audio: true
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+        preferCurrentTab: true,
+        selfBrowserSurface: "include",
+        surfaceSwitching: "exclude",
+        systemAudio: "include"
       };
 
       // 1. Capture screen & system audio

@@ -74,7 +74,7 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
 
   const handleStartAutoDemo = async () => {
     setIsAutoRunning(true);
-    await startDemoRecording(currentModule, currentPage, true); // Force true
+    await startDemoRecording(currentModule, currentPage, true, true); // Force true, silent
     setIsOpen(false);
 
     const guidanceEngine = new LiveGuidanceEngine();
@@ -157,13 +157,13 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
         </div>
       )}
 
-      {isRecording && (
+      {isRecording && !isAutoRunning && (
         <div className="bg-slate-900/95 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-violet-500/40 w-80 space-y-3 animate-pulse">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 bg-red-500 rounded-full animate-ping" />
               <span className="font-bold text-xs text-red-400 uppercase tracking-wider">
-                {isAutoRunning ? '🤖 AUTO-DÉMO EN COURS' : 'REC EN COURS'}
+                REC EN COURS
               </span>
             </div>
             <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg text-xs font-mono text-amber-300 font-bold">
@@ -173,7 +173,7 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
           </div>
 
           <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-800/80 p-2 rounded-xl">
-            <span>{isAutoRunning ? 'Curseur IA en action :' : 'Événements capturés :'}</span>
+            <span>Événements capturés :</span>
             <span className="font-bold text-violet-400 bg-violet-500/20 px-2 py-0.5 rounded">{eventsCount} actions</span>
           </div>
 
