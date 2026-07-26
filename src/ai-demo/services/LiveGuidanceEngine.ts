@@ -191,7 +191,7 @@ export class LiveGuidanceEngine {
 
     // Add article button or Quantity increment
     const addArticleBtn = Array.from(document.querySelectorAll<HTMLElement>('button')).find(
-      b => b.innerText.trim() === '+' || b.innerText.toLowerCase().includes('ajouter') || b.innerText.toLowerCase().includes('article')
+      b => b.innerText.trim() === '+' || b.innerText.toLowerCase().includes('ajouter') || b.innerText.toLowerCase().includes('article') || b.querySelector('svg.lucide-plus')
     );
     if (addArticleBtn) {
       steps.push({
@@ -324,7 +324,8 @@ export class LiveGuidanceEngine {
     LiveGuidanceEngine.isAutoControlActive = true;
 
     const totalSteps = activeScenario.timeline.length;
-    toast.success("🤖 Prise de contrôle automatique en direct : Suivez le curseur IA à l'écran !", { duration: 4000 });
+    
+    // Toasts removed to prevent them from showing up in the recorded video.
 
     // Show DOM virtual cursor
     DomVirtualCursor.show();
@@ -340,16 +341,10 @@ export class LiveGuidanceEngine {
         onStateChange(this.getSessionState());
       }
 
-      // 1. Move cursor, highlight element, and type/click live on DOM
-      await LiveGuidanceEngine.executeStepOnDom(activeStep, isLastStep);
-
-      if (LiveGuidanceEngine.currentSessionId !== sessionId) break;
-
-      // 2. Pause between steps for natural demonstration rhythm and play TTS audio
+      // 1. Start TTS audio simultaneously with DOM action
       const stepDurationMs = Math.max(1200, (activeStep.durationSec || 2.5) * 1000);
       const voiceConfig = VoiceEngine.getAvailableVoices('fr')[0];
       
-      const timerPromise = new Promise<void>(resolve => setTimeout(resolve, stepDurationMs));
       const audioPromise = new Promise<void>(resolve => {
         if (activeStep.narrationText) {
           VoiceEngine.speakText(activeStep.narrationText, voiceConfig, resolve);
@@ -358,13 +353,17 @@ export class LiveGuidanceEngine {
         }
       });
 
-      // Wait for both the minimum step duration AND the audio to finish
-      await Promise.all([timerPromise, audioPromise]);
+      // 2. Move cursor, highlight element, and type/click live on DOM concurrently
+      const domPromise = LiveGuidanceEngine.executeStepOnDom(activeStep, isLastStep);
+
+      // Wait for both the minimum step duration AND the audio and DOM action to finish
+      const timerPromise = new Promise<void>(resolve => setTimeout(resolve, stepDurationMs));
+      await Promise.all([timerPromise, audioPromise, domPromise]);
 
       if (LiveGuidanceEngine.currentSessionId !== sessionId) break;
 
       if (isLastStep) {
-        toast.success("✅ Formulaire complété et validé avec succès en direct !", { icon: '🎉' });
+        // Wait a little bit to show the final state
         await new Promise((resolve) => setTimeout(resolve, 800));
       }
     }
@@ -377,8 +376,6 @@ export class LiveGuidanceEngine {
     if (LiveGuidanceEngine.isAutoControlActive && LiveGuidanceEngine.activeScenario) {
       LiveGuidanceEngine.isAutoControlActive = false;
       LiveGuidanceEngine.isGuidanceActive = false;
-
-      toast.success("Scénario entièrement exécuté. Génération du tutoriel vidéo en cours...", { id: 'auto-video-complete' });
 
       SaiEventBus.publish('sai:scenario_updated', {
         scenarioId: activeScenario.id,
@@ -538,7 +535,7 @@ export class LiveGuidanceEngine {
 
     // 4. Fallback heuristics for form inputs or save button
     if (!targetEl) {
-      if (actionType === 'SUBMIT' || isLastStep || label.includes('enregistrer') || label.includes('valider') || label.includes('sauvegarder') || label.includes('ticket')) {
+      if (actionType === 'SUBMIT' || label.includes('enregistrer') || label.includes('valider') || label.includes('sauvegarder') || label.includes('ticket')) {
         targetEl = document.querySelector<HTMLElement>('button[type="submit"]') ||
           Array.from(document.querySelectorAll<HTMLElement>('button')).find(b => b.innerText.toLowerCase().includes('enregistrer')) ||
           document.querySelector<HTMLElement>('form button:last-child');
