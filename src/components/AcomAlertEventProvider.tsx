@@ -1,35 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AcomAlertPopup, AcomAlertPopupProps } from './AcomAlertPopup';
 
 export const AcomAlertEventProvider: React.FC = () => {
-  const [popup, setPopup] = useState<AcomAlertPopupProps>({
-    isOpen: false,
-    onClose: () => setPopup(prev => ({ ...prev, isOpen: false })),
-    title: '',
-    message: '',
-    type: 'info'
-  });
+  const [queue, setQueue] = useState<AcomAlertPopupProps[]>([]);
+  const [currentPopup, setCurrentPopup] = useState<AcomAlertPopupProps | null>(null);
 
   useEffect(() => {
     const handleShowAlert = (e: any) => {
-      setPopup({
+      const detail = e.detail;
+      if (!detail) return;
+
+      const newItem: AcomAlertPopupProps = {
         isOpen: true,
-        onClose: () => setPopup(prev => ({ ...prev, isOpen: false })),
-        title: e.detail.title,
-        message: e.detail.message,
-        type: e.detail.type || 'info',
-        subtitle: e.detail.subtitle,
-        showCancel: e.detail.showCancel,
-        confirmText: e.detail.confirmText || "D'ACCORD",
-        onConfirm: e.detail.onConfirm
-      });
+        onClose: () => {},
+        title: detail.title,
+        message: detail.message,
+        type: detail.type || 'info',
+        subtitle: detail.subtitle,
+        showCancel: detail.showCancel,
+        confirmText: detail.confirmText || "D'ACCORD",
+        onConfirm: detail.onConfirm
+      };
+
+      setQueue(prevQueue => [...prevQueue, newItem]);
     };
 
     window.addEventListener('SHOW_ACOM_ALERT', handleShowAlert);
     return () => window.removeEventListener('SHOW_ACOM_ALERT', handleShowAlert);
   }, []);
 
-  return <AcomAlertPopup {...popup} />;
+  useEffect(() => {
+    if (!currentPopup && queue.length > 0) {
+      const nextAlert = queue[0];
+      setQueue(prev => prev.slice(1));
+      setCurrentPopup(nextAlert);
+    }
+  }, [queue, currentPopup]);
+
+  const handleClose = useCallback(() => {
+    setCurrentPopup(null);
+  }, []);
+
+  const handleConfirm = useCallback(() => {
+    if (currentPopup?.onConfirm) {
+      try {
+        currentPopup.onConfirm();
+      } catch (err) {
+        console.error("Error in alert onConfirm callback:", err);
+      }
+    }
+    setCurrentPopup(null);
+  }, [currentPopup]);
+
+  if (!currentPopup) return null;
+
+  return (
+    <AcomAlertPopup
+      {...currentPopup}
+      isOpen={true}
+      onClose={handleClose}
+      onConfirm={handleConfirm}
+    />
+  );
 };
 
 export const triggerAcomAlert = (

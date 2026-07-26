@@ -693,8 +693,6 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
 
       const resData = await response.json().catch(() => null);
       if (response.ok && resData?.success !== false) {
-        showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
-        
         // Add to local history
         const newLog = {
           id: `mnotif_${Date.now()}`,
@@ -707,8 +705,6 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
         return true;
       } else {
         console.warn('Failed to send background email to manager:', resData || response.statusText);
-        const errMsg = resData?.error ? ` (${resData.error})` : '';
-        toast.error(`Mail gérant non délivré${errMsg}`);
         return false;
       }
     } catch (error) {
@@ -812,8 +808,6 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
 
       const resData = await response.json().catch(() => null);
       if (response.ok && resData?.success !== false) {
-        showMailSuccessToast("Mail d'encaissement de solde envoyé au gérant avec succès !");
-        
         // Add to local history
         const newLog = {
           id: `mnotif_${Date.now()}`,
@@ -826,8 +820,6 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
         return true;
       } else {
         console.warn('Failed to send background balance email to manager:', resData || response.statusText);
-        const errMsg = resData?.error ? ` (${resData.error})` : '';
-        toast.error(`Mail gérant non délivré${errMsg}`);
         return false;
       }
     } catch (error) {
@@ -1212,7 +1204,6 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
     const updated = [newTicket, ...tickets];
     setTickets(updated);
     localStorage.setItem(`pressing_tickets_${merchant.id}`, JSON.stringify(updated));
-    showAlert('Fiche Enregistrée', `La fiche de réception a été enregistrée avec succès !\nTicket N° : ${ticketNumber}`, 'success', undefined, false, "D'ACCORD", "RÉCEPTION");
 
     // Track as Sales inside system DB
     try {
@@ -1243,10 +1234,32 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
     // Open detail simulator immediately
     setSelectedTicket(newTicket);
 
-    // Auto-email to manager in background on entry
+    // Manager Notifications (WhatsApp & E-mail in single unified behavior)
+    if (managerPhone && managerPhone.trim()) {
+      const waMessage = `📥 [SUIVI GÉRANT] NOUVEAU TICKET PRESSING (${ticketNumber}) 📥\n` +
+        `Client : ${clientName} (${clientPhone || 'N/A'})\n` +
+        `Montant Total : ${total.toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Acompte : ${(paymentStatus === 'unpaid' ? 0 : amountPaid).toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Date : ${format(new Date(), 'dd/MM/yyyy HH:mm')}\n` +
+        `Fiche enregistrée avec succès. ✨`;
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) cleaned = '221' + cleaned;
+      window.open(`https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(waMessage)}`, '_blank');
+    }
+
     if (autoEmailManager && managerEmail && managerEmail.trim()) {
       sendSilentBackgroundEmailToManager(newTicket, 'entrée');
     }
+
+    showAlert(
+      'Fiche Validée — E-mail & WhatsApp',
+      'La fiche client a été enregistrée avec succès et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+      'success',
+      undefined,
+      false,
+      "D'ACCORD",
+      "RÉCEPTION"
+    );
   };
 
   const handleGenerateTicketQuote = () => {

@@ -37,6 +37,7 @@ const TailleurBoutiqueManager = lazy(() => import('../modules/tailleur/component
 const TailleurClientsManager = lazy(() => import('../modules/tailleur/components/TailleurClientsManager').then(m => ({ default: m.TailleurClientsManager })));
 const TailleurOrdersManager = lazy(() => import('../modules/tailleur/components/TailleurOrdersManager').then(m => ({ default: m.TailleurOrdersManager })));
 const TailleurEmbroideryManager = lazy(() => import('../modules/tailleur/components/TailleurEmbroideryManager').then(m => ({ default: m.TailleurEmbroideryManager })));
+const TailleurClosureManager = lazy(() => import('../modules/tailleur/components/TailleurClosureManager').then(m => ({ default: m.TailleurClosureManager })));
 
 // Scolaire Lazy Modules
 const AlertParentsManager = lazy(() => import('../modules/scolaire/components/AlertParentsManager').then(m => ({ default: m.AlertParentsManager })));
@@ -630,6 +631,7 @@ const MerchantSaaS = () => {
           { id: 'tailleur_gallery', label: 'Inspirations & Moodboards', icon: Sparkles },
           { id: 'tailleur_artisans', label: 'Artisans & Équipe', icon: Users },
           { id: 'tailleur_mercerie', label: 'Mercerie & Coût de Revient', icon: Calculator },
+          { id: 'tailleur_closure', label: 'Clôture de Caisse', icon: LockIcon },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
           { id: 'reports', label: 'Rapports', icon: FileText },
           { id: 'settings', label: 'Réglages', icon: Settings },
@@ -997,6 +999,7 @@ const MerchantSaaS = () => {
             {activeTab === 'tailleur_gallery' && <TailleurGalleryManager key="tailleur_gallery" merchant={merchant} />}
             {activeTab === 'tailleur_artisans' && <TailleurArtisansManager key="tailleur_artisans" merchant={merchant} />}
             {activeTab === 'tailleur_mercerie' && <TailleurMercerieCostManager key="tailleur_mercerie" merchant={merchant} />}
+            {activeTab === 'tailleur_closure' && <TailleurClosureManager key="tailleur_closure" merchant={merchant} />}
             {activeTab === 'tailleur_embroidery' && <TailleurEmbroideryManager key="tailleur_embroidery" merchant={merchant} />}
             {activeTab === 'pressing_receipt' && <PressingReceiptManager key="pressing_receipt" merchant={merchant} />}
             {activeTab === 'pressing_delivery' && <PressingDeliveryManager key="pressing_delivery" merchant={merchant} />}

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
+import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { MercerieColorSelector } from './MercerieColorSelector';
 import { 
   MercerieCategoryService, 
@@ -411,10 +412,10 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
     if (editingItem) {
       const updated = mercerie.map(i => i.id === editingItem.id ? newItem : i);
       syncMercerie(updated);
-      toast.success('Article de mercerie mis à jour avec succès.');
+      triggerAcomAlert('Article Mis à Jour', 'Article de mercerie mis à jour avec succès.', 'success', 'MERCERIE');
     } else {
       syncMercerie([newItem, ...mercerie]);
-      toast.success('Nouvel article de mercerie enregistré.');
+      triggerAcomAlert('Nouvel Article Enregistré', 'Nouvel article de mercerie enregistré avec succès.', 'success', 'MERCERIE');
     }
 
     setIsItemModalOpen(false);
@@ -425,7 +426,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
     if (confirm(`Voulez-vous vraiment retirer "${item?.name || 'cet article'}" du stock ?`)) {
       const updated = mercerie.filter(i => i.id !== id);
       syncMercerie(updated);
-      toast.success('Article supprimé du stock de mercerie.');
+      triggerAcomAlert('Article Supprimé', 'Article supprimé du stock de mercerie.', 'success', 'MERCERIE');
     }
   };
 
@@ -441,7 +442,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
       return item;
     });
     syncMercerie(updated);
-    toast.success(`+${qtyToAdd} unité(s) ajoutée(s) au stock.`);
+    triggerAcomAlert('Stock Mis à Jour', `+${qtyToAdd} unité(s) ajoutée(s) au stock.`, 'success', 'MERCERIE');
   };
 
   // ----------------------------------------------------
@@ -477,7 +478,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
         );
         const allCats = MercerieCategoryService.getCategories(merchant.id);
         syncCategories(allCats);
-        toast.success(`Catégorie "${updated.name}" mise à jour.`);
+        triggerAcomAlert('Catégorie Mise à Jour', `Catégorie "${updated.name}" mise à jour.`, 'success', 'MERCERIE');
       } else {
         const created = MercerieCategoryService.addCategory(
           catNameInput,
@@ -489,7 +490,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
         syncCategories(allCats);
         // If modal was opened from inside item form, auto select newly created category!
         setItemCategory(created.name);
-        toast.success(`Nouvelle catégorie "${created.name}" créée !`);
+        triggerAcomAlert('Nouvelle Catégorie Créée', `Nouvelle catégorie "${created.name}" créée !`, 'success', 'MERCERIE');
       }
       setIsCategoryModalOpen(false);
     } catch (err: any) {
@@ -504,7 +505,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
       MercerieCategoryService.updateCategory(id, { isActive: !target.isActive }, merchant.id);
       const allCats = MercerieCategoryService.getCategories(merchant.id);
       syncCategories(allCats);
-      toast.success(`Catégorie "${target.name}" ${!target.isActive ? 'activée' : 'désactivée'}.`);
+      triggerAcomAlert('Statut Catégorie', `Catégorie "${target.name}" ${!target.isActive ? 'activée' : 'désactivée'}.`, 'success', 'MERCERIE');
     } catch (err: any) {
       toast.error(err.message || 'Erreur lors de la modification.');
     }
@@ -519,7 +520,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
       );
       const allCats = MercerieCategoryService.getCategories(merchant.id);
       syncCategories(allCats);
-      toast.success('Catégorie supprimée.');
+      triggerAcomAlert('Catégorie Supprimée', 'Catégorie supprimée.', 'success', 'MERCERIE');
     } catch (err: any) {
       toast.error(err.message || 'Impossible de supprimer cette catégorie.');
     }
@@ -580,7 +581,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
 
     setCurrentSupplyId('');
     setCurrentSupplyQty(1);
-    toast.success('Fourniture ajoutée à la fiche de coût.');
+    triggerAcomAlert('Fourniture Ajoutée', 'Fourniture ajoutée à la fiche de coût avec succès.', 'success', 'MERCERIE');
   };
 
   const handleRemoveSupplyFromCostSheet = (idx: number) => {
@@ -643,7 +644,7 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
     });
     syncMercerie(updatedMercerie);
 
-    toast.success('Fiche de coût enregistrée ! Stock de mercerie mis à jour.');
+    triggerAcomAlert('Fiche de Coût Enregistrée', 'Fiche de coût enregistrée avec succès ! Stock de mercerie mis à jour.', 'success', 'FICHE DE COÛT');
     setSubTab('costs');
     resetCostSheetForm();
   };

@@ -16,6 +16,9 @@ import { GarmentProfileCard } from './GarmentProfileCard';
 import { GarmentLibraryService } from '../services/GarmentLibraryService';
 import { GarmentResolverService } from '../services/GarmentResolverService';
 import { TailorCard, TailorDeleteConfirmModal } from './design-system/TailorDesignSystem';
+import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
+import { showMailSuccessToast } from '../../../components/MailSuccessToast';
+import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 
 export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => {
   const [clients, setClients] = useState<any[]>([]);
@@ -57,6 +60,113 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
   const saveClients = (newClients: any[]) => {
     setClients(newClients);
     localStorage.setItem(`tailleur_clients_${merchant.id}`, JSON.stringify(newClients));
+  };
+
+  const notifyManagerClientSaved = async (clientData: any) => {
+    const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+    const managerEmail = merchant.managerNotifications?.email || '';
+
+    // 1. WhatsApp Channel
+    if (managerPhone && managerPhone.trim()) {
+      const waMessage = `🌟 [SUIVI GÉRANT] NOUVELLE FICHE CLIENT & MESURES 🌟\n\n` +
+        `Atelier : ${merchant.name || 'Atelier de Couture'}\n` +
+        `Client : ${clientData.firstName || ''} ${clientData.lastName || ''}\n` +
+        `Contact : ${clientData.phone || 'Non renseigné'}\n` +
+        `Modèle / Vêtement : ${clientData.preferredGarment || clientData.garmentName || 'Sur-mesure'}\n` +
+        (clientData.measurements && Object.keys(clientData.measurements).length > 0 
+          ? `Mesures (${Object.keys(clientData.measurements).length}) : ${Object.entries(clientData.measurements).map(([k, v]) => `${k}: ${v}cm`).join(', ')}\n` 
+          : '') +
+        `Date : ${format(new Date(), 'dd/MM/yyyy HH:mm')}\n\n` +
+        `La fiche client et ses mesures ont été enregistrées avec succès dans votre atelier. 🧵✂️`;
+
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '221' + cleaned;
+      }
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(waMessage)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    // 2. E-mail Channel
+    if (managerEmail && managerEmail.trim()) {
+      try {
+        const mailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+            <div style="background-color: #0f172a; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+              <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Atelier de Couture'}</h2>
+              <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Suivi d'Activité Gérant en Temps Réel</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <h3 style="color: #0f172a; border-bottom: 2px solid #0f172a; padding-bottom: 5px; margin-bottom: 15px;">👤 Fiche Client & Mesures Enregistrées</h3>
+              
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 150px;"><strong>Client :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${clientData.firstName || ''} ${clientData.lastName || ''}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Téléphone Client :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${clientData.phone || 'Non renseigné'}</td>
+                </tr>
+                ${clientData.email ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Email Client :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${clientData.email}</td>
+                </tr>
+                ` : ''}
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Vêtement / Modèle :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${clientData.preferredGarment || clientData.garmentName || 'Sur-mesure'}</td>
+                </tr>
+                ${clientData.measurements && Object.keys(clientData.measurements).length > 0 ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;" valign="top"><strong>Mesures (cm) :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
+                    <ul style="margin: 0; padding-left: 20px;">
+                      ${Object.entries(clientData.measurements).map(([k, v]) => `<li style="margin: 2px 0;"><strong>${k} :</strong> ${v} cm</li>`).join('')}
+                    </ul>
+                  </td>
+                </tr>
+                ` : ''}
+                ${clientData.notes ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Notes :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-style: italic;">"${clientData.notes}"</td>
+                </tr>
+                ` : ''}
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;"><strong>Date d'enregistrement :</strong></td>
+                  <td style="padding: 8px 0;">${format(new Date(), 'dd/MM/yyyy HH:mm')}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+              Ce rapport automatique a été envoyé en arrière-plan sans action requise de l'opérateur.<br/>
+              <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
+            </div>
+          </div>
+        `;
+
+        const response = await sendEmailDirectlyOrViaBackend({
+          to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
+          subject: `👤 [NOUVEAU CLIENT] Fiche & Mesures de ${clientData.firstName || ''} ${clientData.lastName || ''} - ${merchant.name || 'Atelier'}`,
+          html: mailHtml
+        }, {
+          resendApiKey: merchant.managerNotifications?.resendApiKey,
+          defaultFrom: merchant.managerNotifications?.emailFrom
+        });
+
+        const resData = await response.json().catch(() => null);
+        if (response.ok && resData?.success !== false) {
+          // Background email sent successfully
+        }
+      } catch (err) {
+        console.error("Erreur d'envoi de l'email gérant :", err);
+      }
+    }
   };
 
   const handleRequestDelete = (client: any) => {
@@ -106,7 +216,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
           }
         }
 
-        toast.success(`Client "${target.firstName || ''} ${target.lastName || ''}" supprimé avec succès !`);
+        triggerAcomAlert('Client Supprimé', `Client "${target.firstName || ''} ${target.lastName || ''}" supprimé avec succès !`, 'success', 'CLIENTS');
         await triggerSync();
       }
     } catch (e) {
@@ -163,7 +273,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Listing des mesures exporté avec succès (Excel CSV)");
+      triggerAcomAlert('Export Réussi', 'Listing des mesures exporté avec succès (Excel CSV)', 'success', 'EXPORT');
     } catch (error) {
       console.error(error);
       toast.error("Échec de l'export Excel CSV");
@@ -466,7 +576,13 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
             saveClients(updatedList);
             setIsSmartAssistantOpen(false);
             setCurrentClient(null);
-            toast.success('Fiche client et mesures enregistrées avec succès ! 🧵✨');
+            triggerAcomAlert(
+              'Fiche Client Validée — E-mail & WhatsApp',
+              'La fiche client et les mesures ont été enregistrées avec succès et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+              'success',
+              'RÉCEPTION'
+            );
+            notifyManagerClientSaved(savedClient);
           }}
         />
       )}

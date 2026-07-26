@@ -85,8 +85,9 @@ export class VoiceEngine {
   private static activeAudio: HTMLAudioElement | null = null;
   private static activeOnEnd: (() => void) | null = null;
 
-  public static speakText(text: string, config: VoiceConfig, onEnd?: () => void): void {
+  public static speakText(text: string, config: VoiceConfig, onEnd?: () => void, onPlay?: () => void): void {
     if (typeof window === 'undefined') {
+      if (onPlay) onPlay();
       if (onEnd) onEnd();
       return;
     }
@@ -101,6 +102,10 @@ export class VoiceEngine {
       audio.volume = config.volume;
       audio.playbackRate = config.rate;
       
+      if (onPlay) {
+        audio.onplaying = () => onPlay();
+      }
+
       audio.onended = () => {
         if (this.activeOnEnd) {
           this.activeOnEnd();
@@ -110,30 +115,33 @@ export class VoiceEngine {
       
       audio.onerror = () => {
         console.warn('Network TTS failed, falling back to Web Speech API');
-        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
+        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined, onPlay);
       };
       
       audio.play().catch(e => {
         console.warn('Audio play prevented or failed:', e);
-        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
+        this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined, onPlay);
       });
       
       this.activeAudio = audio;
     } catch (e) {
-      this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined);
+      this.fallbackWebSpeech(text, config, this.activeOnEnd || undefined, onPlay);
     }
   }
 
-  private static fallbackWebSpeech(text: string, config: VoiceConfig, onEnd?: () => void): void {
+  private static fallbackWebSpeech(text: string, config: VoiceConfig, onEnd?: () => void, onPlay?: () => void): void {
     if (!('speechSynthesis' in window)) {
-      if (onEnd) {
-        onEnd();
-        if (this.activeOnEnd === onEnd) this.activeOnEnd = null;
-      }
+      if (onPlay) onPlay();
+      if (onEnd) onEnd();
       return;
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
+    
+    if (onPlay) {
+      utterance.onstart = () => onPlay();
+    }
+
     utterance.pitch = config.pitch;
     utterance.rate = config.rate;
     utterance.volume = config.volume;

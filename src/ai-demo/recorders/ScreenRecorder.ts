@@ -25,7 +25,8 @@ export class ScreenRecorder {
         video: {
           width: { ideal: dim.width, max: dim.width },
           height: { ideal: dim.height, max: dim.height },
-          frameRate: { ideal: fps, max: fps }
+          frameRate: { ideal: fps, max: fps },
+          displaySurface: "browser"
         },
         audio: {
           echoCancellation: false,
@@ -35,7 +36,8 @@ export class ScreenRecorder {
         preferCurrentTab: true,
         selfBrowserSurface: "include",
         surfaceSwitching: "exclude",
-        systemAudio: "include"
+        systemAudio: "include",
+        monitorTypeSurfaces: "exclude"
       };
 
       // 1. Capture screen & system audio

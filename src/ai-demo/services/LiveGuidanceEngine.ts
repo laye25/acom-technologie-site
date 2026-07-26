@@ -341,17 +341,30 @@ export class LiveGuidanceEngine {
         onStateChange(this.getSessionState());
       }
 
-      // 1. Start TTS audio simultaneously with DOM action
+      // 1. Start TTS audio
       const stepDurationMs = Math.max(1200, (activeStep.durationSec || 2.5) * 1000);
       const voiceConfig = VoiceEngine.getAvailableVoices('fr')[0];
       
+      let audioStarted = false;
       const audioPromise = new Promise<void>(resolve => {
         if (activeStep.narrationText) {
-          VoiceEngine.speakText(activeStep.narrationText, voiceConfig, resolve);
+          VoiceEngine.speakText(
+            activeStep.narrationText, 
+            voiceConfig, 
+            resolve, 
+            () => { audioStarted = true; }
+          );
         } else {
+          audioStarted = true;
           resolve();
         }
       });
+      
+      // Wait for audio to actually start playing (buffer loaded) or timeout after 2s
+      let waitStart = Date.now();
+      while (!audioStarted && Date.now() - waitStart < 2000) {
+        await new Promise(r => setTimeout(r, 50));
+      }
 
       // 2. Move cursor, highlight element, and type/click live on DOM concurrently
       const domPromise = LiveGuidanceEngine.executeStepOnDom(activeStep, isLastStep);
@@ -517,6 +530,9 @@ export class LiveGuidanceEngine {
       );
 
       for (const el of candidates) {
+        // Exclude elements inside navigation areas to prevent accidental page jumps
+        if (el.closest('nav') || el.closest('aside') || el.closest('header')) continue;
+
         const text = (
           el.innerText ||
           el.getAttribute('aria-label') ||
@@ -524,9 +540,9 @@ export class LiveGuidanceEngine {
           el.getAttribute('title') ||
           el.getAttribute('name') ||
           ''
-        ).toLowerCase();
+        ).toLowerCase().trim();
 
-        if (text && (text.includes(label) || label.includes(text) || narration.includes(text))) {
+        if (text && text.length > 3 && (text.includes(label) || label.includes(text) || narration.includes(text))) {
           targetEl = el;
           break;
         }

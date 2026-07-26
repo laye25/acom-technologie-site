@@ -434,8 +434,6 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
       const resData = await response.json().catch(() => null);
       if (response.ok && resData?.success !== false) {
-        showMailSuccessToast("Ce mail envoyé en arrière-plan avec succès !");
-        
         // Add to history
         const newLog = {
           id: `mnotif_s_${Date.now()}`,
@@ -450,8 +448,6 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         return true;
       } else {
         console.warn('Failed to send background email to manager for sale:', resData || response.statusText);
-        const errMsg = resData?.error ? ` (${resData.error})` : '';
-        toast.error(`Rapport e-mail de vente non envoyé${errMsg}`);
         return false;
       }
     } catch (err) {
@@ -722,12 +718,32 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     setCustomerName('');
     setCustomerPhone('');
     setSelectedSale(newSale); // show details simulator
-    showAlert('Encaissement Validé', `Encaissement validé ! N° ${saleNumber}`, 'success');
 
-    // Auto-email summary to the manager in the background
+    // Manager Notifications (WhatsApp & E-mail in single unified behavior)
+    if (managerPhone && managerPhone.trim()) {
+      const waMessage = `🛒 [SUIVI GÉRANT] NOUVEL ENCAISSEMENT PRODUIT (${saleNumber}) 🛒\n` +
+        `Client : ${newSale.customerName} (${newSale.customerPhone || 'N/A'})\n` +
+        `Montant Payé : ${cartTotal.toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Date : ${format(new Date(), 'dd/MM/yyyy HH:mm')}\n` +
+        `Encaissement validé avec succès. 🎉`;
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) cleaned = '221' + cleaned;
+      window.open(`https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(waMessage)}`, '_blank');
+    }
+
     if (autoEmailManager && managerEmail && managerEmail.trim()) {
       sendSilentBackgroundSaleEmailToManager(newSale);
     }
+
+    showAlert(
+      'Encaissement Validé — E-mail & WhatsApp',
+      `L'encaissement (N° ${saleNumber}) de ${cartTotal.toLocaleString()} ${merchant.currency || 'FCFA'} a été validé avec succès et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.`,
+      'success',
+      undefined,
+      false,
+      "D'ACCORD",
+      "CAISSE"
+    );
   };
 
   // Generate Proforma Quote Handler

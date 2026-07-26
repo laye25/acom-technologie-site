@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, UserPlus, Scissors, Palette, DollarSign, Calendar, Clock, 
-  CheckCircle2, AlertCircle, Plus, Trash2, Edit, Save, Search, 
+  CheckCircle2, AlertCircle, AlertTriangle, Plus, Trash2, Edit, Save, Search, 
   ArrowLeft, Filter, Wallet, Receipt, CreditCard, ChevronRight, Check,
   UserCheck, History, Award, Info, Landmark, HelpCircle, X, Printer, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
+import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
+import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { db } from '../../../db/db';
 
 interface Merchant {
   id: string;
   name: string;
   currency?: string;
+  managerNotifications?: {
+    whatsappPhone?: string;
+    email?: string;
+    emailFrom?: string;
+    resendApiKey?: string;
+  };
 }
 
 interface Artisan {
@@ -38,6 +47,8 @@ interface TaskAssignment {
   status: 'A faire' | 'En cours' | 'A valider' | 'Terminé';
   dueDate: string;
   payoutStatus: 'Non payé' | 'Payé';
+  payoutDate?: string;
+  payoutId?: string;
   createdAt: string;
   completedAt?: string;
 }
@@ -48,7 +59,12 @@ interface ArtisanPayment {
   artisanName: string;
   amount: number;
   paymentDate: string;
+  timestamp?: string;
   paymentMethod: 'Espèces' | 'Wave' | 'Orange Money' | 'Chèque' | 'Autre';
+  remunerationType?: 'Pièce';
+  assignmentId?: string;
+  missionDescription?: string;
+  status?: 'PAYÉ';
   notes?: string;
 }
 
@@ -57,11 +73,71 @@ interface SalaryPayment {
   artisanId: string;
   artisanName: string;
   amount: number;
-  month: string; // e.g. "2026-06"
+  month: string; // e.g. "2026-06", "2026-07-26", "2026-W30"
+  remunerationType?: 'Pièce' | 'Mensuel' | 'Hebdomadaire' | 'Journalier' | 'Salarié';
+  periodLabel?: string;
   paymentDate: string;
+  timestamp?: string;
   paymentMethod: 'Espèces' | 'Wave' | 'Orange Money' | 'Chèque' | 'Autre';
+  status?: 'PAYÉ';
   notes?: string;
 }
+
+export const getISOWeekKey = (dateStr: string): string => {
+  if (!dateStr) return '';
+  if (dateStr.includes('-W')) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
+  }
+  const weekNr = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
+  const year = d.getFullYear();
+  return `${year}-W${weekNr < 10 ? '0' + weekNr : weekNr}`;
+};
+
+export const isTaskPaid = (
+  taskId: string,
+  assignmentsList: TaskAssignment[],
+  paymentsList: ArtisanPayment[]
+): boolean => {
+  if (!taskId) return false;
+  const task = assignmentsList.find(a => a.id === taskId);
+  if (task && (task.payoutStatus === 'Payé' || !!task.payoutId)) return true;
+  return paymentsList.some(p => p.assignmentId === taskId);
+};
+
+export const isSalaryPeriodPaid = (
+  artisanId: string,
+  remunerationType: string | undefined,
+  periodKey: string,
+  salaryPaymentsList: SalaryPayment[]
+): boolean => {
+  if (!artisanId || !periodKey) return false;
+
+  return salaryPaymentsList.some(p => {
+    if (p.artisanId !== artisanId) return false;
+
+    if (remunerationType === 'Journalier') {
+      return p.month === periodKey;
+    }
+    if (remunerationType === 'Hebdomadaire') {
+      const pWeek = p.month.includes('-W') ? p.month : getISOWeekKey(p.month);
+      const targetWeek = periodKey.includes('-W') ? periodKey : getISOWeekKey(periodKey);
+      return pWeek === targetWeek;
+    }
+    // Mensuel or Salarié
+    const pMonth = p.month.substring(0, 7);
+    const targetMonth = periodKey.substring(0, 7);
+    return pMonth === targetMonth;
+  });
+};
 
 interface TailleurArtisansManagerProps {
   merchant: Merchant;
@@ -231,6 +307,8 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
 
   // Form Fields - Payment
   const [payArtisanId, setPayArtisanId] = useState('');
+  const [selectedTaskIdForPay, setSelectedTaskIdForPay] = useState<string | null>(null);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [payAmount, setPayAmount] = useState(10000);
   const [payMethod, setPayMethod] = useState<ArtisanPayment['paymentMethod']>('Espèces');
   const [payNotes, setPayNotes] = useState('');
@@ -499,7 +577,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
       );
       syncPayments(updatedPayments);
 
-      toast.success('Artisan modifié avec succès');
+      triggerAcomAlert('Artisan Modifié', 'Les informations de l\'artisan ont été modifiées avec succès.', 'success', 'PERSONNEL');
     } else {
       const newArtisan: Artisan = {
         id: 'art-' + Date.now(),
@@ -513,7 +591,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
         createdAt: new Date().toISOString()
       };
       syncArtisans([newArtisan, ...artisans]);
-      toast.success('Nouvel artisan ajouté au personnel');
+      triggerAcomAlert('Nouvel Artisan Ajouté', 'Nouvel artisan ajouté au personnel avec succès !', 'success', 'PERSONNEL');
     }
     setIsArtisanModalOpen(false);
   };
@@ -522,7 +600,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
     if (confirm('Voulez-vous vraiment retirer cet artisan ? Les historiques de paiement seront préservés.')) {
       const updated = artisans.filter(a => a.id !== id);
       syncArtisans(updated);
-      toast.success('Artisan retiré');
+      triggerAcomAlert('Artisan Retiré', 'L\'artisan a été retiré du personnel avec succès.', 'success', 'PERSONNEL');
       if (selectedArtisanId === id) {
         setSelectedArtisanId(null);
       }
@@ -602,7 +680,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
         return a;
       });
       syncAssignments(updated);
-      toast.success('Assignation mise à jour');
+      triggerAcomAlert('Assignation Mise à Jour', 'L\'assignation de la tâche a été mise à jour avec succès.', 'success', 'AFFECTATION');
     } else {
       const newAsg: TaskAssignment = {
         id: 'asg-' + Date.now(),
@@ -629,9 +707,182 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
         syncArtisans(updatedArtisans);
       }
 
-      toast.success('Tâche assignée avec succès');
+      // Trigger Manager Notification for Task Assignment (Suivi Gérant)
+      notifyManagerTaskAssignment({
+        assignment: newAsg,
+        artisan: selectedArtisan,
+        orderClientName: orderClient,
+        orderModelName: orderModel
+      });
     }
     setIsAssignmentModalOpen(false);
+  };
+
+  // Manager Notification & Suivi Gérant Helpers
+  const notifyManagerTaskAssignment = async (params: {
+    assignment: TaskAssignment;
+    artisan: Artisan;
+    orderClientName: string;
+    orderModelName: string;
+  }) => {
+    const { assignment, artisan, orderClientName, orderModelName } = params;
+    const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+    const managerEmail = merchant.managerNotifications?.email || '';
+
+    // Visual Popup / Toast
+    triggerAcomAlert(
+      'Affectation Validée — E-mail & WhatsApp',
+      'L\'affectation de travail a été validée avec succès et transmise par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+      'success',
+      'AFFECTATION'
+    );
+
+    // Email Dispatch
+    if (managerEmail && managerEmail.trim()) {
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;">
+          <div style="background-color: #4c1d95; color: white; padding: 16px; border-radius: 8px; text-align: center;">
+            <h2 style="margin: 0; font-size: 18px;">📋 SUIVI GÉRANT — AFFECTATION DE TRAVAIL</h2>
+            <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.9;">Atelier : ${merchant.name || 'Atelier'}</p>
+          </div>
+          <div style="margin-top: 20px; font-size: 14px; line-height: 1.6;">
+            <p>Bonjour,</p>
+            <p>Une nouvelle affectation de travail a été attribuée dans votre atelier. Voici les détails :</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px;">
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Artisan / Équipe :</strong></td><td style="padding: 8px; font-weight: bold; color: #4c1d95;">${artisan.name} (${artisan.specialty})</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Commande / Client :</strong></td><td style="padding: 8px;">${orderClientName} — ${orderModelName}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Tâche / Description :</strong></td><td style="padding: 8px;">${assignment.taskDescription}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Date d'Affectation :</strong></td><td style="padding: 8px;">${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Échéance Prévue :</strong></td><td style="padding: 8px; font-weight: bold; color: #d97706;">${assignment.dueDate || 'Non spécifiée'}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Rémunération Prévue :</strong></td><td style="padding: 8px;">${assignment.pieceRateAmount ? assignment.pieceRateAmount.toLocaleString('fr-FR') + ' ' + currency : 'À la pièce'}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Utilisateur Valideur :</strong></td><td style="padding: 8px;">${merchant.name} (Gérant / Chef d'Atelier)</td></tr>
+            </table>
+            <p style="margin-top: 16px; font-size: 11px; color: #94a3b8; font-style: italic;">
+              Note : L'affectation de travail n'impacte pas la caisse. Seul un paiement effectif génèrera une sortie de caisse.
+            </p>
+          </div>
+        </div>
+      `;
+
+      try {
+        await sendEmailDirectlyOrViaBackend({
+          to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
+          subject: `📋 [SUIVI GÉRANT] Affectation travail : ${artisan.name} (${orderModelName}) - ${merchant.name || 'Atelier'}`,
+          html
+        }, {
+          resendApiKey: merchant.managerNotifications?.resendApiKey,
+          defaultFrom: merchant.managerNotifications?.emailFrom
+        });
+      } catch (e) {
+        console.error('Email assignment notification error:', e);
+      }
+    }
+
+    // WhatsApp Dispatch
+    if (managerPhone && managerPhone.trim()) {
+      const text = `👑 [SUIVI GÉRANT — AFFECTATION DE TRAVAIL] 📋\n` +
+        `--------------------------------\n` +
+        `• Artisan/Équipe : ${artisan.name} (${artisan.specialty})\n` +
+        `• Client/Modèle : ${orderClientName} - ${orderModelName}\n` +
+        `• Tâche : ${assignment.taskDescription}\n` +
+        `• Date affectation : ${new Date().toLocaleDateString('fr-FR')}\n` +
+        `• Échéance : ${assignment.dueDate || 'Non définie'}\n` +
+        `• Rémunération prévue : ${assignment.pieceRateAmount ? assignment.pieceRateAmount.toLocaleString('fr-FR') + ' ' + currency : 'N/A'}\n` +
+        `• Effectué par : ${merchant.name || 'Gérant'}\n` +
+        `--------------------------------\n` +
+        `Suivi en temps réel — ${merchant.name || 'Atelier'}.`;
+
+      const cleaned = managerPhone.replace(/\s+/g, '').replace(/^\+/, '');
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const url = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
+    }
+  };
+
+  const notifyManagerPayment = async (params: {
+    paymentId: string;
+    artisan: Artisan;
+    amount: number;
+    paymentMethod: string;
+    typeLabel: string;
+    periodOrWork: string;
+    notes?: string;
+  }) => {
+    const { paymentId, artisan, amount, paymentMethod, typeLabel, periodOrWork, notes } = params;
+    const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+    const managerEmail = merchant.managerNotifications?.email || '';
+
+    // Visual Popup / Toast
+    triggerAcomAlert(
+      'Rémunération Validée — E-mail & WhatsApp',
+      'La rémunération artisan a été validée avec succès et transmise par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+      'success',
+      'RÈGLEMENT'
+    );
+
+    // Email Dispatch
+    if (managerEmail && managerEmail.trim()) {
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b;">
+          <div style="background-color: #15803d; color: white; padding: 16px; border-radius: 8px; text-align: center;">
+            <h2 style="margin: 0; font-size: 18px;">💸 SUIVI GÉRANT — PAIEMENT RÉMUNÉRATION ARTISAN</h2>
+            <p style="margin: 4px 0 0; font-size: 12px; opacity: 0.9;">Atelier : ${merchant.name || 'Atelier'}</p>
+          </div>
+          <div style="margin-top: 20px; font-size: 14px; line-height: 1.6;">
+            <p>Bonjour,</p>
+            <p>Un règlement effectif de rémunération vient d'être validé et enregistré en sortie de caisse :</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px;">
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Artisan Bénéficiaire :</strong></td><td style="padding: 8px; font-weight: bold; color: #0f172a;">${artisan.name} (${artisan.specialty})</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Type de Rémunération :</strong></td><td style="padding: 8px;">${typeLabel}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Période / Tâche Concernée :</strong></td><td style="padding: 8px;">${periodOrWork}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Montant Réel Payé :</strong></td><td style="padding: 8px; font-weight: bold; font-size: 15px; color: #15803d;">${amount.toLocaleString('fr-FR')} ${currency}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Mode de Règlement :</strong></td><td style="padding: 8px; font-weight: bold;">${paymentMethod}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Date & Heure :</strong></td><td style="padding: 8px;">${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}</td></tr>
+              <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Validé par :</strong></td><td style="padding: 8px;">Gérant / Caissier (${merchant.name})</td></tr>
+              ${notes ? `<tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 8px; color: #64748b;"><strong>Observations :</strong></td><td style="padding: 8px; font-style: italic;">"${notes}"</td></tr>` : ''}
+            </table>
+            <p style="margin-top: 16px; font-size: 12px; color: #166534; background-color: #f0fdf4; padding: 10px; border-radius: 6px; font-weight: bold;">
+              ✅ Ce paiement est automatiquement enregistré comme sortie de caisse dans la rubrique « Rémunérations Artisans & Équipe ».
+            </p>
+          </div>
+        </div>
+      `;
+
+      try {
+        await sendEmailDirectlyOrViaBackend({
+          to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
+          subject: `💸 [SUIVI GÉRANT] Rémunération payée : ${artisan.name} (${amount.toLocaleString('fr-FR')} ${currency}) - ${merchant.name || 'Atelier'}`,
+          html
+        }, {
+          resendApiKey: merchant.managerNotifications?.resendApiKey,
+          defaultFrom: merchant.managerNotifications?.emailFrom
+        });
+      } catch (e) {
+        console.error('Email payment notification error:', e);
+      }
+    }
+
+    // WhatsApp Dispatch
+    if (managerPhone && managerPhone.trim()) {
+      const text = `👑 [SUIVI GÉRANT — PAIEMENT RÉMUNÉRATION ARTISAN] 💸\n` +
+        `--------------------------------\n` +
+        `• Artisan : ${artisan.name} (${artisan.specialty})\n` +
+        `• Type : ${typeLabel}\n` +
+        `• Période/Travail : ${periodOrWork}\n` +
+        `• Montant payé : ${amount.toLocaleString('fr-FR')} ${currency}\n` +
+        `• Mode : ${paymentMethod}\n` +
+        `• Date/Heure : ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}\n` +
+        `• Validé par : ${merchant.name || 'Gérant'}\n` +
+        `--------------------------------\n` +
+        `✅ Sortie de caisse enregistrée (Rubrique Rémunérations Artisans & Équipe).`;
+
+      const cleaned = managerPhone.replace(/\s+/g, '').replace(/^\+/, '');
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const url = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
+    }
   };
 
   const handleUpdateAsgStatus = (id: string, nextStatus: TaskAssignment['status']) => {
@@ -647,72 +898,188 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
       return a;
     });
     syncAssignments(updated);
-    toast.success(`Statut mis à jour : ${nextStatus}`);
+    triggerAcomAlert('Statut Mis à Jour', `Statut mis à jour : ${nextStatus}`, 'success', 'SUIVI TÂCHES');
   };
 
   const handleDeleteAssignment = (id: string) => {
     if (confirm('Voulez-vous supprimer cette assignation ?')) {
       const updated = assignments.filter(a => a.id !== id);
       syncAssignments(updated);
-      toast.success('Assignation supprimée');
+      triggerAcomAlert('Assignation Supprimée', 'Assignation supprimée avec succès.', 'success', 'SUIVI TÂCHES');
     }
   };
 
   // Payment Modal Handlers
-  const openPaymentForm = (artisanId: string = '') => {
-    const defaultId = artisanId || (artisans.filter(a => a.remunerationType !== 'Salarié')[0]?.id || artisans[0]?.id || '');
+  const openPaymentForm = (artisanId: string = '', taskId: string = '') => {
+    const pieceRateArtisans = artisans.filter(a => !isSalariedType(a.remunerationType));
+    const defaultId = artisanId || (pieceRateArtisans.length > 0 ? pieceRateArtisans[0].id : (artisans[0]?.id || ''));
     setPayArtisanId(defaultId);
     
-    let defaultAmount = 10000;
-    if (defaultId) {
-      const stats = getArtisanStats(defaultId);
-      if (stats.balance > 0) {
-        defaultAmount = stats.balance;
+    if (taskId) {
+      const task = assignments.find(a => a.id === taskId);
+      setSelectedTaskIdForPay(taskId);
+      if (task) {
+        setPayArtisanId(task.artisanId);
+        setPayAmount(task.pieceRateAmount);
+        setPayNotes(`Règlement mission : ${task.taskDescription} (${task.orderClientName})`);
+      }
+    } else {
+      const unpaidTasks = assignments.filter(a => a.artisanId === defaultId && a.status === 'Terminé' && !isTaskPaid(a.id, assignments, payments));
+      if (unpaidTasks.length > 0) {
+        setSelectedTaskIdForPay(unpaidTasks[0].id);
+        setPayAmount(unpaidTasks[0].pieceRateAmount);
+        setPayNotes(`Règlement mission : ${unpaidTasks[0].taskDescription}`);
+      } else {
+        setSelectedTaskIdForPay(null);
+        setPayAmount(0);
+        setPayNotes('');
       }
     }
-    setPayAmount(defaultAmount);
+
     setPayMethod('Espèces');
-    setPayNotes('');
     setIsPaymentModalOpen(true);
   };
 
-  const handleSavePayment = (e: React.FormEvent) => {
+  const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payArtisanId) {
-      toast.error('Sélectionnez un artisan');
-      return;
-    }
-    if (payAmount <= 0) {
-      toast.error('Le montant doit être positif');
-      return;
-    }
 
-    const selectedArtisan = artisans.find(a => a.id === payArtisanId);
-    if (!selectedArtisan) {
-      toast.error('Artisan introuvable');
-      return;
+    if (isSubmittingPayment) return;
+    setIsSubmittingPayment(true);
+
+    try {
+      if (!payArtisanId) {
+        toast.error('Sélectionnez un artisan');
+        setIsSubmittingPayment(false);
+        return;
+      }
+      if (payAmount <= 0) {
+        toast.error('Le montant de la rémunération doit être positif');
+        setIsSubmittingPayment(false);
+        return;
+      }
+
+      const selectedArtisan = artisans.find(a => a.id === payArtisanId);
+      if (!selectedArtisan) {
+        toast.error('Artisan introuvable');
+        setIsSubmittingPayment(false);
+        return;
+      }
+
+      // Verify task assignment payment if a task is selected or if paying a piece rate
+      let targetTask: TaskAssignment | undefined = undefined;
+      if (selectedTaskIdForPay) {
+        targetTask = assignments.find(a => a.id === selectedTaskIdForPay);
+        if (!targetTask) {
+          toast.error('Mission introuvable');
+          setIsSubmittingPayment(false);
+          return;
+        }
+        if (targetTask.status !== 'Terminé') {
+          toast.error('Seule une mission à l\'état "Terminé" peut être réglée.');
+          setIsSubmittingPayment(false);
+          return;
+        }
+        if (targetTask.payoutStatus === 'Payé' || isTaskPaid(targetTask.id, assignments, payments)) {
+          triggerAcomAlert(
+            'Double Paiement Bloqué 🛑',
+            `Cette mission (${targetTask.taskDescription}) a déjà été réglée (Statut PAYÉ). Aucun nouveau paiement n'est possible pour la même mission.`,
+            'error',
+            'SÉCURISATION'
+          );
+          toast.error('Paiement refusé : Cette mission est déjà marquée PAYÉ.');
+          setIsSubmittingPayment(false);
+          return;
+        }
+      } else {
+        // If no task was explicitly chosen, check if there are completed unpaid tasks for this artisan
+        const unpaidCompletedTasks = assignments.filter(
+          a => a.artisanId === payArtisanId && a.status === 'Terminé' && !isTaskPaid(a.id, assignments, payments)
+        );
+        if (unpaidCompletedTasks.length === 0) {
+          triggerAcomAlert(
+            'Double Paiement Bloqué 🛑',
+            `Aucune nouvelle mission terminée à payer pour ${selectedArtisan.name}. Un nouveau paiement exige la création et la réalisation d'une nouvelle mission.`,
+            'error',
+            'SÉCURISATION'
+          );
+          toast.error('Paiement refusé : Aucune mission terminée éligible au paiement.');
+          setIsSubmittingPayment(false);
+          return;
+        }
+        targetTask = unpaidCompletedTasks[0];
+      }
+
+      const newPayId = 'pay-pie-' + Date.now();
+      const newPay: ArtisanPayment = {
+        id: newPayId,
+        artisanId: payArtisanId,
+        artisanName: selectedArtisan.name,
+        amount: Number(payAmount),
+        paymentDate: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString(),
+        paymentMethod: payMethod,
+        remunerationType: 'Pièce',
+        assignmentId: targetTask?.id,
+        missionDescription: targetTask ? `${targetTask.taskDescription} (${targetTask.orderClientName})` : (payNotes.trim() || 'Rémunération à la pièce'),
+        status: 'PAYÉ',
+        notes: payNotes.trim() || undefined
+      };
+
+      // Update assignment payoutStatus to Payé
+      if (targetTask) {
+        const updatedAssignments = assignments.map(a => 
+          a.id === targetTask!.id 
+            ? { ...a, payoutStatus: 'Payé' as const, payoutDate: new Date().toISOString(), payoutId: newPayId } 
+            : a
+        );
+        syncAssignments(updatedAssignments);
+      }
+
+      syncPayments([newPay, ...payments]);
+
+      // 1. Record Cash Movement Expense in Dexie
+      try {
+        await db.expenses.put({
+          id: 'exp_artisan_' + newPay.id,
+          merchantId: merchant.id,
+          title: `Rémunération Artisan : ${selectedArtisan.name}`,
+          amount: Number(payAmount),
+          category: 'Rémunérations Artisans & Équipe',
+          date: new Date().toISOString(),
+          description: `Mode: ${payMethod} | Type: À la pièce | Mission: ${newPay.missionDescription} | Statut: PAYÉ${payNotes.trim() ? ` | Notes: ${payNotes.trim()}` : ''}`,
+          createdAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error('Error saving artisan expense to Dexie:', err);
+      }
+
+      // 2. Dispatch Manager Notifications (Suivi Gérant)
+      notifyManagerPayment({
+        paymentId: newPay.id,
+        artisan: selectedArtisan,
+        amount: Number(payAmount),
+        paymentMethod: payMethod,
+        typeLabel: 'Rémunération à la pièce (Mission Terminée)',
+        periodOrWork: newPay.missionDescription || 'Travail à la pièce',
+        notes: payNotes.trim()
+      });
+
+      setIsPaymentModalOpen(false);
+    } finally {
+      setIsSubmittingPayment(false);
     }
-
-    const newPay: ArtisanPayment = {
-      id: 'pay-' + Date.now(),
-      artisanId: payArtisanId,
-      artisanName: selectedArtisan.name,
-      amount: Number(payAmount),
-      paymentDate: new Date().toISOString().split('T')[0],
-      paymentMethod: payMethod,
-      notes: payNotes.trim() || undefined
-    };
-
-    syncPayments([newPay, ...payments]);
-    toast.success(`Paiement de ${Number(payAmount).toLocaleString('fr-FR')} ${currency} enregistré pour ${selectedArtisan.name}`);
-    setIsPaymentModalOpen(false);
   };
 
-  const handleDeletePayment = (id: string) => {
+  const handleDeletePayment = async (id: string) => {
     if (confirm('Supprimer ce versement d\'acompte ?')) {
       const updated = payments.filter(p => p.id !== id);
       syncPayments(updated);
-      toast.success('Versement annulé');
+      try {
+        await db.expenses.delete('exp_artisan_' + id);
+      } catch (err) {
+        console.error('Error removing artisan expense from Dexie:', err);
+      }
+      triggerAcomAlert('Versement Annulé', 'Versement annulé et supprimé des dépenses de caisse avec succès.', 'success', 'RÈGLEMENT ARTISAN');
     }
   };
 
@@ -734,53 +1101,117 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
     setIsSalaryModalOpen(true);
   };
 
-  const handleSaveSalaryPayment = (e: React.FormEvent) => {
+  const handleSaveSalaryPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paySalaryArtisanId) {
-      toast.error('Sélectionnez un artisan');
-      return;
-    }
-    if (paySalaryAmount <= 0) {
-      toast.error('Le montant de la rémunération doit être positif');
-      return;
-    }
 
-    const selectedArtisan = artisans.find(a => a.id === paySalaryArtisanId);
-    if (!selectedArtisan) {
-      toast.error('Artisan introuvable');
-      return;
-    }
+    if (isSubmittingPayment) return;
+    setIsSubmittingPayment(true);
 
-    const formattedPeriod = formatMonthFrench(paySalaryMonth, selectedArtisan.remunerationType);
-
-    const alreadyPaid = salaryPayments.find(p => p.artisanId === paySalaryArtisanId && p.month === paySalaryMonth);
-    if (alreadyPaid) {
-      if (!confirm(`Un règlement a déjà été enregistré pour ${selectedArtisan.name} pour la période : ${formattedPeriod}. Voulez-vous tout de même enregistrer un versement supplémentaire ?`)) {
+    try {
+      if (!paySalaryArtisanId) {
+        toast.error('Sélectionnez un artisan');
+        setIsSubmittingPayment(false);
         return;
       }
+      if (paySalaryAmount <= 0) {
+        toast.error('Le montant de la rémunération doit être positif');
+        setIsSubmittingPayment(false);
+        return;
+      }
+
+      const selectedArtisan = artisans.find(a => a.id === paySalaryArtisanId);
+      if (!selectedArtisan) {
+        toast.error('Artisan introuvable');
+        setIsSubmittingPayment(false);
+        return;
+      }
+
+      const remType = selectedArtisan.remunerationType || 'Mensuel';
+      let periodKey = paySalaryMonth;
+      if (remType === 'Hebdomadaire') {
+        periodKey = paySalaryMonth.includes('-W') ? paySalaryMonth : getISOWeekKey(paySalaryMonth);
+      } else if (remType === 'Mensuel' || remType === 'Salarié') {
+        periodKey = paySalaryMonth.substring(0, 7);
+      }
+
+      const formattedPeriod = formatMonthFrench(periodKey, remType);
+
+      // STRICT DOUBLE PAYMENT CHECK
+      if (isSalaryPeriodPaid(paySalaryArtisanId, remType, periodKey, salaryPayments)) {
+        triggerAcomAlert(
+          'Double Paiement Bloqué 🛑',
+          `Un paiement a déjà été effectué pour ${selectedArtisan.name} pour la période (${formattedPeriod}). Aucun second paiement n'est autorisé pour cette même période (Statut PAYÉ).`,
+          'error',
+          'SÉCURISATION'
+        );
+        toast.error(`Paiement refusé : La période (${formattedPeriod}) est déjà réglée (PAYÉ).`);
+        setIsSubmittingPayment(false);
+        return;
+      }
+
+      const newSalaryPayId = 'sal-pay-' + Date.now();
+      const newSalaryPay: SalaryPayment = {
+        id: newSalaryPayId,
+        artisanId: paySalaryArtisanId,
+        artisanName: selectedArtisan.name,
+        amount: Number(paySalaryAmount),
+        month: periodKey,
+        remunerationType: remType,
+        periodLabel: formattedPeriod,
+        paymentDate: new Date().toISOString().split('T')[0],
+        timestamp: new Date().toISOString(),
+        paymentMethod: paySalaryMethod,
+        status: 'PAYÉ',
+        notes: paySalaryNotes.trim() || undefined
+      };
+
+      syncSalaryPayments([newSalaryPay, ...salaryPayments]);
+
+      const remLabel = getProfilePaymentLabel(remType);
+
+      // 1. Record Cash Movement Expense in Dexie
+      try {
+        await db.expenses.put({
+          id: 'exp_artisan_' + newSalaryPay.id,
+          merchantId: merchant.id,
+          title: `Rémunération Artisan : ${selectedArtisan.name}`,
+          amount: Number(paySalaryAmount),
+          category: 'Rémunérations Artisans & Équipe',
+          date: new Date().toISOString(),
+          description: `Mode: ${paySalaryMethod} | Type: ${remLabel} | Période: ${formattedPeriod} | Statut: PAYÉ${paySalaryNotes.trim() ? ` | Notes: ${paySalaryNotes.trim()}` : ''}`,
+          createdAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error('Error saving salary expense to Dexie:', err);
+      }
+
+      // 2. Dispatch Manager Notifications (Suivi Gérant)
+      notifyManagerPayment({
+        paymentId: newSalaryPay.id,
+        artisan: selectedArtisan,
+        amount: Number(paySalaryAmount),
+        paymentMethod: paySalaryMethod,
+        typeLabel: remLabel,
+        periodOrWork: formattedPeriod,
+        notes: paySalaryNotes.trim()
+      });
+
+      setIsSalaryModalOpen(false);
+    } finally {
+      setIsSubmittingPayment(false);
     }
-
-    const newSalaryPay: SalaryPayment = {
-      id: 'sal-pay-' + Date.now(),
-      artisanId: paySalaryArtisanId,
-      artisanName: selectedArtisan.name,
-      amount: Number(paySalaryAmount),
-      month: paySalaryMonth,
-      paymentDate: new Date().toISOString().split('T')[0],
-      paymentMethod: paySalaryMethod,
-      notes: paySalaryNotes.trim() || undefined
-    };
-
-    syncSalaryPayments([newSalaryPay, ...salaryPayments]);
-    toast.success(`Règlement de ${Number(paySalaryAmount).toLocaleString('fr-FR')} ${currency} enregistré pour ${selectedArtisan.name} (${formattedPeriod})`);
-    setIsSalaryModalOpen(false);
   };
 
-  const handleDeleteSalaryPayment = (id: string) => {
+  const handleDeleteSalaryPayment = async (id: string) => {
     if (confirm('Supprimer ce règlement de salaire ?')) {
       const updated = salaryPayments.filter(p => p.id !== id);
       syncSalaryPayments(updated);
-      toast.success('Règlement de salaire supprimé');
+      try {
+        await db.expenses.delete('exp_artisan_' + id);
+      } catch (err) {
+        console.error('Error removing salary expense from Dexie:', err);
+      }
+      triggerAcomAlert('Règlement Annulé', 'Règlement de salaire supprimé et annulé de la caisse avec succès.', 'success', 'PAIE MENSUELLE');
     }
   };
 
@@ -1004,7 +1435,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
 
       await html2pdfLib().from(container).set(opt).save();
       document.body.removeChild(container);
-      toast.success("Bulletin de paie téléchargé en PDF !", { id: toastId });
+      triggerAcomAlert('Bulletin Téléchargé', 'Bulletin de paie téléchargé en PDF avec succès !', 'success', 'IMPRESSION');
     } catch (error) {
       console.error("Error generating PDF:", error);
       // Remove container if it was appended but failed during generation
@@ -2569,7 +3000,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
               <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-emerald-50/50">
                 <h4 className="font-bold text-gray-900 text-sm flex items-center gap-1.5">
                   <Wallet className="w-5 h-5 text-emerald-600" />
-                  Régler un Artisan (Acompte / Solde)
+                  Régler un Artisan (Rémunération à la pièce)
                 </h4>
                 <button
                   onClick={() => setIsPaymentModalOpen(false)}
@@ -2584,7 +3015,20 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                   <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Artisan destinataire</label>
                   <select
                     value={payArtisanId}
-                    onChange={(e) => setPayArtisanId(e.target.value)}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setPayArtisanId(id);
+                      const unpaidTasks = assignments.filter(a => a.artisanId === id && a.status === 'Terminé' && !isTaskPaid(a.id, assignments, payments));
+                      if (unpaidTasks.length > 0) {
+                        setSelectedTaskIdForPay(unpaidTasks[0].id);
+                        setPayAmount(unpaidTasks[0].pieceRateAmount);
+                        setPayNotes(`Règlement mission : ${unpaidTasks[0].taskDescription}`);
+                      } else {
+                        setSelectedTaskIdForPay(null);
+                        setPayAmount(0);
+                        setPayNotes('');
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
                   >
                     <option value="">Sélectionner l'artisan...</option>
@@ -2596,6 +3040,49 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                     })}
                   </select>
                 </div>
+
+                {payArtisanId && (() => {
+                  const availableUnpaidTasks = assignments.filter(a => a.artisanId === payArtisanId && a.status === 'Terminé' && !isTaskPaid(a.id, assignments, payments));
+
+                  if (availableUnpaidTasks.length === 0) {
+                    return (
+                      <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs font-semibold text-amber-900 space-y-1.5">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                          <span>Aucune mission terminée en attente de règlement</span>
+                        </div>
+                        <p className="text-[11px] text-amber-700 font-normal">
+                          Cet artisan n'a aucune mission avec le statut « Terminé » non payée. Pour effectuer un nouveau versement, assignez une mission et validez son statut à « Terminé ».
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Mission terminée à régler (*)</label>
+                      <select
+                        value={selectedTaskIdForPay || ''}
+                        onChange={(e) => {
+                          const taskId = e.target.value;
+                          setSelectedTaskIdForPay(taskId);
+                          const t = assignments.find(a => a.id === taskId);
+                          if (t) {
+                            setPayAmount(t.pieceRateAmount);
+                            setPayNotes(`Règlement mission : ${t.taskDescription} (${t.orderClientName})`);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                      >
+                        {availableUnpaidTasks.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.taskDescription} — Client: {t.orderClientName} ({t.pieceRateAmount.toLocaleString('fr-FR')} F)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })()}
 
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Montant versé ({currency})</label>
@@ -2630,7 +3117,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                     type="text"
                     value={payNotes}
                     onChange={(e) => setPayNotes(e.target.value)}
-                    placeholder="Ex: Avance sur robe d'apparat du 24/06"
+                    placeholder="Ex: Règlement mission robe d'apparat"
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all font-semibold"
                   />
                 </div>
@@ -2645,7 +3132,12 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1"
+                    disabled={isSubmittingPayment || (payArtisanId ? assignments.filter(a => a.artisanId === payArtisanId && a.status === 'Terminé' && !isTaskPaid(a.id, assignments, payments)).length === 0 : false)}
+                    className={`px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1 ${
+                      (payArtisanId && assignments.filter(a => a.artisanId === payArtisanId && a.status === 'Terminé' && !isTaskPaid(a.id, assignments, payments)).length === 0) || isSubmittingPayment
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                    }`}
                   >
                     <Check className="w-4 h-4" /> Confirmer le paiement
                   </button>
@@ -2709,38 +3201,57 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      {(() => {
-                        const art = artisans.find(a => a.id === paySalaryArtisanId);
-                        return getPeriodLabel(art?.remunerationType);
-                      })()}
-                    </label>
-                    <input
-                      type={(() => {
-                        const art = artisans.find(a => a.id === paySalaryArtisanId);
-                        return getPeriodInputType(art?.remunerationType);
-                      })()}
-                      required
-                      value={paySalaryMonth}
-                      onChange={(e) => setPaySalaryMonth(e.target.value)}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
-                    />
-                  </div>
+                {paySalaryArtisanId && (() => {
+                  const art = artisans.find(a => a.id === paySalaryArtisanId);
+                  const remType = art?.remunerationType || 'Mensuel';
+                  let pKey = paySalaryMonth;
+                  if (remType === 'Hebdomadaire') {
+                    pKey = paySalaryMonth.includes('-W') ? paySalaryMonth : getISOWeekKey(paySalaryMonth);
+                  } else if (remType === 'Mensuel' || remType === 'Salarié') {
+                    pKey = paySalaryMonth.substring(0, 7);
+                  }
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Montant versé ({currency})</label>
-                    <input
-                      type="number"
-                      required
-                      value={paySalaryAmount}
-                      onChange={(e) => setPaySalaryAmount(Number(e.target.value))}
-                      placeholder="Ex: 150000"
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all font-semibold"
-                    />
-                  </div>
-                </div>
+                  const isPaid = isSalaryPeriodPaid(paySalaryArtisanId, remType, pKey, salaryPayments);
+                  const label = formatMonthFrench(pKey, remType);
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                            {getPeriodLabel(remType)}
+                          </label>
+                          <input
+                            type={getPeriodInputType(remType)}
+                            required
+                            value={paySalaryMonth}
+                            onChange={(e) => setPaySalaryMonth(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Montant versé ({currency})</label>
+                          <input
+                            type="number"
+                            required
+                            value={paySalaryAmount}
+                            onChange={(e) => setPaySalaryAmount(Number(e.target.value))}
+                            placeholder="Ex: 150000"
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      {isPaid && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-bold text-rose-800 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                          <span>🛑 Rémunération déjà réglée pour ({label}). Aucun double paiement n'est autorisé.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Moyen de transaction</label>
@@ -2763,7 +3274,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                     type="text"
                     value={paySalaryNotes}
                     onChange={(e) => setPaySalaryNotes(e.target.value)}
-                    placeholder="Ex: Salaire complet de Juin 2026"
+                    placeholder="Ex: Salaire complet"
                     className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 focus:bg-white transition-all font-semibold"
                   />
                 </div>
@@ -2776,12 +3287,31 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                   >
                     Annuler
                   </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer flex items-center gap-1"
-                  >
-                    <Check className="w-4 h-4" /> Confirmer le règlement
-                  </button>
+                  {(() => {
+                    const art = artisans.find(a => a.id === paySalaryArtisanId);
+                    const remType = art?.remunerationType || 'Mensuel';
+                    let pKey = paySalaryMonth;
+                    if (remType === 'Hebdomadaire') {
+                      pKey = paySalaryMonth.includes('-W') ? paySalaryMonth : getISOWeekKey(paySalaryMonth);
+                    } else if (remType === 'Mensuel' || remType === 'Salarié') {
+                      pKey = paySalaryMonth.substring(0, 7);
+                    }
+                    const isPaid = isSalaryPeriodPaid(paySalaryArtisanId, remType, pKey, salaryPayments);
+
+                    return (
+                      <button
+                        type="submit"
+                        disabled={isPaid || isSubmittingPayment}
+                        className={`px-5 py-2 rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1 ${
+                          isPaid || isSubmittingPayment
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-violet-600 hover:bg-violet-700 text-white cursor-pointer'
+                        }`}
+                      >
+                        {isPaid ? '✓ Période déjà réglée (PAYÉ)' : <><Check className="w-4 h-4" /> Confirmer le règlement</>}
+                      </button>
+                    );
+                  })()}
                 </div>
               </form>
             </motion.div>

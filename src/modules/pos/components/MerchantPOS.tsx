@@ -697,7 +697,6 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 setEmailSendStatus('simulated');
               } else if (data.success) {
                 setEmailSendStatus('success');
-                triggerAcomAlert('Notification Gérant', "Ce mail envoyé en arrière-plan avec succès !", 'success', "ENVOI D'E-MAIL");
               } else {
                 setEmailSendStatus('error');
                 setEmailSendError(data.error || "Erreur de transmission");
@@ -725,7 +724,17 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
-      triggerAcomAlert('Succès', 'Vente enregistrée !', 'success', 'SYSTÈME');
+      
+      if (whatsappUrl) {
+        window.open(whatsappUrl, '_blank');
+      }
+
+      triggerAcomAlert(
+        'Vente Validée — E-mail & WhatsApp',
+        `L'encaissement (${total.toLocaleString()} ${merchant.currency}) a été validé avec succès et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.`,
+        'success',
+        'VENTE'
+      );
     } catch (error) {
       console.error('Checkout error:', error);
       triggerAcomAlert('Erreur', 'Erreur lors de la vente', 'error', 'ALERTE');

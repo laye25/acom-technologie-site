@@ -29,6 +29,9 @@ import {
   TailorActionButton,
   TailorDeleteConfirmModal
 } from './design-system/TailorDesignSystem';
+import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
+import { showMailSuccessToast } from '../../../components/MailSuccessToast';
+import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 
 export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -356,7 +359,225 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
         notes: prep.sewingSpecs.defaultDescription,
         status: prep.canBypassMeasurementStep ? 'coupe' : 'mesures'
       });
-      toast.success(`Modèle sélectionné : "${prep.garment.name}". Profil de mesures & recommandations mis à jour.`);
+      triggerAcomAlert('Modèle Sélectionné', `Modèle sélectionné : "${prep.garment.name}". Profil de mesures & recommandations mis à jour.`, 'success', 'COMMANDES');
+    }
+  };
+
+  const notifyManagerOrderSaved = async (orderData: any) => {
+    const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+    const managerEmail = merchant.managerNotifications?.email || '';
+
+    // 1. WhatsApp Channel
+    if (managerPhone && managerPhone.trim()) {
+      const waMessage = `✂️ [SUIVI GÉRANT] NOUVELLE COMMANDE COUTURE ✂️\n\n` +
+        `Atelier : ${merchant.name || 'Atelier de Couture'}\n` +
+        `N° Commande : ${orderData.tracking_id || orderData.id || 'N/A'}\n` +
+        `Client : ${orderData.clientName || 'Client'}\n` +
+        `Modèle : ${orderData.model || 'Sur-mesure'}\n` +
+        `Montant Total : ${Number(orderData.price || 0).toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Acompte Versé : ${Number(orderData.advance || 0).toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Reste à Payer : ${Math.max(0, Number(orderData.price || 0) - Number(orderData.advance || 0)).toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Livraison prévue : ${orderData.deliveryDate ? format(new Date(orderData.deliveryDate), 'dd/MM/yyyy') : 'Non spécifiée'}\n` +
+        `Date : ${format(new Date(), 'dd/MM/yyyy HH:mm')}\n\n` +
+        `Une nouvelle commande couture a été enregistrée avec succès dans votre atelier. 🧵✨`;
+
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '221' + cleaned;
+      }
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(waMessage)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    // 2. E-mail Channel
+    if (managerEmail && managerEmail.trim()) {
+      try {
+        const mailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+            <div style="background-color: #0f172a; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+              <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Atelier de Couture'}</h2>
+              <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Suivi d'Activité Gérant en Temps Réel</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <h3 style="color: #0f172a; border-bottom: 2px solid #0f172a; padding-bottom: 5px; margin-bottom: 15px;">✂️ Nouvelle Commande Couture Enregistrée</h3>
+              
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 150px;"><strong>N° Commande :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${orderData.tracking_id || orderData.id || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Client :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${orderData.clientName || 'Client'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Modèle / Description :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${orderData.model || 'Sur-mesure'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Montant Total :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0d9488;">${Number(orderData.price || 0).toLocaleString()} ${merchant.currency || 'FCFA'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Acompte Versé :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #16a34a;">${Number(orderData.advance || 0).toLocaleString()} ${merchant.currency || 'FCFA'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Reste à Payer :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #dc2626;">${Math.max(0, Number(orderData.price || 0) - Number(orderData.advance || 0)).toLocaleString()} ${merchant.currency || 'FCFA'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Livraison prévue :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${orderData.deliveryDate ? format(new Date(orderData.deliveryDate), 'dd/MM/yyyy') : 'Non spécifiée'}</td>
+                </tr>
+                ${orderData.notes ? `
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Notes :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-style: italic;">"${orderData.notes}"</td>
+                </tr>
+                ` : ''}
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;"><strong>Date de création :</strong></td>
+                  <td style="padding: 8px 0;">${format(new Date(), 'dd/MM/yyyy HH:mm')}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+              Ce rapport automatique a été envoyé en arrière-plan sans action requise de l'opérateur.<br/>
+              <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
+            </div>
+          </div>
+        `;
+
+        const response = await sendEmailDirectlyOrViaBackend({
+          to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
+          subject: `✂️ [NOUVEAU SUIVI] Commande Couture ${orderData.tracking_id || orderData.id || ''} (${orderData.clientName || ''}) - ${merchant.name || 'Atelier'}`,
+          html: mailHtml
+        }, {
+          resendApiKey: merchant.managerNotifications?.resendApiKey,
+          defaultFrom: merchant.managerNotifications?.emailFrom
+        });
+
+        const resData = await response.json().catch(() => null);
+        if (response.ok && resData?.success !== false) {
+          // Background email sent successfully
+        }
+      } catch (err) {
+        console.error("Erreur d'envoi de l'email gérant :", err);
+      }
+    }
+  };
+
+  const notifyManagerPaymentReceived = async (params: {
+    order: any;
+    amountCollected: number;
+    oldRest: number;
+    newRest: number;
+    newAdvance: number;
+    price: number;
+  }) => {
+    const { order, amountCollected, oldRest, newRest, newAdvance, price } = params;
+    const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+    const managerEmail = merchant.managerNotifications?.email || '';
+
+    // 1. WhatsApp Channel
+    if (managerPhone && managerPhone.trim()) {
+      const waMessage = `💵 [SUIVI GÉRANT] ENCAISSEMENT RÈGLEMENT COUTURE 💵\n\n` +
+        `Atelier : ${merchant.name || 'Atelier de Couture'}\n` +
+        `N° Commande : ${order.tracking_id || order.id || 'N/A'}\n` +
+        `Client : ${order.clientName || 'Client'}\n` +
+        `Modèle : ${order.model || 'Sur-mesure'}\n` +
+        `Montant Encaissé : ${amountCollected.toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Ancien Reste à Payer : ${oldRest.toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Nouveau Reste à Payer : ${newRest.toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Total Commande : ${price.toLocaleString()} ${merchant.currency || 'FCFA'}\n` +
+        `Date/Heure : ${format(new Date(), 'dd/MM/yyyy HH:mm')}\n\n` +
+        `Règlement encaissé et solde mis à jour avec succès. 🧵✨`;
+
+      let cleaned = managerPhone.replace(/[^0-9]/g, '');
+      if (cleaned.length === 9 && cleaned.startsWith('7')) {
+        cleaned = '221' + cleaned;
+      }
+      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(waMessage)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    // 2. E-mail Channel
+    if (managerEmail && managerEmail.trim()) {
+      try {
+        const mailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
+            <div style="background-color: #0f172a; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+              <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Atelier de Couture'}</h2>
+              <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Suivi d'Activité Gérant en Temps Réel</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <h3 style="color: #0f172a; border-bottom: 2px solid #0f172a; padding-bottom: 5px; margin-bottom: 15px;">💵 Encaissement / Règlement de Solde Reçu</h3>
+              
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 160px;"><strong>N° Commande :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${order.tracking_id || order.id || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Client :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${order.clientName || 'Client'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Modèle / Description :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${order.model || 'Sur-mesure'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Montant Encaissé :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #16a34a; font-size: 14px;">+${amountCollected.toLocaleString()} ${merchant.currency || 'FCFA'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Ancien Reste à Payer :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; text-decoration: line-through; color: #64748b;">${oldRest.toLocaleString()} ${merchant.currency || 'FCFA'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Nouveau Reste à Payer :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: ${newRest === 0 ? '#16a34a' : '#dc2626'};">${newRest.toLocaleString()} ${merchant.currency || 'FCFA'} ${newRest === 0 ? '(SOLDÉE TOTALE ✓)' : ''}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Prix Total Commande :</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${price.toLocaleString()} ${merchant.currency || 'FCFA'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; color: #64748b;"><strong>Date / Heure Encaissement :</strong></td>
+                  <td style="padding: 8px 0;">${format(new Date(), 'dd/MM/yyyy HH:mm')}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+              Ce rapport automatique a été envoyé en arrière-plan sans action requise de l'opérateur.<br/>
+              <strong>Système de Suivi SaaS ${merchant.name || 'ACOM'}</strong>.
+            </div>
+          </div>
+        `;
+
+        const response = await sendEmailDirectlyOrViaBackend({
+          to: managerEmail,
+          from: merchant.managerNotifications?.emailFrom || undefined,
+          subject: `💵 [ENCAISSEMENT] Règlement de ${amountCollected.toLocaleString()} ${merchant.currency || 'FCFA'} - Commande ${order.tracking_id || order.id || ''} (${order.clientName || ''})`,
+          html: mailHtml
+        }, {
+          resendApiKey: merchant.managerNotifications?.resendApiKey,
+          defaultFrom: merchant.managerNotifications?.emailFrom
+        });
+
+        const resData = await response.json().catch(() => null);
+        if (response.ok && resData?.success !== false) {
+          // Background email sent successfully
+        }
+      } catch (err) {
+        console.error("Erreur d'envoi de l'email gérant :", err);
+      }
     }
   };
 
@@ -417,7 +638,15 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       toast.error(`Avertissement : La commande est sauvegardée localement mais la synchronisation Cloud a échoué (${errDetail}).`);
     }
 
-    toast.success('Commande enregistrée et synchronisée avec la fiche client ! 🧵✨');
+    triggerAcomAlert(
+      'Commande Validée — E-mail & WhatsApp',
+      'La commande couture a été enregistrée avec succès et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+      'success',
+      'RÉCEPTION'
+    );
+
+    // Notification Gérant en Temps Réel (WhatsApp & E-mail)
+    notifyManagerOrderSaved(savedOrder);
 
     // Rechargement des listes locales
     const savedOrders = localStorage.getItem(`tailleur_orders_${merchant.id}`);
@@ -454,7 +683,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
     const updated = orders.map(o => o.id === id ? { ...o, status: nextStatus, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
     saveOrders(updated);
-    toast.success('Statut de la commande modifié');
+    triggerAcomAlert('Statut Modifié', 'Statut de la commande modifié avec succès.', 'success', 'COMMANDES');
     triggerSync();
   };
 
@@ -466,7 +695,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     const rest = Math.max(0, price - advance);
     
     if (rest <= 0) {
-      toast.success('Cette commande est déjà totalement soldée.');
+      triggerAcomAlert('Commande Soldée', 'Cette commande est déjà totalement soldée.', 'info', 'ENCAISSEMENT');
       return;
     }
     
@@ -485,8 +714,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     }
     
     const price = Number(encaisserOrder.price || 0);
-    const advance = Number(encaisserOrder.advance || 0);
-    const newAdvance = Math.min(price, advance + amount);
+    const oldAdvance = Number(encaisserOrder.advance || 0);
+    const oldRest = Math.max(0, price - oldAdvance);
+    const newAdvance = Math.min(price, oldAdvance + amount);
+    const newRest = Math.max(0, price - newAdvance);
     
     const updated = orders.map(o => 
       o.id === encaisserOrder.id 
@@ -494,8 +725,24 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
         : o
     );
     saveOrders(updated);
-    toast.success(`Paiement de ${amount.toLocaleString()} ${merchant.currency} enregistré avec succès`);
+    triggerAcomAlert(
+      'Règlement Validé — E-mail & WhatsApp',
+      'Le règlement a été validé avec succès et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+      'success',
+      'RÈGLEMENT'
+    );
     triggerSync();
+
+    // Notification Gérant en Temps Réel lors de l'encaissement du solde
+    notifyManagerPaymentReceived({
+      order: encaisserOrder,
+      amountCollected: amount,
+      oldRest,
+      newRest,
+      newAdvance,
+      price
+    });
+
     setIsEncaisserModalOpen(false);
     setEncaisserOrder(null);
     setEncaisserAmount('');
@@ -520,7 +767,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           updatedOrders = orders.filter(o => o.id !== id);
         }
         saveOrders(updatedOrders);
-        toast.success(`Commande CMD-${id.slice(0, 5).toUpperCase()} (${target.clientName || ''}) supprimée avec succès !`);
+        triggerAcomAlert('Commande Supprimée', `Commande CMD-${id.slice(0, 5).toUpperCase()} (${target.clientName || ''}) supprimée avec succès !`, 'success', 'COMMANDES');
         await triggerSync();
       }
     } catch (e) {
@@ -570,7 +817,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Registre des commandes exporté avec succès (Excel CSV)");
+      triggerAcomAlert('Export Réussi', 'Registre des commandes exporté avec succès (Excel CSV)', 'success', 'EXPORT');
     } catch (error) {
       console.error(error);
       toast.error("Échec de l'export Excel CSV");
@@ -1080,7 +1327,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               newDate.setDate(newDate.getDate() + 7);
               const updated = orders.map(o => o.id === order.id ? { ...o, deliveryDate: newDate.toISOString().split('T')[0], isUrgent: false, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
               saveOrders(updated);
-              toast.success("Livraison repoussée de 7 jours (Planifié plus tard)");
+              triggerAcomAlert('Planning Mis à Jour', 'Livraison repoussée de 7 jours (Planifié plus tard)', 'success', 'PLANNING');
               triggerSync();
             }}
             className="w-full text-[9px] bg-slate-50 hover:bg-slate-100 text-slate-700 font-extrabold py-1 px-2 rounded-xl border border-slate-200 cursor-pointer flex items-center justify-center gap-1 mt-2 transition"
@@ -1096,7 +1343,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               newDate.setDate(newDate.getDate() + 2);
               const updated = orders.map(o => o.id === order.id ? { ...o, deliveryDate: newDate.toISOString().split('T')[0], isLater: false, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
               saveOrders(updated);
-              toast.success("Livraison avancée à cette semaine !");
+              triggerAcomAlert('Planning Mis à Jour', 'Livraison avancée à cette semaine !', 'success', 'PLANNING');
               triggerSync();
             }}
             className="w-full text-[9px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold py-1 px-2 rounded-xl border border-indigo-100 cursor-pointer flex items-center justify-center gap-1 mt-2 transition"
@@ -1110,7 +1357,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
             onClick={() => {
               const updated = orders.map(o => o.id === order.id ? { ...o, isUrgent: !o.isUrgent, isLater: !o.isUrgent ? false : o.isLater, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
               saveOrders(updated);
-              toast.success(order.isUrgent ? "Urgence retirée." : "Commande marquée comme URGENTE ! 🚨");
+              triggerAcomAlert('Priorité Modifiée', order.isUrgent ? 'Urgence retirée.' : 'Commande marquée comme URGENTE ! 🚨', 'success', 'PRIORITÉ');
               triggerSync();
             }}
             className={`p-1.5 border rounded-lg hover:scale-105 transition-all cursor-pointer ${
@@ -1124,7 +1371,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
             onClick={() => {
               const updated = orders.map(o => o.id === order.id ? { ...o, isLater: !o.isLater, isUrgent: !o.isLater ? false : o.isUrgent, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
               saveOrders(updated);
-              toast.success(order.isLater ? "Ne plus planifier plus tard." : "Commande planifiée pour plus tard. 🕒");
+              triggerAcomAlert('Planning Modifié', order.isLater ? 'Ne plus planifier plus tard.' : 'Commande planifiée pour plus tard. 🕒', 'success', 'PLANNING');
               triggerSync();
             }}
             className={`p-1.5 border rounded-lg hover:scale-105 transition-all cursor-pointer ${
@@ -1615,7 +1862,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                                 selectedTissuId: fab.id,
                                 tissuLengthUsed: preparedContext.sewingSpecs.recommendedFabricMeters
                               });
-                              toast.success(`Tissu ${fab.name} (${fab.color || ''}) sélectionné (${preparedContext.sewingSpecs.recommendedFabricMeters}m)`);
+                              triggerAcomAlert('Tissu Sélectionné', `Tissu ${fab.name} (${fab.color || ''}) sélectionné (${preparedContext.sewingSpecs.recommendedFabricMeters}m)`, 'success', 'TISSUS');
                             }}
                             className={`p-2.5 rounded-xl text-xs font-bold transition flex items-center justify-between gap-2 text-left cursor-pointer border ${
                               isSelected 
@@ -1749,7 +1996,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                                   ...currentOrder,
                                   selectedMercerieItems: [...current, { mercerieId: item.id, quantityUsed: recommendedQty || 1 }]
                                 });
-                                toast.success(`Article mercerie "${item.name}" ajouté à la commande`);
+                                triggerAcomAlert('Mercerie Ajoutée', `Article mercerie "${item.name}" ajouté à la commande`, 'success', 'MERCERIE');
                               }
                             }}
                             className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-800 rounded-lg text-xs font-bold border border-slate-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -2192,7 +2439,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                         onClick={() => {
                           const updated = orders.map(o => o.id === order.id ? { ...o, isUrgent: !o.isUrgent, isLater: !o.isUrgent ? false : o.isLater, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
                           saveOrders(updated);
-                          toast.success(order.isUrgent ? "Urgence retirée." : "Commande marquée comme URGENTE ! 🚨");
+                          triggerAcomAlert('Priorité Modifiée', order.isUrgent ? 'Urgence retirée.' : 'Commande marquée comme URGENTE ! 🚨', 'success', 'PRIORITÉ');
                           triggerSync();
                         }}
                         className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shrink-0 border ${
@@ -2208,7 +2455,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                         onClick={() => {
                           const updated = orders.map(o => o.id === order.id ? { ...o, isLater: !o.isLater, isUrgent: !o.isLater ? false : o.isUrgent, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
                           saveOrders(updated);
-                          toast.success(order.isLater ? "Retiré des planifiés plus tard." : "Commande planifiée pour plus tard. 🕒");
+                          triggerAcomAlert('Planning Modifié', order.isLater ? 'Retiré des planifiés plus tard.' : 'Commande planifiée pour plus tard. 🕒', 'success', 'PLANNING');
                           triggerSync();
                         }}
                         className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shrink-0 border ${
@@ -2517,7 +2764,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     const cleanPhone = whatsappClientPhone.replace(/[^0-9]/g, '');
                     window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(whatsappMessage)}`, '_blank');
                     setIsWhatsappModalOpen(false);
-                    toast.success('Conversation de suivi ouverte !');
+                    triggerAcomAlert('WhatsApp Ouvert', 'Conversation de suivi ouverte sur WhatsApp !', 'success', 'SUIVI CLIENT');
                   }}
                   className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                 >

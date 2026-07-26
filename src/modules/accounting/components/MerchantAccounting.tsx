@@ -9,6 +9,7 @@ import { dbService } from '../../../services/dbService';
 import { Merchant } from '../../../types';
 import { SchoolAccountingSaaS } from '../../../components/admin/SchoolAccountingSaaS';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
 
 interface AccountingOutflow {
   id: string;
@@ -16,11 +17,36 @@ interface AccountingOutflow {
   category: string;
   date: string;
   amount: number;
+  paymentMethod?: string;
+  reference?: string;
   description?: string;
   source: 'general' | 'delivery' | 'maintenance';
   syncStatus?: string;
   sortKey: number;
 }
+
+const EXPENSE_CATEGORIES = [
+  'Loyer',
+  'Électricité',
+  'Eau',
+  'Internet & Télécommunications',
+  'Transport & Livraison',
+  'Entretien & Réparations',
+  'Machines & Équipements',
+  'Fournitures administratives',
+  'Marketing & Communication',
+  'Taxes & Frais administratifs',
+  'Prestations externes',
+  'Autres dépenses'
+];
+
+const PAYMENT_METHODS = [
+  { id: 'espèces', label: '💵 Espèces (Caisse physique)', shortLabel: 'Espèces' },
+  { id: 'mobile_money', label: '📱 Mobile Money (Wave / Orange Money / Free)', shortLabel: 'Mobile Money' },
+  { id: 'carte', label: '💳 Carte bancaire', shortLabel: 'Carte bancaire' },
+  { id: 'virement', label: '🏦 Virement bancaire', shortLabel: 'Virement' },
+  { id: 'cheque', label: '📄 Chèque bancaire', shortLabel: 'Chèque' }
+];
 
 const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?: string }) => {
   if (merchant.type === 'scolaire') {
@@ -29,7 +55,14 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
 
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [expenseDate, setExpenseDate] = useState(() => format(new Date(), 'yyyy-MM-dd'));
-  const [newExpense, setNewExpense] = useState({ title: '', amount: 0, category: 'Général', description: '' });
+  const [newExpense, setNewExpense] = useState({
+    title: '',
+    amount: 0,
+    category: 'Loyer',
+    paymentMethod: 'espèces',
+    reference: '',
+    description: ''
+  });
   const [saving, setSaving] = useState(false);
   const [expenseLimit, setExpenseLimit] = useState(10);
   const [filterSource, setFilterSource] = useState('all');
@@ -102,9 +135,11 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       list.push({
         id: exp.id,
         title: exp.title,
-        category: exp.category || 'Général',
+        category: exp.category || 'Autres dépenses',
         date: dateStr,
         amount: exp.amount || 0,
+        paymentMethod: exp.paymentMethod || 'espèces',
+        reference: exp.reference,
         description: exp.description,
         source: 'general',
         syncStatus: (exp as any).syncStatus,
@@ -200,21 +235,202 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExpense.title || !newExpense.amount) return;
+
+    // 1. Validation désignation
+    if (!newExpense.title || !newExpense.title.trim()) {
+      triggerAcomAlert(
+        'Champ Requis',
+        'Veuillez renseigner un titre ou une désignation précise pour la dépense.',
+        'warning',
+        'VALIDATION'
+      );
+      return;
+    }
+
+    // 2. Validation montant
+    if (!newExpense.amount || Number(newExpense.amount) <= 0) {
+      triggerAcomAlert(
+        'Montant Invalide',
+        'Veuillez saisir un montant supérieur à zéro.',
+        'warning',
+        'VALIDATION'
+      );
+      return;
+    }
+
+    // 3. Règle obligatoire pour "Autres dépenses"
+    if (newExpense.category === 'Autres dépenses' && (!newExpense.description || !newExpense.description.trim())) {
+      triggerAcomAlert(
+        'Justification Requise',
+        'Pour la catégorie "Autres dépenses", une désignation précise et une justification détaillée sont obligatoires.',
+        'warning',
+        'VALIDATION'
+      );
+      return;
+    }
+
     setSaving(true);
     try {
-      await dbService.merchantExpenses.save({
-        ...newExpense,
+      const savedDateIso = expenseDate ? new Date(expenseDate).toISOString() : new Date().toISOString();
+      
+      const expenseData = {
         merchantId: merchant.id,
-        date: expenseDate ? new Date(expenseDate).toISOString() : new Date().toISOString()
-      });
+        title: newExpense.title.trim(),
+        amount: Number(newExpense.amount),
+        category: newExpense.category || 'Autres dépenses',
+        paymentMethod: newExpense.paymentMethod || 'espèces',
+        reference: newExpense.reference?.trim() || undefined,
+        description: newExpense.description?.trim() || undefined,
+        date: savedDateIso,
+        createdAt: savedDateIso
+      };
+
+      await dbService.merchantExpenses.save(expenseData);
       syncService.syncExpenses(merchant.id);
       setIsAddingExpense(false);
-      setNewExpense({ title: '', amount: 0, category: 'Général', description: '' });
+
+      // --- SUIVI GÉRANT (TEMPS RÉEL) ---
+      const managerEmail = merchant.managerNotifications?.email || merchant.email || '';
+      const managerPhone = merchant.managerNotifications?.whatsappPhone || merchant.phone || '';
+      const currency = merchant.currency || 'FCFA';
+      const operatorName = merchant.name || 'Utilisateur Atelier';
+
+      const pmObj = PAYMENT_METHODS.find(p => p.id === newExpense.paymentMethod) || PAYMENT_METHODS[0];
+      const pmLabel = pmObj.label;
+      const isCash = newExpense.paymentMethod === 'espèces';
+
+      let emailSent = false;
+      let whatsappOpened = false;
+
+      // 1. Send Email Notification
+      if (managerEmail && managerEmail.trim()) {
+        const emailHtml = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+            <div style="background-color: #ef4444; padding: 20px; border-radius: 12px; text-align: center; color: #ffffff; margin-bottom: 20px;">
+              <h2 style="margin: 0; font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+                💸 SUIVI GÉRANT — NOUVELLE DÉPENSE
+              </h2>
+              <p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.9;">
+                SaaS Comptabilité & Gestion — ${merchant.name || 'Atelier'}
+              </p>
+            </div>
+
+            <div style="padding: 10px 0;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 14px; color: #1e293b;">
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold; width: 40%;">Désignation :</td>
+                  <td style="padding: 10px 0; font-weight: bold; color: #0f172a;">${newExpense.title.trim()}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold;">Montant :</td>
+                  <td style="padding: 10px 0; font-weight: 900; color: #dc2626; font-size: 16px;">
+                    ${Number(newExpense.amount).toLocaleString('fr-FR')} ${currency}
+                  </td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold;">Catégorie :</td>
+                  <td style="padding: 10px 0; font-weight: bold;">${newExpense.category}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold;">Mode de paiement :</td>
+                  <td style="padding: 10px 0; font-weight: bold; color: ${isCash ? '#15803d' : '#0369a1'};">${pmLabel}</td>
+                </tr>
+                ${newExpense.reference ? `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold;">N° Justificatif / Réf :</td>
+                  <td style="padding: 10px 0; font-family: monospace; font-weight: bold;">${newExpense.reference}</td>
+                </tr>
+                ` : ''}
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold;">Date :</td>
+                  <td style="padding: 10px 0;">${format(new Date(savedDateIso), 'dd/MM/yyyy')}</td>
+                </tr>
+                ${newExpense.description ? `
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold;">Justification :</td>
+                  <td style="padding: 10px 0; color: #334155; font-style: italic;">${newExpense.description}</td>
+                </tr>
+                ` : ''}
+                <tr style="border-bottom: 1px solid #f1f5f9;">
+                  <td style="padding: 10px 0; color: #64748b; font-weight: bold;">Opérateur :</td>
+                  <td style="padding: 10px 0; font-weight: bold;">${operatorName}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="margin-top: 25px; padding: 12px; background-color: ${isCash ? '#fef2f2' : '#f0f9ff'}; border: 1px solid ${isCash ? '#fecaca' : '#bae6fd'}; border-radius: 10px; font-size: 12px; color: ${isCash ? '#991b1b' : '#075985'}; text-align: center;">
+              <strong>Impact Caisse :</strong> ${isCash ? 'Cette dépense est déduite des espèces lors de la clôture de caisse.' : 'Cette dépense est enregistrée en comptabilité hors caisse physique (Banque/Mobile Money).'}
+            </div>
+
+            <div style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #f1f5f9; text-align: center; font-size: 11px; color: #94a3b8;">
+              Notification automatique transmise en temps réel au Gérant.<br/>
+              <strong>Système ACOM Technologie — ${merchant.name || 'Atelier'}</strong>
+            </div>
+          </div>
+        `;
+
+        try {
+          await sendEmailDirectlyOrViaBackend({
+            to: managerEmail,
+            from: merchant.managerNotifications?.emailFrom || undefined,
+            subject: `💸 [NOUVELLE DÉPENSE] ${newExpense.title} (${Number(newExpense.amount).toLocaleString('fr-FR')} ${currency}) - ${merchant.name || 'Atelier'}`,
+            html: emailHtml
+          }, {
+            resendApiKey: merchant.managerNotifications?.resendApiKey,
+            defaultFrom: merchant.managerNotifications?.emailFrom
+          });
+          emailSent = true;
+        } catch (err) {
+          console.error("Erreur lors de l'envoi de l'e-mail au gérant pour la dépense:", err);
+        }
+      }
+
+      // 2. Open WhatsApp Window for Transmission
+      if (managerPhone && managerPhone.trim()) {
+        const waMessage = 
+          `💸 [SUIVI GÉRANT - NOUVELLE DÉPENSE COMPTA] 🧾\n` +
+          `----------------------------------------\n` +
+          `📌 *Libellé :* ${newExpense.title}\n` +
+          `💰 *Montant :* ${Number(newExpense.amount).toLocaleString('fr-FR')} ${currency}\n` +
+          `🏷️ *Catégorie :* ${newExpense.category}\n` +
+          `💳 *Mode de Paiement :* ${pmObj.shortLabel}\n` +
+          (newExpense.reference ? `📑 *Référence :* ${newExpense.reference}\n` : '') +
+          `📅 *Date :* ${format(new Date(savedDateIso), 'dd/MM/yyyy')}\n` +
+          (newExpense.description ? `📝 *Justification :* ${newExpense.description}\n` : '') +
+          `👤 *Opérateur :* ${operatorName}\n` +
+          `----------------------------------------\n` +
+          `✅ *Comptabilité :* ${isCash ? 'Enregistré et déduit des espèces en caisse.' : 'Enregistré hors caisse physique (Banque/Mobile Money).'}`;
+
+        const cleaned = managerPhone.replace(/\s+/g, '').replace(/^\+/, '');
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const waUrl = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(waMessage)}`;
+        window.open(waUrl, '_blank');
+        whatsappOpened = true;
+      }
+
+      // Single Standardized Alert Popup for Suivi Gérant
+      const alertMsg = managerEmail || managerPhone
+        ? `La dépense "${newExpense.title}" (${Number(newExpense.amount).toLocaleString('fr-FR')} ${currency} via ${pmObj.shortLabel}) a été enregistrée. Le Gérant a été notifié par E-mail${whatsappOpened ? ' et une fenêtre WhatsApp a été ouverte pour transmission' : ''}.`
+        : `La dépense "${newExpense.title}" (${Number(newExpense.amount).toLocaleString('fr-FR')} ${currency} via ${pmObj.shortLabel}) a été enregistrée avec succès.`;
+
+      triggerAcomAlert(
+        'Dépense Enregistrée — Suivi Gérant',
+        alertMsg,
+        'success',
+        'COMPTABILITÉ'
+      );
+
+      setNewExpense({
+        title: '',
+        amount: 0,
+        category: 'Loyer',
+        paymentMethod: 'espèces',
+        reference: '',
+        description: ''
+      });
       setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
-      triggerAcomAlert('Succès', 'Dépense enregistrée avec succès !', 'success', 'SYSTÈME');
     } catch (error) {
-      triggerAcomAlert('Erreur', 'Erreur lors de l\'enregistrement', 'error', 'ALERTE');
+      triggerAcomAlert('Erreur', 'Erreur lors de l\'enregistrement de la dépense', 'error', 'ALERTE');
     } finally {
       setSaving(false);
     }
@@ -231,11 +447,18 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-ink">Comptabilité</h2>
-          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des flux financiers & dépenses</p>
+          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des flux financiers & dépenses générales de l'atelier</p>
         </div>
         <button 
           onClick={() => {
-            setNewExpense({ title: '', amount: 0, category: 'Général', description: '' });
+            setNewExpense({
+              title: '',
+              amount: 0,
+              category: 'Loyer',
+              paymentMethod: 'espèces',
+              reference: '',
+              description: ''
+            });
             setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
             setIsAddingExpense(true);
           }} 
@@ -404,6 +627,28 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-black text-ink text-sm leading-tight truncate">{outflow.title}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            {outflow.paymentMethod && (
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${
+                                outflow.paymentMethod === 'mobile_money' ? 'bg-sky-50 text-sky-700 border-sky-100' :
+                                outflow.paymentMethod === 'carte' ? 'bg-purple-50 text-purple-700 border-purple-100' :
+                                outflow.paymentMethod === 'virement' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                                outflow.paymentMethod === 'cheque' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              }`}>
+                                {outflow.paymentMethod === 'mobile_money' ? '📱 Mobile Money' :
+                                 outflow.paymentMethod === 'carte' ? '💳 Carte' :
+                                 outflow.paymentMethod === 'virement' ? '🏦 Virement' :
+                                 outflow.paymentMethod === 'cheque' ? '📄 Chèque' :
+                                 '💵 Espèces'}
+                              </span>
+                            )}
+                            {outflow.reference && (
+                              <span className="text-[9px] font-mono text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200 font-medium">
+                                Réf: {outflow.reference}
+                              </span>
+                            )}
+                          </div>
                           {outflow.description && (
                             <p className="text-xs text-gray-500 mt-1 italic font-medium leading-relaxed">✏️ {outflow.description}</p>
                           )}
@@ -487,82 +732,162 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <div>
-                  <h3 className="text-xl font-bold text-ink">Nouvelle dépense</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Enregistrement comptable</p>
+                  <h3 className="text-lg font-bold text-ink">Nouvelle dépense manuelle</h3>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">Comptabilité & Suivi Gérant</p>
                 </div>
                 <button onClick={() => setIsAddingExpense(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
                   <X className="w-5 h-5 text-gray-400" />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveExpense} className="p-8 space-y-6">
+              <form onSubmit={handleSaveExpense} className="p-8 space-y-5 overflow-y-auto flex-1">
                 <div>
-                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Désignation / Titre</label>
-                  <input type="text" required value={newExpense.title} onChange={e => setNewExpense({...newExpense, title: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-bold" />
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                    Désignation / Intitulé *
+                  </label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="Ex: Facture Senelec Janvier, Loyer Atelier, Transport coursier..." 
+                    value={newExpense.title} 
+                    onChange={e => setNewExpense({...newExpense, title: e.target.value})} 
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/50 font-bold text-sm" 
+                  />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Montant ({merchant.currency})</label>
-                    <input type="number" required value={newExpense.amount || ''} onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-mono font-bold" />
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                      Montant ({merchant.currency}) *
+                    </label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      required 
+                      placeholder="0" 
+                      value={newExpense.amount || ''} 
+                      onChange={e => setNewExpense({...newExpense, amount: Number(e.target.value)})} 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/50 font-mono font-bold text-sm" 
+                    />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Date de Dépense</label>
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                      Date de Dépense *
+                    </label>
                     <input 
                       type="date" 
                       required 
                       value={expenseDate} 
                       onChange={e => setExpenseDate(e.target.value)} 
-                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 font-mono font-bold text-sm" 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/50 font-mono font-bold text-sm" 
                     />
                   </div>
                 </div>
 
+                {/* Catégorie */}
                 <div>
-                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie (Sélectionnez ou saisissez)</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['Approvisionnement', 'Salaires', 'Loyer & Factures', 'Électricité / Eau', 'Machines', 'Divers'].map((cat) => (
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    Catégorie Comptable *
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {EXPENSE_CATEGORIES.map((cat) => (
                       <button
                         key={cat}
                         type="button"
                         onClick={() => setNewExpense({ ...newExpense, category: cat })}
-                        className={`py-2.5 px-3 text-[10px] font-bold rounded-xl border transition-all ${
+                        className={`py-2 px-2.5 text-[10px] font-bold rounded-xl border transition-all text-left truncate ${
                           newExpense.category === cat 
-                            ? 'bg-rose-50 border-rose-200 text-rose-600 ring-2 ring-rose-500/10 font-bold' 
-                            : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50 font-medium'
+                            ? 'bg-rose-50 border-rose-300 text-rose-700 ring-2 ring-rose-500/10 shadow-sm font-black' 
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold'
                         }`}
                       >
                         {cat}
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Mode de Paiement */}
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    Mode de Paiement *
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {PAYMENT_METHODS.map((pm) => (
+                      <button
+                        key={pm.id}
+                        type="button"
+                        onClick={() => setNewExpense({ ...newExpense, paymentMethod: pm.id })}
+                        className={`py-2 px-2.5 text-[10px] font-bold rounded-xl border transition-all text-left truncate ${
+                          newExpense.paymentMethod === pm.id 
+                            ? 'bg-amber-50 border-amber-300 text-amber-800 ring-2 ring-amber-500/10 shadow-sm font-black' 
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold'
+                        }`}
+                      >
+                        {pm.label}
+                      </button>
+                    ))}
+                  </div>
+                  {newExpense.paymentMethod !== 'espèces' && (
+                    <p className="text-[10px] text-sky-600 font-medium mt-1.5 flex items-center gap-1">
+                      ℹ️ Cette dépense ne sera pas déduite des espèces physiques de la caisse journalière.
+                    </p>
+                  )}
+                </div>
+
+                {/* Référence / N° Justificatif */}
+                <div>
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                    N° Référence / Justificatif (Optionnel)
+                  </label>
                   <input 
                     type="text" 
-                    placeholder="Saisir autre catégorie..." 
-                    value={newExpense.category} 
-                    onChange={e => setNewExpense({...newExpense, category: e.target.value})} 
-                    className="w-full mt-3 px-4 py-2.5 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 text-xs font-bold" 
+                    placeholder="Ex: N° Chèque, Réf Virement, N° Reçu..." 
+                    value={newExpense.reference} 
+                    onChange={e => setNewExpense({...newExpense, reference: e.target.value})} 
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/50 font-mono text-xs font-bold" 
                   />
                 </div>
 
+                {/* Description / Justification */}
                 <div>
-                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Description / Justification (Optionnel)</label>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">
+                      Description / Justification {newExpense.category === 'Autres dépenses' ? '*' : '(Optionnel)'}
+                    </label>
+                  </div>
                   <textarea 
                     rows={2}
-                    placeholder="Saisissez des détails supplémentaires sur cette dépense..." 
+                    placeholder={
+                      newExpense.category === 'Autres dépenses' 
+                        ? 'Justification obligatoire pour la catégorie "Autres dépenses"...' 
+                        : 'Saisissez des détails ou commentaires explicatifs...'
+                    } 
                     value={newExpense.description} 
                     onChange={e => setNewExpense({...newExpense, description: e.target.value})} 
-                    className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-rose-500/20 bg-gray-50/30 text-xs font-medium" 
+                    className={`w-full px-4 py-3 rounded-xl border outline-none text-xs font-medium ${
+                      newExpense.category === 'Autres dépenses' && !newExpense.description?.trim()
+                        ? 'border-amber-300 bg-amber-50/20 focus:ring-2 focus:ring-amber-500/20'
+                        : 'border-gray-200 bg-gray-50/50 focus:ring-2 focus:ring-rose-500/20'
+                    }`} 
                   />
+                  {newExpense.category === 'Autres dépenses' && (
+                    <p className="text-[10px] text-amber-700 font-bold mt-1 flex items-center gap-1">
+                      ⚠️ Pour "Autres dépenses", la désignation et la justification détaillée sont obligatoires.
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex space-x-3 pt-4">
-                  <button type="button" onClick={() => setIsAddingExpense(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
-                  <button type="submit" disabled={saving} className="flex-[2] py-4 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">
-                    {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer la dépense'}
+                <div className="flex space-x-3 pt-4 border-t border-gray-100">
+                  <button type="button" onClick={() => setIsAddingExpense(false)} className="flex-1 py-3.5 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors text-xs">
+                    Annuler
+                  </button>
+                  <button type="submit" disabled={saving} className="flex-[2] py-3.5 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 text-xs">
+                    {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer la dépense & Notifier'}
                   </button>
                 </div>
               </form>

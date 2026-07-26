@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
+import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { syncService } from '../../../services/syncService';
 import { ModalStickyFooter } from './design-system/TailorDesignSystem';
 import { 
@@ -27,6 +28,7 @@ export interface Tissu {
   name: string;
   category: string;
   quantity: number; // in meters
+  minStock?: number; // seuil critique / réapprovisionnement
   price?: number; // per meter fallback
   pricePerMeter?: number; // selling price per meter
   costPricePerMeter?: number; // cost price per meter
@@ -537,7 +539,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
     });
 
     saveFabrics(merged);
-    toast.success('Exemples de tissus générés avec succès !');
+    triggerAcomAlert('Exemples Générés', 'Exemples de tissus générés avec succès !', 'success', 'TISSUS');
     triggerSync(true);
   };
 
@@ -577,7 +579,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             } 
           : t
         );
-        toast.success('Tissu mis à jour avec succès');
+        triggerAcomAlert('Tissu Mis à Jour', 'Tissu mis à jour avec succès.', 'success', 'TISSUS');
       } else {
         // Add
         const newTissu: Tissu = {
@@ -597,7 +599,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
           syncStatus: 'pending'
         };
         updatedList = [...tissus, newTissu];
-        toast.success('Nouveau tissu enregistré');
+        triggerAcomAlert('Nouveau Tissu Enregistré', 'Nouveau tissu enregistré avec succès !', 'success', 'TISSUS');
       }
 
       saveFabrics(updatedList);
@@ -625,7 +627,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
     if (window.confirm('Voulez-vous vraiment supprimer ce tissu de votre stock ?')) {
       const updated = tissus.filter(t => t.id !== id);
       saveFabrics(updated);
-      toast.success('Tissu supprimé du stock');
+      triggerAcomAlert('Tissu Supprimé', 'Tissu supprimé du stock avec succès.', 'success', 'TISSUS');
       triggerSync();
     }
   };
@@ -645,7 +647,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       return t;
     });
     saveFabrics(updated);
-    toast.success('Quantité mise à jour');
+    triggerAcomAlert('Quantité Mise à Jour', 'Quantité de tissu mise à jour avec succès.', 'success', 'TISSUS');
     triggerSync();
   };
 
@@ -1279,21 +1281,37 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                       </select>
                     </div>
 
-                    {/* Quantity */}
-                    <div>
-                      <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
-                        QUANTITÉ EN STOCK (MÈTRES) *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        required
-                        placeholder="Ex: 12.5"
-                        value={currentTissu?.quantity ?? ''}
-                        onChange={e => setCurrentTissu({ ...currentTissu, quantity: e.target.value === '' ? '' as any : Number(e.target.value) })}
-                        className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-black text-violet-700 rounded-xl transition-all outline-none"
-                      />
+                    {/* Quantity & Min Stock */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                          QUANTITÉ (MÈTRES) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          required
+                          placeholder="Ex: 12.5"
+                          value={currentTissu?.quantity ?? ''}
+                          onChange={e => setCurrentTissu({ ...currentTissu, quantity: e.target.value === '' ? '' as any : Number(e.target.value) })}
+                          className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-black text-violet-700 rounded-xl transition-all outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
+                          SEUIL ALERTE (MÈTRES)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          placeholder="Ex: 5.0"
+                          value={currentTissu?.minStock ?? ''}
+                          onChange={e => setCurrentTissu({ ...currentTissu, minStock: e.target.value === '' ? undefined : Number(e.target.value) })}
+                          className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-amber-500/20 text-sm font-bold text-amber-700 rounded-xl transition-all outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
 

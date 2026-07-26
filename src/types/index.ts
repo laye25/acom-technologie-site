@@ -644,6 +644,8 @@ export interface MerchantExpense {
   amount: number;
   category: string;
   date: any;
+  paymentMethod?: string;
+  reference?: string;
   description?: string;
   createdAt: any;
   created_at?: any;

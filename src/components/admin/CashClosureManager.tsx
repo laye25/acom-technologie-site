@@ -20,6 +20,7 @@ export interface CashClosure {
   actualCashCounted: number;
   discrepancy: number;
   notes: string;
+  sentToManagerWA?: boolean;
 }
 
 export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant }) => {
@@ -118,9 +119,18 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     return dailyExpenses.reduce((sum, e) => sum + Number((e as any).amount || 0), 0);
   }, [dailyExpenses]);
 
+  const dailyCashExpensesTotal = useMemo(() => {
+    return dailyExpenses
+      .filter(e => {
+        const pm = String((e as any).paymentMethod || (e as any).modePaiement || 'espèces').toLowerCase();
+        return pm === 'espèces' || pm === 'especes' || pm === 'cash';
+      })
+      .reduce((sum, e) => sum + Number((e as any).amount || 0), 0);
+  }, [dailyExpenses]);
+
   const totalTheoreticalRevenue = useMemo(() => {
-    return Math.max(0, dailySalesRevenue - dailyExpensesTotal);
-  }, [dailySalesRevenue, dailyExpensesTotal]);
+    return Math.max(0, dailySalesRevenue - dailyCashExpensesTotal);
+  }, [dailySalesRevenue, dailyCashExpensesTotal]);
 
   const actualCashNum = useMemo(() => {
     return parseFloat(actualCash.toString().replace(/\s/g, '').replace(',', '.')) || 0;
@@ -333,14 +343,18 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
       return [newClosure, ...filtered];
     });
     
-    showAlert('Transaction Réussie', 'Clôture de caisse enregistrée avec succès !', 'success', 'Système');
+    if (managerPhone && managerPhone.trim()) {
+      const textNotif = getManagerClosureNotificationMessage(newClosure);
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const url = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${managerPhone.replace(/\s+/g, '')}&text=${encodeURIComponent(textNotif)}`;
+      window.open(url, '_blank');
+      newClosure.sentToManagerWA = true;
+    }
 
     if (autoEmailManager && managerEmail) {
-      const toastId = toast.loading('Envoi du rapport au gérant...');
       sendSilentBackgroundClosureEmailToManager(newClosure).then(ok => {
-        toast.dismiss(toastId);
         if (ok) {
-          showAlert('Notification Gérant', 'Ce mail envoyé en arrière-plan avec succès !', 'success', "ENVOI D'E-MAIL");
+          setClosureMailFeedback(prev => ({ ...prev, [newClosure.id]: true }));
         }
       });
     }
@@ -348,6 +362,13 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
     setCashierName('');
     setActualCash('');
     setClosureNotes('');
+
+    showAlert(
+      'Clôture Validée — E-mail & WhatsApp',
+      'La clôture de caisse a été validée et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+      'success',
+      'CLÔTURE'
+    );
   };
 
   return (

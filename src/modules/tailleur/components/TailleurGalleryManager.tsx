@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
+import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 
 // Interfaces
 interface Merchant {
@@ -311,6 +312,7 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
         return m;
       });
       saveModelsToLocal(updated);
+      triggerAcomAlert('Modèle Mis à Jour', 'Modèle mis à jour dans le catalogue avec succès.', 'success', 'GALERIE');
     } else {
       const newModel: GalleryModel = {
         id: 'model-' + Date.now(),
@@ -327,6 +329,7 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
         createdAt: new Date().toISOString()
       };
       saveModelsToLocal([newModel, ...models]);
+      triggerAcomAlert('Nouveau Modèle', 'Nouveau modèle ajouté à la galerie avec succès !', 'success', 'GALERIE');
     }
     setIsModelModalOpen(false);
   };
@@ -342,6 +345,7 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
         modelIds: mb.modelIds.filter(mid => mid !== id)
       }));
       saveMoodboardsToLocal(cleanedMBs);
+      triggerAcomAlert('Modèle Retiré', 'Modèle retiré de votre catalogue.', 'success', 'GALERIE');
     }
   };
 
@@ -380,6 +384,7 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
         return m;
       });
       saveMoodboardsToLocal(updated);
+      triggerAcomAlert('Moodboard Mis à Jour', `Moodboard "${moodboardName}" mis à jour avec succès.`, 'success', 'LOOKBOOK');
     } else {
       const newMB: Moodboard = {
         id: 'mb-' + Date.now(),
@@ -390,6 +395,7 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
         createdAt: new Date().toISOString()
       };
       saveMoodboardsToLocal([newMB, ...moodboards]);
+      triggerAcomAlert('Nouveau Moodboard', `Moodboard "${moodboardName}" créé avec succès !`, 'success', 'LOOKBOOK');
     }
     setIsMoodboardModalOpen(false);
   };
@@ -401,6 +407,7 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
       if (selectedMoodboardId === id) {
         setSelectedMoodboardId(null);
       }
+      triggerAcomAlert('Moodboard Supprimé', 'Moodboard supprimé de votre galerie.', 'success', 'LOOKBOOK');
     }
   };
 

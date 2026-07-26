@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
+import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 
 export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) => {
   const [articles, setArticles] = useState<any[]>([]);
@@ -142,7 +143,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
     let updated;
     if (currentArticle.id) {
       updated = articles.map(art => art.id === currentArticle.id ? { ...currentArticle, updatedAt: new Date().toISOString() } : art);
-      toast.success('Article de prêt-à-porter mis à jour');
+      triggerAcomAlert('Article Mis à Jour', 'Article de prêt-à-porter mis à jour avec succès.', 'success', 'BOUTIQUE');
     } else {
       const newArt = {
         ...currentArticle,
@@ -151,7 +152,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
         updatedAt: new Date().toISOString()
       };
       updated = [newArt, ...articles];
-      toast.success('Nouvel article ajouté au stock de la boutique');
+      triggerAcomAlert('Nouvel Article Ajouté', 'Nouvel article ajouté au stock de la boutique avec succès !', 'success', 'BOUTIQUE');
     }
     saveArticles(updated);
     setIsFormOpen(false);
@@ -215,6 +216,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
       clientName: saleClientName || 'Client de Passage',
       clientPhone: saleClientPhone || '',
       paymentMethod: salePaymentMethod,
+      processedBy: 'Caissier / Vendeur',
       date: new Date().toISOString(),
       items: cart.map(item => ({
         id: item.article.id,
@@ -250,7 +252,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
         paymentMethod: salePaymentMethod as any,
         customerName: newSale.clientName,
         customerPhone: newSale.clientPhone,
-        processedBy: 'system',
+        processedBy: 'Caissier / Vendeur',
         createdAt: new Date().toISOString()
       });
     } catch (err) {
@@ -259,18 +261,42 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
 
     setCart([]);
     setSelectedBoutiqueSale(newSale);
-    toast.success('Vente enregistrée avec succès ! 🎉');
+    triggerAcomAlert(
+      'Vente Boutique Validée — E-mail & WhatsApp',
+      'La vente boutique a été enregistrée avec succès et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+      'success',
+      'CAISSE POS'
+    );
 
-    // Auto-email summary to the manager in the background
-    if (autoEmailManager && managerEmail && managerEmail.trim()) {
-      sendSilentBackgroundBoutiqueSaleEmailToManager(newSale);
+    // Suivi Gérant (Temps Réel) : Déclenchement automatique selon les canaux configurés dans Réglages
+    if (autoEmailManager) {
+      // 1. Canal E-mail
+      if (managerEmail && managerEmail.trim()) {
+        sendSilentBackgroundBoutiqueSaleEmailToManager(newSale);
+      }
+      // 2. Canal WhatsApp
+      if (merchant.managerNotifications?.whatsappPhone && merchant.managerNotifications.whatsappPhone.trim()) {
+        sendWhatsAppBoutiqueSaleNotificationToManager(newSale);
+      }
+    }
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case 'cash': return 'Espèces (Cash)';
+      case 'wave': return 'Wave';
+      case 'orange_money': return 'Orange Money';
+      case 'card': return 'Carte Bancaire';
+      default: return method || 'Espèces';
     }
   };
 
   const sendSilentBackgroundBoutiqueSaleEmailToManager = async (sale: any) => {
-    if (!managerEmail || !managerEmail.trim()) return;
+    if (!managerEmail || !managerEmail.trim()) return false;
 
-    const itemsDesc = `<li style="margin: 4px 0;"><strong>${sale.quantity}x</strong> ${sale.articleName} — <strong>${sale.totalPrice} FCFA</strong></li>`;
+    const itemsDescHtml = (sale.items && sale.items.length > 0)
+      ? sale.items.map((i: any) => `<li style="margin: 4px 0;"><strong>${i.quantity}x</strong> ${i.name} (${Number(i.price || 0).toLocaleString()} ${merchant.currency || 'FCFA'}/u) — <strong>${Number(i.total || 0).toLocaleString()} ${merchant.currency || 'FCFA'}</strong></li>`).join('')
+      : `<li style="margin: 4px 0;"><strong>${sale.quantity}x</strong> ${sale.articleName} — <strong>${Number(sale.totalPrice || 0).toLocaleString()} ${merchant.currency || 'FCFA'}</strong></li>`;
 
     const title = `🛒 Notification de Vente (Boutique Prêt-à-porter)`;
     const themeColor = '#5c2197'; // Purple for Ready-to-wear
@@ -279,7 +305,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; color: #1e293b; background-color: #ffffff;">
         <div style="background-color: ${themeColor}; color: white; padding: 15px; border-radius: 8px; text-align: center;">
           <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">${merchant.name || 'Atelier de Couture'}</h2>
-          <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Suivi d'Activité en Temps Réel — Gérant</p>
+          <p style="margin: 5px 0 0; font-size: 12px; opacity: 0.9;">Suivi d'Activité en Temps Réel — Gérant (Boutique Prêt-à-porter)</p>
         </div>
 
         <div style="margin-top: 20px;">
@@ -287,34 +313,34 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
           
           <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
             <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 150px;"><strong>N° Vente :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 170px;"><strong>N° Vente / Ticket :</strong></td>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #0f172a;">${sale.saleNumber || sale.id}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Client / Acheteur :</strong></td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${sale.clientName} (${sale.clientPhone || 'Client de Passage'})</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${sale.clientName} ${sale.clientPhone ? `(${sale.clientPhone})` : ''}</td>
             </tr>
             <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;" valign="top"><strong>Article Acheté :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;" valign="top"><strong>Articles Vendus :</strong></td>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">
-                <ul style="margin: 0; padding-left: 20px;">${itemsDesc}</ul>
+                <ul style="margin: 0; padding-left: 20px;">${itemsDescHtml}</ul>
               </td>
             </tr>
             <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Sous-Total :</strong></td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${sale.totalPrice} FCFA</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Total suppléments :</strong></td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">0 FCFA</td>
-            </tr>
-            <tr>
               <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Montant Total Encaissé :</strong></td>
-              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #10b981; font-size: 15px;">${sale.totalPrice} FCFA (PAYÉ EN CAISSE ✅)</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold; color: #10b981; font-size: 15px;">${Number(sale.totalPrice || 0).toLocaleString()} ${merchant.currency || 'FCFA'} (PAYÉ EN CAISSE ✅)</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Mode de Paiement :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-weight: bold;">${getPaymentMethodLabel(sale.paymentMethod)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #64748b;"><strong>Vendeur / Caissier :</strong></td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">${sale.processedBy || 'Caissier / Vendeur'}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #64748b;"><strong>Date / Heure :</strong></td>
-              <td style="padding: 8px 0;">${new Date(sale.date).toLocaleString('fr-FR')}</td>
+              <td style="padding: 8px 0;">${format(new Date(sale.date || Date.now()), 'dd/MM/yyyy HH:mm')}</td>
             </tr>
           </table>
         </div>
@@ -351,12 +377,42 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
     }
   };
 
+  const sendWhatsAppBoutiqueSaleNotificationToManager = (sale: any) => {
+    const managerPhone = merchant.managerNotifications?.whatsappPhone || '';
+    if (!managerPhone || !managerPhone.trim()) return;
+
+    const itemsListWa = (sale.items && sale.items.length > 0)
+      ? sale.items.map((i: any) => `• ${i.quantity}x ${i.name} (${Number(i.price || 0).toLocaleString()} ${merchant.currency || 'FCFA'}/u) = ${Number(i.total || 0).toLocaleString()} ${merchant.currency || 'FCFA'}`).join('\n')
+      : `• ${sale.quantity}x ${sale.articleName} = ${Number(sale.totalPrice || 0).toLocaleString()} ${merchant.currency || 'FCFA'}`;
+
+    const text = 
+      `🛒 [SUIVI GÉRANT - VENTE BOUTIQUE PRÊT-À-PORTER] 🛍️\n` +
+      `----------------------------------------\n` +
+      `• N° Vente / Ticket : ${sale.saleNumber || sale.id}\n` +
+      `• Client : ${sale.clientName} ${sale.clientPhone ? `(${sale.clientPhone})` : ''}\n` +
+      `• Vendeur / Caisse : ${sale.processedBy || 'Caissier / Vendeur'}\n` +
+      `• Date / Heure : ${format(new Date(sale.date || Date.now()), 'dd/MM/yyyy HH:mm')}\n` +
+      `----------------------------------------\n` +
+      `ARTICLES VENDUS :\n` +
+      `${itemsListWa}\n` +
+      `----------------------------------------\n` +
+      `• Mode de paiement : ${getPaymentMethodLabel(sale.paymentMethod)}\n` +
+      `• MONTANT TOTAL ENCAISSÉ : ${Number(sale.totalPrice || 0).toLocaleString()} ${merchant.currency || 'FCFA'} ✅\n` +
+      `----------------------------------------\n` +
+      `_Notification automatique de suivi d'activité (${merchant.name || 'ACOM'})._`;
+
+    let cleaned = managerPhone.replace(/[^0-9]/g, '');
+    if (cleaned.length === 9 && cleaned.startsWith('7')) {
+      cleaned = '221' + cleaned;
+    }
+    const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
+
   const dispatchBoutiqueManagerSaleNotif = async (s: any, method: 'whatsapp' | 'email') => {
     if (method === 'email') {
       const success = await sendSilentBackgroundBoutiqueSaleEmailToManager(s);
-      if (success) {
-        toast.success("E-mail envoyé avec succès au gérant !");
-      } else {
+      if (!success) {
         toast.error("Échec de l'envoi de l'e-mail.");
       }
     } else if (method === 'whatsapp') {
@@ -365,24 +421,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
         toast.error("Veuillez configurer le numéro de téléphone WhatsApp du Gérant dans les paramètres.");
         return;
       }
-
-      const text = 
-        `*${merchant.name || 'ACOM'} - RAPPORT DE VENTE BOUTIQUE* 👔\n` +
-        `----------------------------------------\n` +
-        `*Ticket N°* : ${s.saleNumber || s.id}\n` +
-        `*Client* : ${s.clientName}\n` +
-        `*Date* : ${format(new Date(s.date), 'dd/MM/yyyy HH:mm')}\n\n` +
-        `*ARTICLE VENDU* :\n` +
-        `- ${s.articleName} x${s.quantity} : ${s.totalPrice.toLocaleString()} FCFA\n\n` +
-        `*Total encaissé* : ${s.totalPrice.toLocaleString()} FCFA (PAYÉ ✅)\n\n` +
-        `_Notification automatique de suivi d'activité._`;
-
-      let cleaned = managerPhone.replace(/[^0-9]/g, '');
-      if (cleaned.length === 9 && cleaned.startsWith('7')) {
-        cleaned = '221' + cleaned;
-      }
-      const waUrl = `https://api.whatsapp.com/send?phone=${cleaned}&text=${encodeURIComponent(text)}`;
-      window.open(waUrl, '_blank');
+      sendWhatsAppBoutiqueSaleNotificationToManager(s);
     }
   };
 
@@ -391,7 +430,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
     if (confirm('Êtes-vous sûr de vouloir supprimer cet article de la boutique ?')) {
       const updated = articles.filter(art => art.id !== id);
       saveArticles(updated);
-      toast.success('Article retiré de la collection');
+      triggerAcomAlert('Article Supprimé', 'Article retiré de la collection avec succès.', 'success', 'BOUTIQUE');
     }
   };
 
@@ -416,7 +455,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
       return art;
     });
     saveArticles(updated);
-    toast.success(`Le stock de "${article.name}" a été augmenté de +${qty}`);
+    triggerAcomAlert('Stock Réapprovisionné', `Le stock de "${article.name}" a été augmenté de +${qty} avec succès.`, 'success', 'BOUTIQUE');
   };
 
   // Export Stock CSV
@@ -454,7 +493,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("Inventaire de la boutique exporté en CSV");
+      triggerAcomAlert('Inventaire Exporté', 'Inventaire de la boutique exporté en CSV avec succès.', 'success', 'EXPORT');
     } catch (error) {
       console.error(error);
       toast.error("Échec de l'exportation CSV");
@@ -1259,7 +1298,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                             } else {
                               setCart([...cart, { article: art, qty: 1 }]);
                             }
-                            toast.success(`${art.name} ajouté au panier`);
+                            triggerAcomAlert('Ajout au Panier', `${art.name} ajouté au panier avec succès !`, 'success', 'CAISSE POS');
                           }}
                           disabled={isOutOfStock}
                           className={`col-span-2 py-2 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer ${isOutOfStock ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10'}`}

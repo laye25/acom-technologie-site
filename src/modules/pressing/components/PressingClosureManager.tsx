@@ -587,19 +587,18 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                     };
 
                     let sentEmail = false;
-                    let hasAttemptedEmail = false;
                     if (autoEmailManager && managerEmail && managerEmail.trim()) {
-                      hasAttemptedEmail = true;
-                      const toastId = toast.loading('Envoi automatique du rapport de clôture au Gérant...');
                       const success = await sendSilentBackgroundClosureEmailToManager(newClosure);
                       sentEmail = success;
                       newClosure.sentToManager = success;
-                      toast.dismiss(toastId);
-                      if (success) {
-                        toast.success('Rapport de clôture envoyé par e-mail au gérant !');
-                      } else {
-                        toast.error("Rapport par e-mail non envoyé (clé Resend non configurée ou invalide).");
-                      }
+                    }
+
+                    if (managerPhone && managerPhone.trim()) {
+                      const textNotif = getManagerClosureNotificationMessage(newClosure);
+                      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                      const url = `https://${isMobile ? 'api' : 'web'}.whatsapp.com/send?phone=${managerPhone.replace(/\s+/g, '')}&text=${encodeURIComponent(textNotif)}`;
+                      window.open(url, '_blank');
+                      newClosure.sentToManager = true;
                     }
 
                     // Update State & localstorage
@@ -612,32 +611,16 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                     setActualCash(0);
                     setClosureNotes('');
 
-                    // User feedback
-                    if (hasAttemptedEmail && !sentEmail) {
-                      showAlert(
-                        'Caisse Clôturée avec Succès',
-                        `La caisse du jour (${closureDate}) a été clôturée et verrouillée avec succès !\n\n⚠️ Remarque : Le rapport automatique par e-mail n'a pas pu être délivré au gérant (clé API Resend invalide ou non configurée dans les Paramètres > Notifications Gérant). Vous pouvez partager le rapport via WhatsApp ou Mail direct.`,
-                        'success',
-                        undefined,
-                        false,
-                        "D'ACCORD",
-                        "CLÔTURE EFFECTUÉE"
-                      );
-                    } else {
-                      showAlert(
-                        'Caisse Clôturée avec Succès',
-                        `La caisse du jour (${closureDate}) a été clôturée et verrouillée avec succès !`,
-                        'success',
-                        undefined,
-                        false,
-                        "D'ACCORD",
-                        "CLÔTURE EFFECTUÉE"
-                      );
-                    }
-                    
-                    if (!hasAttemptedEmail) {
-                      showAlert('Clôture Enregistrée', `Clôture du ${closureDate} enregistrée à l'instant avec succès !`, 'success', undefined, false, "D'ACCORD", "COFFRE FORT");
-                    }
+                    // Single unified popup confirming closure and indicating E-mail & WhatsApp
+                    showAlert(
+                      'Clôture Validée — E-mail & WhatsApp',
+                      'La clôture de caisse a été validée et le rapport transmis par e-mail au Gérant. Une fenêtre WhatsApp est ouverte pour permettre son envoi également via WhatsApp.',
+                      'success',
+                      undefined,
+                      false,
+                      "D'ACCORD",
+                      "CLÔTURE"
+                    );
                   };
 
                   // Check if closure already exists for this date to prevent duplicate
