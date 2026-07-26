@@ -105,19 +105,19 @@ export class DomVirtualCursor {
 }
 
 export class LiveGuidanceEngine {
-  private activeScenario: ScenarioApplicationIntelligent | null = null;
-  private currentStepIndex: number = 0;
-  private isGuidanceActive: boolean = false;
-  private isAutoControlActive: boolean = false;
-  private autoExecutionTimer: any = null;
-  private currentSessionId: string | null = null;
+  private static activeScenario: ScenarioApplicationIntelligent | null = null;
+  private static currentStepIndex: number = 0;
+  private static isGuidanceActive: boolean = false;
+  private static isAutoControlActive: boolean = false;
+  private static autoExecutionTimer: any = null;
+  private static currentSessionId: string | null = null;
 
   public startGuidanceSession(scenario: ScenarioApplicationIntelligent): GuidanceSessionState {
-    this.activeScenario = scenario;
-    this.currentStepIndex = 0;
-    this.isGuidanceActive = true;
-    this.isAutoControlActive = false;
-
+    LiveGuidanceEngine.activeScenario = scenario;
+    LiveGuidanceEngine.currentStepIndex = 0;
+    LiveGuidanceEngine.isGuidanceActive = true;
+    LiveGuidanceEngine.isAutoControlActive = false;
+    LiveGuidanceEngine.currentSessionId = Math.random().toString(36).substring(7);
     return this.getSessionState();
   }
 
@@ -311,17 +311,17 @@ export class LiveGuidanceEngine {
     onVideoComplete?: () => void
   ): Promise<void> {
     const sessionId = Math.random().toString(36).substring(7);
-    this.currentSessionId = sessionId;
+    LiveGuidanceEngine.currentSessionId = sessionId;
     
-    if (this.isAutoControlActive) {
+    if (LiveGuidanceEngine.isAutoControlActive) {
       VoiceEngine.stopSpeech();
     }
     
     const activeScenario = scenario || LiveGuidanceEngine.buildFormScenarioForCurrentPage('Acom SaaS', 'Interface Active');
-    this.activeScenario = activeScenario;
-    this.currentStepIndex = 0;
-    this.isGuidanceActive = true;
-    this.isAutoControlActive = true;
+    LiveGuidanceEngine.activeScenario = activeScenario;
+    LiveGuidanceEngine.currentStepIndex = 0;
+    LiveGuidanceEngine.isGuidanceActive = true;
+    LiveGuidanceEngine.isAutoControlActive = true;
 
     const totalSteps = activeScenario.timeline.length;
     toast.success("🤖 Prise de contrôle automatique en direct : Suivez le curseur IA à l'écran !", { duration: 4000 });
@@ -330,9 +330,9 @@ export class LiveGuidanceEngine {
     DomVirtualCursor.show();
 
     for (let i = 0; i < totalSteps; i++) {
-      if (!this.isAutoControlActive || !this.activeScenario || this.currentSessionId !== sessionId) break;
+      if (!LiveGuidanceEngine.isAutoControlActive || !LiveGuidanceEngine.activeScenario || LiveGuidanceEngine.currentSessionId !== sessionId) break;
 
-      this.currentStepIndex = i;
+      LiveGuidanceEngine.currentStepIndex = i;
       const activeStep = activeScenario.timeline[i];
       const isLastStep = i === totalSteps - 1;
 
@@ -343,7 +343,7 @@ export class LiveGuidanceEngine {
       // 1. Move cursor, highlight element, and type/click live on DOM
       await LiveGuidanceEngine.executeStepOnDom(activeStep, isLastStep);
 
-      if (this.currentSessionId !== sessionId) break;
+      if (LiveGuidanceEngine.currentSessionId !== sessionId) break;
 
       // 2. Pause between steps for natural demonstration rhythm and play TTS audio
       const stepDurationMs = Math.max(1200, (activeStep.durationSec || 2.5) * 1000);
@@ -361,7 +361,7 @@ export class LiveGuidanceEngine {
       // Wait for both the minimum step duration AND the audio to finish
       await Promise.all([timerPromise, audioPromise]);
 
-      if (this.currentSessionId !== sessionId) break;
+      if (LiveGuidanceEngine.currentSessionId !== sessionId) break;
 
       if (isLastStep) {
         toast.success("✅ Formulaire complété et validé avec succès en direct !", { icon: '🎉' });
@@ -369,14 +369,14 @@ export class LiveGuidanceEngine {
       }
     }
 
-    if (this.currentSessionId !== sessionId) return; // aborted
+    if (LiveGuidanceEngine.currentSessionId !== sessionId) return; // aborted
 
     // Hide DOM virtual cursor after completion
     DomVirtualCursor.hide();
 
-    if (this.isAutoControlActive && this.activeScenario) {
-      this.isAutoControlActive = false;
-      this.isGuidanceActive = false;
+    if (LiveGuidanceEngine.isAutoControlActive && LiveGuidanceEngine.activeScenario) {
+      LiveGuidanceEngine.isAutoControlActive = false;
+      LiveGuidanceEngine.isGuidanceActive = false;
 
       toast.success("Scénario entièrement exécuté. Génération du tutoriel vidéo en cours...", { id: 'auto-video-complete' });
 
@@ -545,7 +545,7 @@ export class LiveGuidanceEngine {
       } else if (actionType === 'INPUT' || label.includes('saisie')) {
         targetEl = document.querySelector<HTMLInputElement>('form input:not([type="hidden"])');
       } else {
-        targetEl = document.querySelector<HTMLElement>('form button, form input, button');
+        targetEl = null; // Do not fallback to random buttons which breaks the UI
       }
     }
 
@@ -670,43 +670,43 @@ export class LiveGuidanceEngine {
   }
 
   public nextStep(): GuidanceSessionState {
-    if (!this.activeScenario) throw new Error('Aucune session de guidance active');
+    if (!LiveGuidanceEngine.activeScenario) throw new Error('Aucune session de guidance active');
 
-    if (this.currentStepIndex < this.activeScenario.timeline.length - 1) {
-      this.currentStepIndex += 1;
+    if (LiveGuidanceEngine.currentStepIndex < LiveGuidanceEngine.activeScenario.timeline.length - 1) {
+      LiveGuidanceEngine.currentStepIndex += 1;
     } else {
-      this.isGuidanceActive = false;
+      LiveGuidanceEngine.isGuidanceActive = false;
     }
 
     return this.getSessionState();
   }
 
   public previousStep(): GuidanceSessionState {
-    if (!this.activeScenario) throw new Error('Aucune session de guidance active');
+    if (!LiveGuidanceEngine.activeScenario) throw new Error('Aucune session de guidance active');
 
-    if (this.currentStepIndex > 0) {
-      this.currentStepIndex -= 1;
+    if (LiveGuidanceEngine.currentStepIndex > 0) {
+      LiveGuidanceEngine.currentStepIndex -= 1;
     }
 
     return this.getSessionState();
   }
 
   public stopSession(): void {
-    if (this.autoExecutionTimer) {
-      clearTimeout(this.autoExecutionTimer);
-      this.autoExecutionTimer = null;
+    if (LiveGuidanceEngine.autoExecutionTimer) {
+      clearTimeout(LiveGuidanceEngine.autoExecutionTimer);
+      LiveGuidanceEngine.autoExecutionTimer = null;
     }
-    this.currentSessionId = null;
+    LiveGuidanceEngine.currentSessionId = null;
     VoiceEngine.stopSpeech();
     DomVirtualCursor.hide();
-    this.activeScenario = null;
-    this.currentStepIndex = 0;
-    this.isGuidanceActive = false;
-    this.isAutoControlActive = false;
+    LiveGuidanceEngine.activeScenario = null;
+    LiveGuidanceEngine.currentStepIndex = 0;
+    LiveGuidanceEngine.isGuidanceActive = false;
+    LiveGuidanceEngine.isAutoControlActive = false;
   }
 
   public getSessionState(): GuidanceSessionState {
-    if (!this.activeScenario) {
+    if (!LiveGuidanceEngine.activeScenario) {
       return {
         scenarioId: '',
         currentStepIndex: 0,
@@ -732,21 +732,21 @@ export class LiveGuidanceEngine {
       };
     }
 
-    const totalSteps = this.activeScenario.timeline.length;
-    const isCompleted = this.currentStepIndex >= totalSteps - 1;
-    const activeStep = this.activeScenario.timeline[this.currentStepIndex] || this.activeScenario.timeline[0];
-    const progressPercentage = Math.round(((this.currentStepIndex + 1) / totalSteps) * 100);
+    const totalSteps = LiveGuidanceEngine.activeScenario.timeline.length;
+    const isCompleted = LiveGuidanceEngine.currentStepIndex >= totalSteps - 1;
+    const activeStep = LiveGuidanceEngine.activeScenario.timeline[LiveGuidanceEngine.currentStepIndex] || LiveGuidanceEngine.activeScenario.timeline[0];
+    const progressPercentage = Math.round(((LiveGuidanceEngine.currentStepIndex + 1) / totalSteps) * 100);
 
     return {
-      scenarioId: this.activeScenario.id,
-      currentStepIndex: this.currentStepIndex,
+      scenarioId: LiveGuidanceEngine.activeScenario.id,
+      currentStepIndex: LiveGuidanceEngine.currentStepIndex,
       totalSteps,
       isCompleted,
       activeStep,
       progressPercentage,
-      waitingForUserAction: !this.isAutoControlActive,
+      waitingForUserAction: !LiveGuidanceEngine.isAutoControlActive,
       history: [],
-      isAutoControlActive: this.isAutoControlActive
+      isAutoControlActive: LiveGuidanceEngine.isAutoControlActive
     };
   }
 }
