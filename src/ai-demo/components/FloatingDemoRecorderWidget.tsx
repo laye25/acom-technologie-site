@@ -73,6 +73,7 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
   }, [currentModule, currentPage, navigate, startDemoRecording, stopDemoRecording]);
 
   const handleStartAutoDemo = async () => {
+    LiveGuidanceEngine.isRealTimeAutoControlEnabled = true;
     setIsAutoRunning(true);
     await startDemoRecording(currentModule, currentPage, true, true); // Force true, silent
     setIsOpen(false);
@@ -89,6 +90,13 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
         }
       }
     );
+  };
+
+  const handleStartManualDemo = async () => {
+    LiveGuidanceEngine.isRealTimeAutoControlEnabled = false;
+    setIsAutoRunning(false);
+    await startDemoRecording(currentModule, currentPage, false, false);
+    setIsOpen(false);
   };
 
   const handleStop = async () => {
@@ -146,6 +154,24 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
           </div>
 
           <div className="space-y-2">
+            <div className="flex items-center justify-between bg-slate-800 p-2.5 rounded-xl border border-slate-700">
+              <span className="text-xs text-slate-300 font-medium">Contrôle Auto Temps Réel</span>
+              <button
+                onClick={() => {
+                  LiveGuidanceEngine.isRealTimeAutoControlEnabled = !LiveGuidanceEngine.isRealTimeAutoControlEnabled;
+                  setIsOpen(!isOpen);
+                  setTimeout(() => setIsOpen(true), 10);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  LiveGuidanceEngine.isRealTimeAutoControlEnabled
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-700 text-slate-400'
+                }`}
+              >
+                {LiveGuidanceEngine.isRealTimeAutoControlEnabled ? 'CONNECTÉ (ON)' : 'DÉCONNECTÉ (OFF)'}
+              </button>
+            </div>
+
             <button
               onClick={handleStartAutoDemo}
               className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 hover:from-emerald-600 hover:to-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl cursor-pointer transition-all border border-emerald-400/30"
@@ -153,6 +179,16 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
               <MousePointerClick className="w-4 h-4 text-emerald-300 animate-bounce" />
               <span>⚡ Auto-Remplissage & Démonstration en Direct</span>
             </button>
+
+            {!LiveGuidanceEngine.isRealTimeAutoControlEnabled && (
+              <button
+                onClick={handleStartManualDemo}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700 cursor-pointer transition-all"
+              >
+                <Video className="w-3.5 h-3.5 text-violet-400" />
+                <span>🎥 Démarrer l'enregistrement manuel</span>
+              </button>
+            )}
           </div>
         </div>
       )}

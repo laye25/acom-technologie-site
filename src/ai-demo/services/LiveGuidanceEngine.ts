@@ -120,7 +120,7 @@ export class LiveGuidanceEngine {
   private static currentStepIndex: number = 0;
   private static isGuidanceActive: boolean = false;
   private static isAutoControlActive: boolean = false;
-  public static isRealTimeAutoControlEnabled: boolean = false;
+  public static isRealTimeAutoControlEnabled: boolean = true;
   private static isPaused: boolean = false;
   private static autoExecutionTimer: any = null;
   private static currentSessionId: string | null = null;
@@ -255,11 +255,9 @@ export class LiveGuidanceEngine {
     onStateChange?: (state: GuidanceSessionState) => void,
     onVideoComplete?: () => void
   ): Promise<void> {
-    if (!LiveGuidanceEngine.isRealTimeAutoControlEnabled) {
-      console.log('Real-Time Automatic Control is disconnected.');
-      if (onVideoComplete) onVideoComplete();
-      return;
-    }
+    // Explicitly enable real-time auto control when starting an auto control session
+    LiveGuidanceEngine.isRealTimeAutoControlEnabled = true;
+
     const sessionId = Math.random().toString(36).substring(7);
     LiveGuidanceEngine.currentSessionId = sessionId;
     
