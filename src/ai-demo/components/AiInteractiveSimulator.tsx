@@ -32,6 +32,19 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
   const [lastTrace, setLastTrace] = useState<any>(null);
   const [debugReport, setDebugReport] = useState<Array<{ label: string; found: boolean; selector: string; tag: string; id: string; rect: string }>>([]);
 
+  // Interactive Visual Unit Test Mode (Règle 51/64)
+  const [isUnitTestMode, setIsUnitTestMode] = useState<boolean>(true); // Default to Unit Test mode as requested for rigorous isolation
+  const [unitTestIndex, setUnitTestIndex] = useState<number>(0);
+
+  const unitTestTargets = [
+    { label: 'Cible 1 : Nom du client', selectors: ['input[placeholder*="Nom"]', 'input[name*="name"]', 'input[type="text"]'] },
+    { label: 'Cible 2 : Téléphone du client', selectors: ['input[type="tel"]', 'input[placeholder*="221"]', 'input[name*="phone"]'] },
+    { label: 'Cible 3 : E-mail du client', selectors: ['input[type="email"]', 'input[placeholder*="@"]'] },
+    { label: 'Cible 4 : Date de dépôt', selectors: ['input[type="date"]', 'input[value*="2026"]'] },
+    { label: 'Cible 5 : Date de retrait', selectors: ['input[type="date"]'] },
+    { label: 'Cible 6 : Bouton Valider / Enregistrer', selectors: ['button', '[role="button"]', 'button[type="submit"]'] }
+  ];
+
   const stepTimerRef = useRef<any>(null);
 
   // Detect SaaS & run Visual DOM Debug Inspector on mount
@@ -170,6 +183,43 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
     setIsPlaying(true);
   };
 
+  // Unit Test Mode effect for highlighting specific targets step-by-step
+  useEffect(() => {
+    if (!isUnitTestMode) return;
+    const currentTargetDef = unitTestTargets[unitTestIndex];
+    if (!currentTargetDef) return;
+
+    // Reset outlines on inputs/buttons
+    document.querySelectorAll('input, button, select').forEach((el: any) => {
+      el.style.outline = '';
+      el.style.boxShadow = '';
+    });
+
+    let targetEl: HTMLElement | null = null;
+    let usedSel = '';
+    for (const sel of currentTargetDef.selectors) {
+      targetEl = document.querySelector(sel) as HTMLElement;
+      if (targetEl) {
+        usedSel = sel;
+        break;
+      }
+    }
+
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetEl.style.outline = '4px solid #ef4444';
+      targetEl.style.boxShadow = '0 0 25px rgba(239, 68, 68, 0.9)';
+      const rect = targetEl.getBoundingClientRect();
+      setCursorPos({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      });
+      setExecutionObservation(`[TEST UNITAIRE DOM] Cible "${currentTargetDef.label}" trouvée via [${usedSel}] (x:${Math.round(rect.left)}, y:${Math.round(rect.top)}, w:${Math.round(rect.width)}, h:${Math.round(rect.height)})`);
+    } else {
+      setExecutionObservation(`[TEST UNITAIRE DOM] ❌ Cible "${currentTargetDef.label}" NON TROUVÉE dans le DOM actif !`);
+    }
+  }, [isUnitTestMode, unitTestIndex]);
+
   return (
     <div className="flex flex-col h-full bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
       {/* Top Banner with Notice & Quick Capture Trigger */}
@@ -223,27 +273,48 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
       <div className="bg-red-950/40 border-b border-red-500/50 px-4 py-3 text-xs text-red-200 flex flex-col gap-2 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-red-400">
-            <span>🚨 DOM DEBUG BUILD 01 — Rapport d'Inspection Visuelle</span>
-            <span className="text-[10px] bg-red-600/60 text-white px-2 py-0.5 rounded font-mono">Mode Cadre Rouge Actif</span>
+            <span>🚨 TEST UNITAIRE VISUEL DOM (Isolation & Cibles Pressing)</span>
+            <span className="text-[10px] bg-red-600/60 text-white px-2 py-0.5 rounded font-mono">
+              Mode Cible par Cible ({unitTestIndex + 1} / {unitTestTargets.length})
+            </span>
           </div>
-          <span className="text-[11px] text-slate-300 font-mono">Document analysé : <code className="text-amber-300">{window.location.href}</code> (document principal / Single Window SPA)</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsUnitTestMode(!isUnitTestMode)}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer transition-all ${
+                isUnitTestMode ? 'bg-red-600 text-white shadow' : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {isUnitTestMode ? 'Mode Unitaire Actif' : 'Activer Mode Unitaire'}
+            </button>
+            <button
+              onClick={() => {
+                if (unitTestIndex > 0) setUnitTestIndex(unitTestIndex - 1);
+                else setUnitTestIndex(unitTestTargets.length - 1);
+              }}
+              className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-bold cursor-pointer"
+            >
+              ◀ Précédent
+            </button>
+            <button
+              onClick={() => {
+                if (unitTestIndex < unitTestTargets.length - 1) setUnitTestIndex(unitTestIndex + 1);
+                else setUnitTestIndex(0);
+              }}
+              className="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-bold cursor-pointer"
+            >
+              Suivant Cible ➔
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-1">
-          {debugReport.map((item, idx) => (
-            <div key={idx} className={`p-2 rounded border ${item.found ? 'bg-slate-900 border-red-500/60 text-slate-200' : 'bg-slate-950 border-slate-800 text-slate-500'}`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-bold text-indigo-300">{item.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.found ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-400'}`}>
-                  {item.found ? 'TROUVÉ (Cadre Rouge)' : 'NON TROUVÉ'}
-                </span>
-              </div>
-              <div className="text-[10px] space-y-0.5 font-mono text-slate-400">
-                <div>Tag: <span className="text-emerald-400">{item.tag}</span> | ID: <span className="text-amber-400">{item.id}</span></div>
-                <div className="truncate">Sélecteur: <span className="text-slate-300">{item.selector}</span></div>
-                <div>Rect: <span className="text-indigo-200">{item.rect}</span></div>
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center justify-between bg-slate-900/90 px-3 py-2 rounded border border-red-500/40 text-[11px]">
+          <div>
+            <span className="text-slate-400 font-bold">Cible Actuelle : </span>
+            <span className="text-amber-300 font-extrabold">{unitTestTargets[unitTestIndex].label}</span>
+          </div>
+          <div className="font-mono text-emerald-400 truncate max-w-md">
+            Sélecteurs : {unitTestTargets[unitTestIndex].selectors.join(' | ')}
+          </div>
         </div>
       </div>
 
