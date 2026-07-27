@@ -95,7 +95,7 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
   const handleStartManualDemo = async () => {
     LiveGuidanceEngine.isRealTimeAutoControlEnabled = false;
     setIsAutoRunning(false);
-    await startDemoRecording(currentModule, currentPage, false, false);
+    await startDemoRecording(currentModule, currentPage, true, false);
     setIsOpen(false);
   };
 

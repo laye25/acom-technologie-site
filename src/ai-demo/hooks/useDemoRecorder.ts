@@ -5,6 +5,7 @@ import { UIAnalyzer } from '../engines/UIAnalyzer';
 import { AiEngine } from '../engines/AiEngine';
 import { DemoManager } from '../services/DemoManager';
 import { VideoStorageService } from '../services/VideoStorageService';
+import { DemoVideoSynthesizer } from '../services/DemoVideoSynthesizer';
 import { SaiEventBus } from '../services/SaiEventBus';
 import { RecordedEvent, DemoProject, DemoLanguage } from '../types';
 import toast from 'react-hot-toast';
@@ -113,10 +114,6 @@ export function useDemoRecorder() {
     if (existingProject) {
       // Just update existing project with new video and events
       targetProject = { ...existingProject };
-      if (videoBlobUrl && capturedBlob) {
-        targetProject.videoBlobUrl = videoBlobUrl;
-        await VideoStorageService.saveVideoBlob(targetProject.id, capturedBlob);
-      }
     } else {
       // Analyze current UI structure
       const uiAnalysis = UIAnalyzer.analyzeCurrentUI(activeModuleRef.current, activePageRef.current);
@@ -142,11 +139,19 @@ export function useDemoRecorder() {
       targetProject.uiAnalysis = uiAnalysis;
       targetProject.timelineSteps = aiContent.timelineSteps;
       targetProject.documentation = aiContent.documentation;
+    }
 
-      if (videoBlobUrl && capturedBlob) {
-        targetProject.videoBlobUrl = videoBlobUrl;
-        await VideoStorageService.saveVideoBlob(targetProject.id, capturedBlob);
+    // Ensure we have a valid video stream blob. If screen capture was refused or empty, synthesize video from steps canvas!
+    if (!capturedBlob || capturedBlob.size === 0) {
+      capturedBlob = await DemoVideoSynthesizer.synthesizeVideoBlob(targetProject);
+      if (capturedBlob && capturedBlob.size > 0) {
+        videoBlobUrl = URL.createObjectURL(capturedBlob);
       }
+    }
+
+    if (videoBlobUrl && capturedBlob) {
+      targetProject.videoBlobUrl = videoBlobUrl;
+      await VideoStorageService.saveVideoBlob(targetProject.id, capturedBlob);
     }
 
     DemoManager.saveProject(targetProject);
