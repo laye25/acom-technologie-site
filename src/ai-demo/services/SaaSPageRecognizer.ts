@@ -6,6 +6,7 @@
 
 import { UIAnalyzer } from '../engines/UIAnalyzer';
 import { UIAnalysis, UIControlInfo, TimelineStep } from '../types';
+import { ScenarioApplicationIntelligent } from '../types/sai';
 
 export interface SaaSProfile {
   saasId: string;
@@ -118,6 +119,71 @@ export class SaaSPageRecognizer {
     });
 
     return steps;
+  }
+
+  public static generateLiveScenario(domainName: string, pageName: string): ScenarioApplicationIntelligent {
+    const analysis = UIAnalyzer.analyzeCurrentUI(domainName, pageName);
+    const timelineSteps = this.generateStepsFromDOM(analysis);
+
+    return {
+      $schema: 'https://acom.tech/schemas/sai.v1.json',
+      id: `sai-live-dynamic-${Date.now()}`,
+      version: '1.0.0',
+      schemaVersion: '1.0.0',
+      metadata: {
+        title: `Scénario Dynamique Live : ${domainName}`,
+        description: `Scénario généré en temps réel par inspection directe du DOM réel de la page active.`,
+        author: 'Acom Live DOM Engine',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        merchantId: 'merchant-live-001',
+        privacyLevel: 'PUBLIC',
+        tags: ['live', 'dom-inspection', 'dynamic', 'runtime'],
+        status: 'validated',
+        reviewStatus: 'APPROVED',
+        qualityScore: 100
+      },
+      application: {
+        appName: domainName,
+        moduleName: analysis.module,
+        pageName: analysis.page,
+        route: window.location.pathname,
+        version: '2.5.0',
+        environment: 'web'
+      },
+      events: [],
+      snapshots: [],
+      timeline: timelineSteps.map(s => ({
+        id: s.id,
+        stepNumber: s.stepNumber,
+        startTimeSec: s.startTimeSec,
+        durationSec: s.durationSec,
+        title: s.title,
+        description: s.description,
+        actionType: s.actionType as any,
+        intent: s.title,
+        targetSelector: s.targetSelector,
+        targetValue: s.targetValue,
+        narrationText: s.narrationText,
+        zoomLevel: s.zoomLevel,
+        effectOverlay: s.effectOverlay,
+        x: s.x,
+        y: s.y
+      })),
+      knowledge: [],
+      narration: [],
+      diagnostics: {
+        overallScore: 100,
+        readabilityScore: 100,
+        rhythmScore: 100,
+        pedagogyScore: 100,
+        deadTimeTrimmedSec: 0,
+        suggestions: []
+      },
+      exports: {},
+      history: [],
+      extensions: {}
+    };
   }
 }
 

@@ -47,19 +47,30 @@ export class DomVirtualCursor {
       el.style.zIndex = '999999';
       el.style.transition = 'top 0.55s cubic-bezier(0.25, 1, 0.5, 1), left 0.55s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s ease';
       el.innerHTML = `
-        <div style="position: relative; width: 100%; height: 100%;">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 12px rgba(92, 33, 151, 0.6));">
+        <div style="position: relative; width: 100%; height: 100%; pointer-events: auto;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 12px rgba(92, 33, 151, 0.6)); pointer-events: none;">
             <path d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z" fill="#8b5cf6" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/>
           </svg>
-          <div id="acom-cursor-ripple" style="position: absolute; top: -10px; left: -10px; width: 52px; height: 52px; border-radius: 50%; border: 2.5px solid #10b981; opacity: 0; transform: scale(0.4); transition: all 0.35s ease-out;"></div>
-          <div style="position: absolute; top: 22px; left: 18px; background: rgba(15, 23, 42, 0.92); color: #6ee7b7; border: 1px solid #10b981; border-radius: 8px; padding: 3px 8px; font-size: 11px; font-weight: 800; white-space: nowrap; font-family: system-ui, sans-serif; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 4px;">
-            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-            <span>Guidage IA Direct</span>
+          <div id="acom-cursor-ripple" style="position: absolute; top: -10px; left: -10px; width: 52px; height: 52px; border-radius: 50%; border: 2.5px solid #10b981; opacity: 0; transform: scale(0.4); transition: all 0.35s ease-out; pointer-events: none;"></div>
+          <div style="position: absolute; top: 22px; left: 18px; background: rgba(15, 23, 42, 0.95); color: #6ee7b7; border: 1px solid #10b981; border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 800; white-space: nowrap; font-family: system-ui, sans-serif; box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 8px; pointer-events: auto;">
+            <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#10b981;"></span>
+            <span>IA Active & Souris Libre</span>
+            <button id="acom-cursor-pause-btn" style="background: rgba(255,255,255,0.15); border: none; color: #fff; padding: 2px 8px; border-radius: 5px; font-size: 10px; cursor: pointer; font-weight: bold; transition: background 0.2s;">Pause</button>
           </div>
         </div>
       `;
       document.body.appendChild(el);
       this.cursorEl = el;
+
+      const pauseBtn = el.querySelector('#acom-cursor-pause-btn');
+      if (pauseBtn) {
+        pauseBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const paused = LiveGuidanceEngine.togglePause();
+          pauseBtn.textContent = paused ? 'Reprendre' : 'Pause';
+          (pauseBtn as HTMLElement).style.background = paused ? '#10b981' : 'rgba(255,255,255,0.15)';
+        });
+      }
     }
     this.cursorEl.style.display = 'block';
     return this.cursorEl;
@@ -109,8 +120,23 @@ export class LiveGuidanceEngine {
   private static currentStepIndex: number = 0;
   private static isGuidanceActive: boolean = false;
   private static isAutoControlActive: boolean = false;
+  public static isRealTimeAutoControlEnabled: boolean = false;
+  private static isPaused: boolean = false;
   private static autoExecutionTimer: any = null;
   private static currentSessionId: string | null = null;
+
+  public static pause(): void {
+    LiveGuidanceEngine.isPaused = true;
+  }
+
+  public static resume(): void {
+    LiveGuidanceEngine.isPaused = false;
+  }
+
+  public static togglePause(): boolean {
+    LiveGuidanceEngine.isPaused = !LiveGuidanceEngine.isPaused;
+    return LiveGuidanceEngine.isPaused;
+  }
 
   public startGuidanceSession(scenario: ScenarioApplicationIntelligent): GuidanceSessionState {
     LiveGuidanceEngine.activeScenario = scenario;
@@ -128,140 +154,59 @@ export class LiveGuidanceEngine {
     const steps: SaiTimelineStep[] = [];
     let stepIndex = 1;
 
-    // Client Name
-    const clientInput = document.querySelector<HTMLInputElement>('input[placeholder*="Nom"], input[placeholder*="nom"], input[name*="name"], input[name*="client"]') || 
-                         document.querySelectorAll<HTMLInputElement>('form input[type="text"]')[0] || 
-                         document.querySelector<HTMLInputElement>('input[type="text"]');
-    if (clientInput) {
+    // Dynamically inspect all real interactive elements on screen
+    const interactiveEls = Array.from(
+      document.querySelectorAll<HTMLElement>('input:not([type="hidden"]), select, textarea, button:not(header button):not(nav button)')
+    ).filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && window.getComputedStyle(el).display !== 'none';
+    });
+
+    for (const el of interactiveEls) {
+      const tag = el.tagName.toLowerCase();
+      const placeholder = el.getAttribute('placeholder') || '';
+      const name = el.getAttribute('name') || '';
+      const ariaLabel = el.getAttribute('aria-label') || '';
+      const text = (el as HTMLButtonElement).innerText || '';
+      const labelText = placeholder || name || ariaLabel || text || `Élément ${stepIndex}`;
+
+      let actionType = 'CLICK';
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+        actionType = 'INPUT';
+      }
+      if (text.toLowerCase().includes('enregistrer') || text.toLowerCase().includes('valider') || text.toLowerCase().includes('soumettre')) {
+        actionType = 'SUBMIT';
+      }
+
       steps.push({
-        id: `step-${stepIndex}`,
-        stepNumber: stepIndex++,
+        id: `step-live-${stepIndex}`,
+        stepNumber: stepIndex,
         startTimeSec: (stepIndex - 1) * 3,
-        durationSec: 3.5,
-        title: 'Saisie du Nom du Client',
-        description: 'Saisie automatique caractère par caractère du nom client dans le formulaire',
-        actionType: 'INPUT',
-        intent: 'Identifier le client',
+        durationSec: 3.0,
+        title: `Action : ${labelText.substring(0, 30)}`,
+        description: `Interaction dynamique en temps réel avec le composant ${labelText}`,
+        actionType: actionType as any,
+        intent: `Interagir avec ${labelText}`,
         zoomLevel: 1,
         effectOverlay: 'green_halo',
-        narrationText: 'Saisie automatique du nom complet Amadou Sow.',
-        targetId: clientInput.id || undefined
+        narrationText: `Saisie ou interaction automatique sur le champ ${labelText}.`,
+        targetId: el.id || undefined
       } as any);
+
+      stepIndex++;
+      if (steps.length >= 8) break;
     }
 
-    // Phone / WhatsApp
-    const phoneInput = document.querySelector<HTMLInputElement>('input[placeholder*="221"], input[placeholder*="phone"], input[placeholder*="Téléphone"], input[name*="phone"]') || 
-                        document.querySelectorAll<HTMLInputElement>('form input[type="text"]')[1];
-    if (phoneInput) {
-      steps.push({
-        id: `step-${stepIndex}`,
-        stepNumber: stepIndex++,
-        startTimeSec: (stepIndex - 1) * 3,
-        durationSec: 3.5,
-        title: 'Numéro de Téléphone / WhatsApp',
-        description: 'Saisie du contact pour l\'envoi automatique des notifications SMS/WhatsApp',
-        actionType: 'INPUT',
-        intent: 'Contacter le client',
-        zoomLevel: 1,
-        effectOverlay: 'green_halo',
-        narrationText: 'Saisie du numéro WhatsApp +221 77 123 45 67.',
-        targetId: phoneInput.id || undefined
-      } as any);
-    }
-
-    // Email
-    const emailInput = document.querySelector<HTMLInputElement>('input[type="email"], input[placeholder*="mail"], input[name*="email"]') || 
-                       document.querySelectorAll<HTMLInputElement>('form input[type="text"]')[2];
-    if (emailInput) {
-      steps.push({
-        id: `step-${stepIndex}`,
-        stepNumber: stepIndex++,
-        startTimeSec: (stepIndex - 1) * 3,
-        durationSec: 3,
-        title: 'Adresse Courriel Client',
-        description: 'Saisie de l\'adresse email pour transmission du ticket numérique',
-        actionType: 'INPUT',
-        intent: 'Notifier le client',
-        zoomLevel: 1,
-        effectOverlay: 'green_halo',
-        narrationText: 'Saisie de l\'email client@gmail.com.',
-        targetId: emailInput.id || undefined
-      } as any);
-    }
-
-    // Add article button or Quantity increment
-    const addArticleBtn = Array.from(document.querySelectorAll<HTMLElement>('button')).find(
-      b => b.innerText.trim() === '+' || b.innerText.toLowerCase().includes('ajouter') || b.innerText.toLowerCase().includes('article') || b.querySelector('svg.lucide-plus')
-    );
-    if (addArticleBtn) {
-      steps.push({
-        id: `step-${stepIndex}`,
-        stepNumber: stepIndex++,
-        startTimeSec: (stepIndex - 1) * 3,
-        durationSec: 2.5,
-        title: 'Ajout d\'un Article / Quantité',
-        description: 'Incrémentation de la quantité d\'articles dans la commande',
-        actionType: 'CLICK',
-        intent: 'Incrémenter le panier',
-        zoomLevel: 1,
-        effectOverlay: 'green_halo',
-        narrationText: 'Clic sur le bouton d\'ajout d\'article.',
-        targetId: addArticleBtn.id || undefined
-      } as any);
-    }
-
-    // Weight / Amount / Acompte
-    const numInput = document.querySelector<HTMLInputElement>('input[type="number"]:not([disabled]), input[placeholder*="500"], input[placeholder*="6.5"]');
-    if (numInput) {
-      steps.push({
-        id: `step-${stepIndex}`,
-        stepNumber: stepIndex++,
-        startTimeSec: (stepIndex - 1) * 3,
-        durationSec: 3,
-        title: 'Saisie des Valeurs / Acompte',
-        description: 'Saisie de l\'acompte perçu ou du poids en kg',
-        actionType: 'INPUT',
-        intent: 'Régler l\'acompte',
-        zoomLevel: 1,
-        effectOverlay: 'green_halo',
-        narrationText: 'Saisie de la valeur financière ou du poids.',
-        targetId: numInput.id || undefined
-      } as any);
-    }
-
-    // Save Button / Submit
-    const submitBtn = document.querySelector<HTMLElement>('button[type="submit"]') || 
-                       Array.from(document.querySelectorAll<HTMLElement>('button')).find(
-                         b => b.innerText.toLowerCase().includes('enregistrer') || b.innerText.toLowerCase().includes('valider') || b.innerText.toLowerCase().includes('sauvegarder')
-                       );
-    if (submitBtn) {
-      steps.push({
-        id: `step-${stepIndex}`,
-        stepNumber: stepIndex++,
-        startTimeSec: (stepIndex - 1) * 3,
-        durationSec: 3.5,
-        title: 'Validation & Enregistrement du Formulaire',
-        description: 'Enregistrement des données saisies et confirmation',
-        actionType: 'SUBMIT',
-        intent: 'Finaliser l\'opération',
-        zoomLevel: 1,
-        effectOverlay: 'green_halo',
-        narrationText: 'Validation finale du formulaire et enregistrement des données.',
-        targetId: submitBtn.id || undefined
-      } as any);
-    }
-
-    // Fallback if no specific input matched
     if (steps.length === 0) {
       steps.push({
         id: 'step-fallback-1',
         stepNumber: 1,
         startTimeSec: 0,
         durationSec: 3,
-        title: 'Démonstration de l\'Interface Active',
-        description: 'Parcours guidé automatique des éléments de la page',
+        title: 'Exploration de la Page Active',
+        description: 'Parcours guidé de l\'interface active',
         actionType: 'CLICK',
-        intent: 'Présenter la page',
+        intent: 'Explorer la page',
         zoomLevel: 1,
         effectOverlay: 'green_halo',
         narrationText: 'Parcours guidé de l\'interface active.'
@@ -273,15 +218,15 @@ export class LiveGuidanceEngine {
     return {
       $schema: 'https://acom-technologie.com/schemas/sai-v2.json',
       schemaVersion: '2.0.0',
-      id: `sai-auto-${Date.now()}`,
+      id: `sai-live-${Date.now()}`,
       version: '2.0.0',
       metadata: {
-        title: `Démonstration ${pageName}`,
-        description: `Scénario de démonstration automatique pour ${moduleName}`,
+        title: `Démonstration Dynamique : ${pageName}`,
+        description: `Scénario généré dynamiquement par inspection directe du DOM pour ${moduleName}`,
         createdAt: isoNow,
         updatedAt: isoNow,
-        author: 'ACOM AI Live Guidance',
-        tags: ['auto-demo'],
+        author: 'ACOM AI Live Dynamic Engine',
+        tags: ['live-dynamic-dom'],
         reviewStatus: 'PUBLISHED',
         merchantId: 'merchant-default',
         privacyLevel: 'INTERNAL',
@@ -310,6 +255,11 @@ export class LiveGuidanceEngine {
     onStateChange?: (state: GuidanceSessionState) => void,
     onVideoComplete?: () => void
   ): Promise<void> {
+    if (!LiveGuidanceEngine.isRealTimeAutoControlEnabled) {
+      console.log('Real-Time Automatic Control is disconnected.');
+      if (onVideoComplete) onVideoComplete();
+      return;
+    }
     const sessionId = Math.random().toString(36).substring(7);
     LiveGuidanceEngine.currentSessionId = sessionId;
     
@@ -331,6 +281,13 @@ export class LiveGuidanceEngine {
     DomVirtualCursor.show();
 
     for (let i = 0; i < totalSteps; i++) {
+      if (!LiveGuidanceEngine.isAutoControlActive || !LiveGuidanceEngine.activeScenario || LiveGuidanceEngine.currentSessionId !== sessionId) break;
+
+      // Respect pause state to allow user manual mouse guidance & interaction
+      while (LiveGuidanceEngine.isPaused && LiveGuidanceEngine.isAutoControlActive && LiveGuidanceEngine.currentSessionId === sessionId) {
+        await new Promise(r => setTimeout(r, 250));
+      }
+
       if (!LiveGuidanceEngine.isAutoControlActive || !LiveGuidanceEngine.activeScenario || LiveGuidanceEngine.currentSessionId !== sessionId) break;
 
       LiveGuidanceEngine.currentStepIndex = i;

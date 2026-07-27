@@ -14,6 +14,7 @@ import { ScenarioApplicationIntelligent, SaiTimelineStep } from '../types/sai';
 import { GOLDEN_PRESSING_SCENARIO } from '../integration-tests/pressing-demo/PressingScenario';
 import { DomainProfileRegistry, AcomDomainId } from '../services/DomainProfiles';
 import { ProjectManager, DemoCourseProject } from '../services/ProjectManager';
+import { SaaSPageRecognizer } from '../services/SaaSPageRecognizer';
 import {
   Video,
   Search,
@@ -89,22 +90,35 @@ export const ExperienceWorkspace: React.FC = () => {
           </p>
         </div>
 
-        {/* Domain Profile Selector */}
-        <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-          <span className="text-xs text-slate-400 px-2 font-medium">Profil Métier:</span>
-          {DomainProfileRegistry.getAllProfiles().map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setSelectedDomain(p.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                selectedDomain === p.id
-                  ? 'bg-blue-600 text-white shadow'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-            >
-              {p.name}
-            </button>
-          ))}
+        {/* Domain Profile Selector & Live Dynamic DOM Button */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              const liveScen = SaaSPageRecognizer.generateLiveScenario(activeProfile.name, 'Réception & Dépôt');
+              setScenario(liveScen);
+              setSelectedStepIndex(0);
+            }}
+            className="px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-lg transition-all cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>Passer en Mode Live DOM (Dynamique)</span>
+          </button>
+          <div className="flex items-center gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+            <span className="text-xs text-slate-400 px-2 font-medium">Profil Métier:</span>
+            {DomainProfileRegistry.getAllProfiles().map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setSelectedDomain(p.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedDomain === p.id
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
