@@ -137,13 +137,31 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
         </div>
 
         {onTriggerNativeCapture && (
-          <button
-            onClick={onTriggerNativeCapture}
-            className="px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95"
-          >
-            <Video className="w-3.5 h-3.5 text-amber-300" />
-            <span>Capturer en Vidéo Natif (1080p)</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const profile = SaaSPageRecognizer.detectActiveSaaSAndPage();
+                setSaasProfile(profile);
+                const newSteps = SaaSPageRecognizer.generateStepsFromDOM(profile.uiAnalysis);
+                if (newSteps.length > 0 && project.timelineSteps) {
+                  project.timelineSteps = newSteps;
+                  onSelectStep(0);
+                  setExecutionObservation(`SaaS "${profile.saasName}" et page "${profile.pageName}" analysés : ${newSteps.length} étapes DOM générées avec succès !`);
+                }
+              }}
+              className="px-3 py-1 bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Analyser le DOM & Adapter</span>
+            </button>
+            <button
+              onClick={onTriggerNativeCapture}
+              className="px-3 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95"
+            >
+              <Video className="w-3.5 h-3.5 text-amber-300" />
+              <span>Capturer en Vidéo Natif (1080p)</span>
+            </button>
+          </div>
         )}
       </div>
 

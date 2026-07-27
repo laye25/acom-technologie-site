@@ -5,7 +5,7 @@
  */
 
 import { UIAnalyzer } from '../engines/UIAnalyzer';
-import { UIAnalysis, UIControlInfo } from '../types';
+import { UIAnalysis, UIControlInfo, TimelineStep } from '../types';
 
 export interface SaaSProfile {
   saasId: string;
@@ -29,7 +29,7 @@ export class SaaSPageRecognizer {
     let saasId = 'pressing';
     let saasName = 'Acom Pressing';
     let pageId = 'reception';
-    let pageName = 'Nouvel Enregistrement';
+    let pageName = 'Réception & Dépôt Client';
 
     if (fullUrl.includes('tailleur') || fullUrl.includes('couture')) {
       saasId = 'tailleur';
@@ -67,38 +67,57 @@ export class SaaSPageRecognizer {
       pageId,
       pageName,
       route: pathname,
-      confidence: 0.98,
+      confidence: 0.99,
       uiAnalysis
     };
   }
 
   /**
-   * Matches or maps recognized UI controls to business actions
+   * Generates real DOM-driven timeline steps from discovered UI controls
    */
-  public static mapControlsToBusinessActions(controls: UIControlInfo[]): Array<{
-    actionName: string;
-    control?: UIControlInfo;
-    targetSelector: string;
-    intent: string;
-  }> {
-    return controls.map((ctrl, idx) => {
-      let actionName = 'click';
-      let intent = `Action sur ${ctrl.label}`;
+  public static generateStepsFromDOM(uiAnalysis: UIAnalysis): TimelineStep[] {
+    const steps: TimelineStep[] = [];
+    const controls = uiAnalysis.controls || [];
 
-      if (ctrl.type === 'textbox' || ctrl.type === 'select') {
-        actionName = 'input';
-        intent = `Saisie dans ${ctrl.label}`;
-      } else if (ctrl.label.toLowerCase().includes('imprimer') || ctrl.label.toLowerCase().includes('valider')) {
-        actionName = 'submit';
-        intent = `Validation et émission du document`;
-      }
-
-      return {
-        actionName,
-        control: ctrl,
-        targetSelector: ctrl.selector || `#control-${idx}`,
-        intent
-      };
+    // Step 1: Page recognition & Context
+    steps.push({
+      id: 'step-recog',
+      stepNumber: 1,
+      startTimeSec: 0,
+      durationSec: 3,
+      title: `Reconnaissance SaaS : ${uiAnalysis.module}`,
+      description: `Page active détectée : ${uiAnalysis.page} (${uiAnalysis.controls.length} éléments DOM cartographiés).`,
+      actionType: 'click',
+      targetSelector: 'body',
+      narrationText: `Module ${uiAnalysis.module} reconnu. Page active : ${uiAnalysis.page}. Cartographie DOM réelle établie.`,
+      zoomLevel: 1.0,
+      effectOverlay: 'green_halo',
+      x: 200,
+      y: 150
     });
+
+    // Generate steps from discovered controls
+    controls.slice(0, 5).forEach((ctrl, idx) => {
+      const isInput = ctrl.type === 'textbox' || ctrl.type === 'select';
+      steps.push({
+        id: `step-ctrl-${idx}`,
+        stepNumber: idx + 2,
+        startTimeSec: (idx + 1) * 3,
+        durationSec: 3,
+        title: isInput ? `Saisie : ${ctrl.label}` : `Action : ${ctrl.label}`,
+        description: `Interaction temps réel sur l'élément stable "${ctrl.selector}".`,
+        actionType: isInput ? 'input' : 'click',
+        targetSelector: ctrl.selector,
+        targetValue: isInput ? 'Amadou Sow' : undefined,
+        narrationText: isInput ? `Saisie automatique dans le champ ${ctrl.label}.` : `Clic sur le bouton ${ctrl.label}.`,
+        zoomLevel: 1.2,
+        effectOverlay: 'arrow_pointer',
+        x: 350 + (idx * 50) % 300,
+        y: 200 + (idx * 40) % 200
+      });
+    });
+
+    return steps;
   }
 }
+
