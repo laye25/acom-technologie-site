@@ -100,7 +100,15 @@ export class DemoEventRecorder {
     // Ignore direct clicks inside text inputs to avoid duplicating click + input
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
-    const label = target.innerText?.trim().substring(0, 40) || 
+    // Ignore global header / navigation clicks (like "ACOMZONE" branding) unless explicitly tagged with data-sai-id
+    const saiId = target.getAttribute('data-sai-id');
+    const isHeaderOrNav = target.closest('header, nav') && !saiId;
+    const labelText = target.innerText?.trim() || '';
+    if (isHeaderOrNav || labelText.includes('ACOMZONE')) {
+      return;
+    }
+
+    const label = labelText.substring(0, 40) || 
                   target.getAttribute('aria-label') || 
                   target.getAttribute('title') || 
                   target.getAttribute('placeholder') ||
@@ -118,10 +126,10 @@ export class DemoEventRecorder {
     }
 
     this.addEvent({
-      action: 'click',
+      action: saiId === 'pressing.receipt.ticket.submit' ? 'submit' : 'click',
       buttonOrLabel: label || 'Action',
       targetTag: target.tagName,
-      targetId: target.id || undefined,
+      targetId: saiId || target.id || undefined,
       x: clickX,
       y: clickY,
       hasSensitiveData: isSensitive
@@ -132,6 +140,7 @@ export class DemoEventRecorder {
     const target = e.target as HTMLInputElement | HTMLTextAreaElement;
     if (!target) return;
 
+    const saiId = target.getAttribute('data-sai-id');
     const isSensitive = SensitiveDataMasker.isElementSensitive(target);
     const maskedVal = SensitiveDataMasker.maskValue(target.value, isSensitive);
 
@@ -139,18 +148,28 @@ export class DemoEventRecorder {
     const inputX = Math.round(rect.left + rect.width / 2);
     const inputY = Math.round(rect.top + rect.height / 2);
 
-    // Throttle input events ONLY if user is typing continuously into the EXACT SAME DOM element
-    const lastEvent = this.events[this.events.length - 1];
-    if (lastEvent && lastEvent.action === 'input' && this.lastInputTargetRef === target) {
-      lastEvent.valueMasked = maskedVal;
+    // Find if an event for this exact input field already exists in events array (Deduplication)
+    const existingIndex = this.events.findIndex(ev => 
+      ev.action === 'input' && (saiId && ev.targetId === saiId || ev.targetId === target.id)
+    );
+
+    if (existingIndex !== -1) {
+      // Update existing event value instead of duplicating
+      this.events[existingIndex].valueMasked = maskedVal;
       const latestSnapshot = this.capturePageSnapshot();
       if (latestSnapshot) {
-        lastEvent.screenshotUrl = latestSnapshot;
+        this.events[existingIndex].screenshotUrl = latestSnapshot;
       }
       return;
     }
 
-    // New input element focused/typed into
+    // Also fallback to lastEvent throttle if ref matches
+    const lastEvent = this.events[this.events.length - 1];
+    if (lastEvent && lastEvent.action === 'input' && (this.lastInputTargetRef === target)) {
+      lastEvent.valueMasked = maskedVal;
+      return;
+    }
+
     this.lastInputTargetRef = target;
 
     // Find human label
@@ -164,7 +183,7 @@ export class DemoEventRecorder {
       action: 'input',
       buttonOrLabel: label.substring(0, 40),
       targetTag: target.tagName,
-      targetId: target.id || undefined,
+      targetId: saiId || target.id || undefined,
       x: inputX,
       y: inputY,
       valueMasked: maskedVal,

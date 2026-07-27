@@ -48,24 +48,37 @@ export class RealDOMExecutionEngine {
     if (selector) {
       targetEl = document.querySelector(selector) as HTMLElement;
     }
+    if (!targetEl && (step as any).targetId) {
+      targetEl = document.querySelector(`[data-sai-id="${(step as any).targetId}"], #${(step as any).targetId}`) as HTMLElement;
+    }
 
     // Disambiguation & Fallbacks for Pressing / Forms
     if (!targetEl) {
-      if (businessTarget.toLowerCase().includes('téléphone') || businessTarget.toLowerCase().includes('whatsapp')) {
-        targetEl = document.querySelector('input[type="tel"], input[placeholder*="221"], input[name*="phone"]') as HTMLElement;
-        selectorUsed = 'input[type="tel"] | input[placeholder*="221"]';
-      } else if (businessTarget.toLowerCase().includes('client') || businessTarget.toLowerCase().includes('nom')) {
-        targetEl = document.querySelector('input[placeholder*="Nom"], input[name*="name"], input[type="text"]') as HTMLElement;
-        selectorUsed = 'input[placeholder*="Nom"] | input[type="text"]';
-      } else if (businessTarget.toLowerCase().includes('email')) {
-        targetEl = document.querySelector('input[type="email"], input[placeholder*="@"]') as HTMLElement;
-        selectorUsed = 'input[type="email"]';
+      const lowerTitle = businessTarget.toLowerCase();
+      if (lowerTitle.includes('téléphone') || lowerTitle.includes('whatsapp') || lowerTitle.includes('phone')) {
+        targetEl = document.querySelector('[data-sai-id="pressing.receipt.customer.phone"], input[type="tel"], input[placeholder*="221"], input[name*="phone"]') as HTMLElement;
+        selectorUsed = '[data-sai-id="pressing.receipt.customer.phone"]';
+      } else if (lowerTitle.includes('client') || lowerTitle.includes('nom') || lowerTitle.includes('fullname')) {
+        targetEl = document.querySelector('[data-sai-id="pressing.receipt.customer.fullName"], input[placeholder*="Nom"], input[name*="name"], input[type="text"]') as HTMLElement;
+        selectorUsed = '[data-sai-id="pressing.receipt.customer.fullName"]';
+      } else if (lowerTitle.includes('email')) {
+        targetEl = document.querySelector('[data-sai-id="pressing.receipt.customer.email"], input[type="email"], input[placeholder*="@"]') as HTMLElement;
+        selectorUsed = '[data-sai-id="pressing.receipt.customer.email"]';
+      } else if (lowerTitle.includes('dépôt') || lowerTitle.includes('deposit')) {
+        targetEl = document.querySelector('[data-sai-id="pressing.receipt.order.depositDate"], input[type="date"]') as HTMLElement;
+        selectorUsed = '[data-sai-id="pressing.receipt.order.depositDate"]';
+      } else if (lowerTitle.includes('retrait') || lowerTitle.includes('pickup')) {
+        targetEl = document.querySelector('[data-sai-id="pressing.receipt.order.pickupDate"], input[type="date"]') as HTMLElement;
+        selectorUsed = '[data-sai-id="pressing.receipt.order.pickupDate"]';
+      } else if (lowerTitle.includes('validation') || lowerTitle.includes('enregistrer') || lowerTitle.includes('submit')) {
+        targetEl = document.querySelector('[data-sai-id="pressing.receipt.ticket.submit"], button[type="submit"]') as HTMLElement;
+        selectorUsed = '[data-sai-id="pressing.receipt.ticket.submit"]';
       } else if (step.actionType === 'input') {
         targetEl = document.querySelector('input, textarea, select') as HTMLElement;
         selectorUsed = 'input, textarea, select';
       } else if (step.actionType === 'click' || step.actionType === 'submit') {
-        targetEl = document.querySelector('button, [role="button"], input[type="submit"]') as HTMLElement;
-        selectorUsed = 'button, [role="button"]';
+        targetEl = document.querySelector('main button:not(header button):not(nav button), form button, [role="button"]:not(header [role="button"]):not(nav [role="button"]), input[type="submit"]') as HTMLElement;
+        selectorUsed = 'main button, form button, [role="button"]';
       }
     }
 

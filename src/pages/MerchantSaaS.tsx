@@ -889,7 +889,15 @@ const MerchantSaaS = () => {
               <NetworkStatusIndicator position="inline" plan={merchant.plan} />
               
               <button
-                onClick={() => setActiveTab('acom_zone')}
+                onClick={() => {
+                  console.trace("[ACOMZONE-NAVIGATION]", {
+                    source: 'MerchantSaaS Header Button',
+                    activeTab,
+                    currentAIStep: (window as any).__currentAIStep || 'unknown',
+                    currentTarget: (window as any).__currentTarget || 'unknown'
+                  });
+                  setActiveTab('acom_zone');
+                }}
                 className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
                   activeTab === 'acom_zone' 
                     ? 'bg-[#0a0a0a] text-white shadow-lg shadow-black/20 ring-2 ring-violet-500 scale-105' 

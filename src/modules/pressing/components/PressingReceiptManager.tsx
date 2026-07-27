@@ -1828,6 +1828,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <input
                   type="text"
                   required
+                  data-sai-id="pressing.receipt.customer.fullName"
                   placeholder="Nom complet"
                   value={clientName}
                   onChange={e => setClientName(e.target.value)}
@@ -1838,6 +1839,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Téléphone / WhatsApp Contacts</label>
                 <input
                   type="text"
+                  data-sai-id="pressing.receipt.customer.phone"
                   placeholder="ex: +221771234567"
                   value={clientPhone}
                   onChange={e => setClientPhone(e.target.value)}
@@ -1848,6 +1850,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Adresse Email <span className="text-gray-400 font-normal">(Optionnel)</span></label>
                 <input
                   type="email"
+                  data-sai-id="pressing.receipt.customer.email"
                   placeholder="client@mail.com"
                   value={clientEmail}
                   onChange={e => setClientEmail(e.target.value)}
@@ -2151,6 +2154,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
             <div className="pt-4 border-t border-dashed border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="submit"
+                data-sai-id="pressing.receipt.ticket.submit"
                 className="w-full bg-[#5c2197] hover:bg-[#481977] text-white py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" /> Enregistrer le Ticket

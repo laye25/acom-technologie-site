@@ -15,8 +15,8 @@ export class TimelineEngine {
     let stepNumber = 1;
 
     events.forEach((evt, idx) => {
-      // Group related key events (filter out repetitive mouse moves/inputs)
-      if (evt.action === 'click' || evt.action === 'page_change' || evt.action === 'submit' || evt.action === 'delete' || evt.action === 'error') {
+      // Group related key events
+      if (evt.action === 'click' || evt.action === 'input' || evt.action === 'page_change' || evt.action === 'submit' || evt.action === 'delete' || evt.action === 'error') {
         const startTimeSec = Math.round(evt.timestampMs / 100) / 10;
         const durationSec = 3.0; // default step duration
 
@@ -40,6 +40,14 @@ export class TimelineEngine {
             narrationText = AiEngine.generateContextualNarration('click', evt.buttonOrLabel || 'Bouton', evt.page, idx, events.length);
             effectOverlay = 'green_halo';
             zoomLevel = 1.3;
+            break;
+
+          case 'input':
+            title = `Saisie : ${evt.buttonOrLabel}`;
+            description = `Saisie de données dans le champ "${evt.buttonOrLabel}"`;
+            narrationText = `Saisissez les informations dans le champ ${evt.buttonOrLabel}.`;
+            effectOverlay = 'green_halo';
+            zoomLevel = 1.2;
             break;
 
           case 'submit':
@@ -82,6 +90,8 @@ export class TimelineEngine {
           description,
           narrationText,
           actionType: evt.action,
+          targetValue: evt.valueMasked,
+          targetSelector: evt.targetId ? `[data-sai-id="${evt.targetId}"], #${evt.targetId}` : undefined,
           x: evt.x,
           y: evt.y,
           zoomLevel,
