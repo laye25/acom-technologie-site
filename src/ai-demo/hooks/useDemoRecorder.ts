@@ -56,35 +56,41 @@ export function useDemoRecorder() {
     pageName: string,
     enableScreenCapture: boolean = true,
     isSilent: boolean = false
-  ) => {
+  ): Promise<boolean> => {
     setActiveModule(moduleName);
     activeModuleRef.current = moduleName;
     setActivePage(pageName);
     activePageRef.current = pageName;
-    
-    eventRecorder.startRecording(moduleName, pageName);
-    setIsRecording(true);
-    isRecordingRef.current = true;
 
     if (enableScreenCapture) {
       const screenOk = await screenRecorder.startCapture('1080p', 30);
-      setIsScreenCapture(screenOk);
-      isScreenCaptureRef.current = screenOk;
-      if (!isSilent) {
-        if (screenOk) {
-          toast.success('Capture vidéo HD de l\'écran activée (ScreenRec) !');
-        } else {
-          toast('Capture vidéo d\'écran non activée. Seules les étapes texte seront enregistrées.', { icon: 'ℹ️' });
+      if (!screenOk) {
+        setIsScreenCapture(false);
+        isScreenCaptureRef.current = false;
+        setIsRecording(false);
+        isRecordingRef.current = false;
+        if (!isSilent) {
+          toast.error("Enregistrement annulé : l'autorisation de partage d'écran est requise.");
         }
+        return false;
       }
+
+      setIsScreenCapture(true);
+      isScreenCaptureRef.current = true;
     } else {
       setIsScreenCapture(false);
       isScreenCaptureRef.current = false;
     }
 
+    eventRecorder.startRecording(moduleName, pageName);
+    setIsRecording(true);
+    isRecordingRef.current = true;
+
     if (!isSilent) {
       toast.success(`Enregistrement ACOM AI Demo démarré : ${moduleName} - ${pageName}`);
     }
+
+    return true;
   }, []);
 
   const stopDemoRecording = useCallback(async (language: DemoLanguage = 'fr', existingProject?: DemoProject): Promise<DemoProject | null> => {

@@ -31,42 +31,42 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsub = SaiEventBus.subscribe('sai:trigger_live_demo_capture', (payload?: any) => {
+    const unsub = SaiEventBus.subscribe('sai:trigger_live_demo_capture', async (payload?: any) => {
       const mod = payload?.moduleName || currentModule;
       const pag = payload?.pageName || currentPage;
       const project = payload?.project;
       
-      startDemoRecording(mod, pag, true).then(() => {
-        setIsOpen(false);
-        setIsAutoRunning(true);
-        const guidanceEngine = new LiveGuidanceEngine();
-        
-        let scenarioObj = undefined;
-        if (project) {
-          scenarioObj = {
-            id: project.id,
-            version: '1.0.0',
-            application: { appName: project.moduleName, moduleName: project.pageName },
-            timeline: project.timelineSteps || [],
-            recordedEvents: project.events || []
-          };
-        }
+      const started = await startDemoRecording(mod, pag, true, true);
+      if (!started) return;
 
-        guidanceEngine.startAutoControlSession(
-          scenarioObj as any,
-          undefined,
-          async () => {
-            setIsAutoRunning(false);
-            const savedProject = await stopDemoRecording('fr', project);
-            if (savedProject && !project) {
-              navigate(`/admin/ai-demo?project=${savedProject.id}`);
-            } else {
-              // Reload page to reflect new video if we updated an existing project, or trigger an event
-              SaiEventBus.publish('sai:scenario_updated', { scenarioId: project.id, completedAt: Date.now() });
-            }
+      setIsOpen(false);
+      setIsAutoRunning(true);
+      const guidanceEngine = new LiveGuidanceEngine();
+      
+      let scenarioObj = undefined;
+      if (project) {
+        scenarioObj = {
+          id: project.id,
+          version: '1.0.0',
+          application: { appName: project.moduleName, moduleName: project.pageName },
+          timeline: project.timelineSteps || [],
+          recordedEvents: project.events || []
+        };
+      }
+
+      guidanceEngine.startAutoControlSession(
+        scenarioObj as any,
+        undefined,
+        async () => {
+          setIsAutoRunning(false);
+          const savedProject = await stopDemoRecording('fr', project);
+          if (savedProject && !project) {
+            navigate(`/admin/ai-demo?project=${savedProject.id}`);
+          } else if (project) {
+            SaiEventBus.publish('sai:scenario_updated', { scenarioId: project.id, completedAt: Date.now() });
           }
-        );
-      });
+        }
+      );
     });
 
     return () => unsub();
@@ -74,8 +74,13 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
 
   const handleStartAutoDemo = async () => {
     LiveGuidanceEngine.isRealTimeAutoControlEnabled = true;
+    const started = await startDemoRecording(currentModule, currentPage, true, true); // Force true, silent
+    if (!started) {
+      setIsAutoRunning(false);
+      return;
+    }
+
     setIsAutoRunning(true);
-    await startDemoRecording(currentModule, currentPage, true, true); // Force true, silent
     setIsOpen(false);
 
     const guidanceEngine = new LiveGuidanceEngine();
@@ -95,8 +100,10 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
   const handleStartManualDemo = async () => {
     LiveGuidanceEngine.isRealTimeAutoControlEnabled = false;
     setIsAutoRunning(false);
-    await startDemoRecording(currentModule, currentPage, true, false);
-    setIsOpen(false);
+    const started = await startDemoRecording(currentModule, currentPage, true, false);
+    if (started) {
+      setIsOpen(false);
+    }
   };
 
   const handleStop = async () => {
