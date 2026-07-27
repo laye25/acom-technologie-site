@@ -553,11 +553,11 @@ export const MerchantDashboard = ({
                     setRestoreLogResult({
                       success: false,
                       logs: [`[RESTORE] ERREUR FATALE : ${err.message || String(err)}`],
-                      importedCounts: { products: 0, sales: 0, expenses: 0 },
-                      copiedCounts: { products: 0, sales: 0, expenses: 0 },
-                      openedCounts: { products: 0, sales: 0, expenses: 0 },
-                      dexieCounts: { products: 0, sales: 0, expenses: 0 },
-                      dashboardCounts: { products: 0, sales: 0, expenses: 0 },
+                      importedCounts: { aperçu: 0, clients: 0, commandes: 0, tissus: 0, boutique: 0, inspirations: 0, artisans: 0, mercerie: 0, compta: 0, products: 0, sales: 0, expenses: 0 },
+                      copiedCounts: { aperçu: 0, clients: 0, commandes: 0, tissus: 0, boutique: 0, inspirations: 0, artisans: 0, mercerie: 0, compta: 0, products: 0, sales: 0, expenses: 0 },
+                      openedCounts: { aperçu: 0, clients: 0, commandes: 0, tissus: 0, boutique: 0, inspirations: 0, artisans: 0, mercerie: 0, compta: 0, products: 0, sales: 0, expenses: 0 },
+                      dexieCounts: { aperçu: 0, clients: 0, commandes: 0, tissus: 0, boutique: 0, inspirations: 0, artisans: 0, mercerie: 0, compta: 0, products: 0, sales: 0, expenses: 0 },
+                      dashboardCounts: { aperçu: 0, clients: 0, commandes: 0, tissus: 0, boutique: 0, inspirations: 0, artisans: 0, mercerie: 0, compta: 0, products: 0, sales: 0, expenses: 0 },
                       activeDbPath: 'Erreur',
                       detectedDbFiles: [],
                       errorStep: 'Restauration globale',
@@ -599,12 +599,12 @@ export const MerchantDashboard = ({
             {/* 5-Level Audit Comparison Table */}
             <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3 font-mono text-xs">
               <div className="text-[11px] font-bold uppercase text-slate-400 tracking-wider flex items-center justify-between">
-                <span>Tableau d'Audit des Enregistrements</span>
+                <span>Tableau d'Audit des Enregistrements (Couture & 9 Domaines)</span>
                 <span className="text-[10px] text-slate-500 font-normal">Base active : {restoreLogResult.activeDbPath}</span>
               </div>
 
               <div className="grid grid-cols-6 gap-1 text-[10px] font-bold uppercase text-slate-400 border-b border-slate-800 pb-2">
-                <div>Table</div>
+                <div>Domaine / Table</div>
                 <div className="text-center">1. Importé</div>
                 <div className="text-center">2. Copié</div>
                 <div className="text-center">3. Ouvert</div>
@@ -612,32 +612,26 @@ export const MerchantDashboard = ({
                 <div className="text-center">5. Dashboard</div>
               </div>
 
-              <div className="grid grid-cols-6 gap-1 text-slate-200 text-[11px] items-center">
-                <div className="font-bold text-emerald-400">Products</div>
-                <div className="text-center font-bold">{restoreLogResult.importedCounts.products}</div>
-                <div className="text-center font-bold">{restoreLogResult.copiedCounts.products}</div>
-                <div className="text-center font-bold">{restoreLogResult.openedCounts.products}</div>
-                <div className="text-center font-bold">{restoreLogResult.dexieCounts.products}</div>
-                <div className="text-center font-bold text-emerald-400">{restoreLogResult.dashboardCounts.products}</div>
-              </div>
-
-              <div className="grid grid-cols-6 gap-1 text-slate-200 text-[11px] items-center">
-                <div className="font-bold text-emerald-400">Sales</div>
-                <div className="text-center font-bold">{restoreLogResult.importedCounts.sales}</div>
-                <div className="text-center font-bold">{restoreLogResult.copiedCounts.sales}</div>
-                <div className="text-center font-bold">{restoreLogResult.openedCounts.sales}</div>
-                <div className="text-center font-bold">{restoreLogResult.dexieCounts.sales}</div>
-                <div className="text-center font-bold text-emerald-400">{restoreLogResult.dashboardCounts.sales}</div>
-              </div>
-
-              <div className="grid grid-cols-6 gap-1 text-slate-200 text-[11px] items-center">
-                <div className="font-bold text-emerald-400">Expenses</div>
-                <div className="text-center font-bold">{restoreLogResult.importedCounts.expenses}</div>
-                <div className="text-center font-bold">{restoreLogResult.copiedCounts.expenses}</div>
-                <div className="text-center font-bold">{restoreLogResult.openedCounts.expenses}</div>
-                <div className="text-center font-bold">{restoreLogResult.dexieCounts.expenses}</div>
-                <div className="text-center font-bold text-emerald-400">{restoreLogResult.dashboardCounts.expenses}</div>
-              </div>
+              {[
+                { key: 'aperçu', label: '1. Aperçu & Clôtures' },
+                { key: 'clients', label: '2. Clients Couture' },
+                { key: 'commandes', label: '3. Commandes Mesures' },
+                { key: 'tissus', label: '4. Tissus & Wax' },
+                { key: 'boutique', label: '5. Boutique Prêt-à-porter' },
+                { key: 'inspirations', label: '6. Inspirations' },
+                { key: 'artisans', label: '7. Artisans & Équipe' },
+                { key: 'mercerie', label: '8. Mercerie & Coûts' },
+                { key: 'compta', label: '9. Compta & Dépenses' },
+              ].map(domain => (
+                <div key={domain.key} className="grid grid-cols-6 gap-1 text-slate-200 text-[11px] items-center">
+                  <div className="font-bold text-emerald-400 truncate">{domain.label}</div>
+                  <div className="text-center font-bold">{restoreLogResult.importedCounts[domain.key] || 0}</div>
+                  <div className="text-center font-bold">{restoreLogResult.copiedCounts[domain.key] || 0}</div>
+                  <div className="text-center font-bold">{restoreLogResult.openedCounts[domain.key] || 0}</div>
+                  <div className="text-center font-bold">{restoreLogResult.dexieCounts[domain.key] || 0}</div>
+                  <div className="text-center font-bold text-emerald-400">{restoreLogResult.dashboardCounts[domain.key] || 0}</div>
+                </div>
+              ))}
             </div>
 
             {/* Complete Log Output Stream */}
