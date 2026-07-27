@@ -30,13 +30,62 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
   const [saasProfile, setSaasProfile] = useState<SaaSProfile | null>(null);
   const [executionObservation, setExecutionObservation] = useState<string>('');
   const [lastTrace, setLastTrace] = useState<any>(null);
+  const [debugReport, setDebugReport] = useState<Array<{ label: string; found: boolean; selector: string; tag: string; id: string; rect: string }>>([]);
 
   const stepTimerRef = useRef<any>(null);
 
-  // Detect SaaS & Page on mount
+  // Detect SaaS & run Visual DOM Debug Inspector on mount
   useEffect(() => {
     const profile = SaaSPageRecognizer.detectActiveSaaSAndPage();
     setSaasProfile(profile);
+
+    // Run Visual DOM Debug Inspector scan
+    const targets = [
+      { label: 'Nom client', selectors: ['input[placeholder*="Nom"]', 'input[name*="name"]', 'input[type="text"]'] },
+      { label: 'Téléphone', selectors: ['input[type="tel"]', 'input[placeholder*="221"]', 'input[name*="phone"]'] },
+      { label: 'E-mail', selectors: ['input[type="email"]', 'input[placeholder*="@"]'] },
+      { label: 'Bouton Enregistrer', selectors: ['button', '[role="button"]', 'button[type="submit"]'] }
+    ];
+
+    const report: Array<{ label: string; found: boolean; selector: string; tag: string; id: string; rect: string }> = [];
+
+    targets.forEach(t => {
+      let el: HTMLElement | null = null;
+      let usedSel = '';
+      for (const sel of t.selectors) {
+        el = document.querySelector(sel) as HTMLElement;
+        if (el) {
+          usedSel = sel;
+          break;
+        }
+      }
+
+      if (el) {
+        // Draw Red Debug Box for DOM Debug Build 01
+        el.style.outline = '4px solid #ef4444';
+        el.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.6)';
+        const rect = el.getBoundingClientRect();
+        report.push({
+          label: t.label,
+          found: true,
+          selector: usedSel,
+          tag: el.tagName.toLowerCase(),
+          id: el.id || 'N/A',
+          rect: `x:${Math.round(rect.left)}, y:${Math.round(rect.top)}, w:${Math.round(rect.width)}, h:${Math.round(rect.height)}`
+        });
+      } else {
+        report.push({
+          label: t.label,
+          found: false,
+          selector: t.selectors.join(' | '),
+          tag: 'none',
+          id: 'none',
+          rect: 'N/A'
+        });
+      }
+    });
+
+    setDebugReport(report);
   }, []);
 
   // Position cursor & execute real DOM action with precise coordinates and trace
@@ -130,6 +179,9 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
           <span className="text-xs font-bold text-slate-200">
             Simulateur IA & DOM Réel
           </span>
+          <span className="text-[10px] bg-red-600 text-white font-mono px-2 py-0.5 rounded-full font-bold shadow animate-pulse">
+            DOM DEBUG BUILD 01
+          </span>
           {saasProfile && (
             <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" />
@@ -167,12 +219,33 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
         )}
       </div>
 
-      {executionObservation && (
-        <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-1.5 text-[11px] text-indigo-300 flex items-center gap-2">
-          <span className="font-bold text-indigo-400">🔍 État DOM :</span>
-          <span className="truncate">{executionObservation}</span>
+      {/* DOM DEBUG BUILD 01 - Visual Inspection Report Panel */}
+      <div className="bg-red-950/40 border-b border-red-500/50 px-4 py-3 text-xs text-red-200 flex flex-col gap-2 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-red-400">
+            <span>🚨 DOM DEBUG BUILD 01 — Rapport d'Inspection Visuelle</span>
+            <span className="text-[10px] bg-red-600/60 text-white px-2 py-0.5 rounded font-mono">Mode Cadre Rouge Actif</span>
+          </div>
+          <span className="text-[11px] text-slate-300 font-mono">Document analysé : <code className="text-amber-300">{window.location.href}</code> (document principal / Single Window SPA)</span>
         </div>
-      )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-1">
+          {debugReport.map((item, idx) => (
+            <div key={idx} className={`p-2 rounded border ${item.found ? 'bg-slate-900 border-red-500/60 text-slate-200' : 'bg-slate-950 border-slate-800 text-slate-500'}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-indigo-300">{item.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.found ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-400'}`}>
+                  {item.found ? 'TROUVÉ (Cadre Rouge)' : 'NON TROUVÉ'}
+                </span>
+              </div>
+              <div className="text-[10px] space-y-0.5 font-mono text-slate-400">
+                <div>Tag: <span className="text-emerald-400">{item.tag}</span> | ID: <span className="text-amber-400">{item.id}</span></div>
+                <div className="truncate">Sélecteur: <span className="text-slate-300">{item.selector}</span></div>
+                <div>Rect: <span className="text-indigo-200">{item.rect}</span></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* SaaS & DOM Cartography Diagnostic Panel */}
       {saasProfile && (
