@@ -29,6 +29,7 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
   const [showRipple, setShowRipple] = useState<boolean>(false);
   const [saasProfile, setSaasProfile] = useState<SaaSProfile | null>(null);
   const [executionObservation, setExecutionObservation] = useState<string>('');
+  const [lastTrace, setLastTrace] = useState<any>(null);
 
   const stepTimerRef = useRef<any>(null);
 
@@ -38,13 +39,18 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
     setSaasProfile(profile);
   }, []);
 
-  // Position cursor & execute real DOM action when step changes
+  // Position cursor & execute real DOM action with precise coordinates and trace
   useEffect(() => {
     if (currentStep) {
-      const targetX = currentStep.x || 350 + (activeStepIndex * 80) % 300;
-      const targetY = currentStep.y || 200 + (activeStepIndex * 60) % 200;
-      
-      setCursorPos({ x: targetX, y: targetY });
+      const trace = RealDOMExecutionEngine.executeStepWithTrace(currentStep, activeStepIndex);
+      setLastTrace(trace);
+      setExecutionObservation(trace.resultObtained);
+
+      if (trace.coordinates) {
+        setCursorPos({ x: trace.coordinates.x, y: trace.coordinates.y });
+      } else {
+        setExecutionObservation(`ÉLÉMENT NON RECONNU : ${currentStep.title || 'Cible'}`);
+      }
 
       // Trigger click ripple animation on click/submit actions
       if (currentStep.actionType === 'click' || currentStep.actionType === 'submit') {
@@ -52,10 +58,6 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
         const t = setTimeout(() => setShowRipple(false), 800);
         return () => clearTimeout(t);
       }
-
-      // Execute on real DOM and observe state
-      const result = RealDOMExecutionEngine.executeStepOnRealDOM(currentStep);
-      setExecutionObservation(result.observation);
     }
   }, [activeStepIndex, currentStep]);
 
@@ -169,6 +171,63 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
         <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-1.5 text-[11px] text-indigo-300 flex items-center gap-2">
           <span className="font-bold text-indigo-400">🔍 État DOM :</span>
           <span className="truncate">{executionObservation}</span>
+        </div>
+      )}
+
+      {/* SaaS & DOM Cartography Diagnostic Panel */}
+      {saasProfile && (
+        <div className="bg-slate-900/95 border-b border-slate-800 px-4 py-3 text-xs text-slate-300 flex flex-col gap-2 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-emerald-400">🎯 SaaS Reconnu : {saasProfile.saasName}</span>
+              <span className="text-slate-500">|</span>
+              <span className="font-semibold text-slate-200">Page : {saasProfile.pageName}</span>
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded border border-indigo-500/30">
+                Confiance : {(saasProfile.confidence * 100)}%
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-400">
+              {saasProfile.uiAnalysis.controls.length} éléments DOM métier cartographiés
+            </span>
+          </div>
+
+          {/* Verifiable Real-Time Execution Trace (Règle 60/64) */}
+          {lastTrace && (
+            <div className="bg-slate-950 border border-indigo-500/40 rounded-lg p-2.5 text-[11px] grid grid-cols-2 gap-x-4 gap-y-1.5 mt-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-bold">Cible Métier :</span>
+                <span className="text-indigo-300 font-semibold">{lastTrace.businessTarget}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-bold">Type DOM :</span>
+                <code className="text-emerald-400 font-mono text-[10px]">{lastTrace.actualElementType}</code>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-bold">Sélecteur :</span>
+                <code className="text-amber-300 font-mono text-[10px] bg-slate-900 px-1 rounded truncate">{lastTrace.selectorUsed}</code>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-bold">Action :</span>
+                <span className="text-slate-200">{lastTrace.actionExecuted}</span>
+              </div>
+              <div className="col-span-2 flex items-center gap-1.5 bg-slate-900/80 px-2 py-1 rounded">
+                <span className="text-slate-400 font-bold">Résultat :</span>
+                <span className={lastTrace.success ? "text-emerald-300 font-medium" : "text-red-400 font-medium"}>
+                  {lastTrace.resultObtained}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5 max-h-16 overflow-y-auto mt-1">
+            {saasProfile.uiAnalysis.controls.map((ctrl, i) => (
+              <div key={i} className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[10px] flex items-center gap-2">
+                <span className="text-indigo-400 font-bold">{ctrl.label}</span>
+                <span className="text-slate-500">[{ctrl.type}]</span>
+                <code className="text-emerald-300 font-mono text-[9px] bg-slate-900 px-1 rounded">{ctrl.selector}</code>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
