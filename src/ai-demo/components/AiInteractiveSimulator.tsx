@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Video, MousePointer, FastForward, CheckCircle2, ChevronLeft, ChevronRight, Layers, Lock } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, Video, MousePointer, FastForward, CheckCircle2, ChevronLeft, ChevronRight, Layers, Lock, ShieldCheck } from 'lucide-react';
 import { DemoProject, TimelineStep } from '../types';
 import { VoiceEngine } from '../voice/VoiceEngine';
+import { SaaSPageRecognizer, SaaSProfile } from '../services/SaaSPageRecognizer';
+import { RealDOMExecutionEngine } from '../engines/RealDOMExecutionEngine';
 
 interface AiInteractiveSimulatorProps {
   project: DemoProject;
@@ -25,10 +27,18 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number }>({ x: 400, y: 250 });
   const [showRipple, setShowRipple] = useState<boolean>(false);
+  const [saasProfile, setSaasProfile] = useState<SaaSProfile | null>(null);
+  const [executionObservation, setExecutionObservation] = useState<string>('');
 
   const stepTimerRef = useRef<any>(null);
 
-  // Position cursor based on step coordinates or default
+  // Detect SaaS & Page on mount
+  useEffect(() => {
+    const profile = SaaSPageRecognizer.detectActiveSaaSAndPage();
+    setSaasProfile(profile);
+  }, []);
+
+  // Position cursor & execute real DOM action when step changes
   useEffect(() => {
     if (currentStep) {
       const targetX = currentStep.x || 350 + (activeStepIndex * 80) % 300;
@@ -42,6 +52,10 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
         const t = setTimeout(() => setShowRipple(false), 800);
         return () => clearTimeout(t);
       }
+
+      // Execute on real DOM and observe state
+      const result = RealDOMExecutionEngine.executeStepOnRealDOM(currentStep);
+      setExecutionObservation(result.observation);
     }
   }, [activeStepIndex, currentStep]);
 
@@ -112,11 +126,14 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
           <span className="text-xs font-bold text-slate-200">
-            Simulateur IA Interactif
+            Simulateur IA & DOM Réel
           </span>
-          <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30">
-            Replay Vectoriel Règle 60
-          </span>
+          {saasProfile && (
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3" />
+              <span>SaaS Détecté : {saasProfile.saasName} ({saasProfile.pageName})</span>
+            </span>
+          )}
         </div>
 
         {onTriggerNativeCapture && (
@@ -129,6 +146,13 @@ export const AiInteractiveSimulator: React.FC<AiInteractiveSimulatorProps> = ({
           </button>
         )}
       </div>
+
+      {executionObservation && (
+        <div className="bg-slate-900/90 border-b border-slate-800 px-4 py-1.5 text-[11px] text-indigo-300 flex items-center gap-2">
+          <span className="font-bold text-indigo-400">🔍 État DOM :</span>
+          <span className="truncate">{executionObservation}</span>
+        </div>
+      )}
 
       {/* Main Simulation Viewport (Simulated Browser Canvas) */}
       <div className="relative flex-1 bg-slate-900 flex flex-col overflow-hidden">
