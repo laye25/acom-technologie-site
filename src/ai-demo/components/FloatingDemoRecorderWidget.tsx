@@ -4,9 +4,11 @@
 import React, { useState, useEffect } from 'react';
 import { useDemoRecorder } from '../hooks/useDemoRecorder';
 import { LiveGuidanceEngine } from '../services/LiveGuidanceEngine';
+import { SaaSPageRecognizer } from '../services/SaaSPageRecognizer';
 import { SaiEventBus } from '../services/SaiEventBus';
-import { Video, Square, Sparkles, X, Clock, MousePointerClick } from 'lucide-react';
+import { Video, Square, Sparkles, X, Clock, MousePointerClick, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 interface FloatingDemoRecorderWidgetProps {
   currentModule?: string;
@@ -111,6 +113,17 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
     const project = await stopDemoRecording();
     if (project) {
       navigate(`/admin/ai-demo?project=${project.id}`);
+    }
+  };
+
+  const handleQuickAutofill = () => {
+    const filledCount = SaaSPageRecognizer.autofillCurrentPageInputs();
+    if (filledCount > 0) {
+      toast.success(`⚡ ${filledCount} champ(s) pré-rempli(s) instantanément !`, {
+        icon: '✨'
+      });
+    } else {
+      toast('Aucun champ de formulaire détecté sur cette page.', { icon: 'ℹ️' });
     }
   };
 
@@ -219,6 +232,14 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
             <span>Événements capturés :</span>
             <span className="font-bold text-violet-400 bg-violet-500/20 px-2 py-0.5 rounded">{eventsCount} actions</span>
           </div>
+
+          <button
+            onClick={handleQuickAutofill}
+            className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all border border-emerald-400/30"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+            <span>⚡ Pré-remplissage Rapide des Champs</span>
+          </button>
 
           <button
             onClick={handleStop}

@@ -185,5 +185,96 @@ export class SaaSPageRecognizer {
       extensions: {}
     };
   }
+
+  /**
+   * Instantly fills current visible form inputs on the active page with realistic demo data.
+   */
+  public static autofillCurrentPageInputs(): number {
+    const inputs = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), textarea, select'
+    )).filter(el => {
+      const style = window.getComputedStyle(el);
+      const isReadOnly = 'readOnly' in el ? (el as HTMLInputElement | HTMLTextAreaElement).readOnly : false;
+      return style.display !== 'none' && style.visibility !== 'hidden' && !el.disabled && !isReadOnly;
+    });
+
+    let filledCount = 0;
+
+    const sampleNames = ['Amadou Diallo', 'Aïssatou Sow', 'Khadija Ndiaye', 'Ousmane Ba'];
+    const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+
+    inputs.forEach(el => {
+      const textContext = [
+        el.getAttribute('name') || '',
+        el.getAttribute('id') || '',
+        el.getAttribute('placeholder') || '',
+        el.getAttribute('aria-label') || '',
+        el.labels ? Array.from(el.labels).map(l => l.innerText).join(' ') : '',
+        el.parentElement?.innerText || ''
+      ].join(' ').toLowerCase();
+
+      let valToSet = '';
+
+      if (textContext.includes('nom') || textContext.includes('client') || textContext.includes('customer') || textContext.includes('nom complet')) {
+        valToSet = randomName;
+      } else if (textContext.includes('tel') || textContext.includes('phone') || textContext.includes('whatsapp') || textContext.includes('mobile')) {
+        valToSet = '+221 77 845 12 90';
+      } else if (textContext.includes('mail') || textContext.includes('email')) {
+        valToSet = 'client.demo@acom.sn';
+      } else if (textContext.includes('adresse') || textContext.includes('address') || textContext.includes('ville') || textContext.includes('quartier')) {
+        valToSet = 'Dakar, Mermoz - Sacré Cœur';
+      } else if (textContext.includes('obs') || textContext.includes('remarque') || textContext.includes('note') || textContext.includes('description') || textContext.includes('état')) {
+        valToSet = 'Costume 2 pièces + Chemise, traitement anti-taches prioritaire.';
+      } else if (textContext.includes('montant') || textContext.includes('prix') || textContext.includes('tarif') || textContext.includes('price') || textContext.includes('avance') || textContext.includes('paye')) {
+        valToSet = '15000';
+      } else if (textContext.includes('qte') || textContext.includes('quantite') || textContext.includes('nombre') || textContext.includes('poids')) {
+        valToSet = '3';
+      } else if (el.tagName.toLowerCase() === 'select') {
+        const select = el as HTMLSelectElement;
+        if (select.options.length > 1) {
+          select.selectedIndex = Math.min(1, select.options.length - 1);
+          valToSet = select.value;
+        }
+      } else if (!el.value) {
+        valToSet = 'Donnée Démo ACOM';
+      }
+
+      if (valToSet) {
+        // Dispatch React synthetic value change
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          el.tagName.toLowerCase() === 'textarea'
+            ? window.HTMLTextAreaElement.prototype
+            : el.tagName.toLowerCase() === 'select'
+            ? window.HTMLSelectElement.prototype
+            : window.HTMLInputElement.prototype,
+          'value'
+        )?.set;
+
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(el, valToSet);
+        } else {
+          el.value = valToSet;
+        }
+
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('blur', { bubbles: true }));
+
+        // Visual flash effect on filled inputs
+        const origOutline = el.style.outline;
+        const origTransition = el.style.transition;
+        el.style.transition = 'all 0.3s ease';
+        el.style.outline = '2px solid #10b981';
+        setTimeout(() => {
+          el.style.outline = origOutline;
+          el.style.transition = origTransition;
+        }, 1200);
+
+        filledCount++;
+      }
+    });
+
+    return filledCount;
+  }
 }
 
