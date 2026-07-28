@@ -35,7 +35,7 @@ export const AIDemoConsolePage: React.FC = () => {
   }, []);
 
   const handleStartGoldenTutorial = () => {
-    TutorialEngine.startTutorial(PRESSING_GOLDEN_TUTORIAL);
+    TutorialEngine.startTutorialSelection('pressing');
   };
 
   const handleStartScreenRecord = async () => {

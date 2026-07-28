@@ -5,6 +5,8 @@ import {
   useSchoolLiveParentProfile 
 } from '../modules/scolaire/hooks/useSchoolSaaS';
 import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import { ContextEngine } from '../ai-demo/Intelligence/ContextEngine';
+import { TutorialEngine } from '../ai-demo/Tutorial/TutorialEngine';
 
 // Core Merchant & Module Lazy Loading (Clean Architecture & Performance Optimization)
 const MerchantOnboarding = lazy(() => import('../modules/onboarding/components/MerchantOnboarding'));
@@ -189,6 +191,16 @@ const MerchantSaaS = () => {
   const [loggedTeacherProfile, setLoggedTeacherProfile] = useState<any>(null);
   const [loggedParentProfile, setLoggedParentProfile] = useState<any>(null);
   const [loggedStudentProfile, setLoggedStudentProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (activeTab) {
+      ContextEngine.updateContext({
+        currentPage: activeTab,
+        activeSaaS: (merchant?.type as any) || 'pressing'
+      });
+      TutorialEngine.onPageSelected(activeTab);
+    }
+  }, [activeTab, merchant]);
 
   useEffect(() => {
     if (merchant?.managerNotifications?.apiBaseUrl) {
@@ -966,7 +978,14 @@ const MerchantSaaS = () => {
                     <div key={tab.id} className="snap-start shrink-0">
                       <TabButton 
                         active={activeTab === tab.id} 
-                        onClick={() => setActiveTab(tab.id)} 
+                        onClick={() => {
+                          setActiveTab(tab.id);
+                          ContextEngine.updateContext({
+                            currentPage: tab.id,
+                            activeSaaS: (merchant?.type as any) || 'pressing'
+                          });
+                          TutorialEngine.onPageSelected(tab.id);
+                        }} 
                         icon={tab.icon} 
                         label={tab.label} 
                       />

@@ -16,6 +16,8 @@ type ConfirmationHandler = (request: PendingConfirmationRequest) => void;
 
 class ConfirmationGuardService {
   private activeHandler: ConfirmationHandler | null = null;
+  private pendingRequest: PendingConfirmationRequest | null = null;
+  private subscribers: Set<(req: PendingConfirmationRequest | null) => void> = new Set();
 
   public registerHandler(handler: ConfirmationHandler): void {
     this.activeHandler = handler;
@@ -23,6 +25,31 @@ class ConfirmationGuardService {
 
   public unregisterHandler(): void {
     this.activeHandler = null;
+  }
+
+  public subscribe(listener: (req: PendingConfirmationRequest | null) => void): () => void {
+    this.subscribers.add(listener);
+    listener(this.pendingRequest);
+    return () => {
+      this.subscribers.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    this.subscribers.forEach(s => s(this.pendingRequest));
+  }
+
+  public getPendingRequest(): PendingConfirmationRequest | null {
+    return this.pendingRequest;
+  }
+
+  public resolvePendingRequest(confirmed: boolean): void {
+    if (this.pendingRequest) {
+      const req = this.pendingRequest;
+      this.pendingRequest = null;
+      this.notify();
+      req.resolve(confirmed);
+    }
   }
 
   public async requestConfirmation(
@@ -37,16 +64,20 @@ class ConfirmationGuardService {
         params,
         context,
         timestamp: new Date().toISOString(),
-        resolve
+        resolve: (val: boolean) => {
+          if (this.pendingRequest?.id === request.id) {
+            this.pendingRequest = null;
+            this.notify();
+          }
+          resolve(val);
+        }
       };
+
+      this.pendingRequest = request;
+      this.notify();
 
       if (this.activeHandler) {
         this.activeHandler(request);
-      } else {
-        // Fallback: window.confirm
-        const msg = `[ACTION SENSIBLE REQUIS] : ${action.name}\n\nParamètres : ${JSON.stringify(params, null, 2)}\n\nVoulez-vous vraiment exécuter cette opération ?`;
-        const accepted = window.confirm(msg);
-        resolve(accepted);
       }
     });
   }

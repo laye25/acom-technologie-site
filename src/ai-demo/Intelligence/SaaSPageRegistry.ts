@@ -30,6 +30,7 @@ class SaaSPageRegistryService {
 
   constructor() {
     this.registerGoldenReferencePressingPage();
+    this.registerAdditionalPressingPages();
     this.registerStockPage();
   }
 
@@ -43,6 +44,48 @@ class SaaSPageRegistryService {
 
   public getPageBySaaS(saasId: string): SaaSPageDefinition[] {
     return Array.from(this.pages.values()).filter(p => p.saasId === saasId);
+  }
+
+  private registerAdditionalPressingPages(): void {
+    this.registerPage({
+      pageId: 'dashboard',
+      saasId: 'pressing',
+      name: 'Aperçu & Tableau de Bord',
+      purpose: 'Vue synthétique des indicateurs clés, dépôts récents et chiffre d\'affaires',
+      zones: []
+    });
+
+    this.registerPage({
+      pageId: 'pressing_delivery',
+      saasId: 'pressing',
+      name: 'Livraisons & Retraits',
+      purpose: 'Suivi et enregistrement des retraits de vêtements prêts et livraisons clients',
+      zones: []
+    });
+
+    this.registerPage({
+      pageId: 'pressing_stock',
+      saasId: 'pressing',
+      name: 'Vente & Stock',
+      purpose: 'Gestion des produits de pressing, détachants et ventes d\'articles au comptoir',
+      zones: []
+    });
+
+    this.registerPage({
+      pageId: 'pressing_tarifs',
+      saasId: 'pressing',
+      name: 'Paramètres Tarifs',
+      purpose: 'Configuration des grilles tarifaires des vêtements et prestations de pressing',
+      zones: []
+    });
+
+    this.registerPage({
+      pageId: 'pressing_closure',
+      saasId: 'pressing',
+      name: 'Clôture de Caisse',
+      purpose: 'Bilan journalier, comptage physique des espèces et clôture de caisse',
+      zones: []
+    });
   }
 
   /**

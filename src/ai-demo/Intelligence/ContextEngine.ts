@@ -20,6 +20,20 @@ class ContextEngineService {
     currency: 'FCFA'
   };
 
+  private listeners: Set<(context: SaaSContext) => void> = new Set();
+
+  public subscribe(listener: (context: SaaSContext) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    const ctx = this.getContext();
+    this.listeners.forEach(l => l(ctx));
+  }
+
   public getContext(): SaaSContext {
     return { ...this.currentContext };
   }
@@ -33,6 +47,7 @@ class ContextEngineService {
       ...this.currentContext,
       ...updates
     };
+    this.notify();
     return this.getContext();
   }
 
@@ -41,6 +56,7 @@ class ContextEngineService {
       ...this.currentContext.user,
       ...userUpdates
     };
+    this.notify();
     return this.getContext();
   }
 

@@ -1842,6 +1842,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Téléphone / WhatsApp Contacts</label>
                 <input
                   type="text"
+                  data-acom-id="pressing.receipt.client_phone"
                   data-sai-id="pressing.receipt.customer.phone"
                   placeholder="ex: +221771234567"
                   value={clientPhone}
@@ -1853,6 +1854,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Adresse Email <span className="text-gray-400 font-normal">(Optionnel)</span></label>
                 <input
                   type="email"
+                  data-acom-id="pressing.receipt.client_email"
                   data-sai-id="pressing.receipt.customer.email"
                   placeholder="client@mail.com"
                   value={clientEmail}
@@ -1868,6 +1870,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <input
                   type="date"
                   required
+                  data-acom-id="pressing.receipt.deposit_date"
                   value={depositDate}
                   onChange={e => {
                     setDepositDate(e.target.value);
@@ -1886,6 +1889,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <input
                   type="date"
                   required
+                  data-acom-id="pressing.receipt.pickup_date"
                   value={expectedDeliveryDate}
                   onChange={e => setExpectedDeliveryDate(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 font-mono text-sm"
@@ -1898,6 +1902,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Observations / État du linge</label>
                 <input
                   type="text"
+                  data-acom-id="pressing.receipt.notes"
                   placeholder="ex: Col sale, bouton manquant, linge délicat..."
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
@@ -1909,6 +1914,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
                   <button
                     type="button"
+                    data-acom-id="pressing.receipt.billing_type_article"
                     onClick={() => setBillingType('article')}
                     className={`py-2 text-xs font-bold rounded-lg transition-all ${
                       billingType === 'article' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-800'
@@ -1918,6 +1924,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                   </button>
                   <button
                     type="button"
+                    data-acom-id="pressing.receipt.billing_type_weight"
                     onClick={() => setBillingType('poids')}
                     className={`py-2 text-xs font-bold rounded-lg transition-all ${
                       billingType === 'poids' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-800'
@@ -2030,7 +2037,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
             )}
 
             {/* Supplementary Options */}
-            <div className="space-y-3 pt-4 border-t border-dashed border-gray-100">
+            <div data-acom-id="pressing.receipt.supplements" className="space-y-3 pt-4 border-t border-dashed border-gray-100">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Prestations optionnelles</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {Object.keys(supplements).map((key) => {
@@ -2069,6 +2076,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
               <div>
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Type de remise</label>
                 <select
+                  data-acom-id="pressing.receipt.discount_type"
                   value={discountType}
                   onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#5c2197]/20 bg-gray-50/50 text-xs font-bold text-ink"
@@ -2080,6 +2088,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
               <div>
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">{discountType === 'percent' ? 'Valeur en pourcentage (%)' : 'Remise immédiate (FCFA)'}</label>
                 <input
+                  data-acom-id="pressing.receipt.discount_value"
                   type="number"
                   placeholder={discountType === 'percent' ? "ex: 10" : "ex: 500"}
                   value={discountValue || ''}
@@ -2096,6 +2105,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Statut de paiement</label>
                   <select
+                    data-acom-id="pressing.receipt.payment_status"
                     value={paymentStatus}
                     onChange={e => {
                       const status = e.target.value as 'unpaid' | 'partial' | 'paid';
@@ -2134,6 +2144,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Règlement via :</label>
                   <select
+                    data-acom-id="pressing.receipt.payment_method"
                     disabled={paymentStatus === 'unpaid'}
                     value={paymentMethod}
                     onChange={e => setPaymentMethod(e.target.value as any)}
@@ -2147,7 +2158,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 </div>
               </div>
 
-              <div className="flex justify-between items-center p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs font-mono">
+              <div data-acom-id="pressing.receipt.remaining_amount" className="flex justify-between items-center p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs font-mono">
                 <span className="text-gray-500 font-bold">Reste à encaisser :</span>
                 <span className={`font-black ${total - amountPaid > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                   {(total - amountPaid).toLocaleString()} FCFA
@@ -2178,7 +2189,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
           <div className="lg:col-span-5 space-y-4">
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-400">Aperçu Réel du Ticket de Caisse</h4>
             
-            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 relative overflow-hidden">
+            <div data-acom-id="pressing.receipt.ticket_preview_box" className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 relative overflow-hidden">
               <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-[#5c2197] to-[#8a33ed]" />
               
               <div className="space-y-4 font-mono text-[11px] text-gray-700 leading-relaxed bg-[#fbfbf9] p-5 rounded-2xl border border-dashed border-gray-200 shadow-inner">
@@ -2293,12 +2304,13 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
               </div>
 
               {selectedTicket && (
-                <div className="flex flex-col gap-2.5 bg-[#faf5ff] p-5 rounded-2xl border border-purple-100 shadow-inner">
+                <div data-acom-id="pressing.receipt.post_creation_panel" className="flex flex-col gap-2.5 bg-[#faf5ff] p-5 rounded-2xl border border-purple-100 shadow-inner">
                   <p className="text-xs font-black text-[#5c2197] text-center animate-pulse">🎉 Nouveau ticket enregistré : {selectedTicket.ticketNumber}</p>
                   
                   {/* Print & PDF Buttons */}
                   <div className="grid grid-cols-3 gap-1.5 mt-1">
                     <button
+                      data-acom-id="pressing.receipt.print_roll_80"
                       type="button"
                       onClick={() => printPressingTicketDirect(merchant, selectedTicket, '80mm', tarifs, handleDownloadPDF)}
                       className="bg-[#1e293b] hover:bg-black text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm"
@@ -2307,6 +2319,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                       <Printer className="w-3.5 h-3.5" /> Roll (80)
                     </button>
                     <button
+                      data-acom-id="pressing.receipt.print_roll_58"
                       type="button"
                       onClick={() => printPressingTicketDirect(merchant, selectedTicket, '58mm', tarifs, handleDownloadPDF)}
                       className="bg-[#4b5563] hover:bg-gray-800 text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm"
@@ -2315,6 +2328,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                       <Printer className="w-3.5 h-3.5" /> Roll (58)
                     </button>
                     <button
+                      data-acom-id="pressing.receipt.print_a4"
                       type="button"
                       onClick={() => printPressingTicketDirect(merchant, selectedTicket, 'A4', tarifs, handleDownloadPDF)}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm"
@@ -2328,6 +2342,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                   <div className="grid grid-cols-2 gap-2">
                     {/* Download PDF button as requested ("téléchargement par pdf") */}
                     <button
+                      data-acom-id="pressing.receipt.download_pdf"
                       type="button"
                       onClick={() => handleDownloadPDF(selectedTicket)}
                       className="py-2 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[10px] sm:text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm border border-gray-200"
@@ -2337,6 +2352,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
 
                     {/* WhatsApp Client button as requested ("envois de par WhatsApp") */}
                     <button
+                      data-acom-id="pressing.receipt.whatsapp_client"
                       type="button"
                       onClick={() => handleSendClientWhatsApp(selectedTicket)}
                       className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] sm:text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm"
@@ -2346,12 +2362,13 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                   </div>
 
                   {/* Supervisor notifications */}
-                  <div className="border-t border-indigo-200/50 mt-1.5 pt-2">
+                  <div data-acom-id="pressing.receipt.manager_tracking" className="border-t border-indigo-200/50 mt-1.5 pt-2">
                     <p className="text-[9px] font-mono font-bold text-indigo-700 uppercase tracking-widest text-center flex items-center justify-center gap-1.5 mb-1.5">
                       <span>👑</span> Suivi Temps Réel du Gérant (Dépôt / Entrée)
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       <button
+                        data-acom-id="pressing.receipt.whatsapp_manager"
                         type="button"
                         onClick={() => dispatchManagerNotif(selectedTicket, 'entrée', 'whatsapp')}
                         className="py-1.5 px-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[9px] font-bold rounded-xl flex items-center justify-center gap-1 transition shadow-sm"
@@ -2359,6 +2376,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                         <MessageSquare className="w-3 h-3 text-emerald-600" /> WhatsApp Gérant
                       </button>
                       <button
+                        data-acom-id="pressing.receipt.email_manager"
                         type="button"
                         onClick={() => dispatchManagerNotif(selectedTicket, 'entrée', 'email')}
                         className="py-1.5 px-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-[9px] font-bold rounded-xl flex items-center justify-center gap-1 transition shadow-sm"
@@ -2377,6 +2395,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                   {/* Reset form for a fresh client order */}
                   <div className="border-t border-indigo-200/50 mt-1 pt-2">
                     <button
+                      data-acom-id="pressing.receipt.new_client"
                       type="button"
                       onClick={resetFormFields}
                       className="w-full py-2.5 px-3 bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-[11px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition hover:scale-[1.02] duration-150 shadow-md"

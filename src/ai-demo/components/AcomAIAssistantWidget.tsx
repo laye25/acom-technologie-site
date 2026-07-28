@@ -8,7 +8,9 @@ import { ActionRouter } from '../SaaSGateway/ActionRouter';
 import { ContextEngine } from '../Intelligence/ContextEngine';
 import { LanguageEngine } from '../Assistant/LanguageEngine';
 import { ConversationContext, ChatMessage } from '../Assistant/ConversationContext';
-import { Mic, MicOff, Send, Sparkles, Volume2, Globe, Shield, RefreshCw, X, MessageSquare } from 'lucide-react';
+import { VoiceSessionManager, VoiceSessionInfo } from '../Assistant/VoiceSessionManager';
+import { VoiceOrbIndicator } from './VoiceOrbIndicator';
+import { Mic, MicOff, Send, Sparkles, Volume2, Globe, Shield, RefreshCw, X, MessageSquare, Radio } from 'lucide-react';
 
 interface WidgetProps {
   embedded?: boolean;
@@ -18,11 +20,10 @@ interface WidgetProps {
 export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false, onClose }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [language, setLanguage] = useState<'fr' | 'wo'>('fr');
-  const [stopListeningFn, setStopListeningFn] = useState<(() => void) | null>(null);
+  const [voiceInfo, setVoiceInfo] = useState<VoiceSessionInfo>(VoiceSessionManager.getInfo());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,8 +34,13 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
     setMessages(ConversationContext.getMessages());
     setLanguage(ConversationContext.getLanguage());
 
+    const unsubVoice = VoiceSessionManager.subscribe((info) => {
+      setVoiceInfo(info);
+    });
+
     return () => {
       unsub();
+      unsubVoice();
     };
   }, []);
 
@@ -148,29 +154,11 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
     }
   };
 
-  const toggleMic = () => {
-    if (isListening) {
-      if (stopListeningFn) stopListeningFn();
-      setIsListening(false);
-      setStopListeningFn(null);
+  const toggleVoiceMode = () => {
+    if (voiceInfo.active) {
+      VoiceSessionManager.stopSession();
     } else {
-      setIsListening(true);
-      const stop = LanguageEngine.listenOnce(
-        (transcript) => {
-          setIsListening(false);
-          setStopListeningFn(null);
-          if (transcript) {
-            setInputText(transcript);
-            handleSendPrompt(transcript);
-          }
-        },
-        (err) => {
-          console.warn('[VoiceMic] Error:', err);
-          setIsListening(false);
-          setStopListeningFn(null);
-        }
-      );
-      setStopListeningFn(() => stop);
+      VoiceSessionManager.startSession(language);
     }
   };
 
@@ -208,6 +196,20 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Continuous Voice Mode Toggle Header Button */}
+          <button
+            onClick={toggleVoiceMode}
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition flex items-center gap-1.5 ${
+              voiceInfo.active
+                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.3)] animate-pulse'
+                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+            }`}
+            title={voiceInfo.active ? 'Arrêter la conversation vocale' : 'Lancer le Mode Conversation Vocale Continu'}
+          >
+            <Radio className={`w-3.5 h-3.5 ${voiceInfo.active ? 'text-cyan-400 animate-spin' : 'text-slate-400'}`} />
+            <span>{voiceInfo.active ? 'Vocal Actif' : 'Mode Vocal'}</span>
+          </button>
+
           {/* Language Toggle */}
           <button
             onClick={toggleLanguage}
@@ -220,6 +222,7 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
 
           <button
             onClick={() => {
+              if (voiceInfo.active) VoiceSessionManager.stopSession();
               if (onClose) onClose();
               setIsOpen(false);
             }}
@@ -230,6 +233,16 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
           </button>
         </div>
       </div>
+
+      {/* Voice Orb Indicator when Continuous Voice Mode is Active */}
+      {voiceInfo.active && (
+        <div className="px-4 pt-2">
+          <VoiceOrbIndicator
+            sessionInfo={voiceInfo}
+            onStop={() => VoiceSessionManager.stopSession()}
+          />
+        </div>
+      )}
 
       {/* Quick Preset Buttons */}
       <div className="p-3 bg-slate-950/50 border-b border-slate-800/80 flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -327,18 +340,18 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
           }}
           className="flex items-center gap-2"
         >
-          {/* Mic Button */}
+          {/* Mic Button toggles continuous voice conversation mode */}
           <button
             type="button"
-            onClick={toggleMic}
+            onClick={toggleVoiceMode}
             className={`p-2.5 rounded-xl transition border ${
-              isListening
-                ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
+              voiceInfo.active
+                ? 'bg-cyan-600 text-white border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)] animate-pulse'
                 : 'bg-slate-800 hover:bg-slate-700 text-indigo-400 border-slate-700'
             }`}
-            title={isListening ? 'Écoute en cours... Appuyez pour stopper' : 'Parler en Wolof ou Français'}
+            title={voiceInfo.active ? 'Mode Vocal Actif - Appuyez pour arrêter' : 'Démarrer le Mode Conversation Vocale Continu'}
           >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            {voiceInfo.active ? <MicOff className="w-4 h-4 text-cyan-200" /> : <Mic className="w-4 h-4" />}
           </button>
 
           <input

@@ -97,6 +97,8 @@ export interface TutorialStep {
   speechFr: string;
   speechWolof: string;
   expectedEvent?: string;
+  isOptional?: boolean;
+  stepCategory?: 'required' | 'optional' | 'conditional' | 'control' | 'final' | 'info' | 'option' | 'fallback' | 'next_cycle';
 }
 
 export interface TutorialScenario {
