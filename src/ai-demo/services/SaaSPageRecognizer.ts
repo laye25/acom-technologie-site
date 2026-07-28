@@ -191,8 +191,9 @@ export class SaaSPageRecognizer {
    */
   public static autofillCurrentPageInputs(): number {
     const inputs = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
-      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]), textarea, select'
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="search"]), textarea, select'
     )).filter(el => {
+      if (el.closest('#acom-demo-floating-widget')) return false;
       const style = window.getComputedStyle(el);
       const isReadOnly = 'readOnly' in el ? (el as HTMLInputElement | HTMLTextAreaElement).readOnly : false;
       return style.display !== 'none' && style.visibility !== 'hidden' && !el.disabled && !isReadOnly;

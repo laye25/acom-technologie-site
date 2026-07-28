@@ -116,7 +116,11 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
     }
   };
 
-  const handleQuickAutofill = () => {
+  const handleQuickAutofill = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const filledCount = SaaSPageRecognizer.autofillCurrentPageInputs();
     if (filledCount > 0) {
       toast.success(`⚡ ${filledCount} champ(s) pré-rempli(s) instantanément !`, {
@@ -137,7 +141,12 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
     <div id="acom-demo-floating-widget" className="fixed bottom-24 right-4 z-50 font-sans">
       {!isRecording && !isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsOpen(true);
+          }}
           className="flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-full shadow-2xl hover:shadow-indigo-500/25 transition-all transform hover:scale-105 cursor-pointer font-bold text-xs tracking-wide border border-white/20"
         >
           <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
@@ -157,7 +166,15 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
                 <p className="text-[11px] text-slate-400">{currentModule} • {currentPage}</p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white p-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+              className="text-slate-400 hover:text-white p-1"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -177,7 +194,10 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
             <div className="flex items-center justify-between bg-slate-800 p-2.5 rounded-xl border border-slate-700">
               <span className="text-xs text-slate-300 font-medium">Contrôle Auto Temps Réel</span>
               <button
-                onClick={() => {
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   LiveGuidanceEngine.isRealTimeAutoControlEnabled = !LiveGuidanceEngine.isRealTimeAutoControlEnabled;
                   setIsOpen(!isOpen);
                   setTimeout(() => setIsOpen(true), 10);
@@ -193,7 +213,12 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
             </div>
 
             <button
-              onClick={handleStartAutoDemo}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleStartAutoDemo();
+              }}
               className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-600 to-indigo-600 hover:from-emerald-600 hover:to-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xl cursor-pointer transition-all border border-emerald-400/30"
             >
               <MousePointerClick className="w-4 h-4 text-emerald-300 animate-bounce" />
@@ -202,7 +227,12 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
 
             {!LiveGuidanceEngine.isRealTimeAutoControlEnabled && (
               <button
-                onClick={handleStartManualDemo}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleStartManualDemo();
+                }}
                 className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700 cursor-pointer transition-all"
               >
                 <Video className="w-3.5 h-3.5 text-violet-400" />
@@ -234,7 +264,12 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
           </div>
 
           <button
-            onClick={handleQuickAutofill}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleQuickAutofill(e);
+            }}
             className="w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all border border-emerald-400/30"
           >
             <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
@@ -242,7 +277,12 @@ export const FloatingDemoRecorderWidget: React.FC<FloatingDemoRecorderWidgetProp
           </button>
 
           <button
-            onClick={handleStop}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleStop();
+            }}
             className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg cursor-pointer transition-all"
           >
             <Square className="w-3.5 h-3.5 fill-current" />
