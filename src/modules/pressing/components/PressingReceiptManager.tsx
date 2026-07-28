@@ -1750,6 +1750,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
           </button>
           <button
             onClick={() => setActiveSubTab('active')}
+            data-tutorial-id="pressing.ticket.pay_btn"
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 whitespace-nowrap ${
               activeSubTab === 'active' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
@@ -1774,6 +1775,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
           </button>
           <button
             onClick={() => setActiveSubTab('closures')}
+            data-tutorial-id="pressing.closure.submit_btn"
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 whitespace-nowrap ${
               activeSubTab === 'closures' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
             }`}
@@ -1828,6 +1830,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <input
                   type="text"
                   required
+                  data-acom-id="pressing.receipt.client_name"
                   data-sai-id="pressing.receipt.customer.fullName"
                   placeholder="Nom complet"
                   value={clientName}
@@ -1928,7 +1931,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
 
             {/* Mode: Article */}
             {billingType === 'article' && (
-              <div className="space-y-4 pt-4 border-t border-dashed border-gray-100">
+              <div data-acom-id="pressing.receipt.articles_grid" className="space-y-4 pt-4 border-t border-dashed border-gray-100">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-black uppercase text-gray-400 tracking-wider">Quantité d'articles à laver</h4>
                   <span className="text-[10px] font-bold px-2 py-1 rounded bg-[#faf5ff] text-[#5c2197]">Tarification unitaire</span>
@@ -2116,6 +2119,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Montant Perçu (FCFA)</label>
                   <input
+                    data-acom-id="pressing.receipt.advance_amount"
                     type="number"
                     disabled={paymentStatus === 'unpaid'}
                     value={paymentStatus === 'unpaid' ? 0 : amountPaid || ''}
@@ -2154,6 +2158,7 @@ export const PressingReceiptManager = ({ merchant }: { merchant: Merchant }) => 
             <div className="pt-4 border-t border-dashed border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button
                 type="submit"
+                data-acom-id="pressing.receipt.submit_btn"
                 data-sai-id="pressing.receipt.ticket.submit"
                 className="w-full bg-[#5c2197] hover:bg-[#481977] text-white py-3.5 px-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
               >

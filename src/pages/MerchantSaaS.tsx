@@ -59,7 +59,7 @@ const PrescriptionManager = lazy(() => import('../modules/medical/components/Pre
 const SchoolScheduleManager = lazy(() => import('../components/admin/SchoolScheduleManager').then(m => ({ default: m.SchoolScheduleManager })));
 const StudentPortalsManager = lazy(() => import('../components/admin/StudentPortalsManager').then(m => ({ default: m.StudentPortalsManager })));
 const CashClosureManager = lazy(() => import('../components/admin/CashClosureManager').then(m => ({ default: m.CashClosureManager })));
-const FloatingDemoRecorderWidget = lazy(() => import('../ai-demo/components/FloatingDemoRecorderWidget').then(m => ({ default: m.FloatingDemoRecorderWidget })));
+// Removed FloatingDemoRecorderWidget
 
 import { useAuth } from '../context/AuthContext';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -126,6 +126,11 @@ import { Elements } from '@stripe/react-stripe-js';
 import { PaymentForm } from '../components/PaymentForm';
 import { LogOut } from 'lucide-react';
 import { ScheduleManager } from '../components/admin/ScheduleManager';
+
+import { ActionConfirmationModal } from '../ai-demo/components/ActionConfirmationModal';
+import { TutorialOverlay } from '../ai-demo/components/TutorialOverlay';
+import { AcomAIAssistantWidget } from '../ai-demo/components/AcomAIAssistantWidget';
+import { AIDemoConsolePage } from '../ai-demo/components/AIDemoConsolePage';
 
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
@@ -663,6 +668,7 @@ const MerchantSaaS = () => {
     }
     
     // AcomZone is now isolated in the header directly, not injected in tabs list
+    tabs.unshift({ id: 'ai_demo', label: '✨ Acom IA Démo', icon: Sparkles });
     return tabs;
   };
 
@@ -889,6 +895,19 @@ const MerchantSaaS = () => {
               <NetworkStatusIndicator position="inline" plan={merchant.plan} />
               
               <button
+                onClick={() => setActiveTab('ai_demo')}
+                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
+                  activeTab === 'ai_demo' 
+                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg ring-2 ring-indigo-500 scale-105' 
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105'
+                }`}
+                title="Ouvrir la Console Acom IA Démo"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                <span>Acom IA Démo</span>
+              </button>
+
+              <button
                 onClick={() => {
                   console.trace("[ACOMZONE-NAVIGATION]", {
                     source: 'MerchantSaaS Header Button',
@@ -1014,6 +1033,7 @@ const MerchantSaaS = () => {
             {activeTab === 'pressing_stock' && <PressingStockManager key="pressing_stock" merchant={merchant} />}
             {activeTab === 'pressing_tarifs' && <PressingTarifsManager key="pressing_tarifs" merchant={merchant} />}
             {activeTab === 'acom_zone' && <AcomZoneMerchantPanel key="acom_zone" merchant={merchant} />}
+            {activeTab === 'ai_demo' && <AIDemoConsolePage key="ai_demo" />}
           </AnimatePresence>
         </Suspense>
 
@@ -1029,12 +1049,10 @@ const MerchantSaaS = () => {
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <FloatingDemoRecorderWidget
-          currentModule={merchant?.type || 'Acom SaaS'}
-          currentPage={activeTab}
-        />
-      </Suspense>
+      {/* Acom IA Démo Global Infrastructure */}
+      <ActionConfirmationModal />
+      <TutorialOverlay />
+      <AcomAIAssistantWidget />
     </div>
   );
 };

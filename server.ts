@@ -243,6 +243,192 @@ async function startServer() {
     }
   });
 
+  // Acom IA NLU Intent Engine Proxy route
+  app.post("/api/gemini/nlu-intent", async (req, res) => {
+    try {
+      const { prompt, saasContext, availableCapabilities } = req.body || {};
+
+      if (!prompt || typeof prompt !== "string") {
+        return res.status(400).json({ error: "Prompt string is required" });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        console.warn("[Gemini NLU] GEMINI_API_KEY missing, using intelligent rule fallback.");
+        return res.json(ruleBasedNLUFallback(prompt, availableCapabilities));
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey });
+
+      const capabilitiesDesc = (availableCapabilities || []).map((c: any) => 
+        `- ID: ${c.id} | Nom: ${c.name} | Risk: ${c.riskLevel} | Parameters: ${JSON.stringify(c.parameters || [])}`
+      ).join('\n');
+
+      const systemPrompt = `Tu es l'Intelligence de Gestion Acom IA pour les SaaS Acom (Pressing, Couture, Stock, etc.).
+Ton rôle est d'analyser la demande de l'utilisateur (en français ou en wolof) et de la convertir rigoureusement en une intention structurée.
+
+SAAS ACTIF: ${saasContext?.activeSaaS || 'pressing'}
+UTILISATEUR: ${saasContext?.user?.userName || 'Utilisateur'} (Rôle: ${saasContext?.user?.role || 'gerant'})
+
+CAPABILITÉS DISPONIBLES:
+${capabilitiesDesc}
+
+DIRECTIVES DE SÉCURITÉ ET D'EXÉCUTION:
+1. Ne jamais inventer une donnée manquante obligatoire. Si une information essentielle manque (ex: nom du client pour une création), indique missingParameters: ["clientName"].
+2. Si la demande est ambiguë, passe isAmbiguous: true et demande des précisions.
+3. Classe le riskLevel en 'read' (consultation/recherche), 'normal' (création/enregistrement standard), ou 'sensible' (clôture de caisse, suppression, gros montants).
+4. Fournis une explication claire en Français (explanationFr) et en Wolof (explanationWolof).
+
+FORMAT DE RÉPONSE STRICTEMENT JSON:
+{
+  "intentId": "id_de_l_action",
+  "actionFound": true/false,
+  "parameters": { ... },
+  "missingParameters": [],
+  "isAmbiguous": false,
+  "clarificationMessageFr": "",
+  "clarificationMessageWolof": "",
+  "explanationFr": "...",
+  "explanationWolof": "...",
+  "riskLevel": "read" | "normal" | "sensible",
+  "confidence": 0.95
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: `${systemPrompt}\n\nDEMANDE UTILISATEUR: "${prompt}"`,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const responseText = response.text || "{}";
+      const parsedJson = JSON.parse(responseText);
+
+      return res.json(parsedJson);
+    } catch (err: any) {
+      console.error("[Gemini NLU Error]", err);
+      const fallback = ruleBasedNLUFallback(req.body?.prompt || "", req.body?.availableCapabilities);
+      return res.json(fallback);
+    }
+  });
+
+  function ruleBasedNLUFallback(prompt: string, capabilities: any[]): any {
+    const text = prompt.toLowerCase();
+
+    // 1. Customer Search / Creation
+    if (text.includes('cherche client') || text.includes('recherche client') || text.includes('wut client') || text.includes('gis client')) {
+      const match = prompt.match(/(?:client|wut|gis|recherche)\s+([a-zA-Z0-9\s]+)/i);
+      const query = match ? match[1].trim() : prompt;
+      return {
+        intentId: 'pressing.searchCustomer',
+        actionFound: true,
+        parameters: { query },
+        missingParameters: [],
+        isAmbiguous: false,
+        explanationFr: `Recherche du client "${query}".`,
+        explanationWolof: `Wut nañu client "${query}".`,
+        riskLevel: 'read',
+        confidence: 0.9
+      };
+    }
+
+    if (text.includes('ajoute client') || text.includes('créer client') || text.includes('creer client') || text.includes('bind client')) {
+      const nameMatch = prompt.match(/(?:client|nom)\s+([a-zA-Z\s]+)/i);
+      const phoneMatch = prompt.match(/(\+?221\s?[0-9]{8,9}|7[06785]\d{7})/);
+      const clientName = nameMatch ? nameMatch[1].trim() : '';
+      const clientPhone = phoneMatch ? phoneMatch[0].replace(/\s/g, '') : '';
+
+      const missing = [];
+      if (!clientName) missing.push('clientName');
+      if (!clientPhone) missing.push('clientPhone');
+
+      return {
+        intentId: 'pressing.createCustomer',
+        actionFound: true,
+        parameters: { clientName, clientPhone },
+        missingParameters: missing,
+        isAmbiguous: false,
+        explanationFr: missing.length > 0 ? `Il manque : ${missing.join(', ')}.` : `Création du client ${clientName} (${clientPhone}).`,
+        explanationWolof: missing.length > 0 ? `Dafa manque : ${missing.join(', ')}.` : `Bind client ${clientName}.`,
+        riskLevel: 'normal',
+        confidence: 0.85
+      };
+    }
+
+    // 2. Receipt Creation / Deposit
+    if (text.includes('dépôt') || text.includes('depot') || text.includes('senat') || text.includes('habit') || text.includes('linge') || text.includes('ticket')) {
+      const nameMatch = prompt.match(/(?:client|pour|nom)\s+([a-zA-Z]+)/i);
+      const amountMatch = prompt.match(/(\d+[\d\s]*)\s*(?:fcfa|f|cfa)/i);
+      const clientName = nameMatch ? nameMatch[1].trim() : 'Client Passage';
+      const amountPaid = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : 0;
+
+      return {
+        intentId: 'pressing.createReceipt',
+        actionFound: true,
+        parameters: { clientName, amountPaid, totalAmount: 2500, billingType: 'article' },
+        missingParameters: [],
+        isAmbiguous: false,
+        explanationFr: `Enregistrement du dépôt pour ${clientName}. Acompte: ${amountPaid} FCFA.`,
+        explanationWolof: `Bind dépôt ci touru ${clientName}. Versé: ${amountPaid} FCFA.`,
+        riskLevel: 'normal',
+        confidence: 0.85
+      };
+    }
+
+    // 3. Payment
+    if (text.includes('règlement') || text.includes('reglement') || text.includes('paye') || text.includes('versé') || text.includes('fay')) {
+      const amountMatch = prompt.match(/(\d+[\d\s]*)\s*(?:fcfa|f|cfa)/i);
+      const amount = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : 5000;
+
+      return {
+        intentId: 'pressing.recordPayment',
+        actionFound: true,
+        parameters: { amount },
+        missingParameters: [],
+        isAmbiguous: false,
+        explanationFr: `Enregistrement du paiement de ${amount} FCFA.`,
+        explanationWolof: `Bind fey bu ${amount} FCFA.`,
+        riskLevel: 'normal',
+        confidence: 0.85
+      };
+    }
+
+    // 4. Close Cash Register
+    if (text.includes('clôture') || text.includes('cloture') || text.includes('tëj caisse') || text.includes('ferme caisse')) {
+      const amountMatch = prompt.match(/(\d+[\d\s]*)\s*(?:fcfa|f|cfa)/i);
+      const actualCashCounted = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : 15000;
+
+      return {
+        intentId: 'pressing.closeCashRegister',
+        actionFound: true,
+        parameters: { actualCashCounted },
+        missingParameters: [],
+        isAmbiguous: false,
+        explanationFr: `Clôture de caisse avec ${actualCashCounted} FCFA comptés.`,
+        explanationWolof: `Tëj caisse ak ${actualCashCounted} FCFA.`,
+        riskLevel: 'sensible',
+        confidence: 0.9
+      };
+    }
+
+    // Default Unknown
+    return {
+      intentId: '',
+      actionFound: false,
+      parameters: {},
+      missingParameters: [],
+      isAmbiguous: true,
+      clarificationMessageFr: `Je n'ai pas compris votre demande "${prompt}". Pouvez-vous reformuler ?`,
+      clarificationMessageWolof: `Deggoma bakh waxaatal.`,
+      explanationFr: `Demande non reconnue.`,
+      explanationWolof: `Deggoma bakh.`,
+      riskLevel: 'read',
+      confidence: 0.3
+    };
+  }
+
 
   // Helper to sanitize API keys (removes quotes and whitespace)
   function sanitizeApiKey(key: any): string | null {
