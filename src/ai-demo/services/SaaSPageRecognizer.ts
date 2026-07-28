@@ -190,10 +190,23 @@ export class SaaSPageRecognizer {
    * Instantly fills current visible form inputs on the active page with realistic demo data.
    */
   public static autofillCurrentPageInputs(): number {
-    const inputs = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
-      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="search"]), textarea, select'
+    const inputs = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+      'input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input:not([type]), textarea'
     )).filter(el => {
-      if (el.closest('#acom-demo-floating-widget')) return false;
+      // Ignore floating widget, navigation, header, sidebar, search bars and filters
+      if (
+        el.closest('#acom-demo-floating-widget') ||
+        el.closest('nav') ||
+        el.closest('header') ||
+        el.closest('aside') ||
+        el.closest('[role="search"]') ||
+        el.closest('.search-bar') ||
+        el.closest('[class*="search"]') ||
+        el.closest('[id*="search"]') ||
+        el.closest('[class*="filter"]')
+      ) {
+        return false;
+      }
       const style = window.getComputedStyle(el);
       const isReadOnly = 'readOnly' in el ? (el as HTMLInputElement | HTMLTextAreaElement).readOnly : false;
       return style.display !== 'none' && style.visibility !== 'hidden' && !el.disabled && !isReadOnly;
@@ -230,12 +243,6 @@ export class SaaSPageRecognizer {
         valToSet = '15000';
       } else if (textContext.includes('qte') || textContext.includes('quantite') || textContext.includes('nombre') || textContext.includes('poids')) {
         valToSet = '3';
-      } else if (el.tagName.toLowerCase() === 'select') {
-        const select = el as HTMLSelectElement;
-        if (select.options.length > 1) {
-          select.selectedIndex = Math.min(1, select.options.length - 1);
-          valToSet = select.value;
-        }
       } else if (!el.value) {
         valToSet = 'Donnée Démo ACOM';
       }
@@ -245,8 +252,6 @@ export class SaaSPageRecognizer {
         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
           el.tagName.toLowerCase() === 'textarea'
             ? window.HTMLTextAreaElement.prototype
-            : el.tagName.toLowerCase() === 'select'
-            ? window.HTMLSelectElement.prototype
             : window.HTMLInputElement.prototype,
           'value'
         )?.set;
@@ -259,7 +264,6 @@ export class SaaSPageRecognizer {
 
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.dispatchEvent(new Event('blur', { bubbles: true }));
 
         // Visual flash effect on filled inputs
         const origOutline = el.style.outline;
