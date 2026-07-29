@@ -1171,7 +1171,7 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-4 mb-6 md:mb-8">
             {Object.entries(
               tabs.reduce((acc, tab) => {
                 const group = tab.group || 'Général';
