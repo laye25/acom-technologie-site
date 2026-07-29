@@ -89,7 +89,8 @@ import {
   Printer, HardDrive, Database, RefreshCw, Upload, Cpu, Terminal,
   Lock as LockIcon, GitBranch, Github, Monitor, MonitorUp, Rocket,
   Filter, SlidersHorizontal, ArrowUpDown, Tag, Scissors, Palette, ScanLine, PenTool, BookOpen,
-  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key, Bus, Utensils, WashingMachine, ShoppingBag
+  ShieldAlert, Heart, FileCheck, Fingerprint, Sparkles, LayoutDashboard, Key, Bus, Utensils, WashingMachine, ShoppingBag,
+  Crown, ShieldCheck, ChevronRight, ChevronDown, Bell, Layers
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -135,6 +136,7 @@ import { AcomAIAssistantWidget } from '../ai-demo/components/AcomAIAssistantWidg
 import { AIDemoConsolePage } from '../ai-demo/components/AIDemoConsolePage';
 import { SaaSSelectorDropdown } from '../components/SaaSSelectorDropdown';
 import { SaaSManagerModal } from '../components/SaaSManagerModal';
+import { NotificationCenter } from '../components/NotificationCenter';
 
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
@@ -823,153 +825,317 @@ const MerchantSaaS = () => {
     <div className="min-h-screen bg-gray-50 pt-6 md:pt-12 lg:pt-24 pb-12">
         <AcomAlertEventProvider />
         <div className="max-w-7xl mx-auto px-4">
-          {/* Header */}
-          <div className="flex flex-col mb-6 md:mb-12 gap-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center space-x-6">
-                <div className="w-16 h-16 bg-primary/10 rounded-[2rem] flex items-center justify-center border border-primary/10 shadow-inner overflow-hidden shrink-0">
+          {/* Header Container Card */}
+          <div className="bg-white rounded-[2rem] p-5 sm:p-7 md:p-8 border border-slate-200/80 shadow-sm md:shadow-md mb-8 transition-all space-y-6">
+            {/* ROW 1: BRANDING, BADGES & USER PROFILE BAR */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-6 border-b border-slate-100">
+              {/* Left: App Logo + Name + Sector + Plan Badge */}
+              <div className="flex items-center gap-4 sm:gap-5 flex-wrap">
+                <div className="w-14 h-14 bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center border border-violet-300/30 shadow-md shadow-violet-500/20 shrink-0 overflow-hidden p-1">
                   {merchant.logo ? (
-                    <img src={merchant.logo} alt="Logo" className="w-full h-full object-contain bg-white p-1" />
+                    <img src={merchant.logo} alt={merchant.name} className="w-full h-full object-contain rounded-xl bg-white/95 p-0.5" />
                   ) : (
-                    <Store className="w-8 h-8 text-primary" />
+                    <span className="text-2xl font-black text-white font-sans tracking-tighter">
+                      {merchant.name ? merchant.name.slice(0, 2).toUpperCase() : 'A'}
+                    </span>
                   )}
                 </div>
-                <div>
-                  <h1 className="text-3xl font-black text-ink tracking-tight">{merchant.name}</h1>
-                  <div className="flex flex-wrap items-center mt-1.5 gap-y-2">
-                    <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">
-                      {merchant.type === 'entreprise' ? 'Management Entreprise' :
-                       merchant.type === 'chantier' ? 'Management BTP / Chantier' :
-                       merchant.type === 'transport' ? 'Management Flotte' :
-                       merchant.type === 'rh' ? 'Management RH' :
-                       merchant.type === 'scolaire' ? 'Management Scolaire' :
-                       merchant.type === 'medical' ? 'Management Médical' :
-                       merchant.type === 'pressing' ? 'Management Pressing' :
-                       merchant.type === 'tailleur' ? 'Ateliers de Couture' :
-                       merchant.type === 'broderie' ? 'Acom Creative Studio' :
-                       'Management Commerce'}
+
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">
+                      {merchant.name || 'Acom'}
+                    </h1>
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-violet-50 border border-violet-200/80 text-violet-700 font-extrabold text-xs tracking-tight shadow-sm">
+                      <Crown className="w-3.5 h-3.5 text-violet-600 fill-violet-600" />
+                      PLAN {merchant.plan || 'PREMIUM'}
                     </span>
-                    <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
-                    <span className="text-[10px] font-mono font-black text-primary uppercase tracking-[0.2em]">
-                      Plan {merchant.plan}
-                    </span>
-                    {merchant.licenseType && (
-                      <>
-                        <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
-                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${
-                          merchant.licenseType === 'cloud' 
-                            ? 'bg-blue-50 border-blue-100 text-blue-600' 
-                            : 'bg-emerald-50 border-emerald-100 text-emerald-600'
-                        }`}>
-                          {merchant.licenseType === 'cloud' ? <Database className="w-3 h-3" /> : <HardDrive className="w-3 h-3" />}
-                          <span className="text-[9px] font-black uppercase tracking-widest leading-none">
-                            {merchant.licenseType === 'cloud' ? 'Licence Cloud' : 'Licence Locale'}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    {isSpecialManager && (
-                      <>
-                        <span className="mx-3 w-1 h-1 bg-gray-300 rounded-full"></span>
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-100/60 shadow-sm">
-                          <SlidersHorizontal className="w-3 h-3 text-indigo-500 shrink-0" />
-                          <select
-                            value={merchant.type || 'boutique'}
-                            onChange={(e) => {
-                              const selected = e.target.value;
-                              setOverrideType(selected);
-                              setActiveTab('dashboard');
-                              const newParams = new URLSearchParams(searchParams);
-                              newParams.set('type', selected);
-                              setSearchParams(newParams, { replace: true });
-                              toast.success(`Logiciel SaaS activé : ${selected.toUpperCase()}`);
-                            }}
-                            className="bg-transparent border-none text-[9px] font-black font-mono text-indigo-700 uppercase tracking-widest focus:outline-none cursor-pointer outline-none p-0 pr-6"
-                            title="Changer de logiciel de gestion SaaS"
-                          >
-                            <option value="boutique">🛒 Commerce / Boutique</option>
-                            <option value="entreprise">🛠️ Service & Intervention</option>
-                            <option value="chantier">🚧 BTP & Chantier</option>
-                            <option value="transport">🚚 Flotte & Transport</option>
-                            <option value="rh">👥 Ressources Humaines</option>
-                            <option value="scolaire">🎓 Gestion Scolaire</option>
-                            <option value="medical">🏥 Clinique & Médical</option>
-                            <option value="pressing">🧺 Pressing & Laverie</option>
-                            <option value="tailleur">🪡 Ateliers de Couture</option>
-                            <option value="broderie">✨ Acom Creative Studio</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
+                  </div>
+
+                  <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 mt-1.5">
+                    {merchant.type === 'entreprise' ? 'MANAGEMENT ENTREPRISE' :
+                     merchant.type === 'chantier' ? 'MANAGEMENT BTP / CHANTIER' :
+                     merchant.type === 'transport' ? 'MANAGEMENT FLOTTE' :
+                     merchant.type === 'rh' ? 'MANAGEMENT RH' :
+                     merchant.type === 'scolaire' ? 'MANAGEMENT SCOLAIRE' :
+                     merchant.type === 'medical' ? 'CLINIQUE & MÉDICAL' :
+                     merchant.type === 'pressing' ? 'MANAGEMENT PRESSING' :
+                     merchant.type === 'tailleur' ? 'ATELIERS DE COUTURE' :
+                     merchant.type === 'broderie' ? 'ACOM CREATIVE STUDIO' :
+                     'MANAGEMENT COMMERCE'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right: Notifications & User Profile */}
+              <div className="flex items-center gap-4 self-end lg:self-auto shrink-0">
+                <NotificationCenter />
+
+                <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+
+                <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 px-3.5 py-1.5 rounded-2xl transition-all cursor-pointer">
+                  <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-sm shrink-0">
+                    {user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : (user?.email ? user.email.slice(0, 2).toUpperCase() : 'AN')}
+                  </div>
+                  <div className="text-left hidden sm:block min-w-0">
+                    <div className="text-xs font-black text-slate-800 leading-tight truncate max-w-[140px]">
+                      {user?.displayName || (user?.email ? user.email.split('@')[0] : 'Abdoulaye NDIAYE')}
+                    </div>
+                    <div className="text-[10px] font-medium text-slate-400 leading-tight">
+                      Administrateur
+                    </div>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </div>
+              </div>
+            </div>
+
+            {/* ROW 2: STATUS INDICATORS & METRICS STRIP */}
+            <div className="bg-slate-50/90 border border-slate-200/70 rounded-2xl p-2.5 sm:p-3 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
+              {/* 1. Licence Status */}
+              <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black font-mono uppercase tracking-wider text-slate-700 leading-tight truncate">
+                    {merchant.licenseType === 'cloud' ? 'LICENCE CLOUD' : 'LICENCE LOCALE'}
+                  </div>
+                  <div className="text-xs font-extrabold text-emerald-600 leading-tight">
+                    Active
                   </div>
                 </div>
               </div>
-            
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <NetworkStatusIndicator position="inline" plan={merchant.plan} />
 
-              <SaaSSelectorDropdown 
-                merchant={merchant} 
-                onUpdateMerchant={(updated) => {
-                  setMerchant(updated);
-                  setOverrideType(null);
-                  const newParams = new URLSearchParams(searchParams);
-                  newParams.set('type', updated.type || 'stock');
-                  setSearchParams(newParams, { replace: true });
-                }} 
-              />
-              
-              <button
-                onClick={() => setActiveTab('ai_demo')}
-                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
-                  activeTab === 'ai_demo' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg ring-2 ring-indigo-500 scale-105' 
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105'
-                }`}
-                title="Ouvrir la Console Acom IA Démo"
-              >
-                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-                <span>Acom IA Démo</span>
-              </button>
+              {/* 2. Sector Metric / Ateliers */}
+              <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
+                <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 border border-violet-100 flex items-center justify-center shrink-0">
+                  {merchant.type === 'tailleur' || merchant.type === 'broderie' ? (
+                    <Scissors className="w-5 h-5" />
+                  ) : merchant.type === 'medical' ? (
+                    <Stethoscope className="w-5 h-5" />
+                  ) : merchant.type === 'scolaire' ? (
+                    <GraduationCap className="w-5 h-5" />
+                  ) : (
+                    <Store className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black font-mono uppercase tracking-wider text-slate-700 leading-tight truncate">
+                    {merchant.type === 'tailleur' ? 'ATELIERS' :
+                     merchant.type === 'scolaire' ? 'ÉTABLISSEMENT' :
+                     merchant.type === 'medical' ? 'CLINIQUE' : 'MAGASINS'}
+                  </div>
+                  <div className="text-xs font-bold text-slate-500 leading-tight truncate">
+                    2 {merchant.type === 'tailleur' ? 'ateliers actifs' : 'unités actives'}
+                  </div>
+                </div>
+              </div>
 
-              <button
-                onClick={() => {
-                  console.trace("[ACOMZONE-NAVIGATION]", {
-                    source: 'MerchantSaaS Header Button',
-                    activeTab,
-                    currentAIStep: (window as any).__currentAIStep || 'unknown',
-                    currentTarget: (window as any).__currentTarget || 'unknown'
-                  });
-                  setActiveTab('acom_zone');
-                }}
-                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
-                  activeTab === 'acom_zone' 
-                    ? 'bg-[#0a0a0a] text-white shadow-lg shadow-black/20 ring-2 ring-violet-500 scale-105' 
-                    : 'bg-[#0a0a0a] text-white hover:bg-neutral-900 hover:scale-105'
-                }`}
-                title="Accéder à l'espace AcomZone"
-              >
-                <Store className="w-4 h-4 text-violet-400" />
-                <span>AcomZone</span>
-              </button>
+              {/* 3. SaaS Actif Selector */}
+              <div className="flex items-center gap-2 px-2 py-1 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
+                <div className="min-w-0 w-full">
+                  {isSpecialManager ? (
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black font-mono text-slate-400 uppercase tracking-widest px-1">
+                        SAAS ACTIF
+                      </span>
+                      <select
+                        value={merchant.type || 'boutique'}
+                        onChange={(e) => {
+                          const selected = e.target.value;
+                          setOverrideType(selected);
+                          setActiveTab('dashboard');
+                          const newParams = new URLSearchParams(searchParams);
+                          newParams.set('type', selected);
+                          setSearchParams(newParams, { replace: true });
+                          toast.success(`Logiciel SaaS activé : ${selected.toUpperCase()}`);
+                        }}
+                        className="bg-transparent border-none text-xs font-bold text-slate-800 focus:outline-none cursor-pointer outline-none p-0 pr-2 truncate"
+                        title="Changer de logiciel de gestion SaaS"
+                      >
+                        <option value="boutique">🛒 Management Commerce</option>
+                        <option value="entreprise">🛠️ Service & Intervention</option>
+                        <option value="chantier">🚧 BTP & Chantier</option>
+                        <option value="transport">🚚 Flotte & Transport</option>
+                        <option value="rh">👥 Ressources Humaines</option>
+                        <option value="scolaire">🎓 Gestion Scolaire</option>
+                        <option value="medical">🏥 Clinique & Médical</option>
+                        <option value="pressing">🧺 Pressing & Laverie</option>
+                        <option value="tailleur">🪡 Ateliers de Couture</option>
+                        <option value="broderie">✨ Acom Creative Studio</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <SaaSSelectorDropdown 
+                      merchant={merchant} 
+                      onUpdateMerchant={(updated) => {
+                        setMerchant(updated);
+                        setOverrideType(null);
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.set('type', updated.type || 'stock');
+                        setSearchParams(newParams, { replace: true });
+                      }} 
+                    />
+                  )}
+                </div>
+              </div>
 
-              <button
-                onClick={() => setActiveTab('build')}
-                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm ${
-                  activeTab === 'build' ? 'bg-primary text-white shadow-primary/20' : 'bg-primary/10 text-primary hover:bg-primary/20'
-                }`}
-              >
-                <Monitor className="w-4 h-4" />
-                <span className="hidden md:inline">App Desktop</span>
-              </button>
-              <button
-                onClick={() => signOut()}
-                className="flex items-center space-x-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-100 transition-all"
-                title="Se déconnecter"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden md:inline">Déconnexion</span>
-              </button>
+              {/* 5. Écrit. Disque / Sync Date */}
+              <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl col-span-2 sm:col-span-1">
+                <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black font-mono uppercase tracking-wider text-slate-700 leading-tight truncate">
+                    ÉCRIT. DISQUE
+                  </div>
+                  <div className="text-xs font-bold text-slate-600 leading-tight">
+                    {new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ROW 3: ACCÈS RAPIDES STRIP */}
+            <div>
+              <h3 className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-slate-400 mb-2.5 px-1">
+                ACCÈS RAPIDES
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {/* 1. ACOM IA DÉMO */}
+                <button
+                  onClick={() => setActiveTab('ai_demo')}
+                  className={`group p-3.5 rounded-2xl flex items-center justify-between text-left transition-all shadow-sm cursor-pointer ${
+                    activeTab === 'ai_demo' 
+                      ? 'bg-violet-700 text-white ring-2 ring-violet-400 scale-[1.02]' 
+                      : 'bg-violet-600 hover:bg-violet-700 text-white hover:scale-[1.01]'
+                  }`}
+                  title="Ouvrir la Console Acom IA Démo"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black uppercase tracking-wider truncate">
+                        ACOM IA DÉMO
+                      </div>
+                      <div className="text-[11px] text-violet-200 font-medium truncate">
+                        Assistant intelligent
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
+                </button>
+
+                {/* 2. ACOMZONE */}
+                <button
+                  onClick={() => {
+                    console.trace("[ACOMZONE-NAVIGATION]", {
+                      source: 'MerchantSaaS Header Button',
+                      activeTab
+                    });
+                    setActiveTab('acom_zone');
+                  }}
+                  className={`group p-3.5 rounded-2xl flex items-center justify-between text-left transition-all shadow-sm cursor-pointer ${
+                    activeTab === 'acom_zone' 
+                      ? 'bg-slate-950 text-white ring-2 ring-violet-500 scale-[1.02]' 
+                      : 'bg-slate-900 hover:bg-slate-800 text-white hover:scale-[1.01]'
+                  }`}
+                  title="Accéder à l'espace AcomZone"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                      <Store className="w-5 h-5 text-violet-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black uppercase tracking-wider truncate">
+                        ACOMZONE
+                      </div>
+                      <div className="text-[11px] text-slate-300 font-medium truncate">
+                        Marketplace
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
+                </button>
+
+                {/* 3. APP DESKTOP */}
+                <button
+                  onClick={() => setActiveTab('build')}
+                  className={`group p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                    activeTab === 'build' 
+                      ? 'bg-violet-100 text-violet-950 border-violet-300 ring-2 ring-violet-400 scale-[1.02]' 
+                      : 'bg-violet-50/80 hover:bg-violet-100 text-violet-900 border-violet-100 hover:scale-[1.01]'
+                  }`}
+                  title="Accéder à l'application Desktop"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-violet-200/60 flex items-center justify-center shrink-0 text-violet-700">
+                      <Monitor className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black uppercase tracking-wider truncate">
+                        APP DESKTOP
+                      </div>
+                      <div className="text-[11px] text-violet-700/80 font-medium truncate">
+                        Application locale
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-violet-500 group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
+                </button>
+
+                {/* 4. DOCUMENTATION */}
+                <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`group p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
+                    activeTab === 'settings' 
+                      ? 'bg-slate-200 text-slate-950 border-slate-300 ring-2 ring-slate-400 scale-[1.02]' 
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200/80 hover:scale-[1.01]'
+                  }`}
+                  title="Consulter la documentation"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-slate-200/80 flex items-center justify-center shrink-0 text-slate-700">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black uppercase tracking-wider truncate">
+                        DOCUMENTATION
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-medium truncate">
+                        Guides & tutoriels
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
+                </button>
+
+                {/* 5. DÉCONNEXION */}
+                <button
+                  onClick={() => signOut()}
+                  className="group p-3.5 rounded-2xl bg-rose-50/80 hover:bg-rose-100 text-rose-700 border border-rose-100 flex items-center justify-between text-left transition-all cursor-pointer hover:scale-[1.01]"
+                  title="Quitter la session"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-rose-200/60 flex items-center justify-center shrink-0 text-rose-600">
+                      <LogOut className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black uppercase tracking-wider truncate">
+                        DÉCONNEXION
+                      </div>
+                      <div className="text-[11px] text-rose-500 font-medium truncate">
+                        Quitter la session
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-rose-400 group-hover:translate-x-1 transition-transform shrink-0 ml-1" />
+                </button>
+              </div>
             </div>
           </div>
           
@@ -1008,7 +1174,6 @@ const MerchantSaaS = () => {
               </div>
             ))}
           </div>
-        </div>
 
         {/* Content */}
         <Suspense fallback={
