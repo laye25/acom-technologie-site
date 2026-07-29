@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const getApiKey = () => import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : '');
+const getApiKey = () => import.meta.env.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? (process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY2) : '');
 
 let aiInstance: GoogleGenAI | null = null;
 

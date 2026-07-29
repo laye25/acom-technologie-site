@@ -251,9 +251,9 @@ async function startServer() {
         return res.status(400).json({ error: "Données audio manquantes ou invalides" });
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY2;
       if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY non configuré" });
+        return res.status(500).json({ error: "GEMINI_API_KEY ou GEMINI_API_KEY2 non configuré" });
       }
 
       const { GoogleGenAI } = await import("@google/genai");
@@ -299,9 +299,9 @@ async function startServer() {
         return res.status(400).json({ error: "Prompt string is required" });
       }
 
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY2;
       if (!apiKey) {
-        console.warn("[Gemini NLU] GEMINI_API_KEY missing, using intelligent rule fallback.");
+        console.warn("[Gemini NLU] GEMINI_API_KEY / GEMINI_API_KEY2 missing, using intelligent rule fallback.");
         return res.json(ruleBasedNLUFallback(prompt, availableCapabilities));
       }
 

@@ -4,9 +4,9 @@ let aiClient: GoogleGenAI | null = null;
 
 function getAiClient() {
   if (!aiClient) {
-    const apiKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : undefined;
+    const apiKey = typeof process !== 'undefined' ? (process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY2) : undefined;
     if (!apiKey) {
-      console.warn("GEMINI_API_KEY is not defined. AI features will be disabled.");
+      console.warn("GEMINI_API_KEY / GEMINI_API_KEY2 is not defined. AI features will be disabled.");
       return null;
     }
     aiClient = new GoogleGenAI({ apiKey });
