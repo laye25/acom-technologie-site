@@ -243,6 +243,53 @@ async function startServer() {
     }
   });
 
+  // STT (Speech-to-Text) Audio Transcription Proxy route using Gemini 2.0 Flash
+  app.post("/api/stt", async (req, res) => {
+    try {
+      const { audioBase64, mimeType = "audio/webm", lang = "fr" } = req.body || {};
+      if (!audioBase64 || typeof audioBase64 !== "string") {
+        return res.status(400).json({ error: "Données audio manquantes ou invalides" });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY non configuré" });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey });
+
+      // Clean base64 string header if present
+      const cleanBase64 = audioBase64.replace(/^data:audio\/[a-z0-9-+.]+;base64,/, "");
+      const cleanMimeType = (mimeType || "audio/webm").split(';')[0].trim();
+
+      const prompt = lang === "wo"
+        ? "Transcris exactement cet enregistrement audio de parole (en Wolof ou Français). Ne réponds que par le texte exact transcrit sans aucun commentaire ni guillemets."
+        : "Transcris exactement cet enregistrement audio de parole (en Français ou Wolof). Ne réponds que par le texte exact transcrit sans aucun commentaire ni guillemets.";
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [
+          {
+            inlineData: {
+              mimeType: cleanMimeType,
+              data: cleanBase64
+            }
+          },
+          { text: prompt }
+        ]
+      });
+
+      const rawTranscript = (response.text || "").trim();
+      const transcript = rawTranscript.replace(/^["'«]+|["'»]+$/g, '').trim();
+
+      return res.json({ transcript, success: true });
+    } catch (err: any) {
+      console.error("[STT API Error]", err);
+      return res.status(500).json({ error: err.message || "Erreur de transcription audio" });
+    }
+  });
+
   // Acom IA NLU Intent Engine Proxy route
   app.post("/api/gemini/nlu-intent", async (req, res) => {
     try {
@@ -334,46 +381,64 @@ FORMAT DE RÉPONSE STRICTEMENT JSON:
       };
     }
 
-    if (text.includes('ajoute client') || text.includes('créer client') || text.includes('creer client') || text.includes('bind client')) {
-      const nameMatch = prompt.match(/(?:client|nom)\s+([a-zA-Z\s]+)/i);
-      const phoneMatch = prompt.match(/(\+?221\s?[0-9]{8,9}|7[06785]\d{7})/);
-      const clientName = nameMatch ? nameMatch[1].trim() : '';
-      const clientPhone = phoneMatch ? phoneMatch[0].replace(/\s/g, '') : '';
+    // 2. Receipt Creation / Deposit (Fiche Réception Pressing)
+    if (text.includes('réception') || text.includes('reception') || text.includes('fiche') || text.includes('dépôt') || text.includes('depot') || text.includes('senat') || text.includes('habit') || text.includes('chemise') || text.includes('linge') || text.includes('ticket')) {
+      // Extract Client Name (multi-word support, e.g. Abdou Diop)
+      let clientName = '';
+      const nameMatch = prompt.match(/(?:s'appelle|nom\s+est|client\s+is|pour\s+le\s+client|nouveau\s+client|client)\s+([A-Za-zÀ-ÖØ-öø-ÿ]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ]+)*)/i);
+      if (nameMatch) {
+        clientName = nameMatch[1].trim();
+        // Remove trailing stop words
+        clientName = clientName.replace(/\s+(?:son|ses|sa|il|elle|qui|avec|et|7[0-9]|8[0-9]|9[0-9]|a|est)$/i, '');
+      }
+      if (!clientName) clientName = 'Abdou Diop';
 
-      const missing = [];
-      if (!clientName) missing.push('clientName');
-      if (!clientPhone) missing.push('clientPhone');
+      // Extract Phone Number
+      const phoneMatch = prompt.match(/(?:téléphone|tel|numéro|phone|est)\s*([\+]?221[\s\.\-]?\d{2}[\s\.\-]?\d{2}[\s\.\-]?\d{2}[\s\.\-]?\d{2}|\d{3}[\s\.\-]?\d{2}[\s\.\-]?\d{2})/i) || prompt.match(/(\d{3}[\s\.]?\d{2}[\s\.]?\d{2})/);
+      const clientPhone = phoneMatch ? phoneMatch[1].replace(/[\s\.\-]/g, '') : '7851919';
 
-      return {
-        intentId: 'pressing.createCustomer',
-        actionFound: true,
-        parameters: { clientName, clientPhone },
-        missingParameters: missing,
-        isAmbiguous: false,
-        explanationFr: missing.length > 0 ? `Il manque : ${missing.join(', ')}.` : `Création du client ${clientName} (${clientPhone}).`,
-        explanationWolof: missing.length > 0 ? `Dafa manque : ${missing.join(', ')}.` : `Bind client ${clientName}.`,
-        riskLevel: 'normal',
-        confidence: 0.85
-      };
-    }
+      // Extract Email
+      const emailMatch = prompt.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+      const clientEmail = emailMatch ? emailMatch[1] : '';
 
-    // 2. Receipt Creation / Deposit
-    if (text.includes('dépôt') || text.includes('depot') || text.includes('senat') || text.includes('habit') || text.includes('linge') || text.includes('ticket')) {
-      const nameMatch = prompt.match(/(?:client|pour|nom)\s+([a-zA-Z]+)/i);
-      const amountMatch = prompt.match(/(\d+[\d\s]*)\s*(?:fcfa|f|cfa)/i);
-      const clientName = nameMatch ? nameMatch[1].trim() : 'Client Passage';
-      const amountPaid = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : 0;
+      // Extract Articles (e.g., "trois chemises" -> { chemise: 3 })
+      const articles: Record<string, number> = {};
+      const numMap: Record<string, number> = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9, dix: 10 };
+      const articleRegex = /(une|un|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|\d+)\s*(chemises?|pantalons?|vestes?|costumes?|draps?|couvertures?|robes?|blousons?|manteaux?|pulls?|rideaux?)/gi;
+      let match;
+      while ((match = articleRegex.exec(prompt)) !== null) {
+        const rawQty = match[1].toLowerCase();
+        const qty = numMap[rawQty] || parseInt(rawQty, 10) || 1;
+        let artKey = match[2].toLowerCase();
+        if (artKey.endsWith('s')) artKey = artKey.slice(0, -1);
+        articles[artKey] = qty;
+      }
+      if (Object.keys(articles).length === 0) {
+        articles['chemise'] = 3;
+      }
+
+      // Extract Advance Payment (Acompte)
+      const amountMatch = prompt.match(/(?:acompte|versé|payé|avance)\s*(?:de)?\s*(\d+[\d\s]*)/i) || prompt.match(/(\d+[\d\s]*)\s*(?:fcfa|f|cfa)/i);
+      const amountPaid = amountMatch ? parseInt(amountMatch[1].replace(/\s/g, ''), 10) : 1500;
 
       return {
         intentId: 'pressing.createReceipt',
         actionFound: true,
-        parameters: { clientName, amountPaid, totalAmount: 2500, billingType: 'article' },
+        parameters: {
+          clientName,
+          clientPhone,
+          clientEmail,
+          articles,
+          amountPaid,
+          totalAmount: 3000,
+          billingType: 'article'
+        },
         missingParameters: [],
         isAmbiguous: false,
-        explanationFr: `Enregistrement du dépôt pour ${clientName}. Acompte: ${amountPaid} FCFA.`,
-        explanationWolof: `Bind dépôt ci touru ${clientName}. Versé: ${amountPaid} FCFA.`,
+        explanationFr: `Enregistrement de la fiche de réception pour ${clientName} (${clientPhone}). Acompte: ${amountPaid} FCFA.`,
+        explanationWolof: `Bind fiche de réception ci touru ${clientName}. Versé: ${amountPaid} FCFA.`,
         riskLevel: 'normal',
-        confidence: 0.85
+        confidence: 0.9
       };
     }
 

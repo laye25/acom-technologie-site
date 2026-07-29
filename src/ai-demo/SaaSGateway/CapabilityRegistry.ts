@@ -136,20 +136,79 @@ class CapabilityRegistryService {
       parameters: [
         { name: 'clientName', type: 'string', description: 'Nom du client', required: true },
         { name: 'clientPhone', type: 'string', description: 'Téléphone du client', required: false },
-        { name: 'articles', type: 'object', description: 'Détail des articles ex: { veste: 2, pantalon: 1 }', required: false },
+        { name: 'clientEmail', type: 'string', description: 'E-mail du client', required: false },
+        { name: 'articles', type: 'object', description: 'Détail des articles ex: { chemise: 3, pantalon: 1 }', required: false },
         { name: 'billingType', type: 'string', description: 'article ou poids', required: false, defaultValue: 'article' },
         { name: 'weightKg', type: 'number', description: 'Poids en Kg si facturation au poids', required: false, defaultValue: 0 },
         { name: 'amountPaid', type: 'number', description: 'Acompte versé en FCFA', required: false, defaultValue: 0 },
-        { name: 'totalAmount', type: 'number', description: 'Montant total estimé', required: false, defaultValue: 2500 }
+        { name: 'totalAmount', type: 'number', description: 'Montant total estimé', required: false, defaultValue: 3000 }
       ],
       execute: async (params, context): Promise<SaaSActionResult> => {
-        const savedTicketsRaw = localStorage.getItem(`pressing_tickets_${context.merchantId}`);
-        const existingTickets: any[] = savedTicketsRaw ? JSON.parse(savedTicketsRaw) : [];
+        const clientName = (params.clientName || 'Client Passage').trim();
+        const clientPhone = (params.clientPhone || '').trim();
+        const clientEmail = (params.clientEmail || '').trim();
 
-        const nextNumber = existingTickets.length + 1;
-        const ticketNumber = `PR-2026-${String(nextNumber).padStart(4, '0')}`;
+        // 1. Auto-create/register customer in db.users if not present
+        if (clientName && clientName !== 'Client Passage') {
+          const existingUsers = await db.users
+            .filter(u => u.role === 'client' && (u.name || '').toLowerCase() === clientName.toLowerCase())
+            .toArray();
 
-        const total = Number(params.totalAmount) || 2500;
+          if (existingUsers.length === 0) {
+            const newUserId = `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            const newCustomer = {
+              id: newUserId,
+              merchantId: context.merchantId,
+              name: clientName,
+              email: clientEmail,
+              phone: clientPhone,
+              role: 'client',
+              updatedAt: new Date().toISOString()
+            };
+            await db.users.add(newCustomer);
+            EventBus.emit({
+              type: 'CUSTOMER_CREATED',
+              saas: 'pressing',
+              merchantId: context.merchantId,
+              payload: newCustomer,
+              triggeredBy: 'ai_assistant'
+            });
+          }
+        }
+
+        // 2. Parse articles & compute total dynamically
+        let articlesMap: Record<string, number> = { chemise: 3 };
+        if (typeof params.articles === 'object' && params.articles !== null) {
+          articlesMap = params.articles;
+        } else if (typeof params.articles === 'string') {
+          const match = params.articles.match(/(\d+)\s*([a-zA-Z]+)/);
+          if (match) {
+            articlesMap = { [match[2].toLowerCase()]: parseInt(match[1], 10) };
+          }
+        }
+
+        // Saved tariffs lookup or standard default rates
+        const savedTarifsRaw = localStorage.getItem(`pressing_tarifs_${context.merchantId}`);
+        const savedTarifs = savedTarifsRaw ? JSON.parse(savedTarifsRaw) : null;
+        const articlePrices: Record<string, number> = savedTarifs?.articles || {
+          chemise: 1000,
+          pantalon: 1500,
+          veste: 1500,
+          costume: 3000,
+          robe: 2000,
+          blouson: 2000,
+          manteau: 2500,
+          pull: 1200
+        };
+
+        let calculatedTotal = 0;
+        Object.entries(articlesMap).forEach(([art, qty]) => {
+          const key = art.toLowerCase().replace(/s$/, '');
+          const unitPrice = articlePrices[key] || articlePrices[art] || 1000;
+          calculatedTotal += unitPrice * Number(qty);
+        });
+
+        const total = Number(params.totalAmount) || calculatedTotal || 3000;
         const amountPaid = Number(params.amountPaid) || 0;
         const paymentStatus = amountPaid >= total ? 'paid' : amountPaid > 0 ? 'partial' : 'unpaid';
 
@@ -157,15 +216,22 @@ class CapabilityRegistryService {
         d.setDate(d.getDate() + 3);
         const expectedDeliveryDate = format(d, 'yyyy-MM-dd');
 
+        const savedTicketsRaw = localStorage.getItem(`pressing_tickets_${context.merchantId}`);
+        const existingTickets: any[] = savedTicketsRaw ? JSON.parse(savedTicketsRaw) : [];
+
+        const nextNumber = existingTickets.length + 1;
+        const ticketNumber = `PR-2026-${String(nextNumber).padStart(4, '0')}`;
+
         const newTicket = {
           id: `t_${Date.now()}`,
           ticketNumber,
-          clientName: params.clientName,
-          clientPhone: params.clientPhone || '',
+          clientName,
+          clientPhone,
+          clientEmail,
           depositDate: format(new Date(), 'yyyy-MM-dd'),
           expectedDeliveryDate,
           billingType: params.billingType || 'article',
-          articles: params.articles || { veste: 1 },
+          articles: articlesMap,
           weightService: 'standard',
           weightKg: params.weightKg || 0,
           supplements: {},
@@ -181,7 +247,7 @@ class CapabilityRegistryService {
           paymentMethod: 'cash',
           amountPaid,
           amountPaidAtDeposit: amountPaid,
-          notes: 'Créé via Acom IA Démo'
+          notes: 'Créé via Mode Vocal Acom IA'
         };
 
         const updated = [newTicket, ...existingTickets];
@@ -202,8 +268,8 @@ class CapabilityRegistryService {
             date: new Date().toISOString()
           }],
           paymentMethod: 'cash',
-          customerName: params.clientName,
-          customerPhone: params.clientPhone || '',
+          customerName: clientName,
+          customerPhone: clientPhone,
           processedBy: 'ai_assistant',
           createdAt: new Date().toISOString()
         });
@@ -216,11 +282,20 @@ class CapabilityRegistryService {
           triggeredBy: 'ai_assistant'
         });
 
+        // Trigger window custom event for real-time UI refresh
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('pressing_receipt_updated', { detail: newTicket }));
+        }
+
+        const articlesSummary = Object.entries(articlesMap)
+          .map(([k, v]) => `${v} ${k}${v > 1 ? 's' : ''}`)
+          .join(', ');
+
         return {
           success: true,
           actionId: 'pressing.createReceipt',
-          messageFr: `Ticket N° ${ticketNumber} créé pour ${params.clientName}. Total: ${total.toLocaleString()} FCFA (Acompte: ${amountPaid.toLocaleString()} FCFA).`,
-          messageWolof: `Bingo! Defal nañu ticket ${ticketNumber} ci touru ${params.clientName}. Total: ${total.toLocaleString()} FCFA.`,
+          messageFr: `La réception d'${clientName} a été enregistrée avec ${articlesSummary} et un acompte de ${amountPaid.toLocaleString()} FCFA. Le ticket ${ticketNumber} a été créé.`,
+          messageWolof: `Bingo! Defal nañu ticket ${ticketNumber} ci touru ${clientName} ak acompte ${amountPaid.toLocaleString()} FCFA.`,
           data: newTicket,
           emittedEvent: 'RECEIPT_CREATED'
         };

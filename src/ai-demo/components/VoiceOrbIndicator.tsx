@@ -158,6 +158,17 @@ export const VoiceOrbIndicator: React.FC<VoiceOrbIndicatorProps> = ({ sessionInf
           {statusText || 'Conversation active'}
         </p>
 
+        {/* Manual Send Voice Chunk Button */}
+        {(state === 'listening' || state === 'speech_detected') && (
+          <button
+            onClick={() => VoiceSessionManager.triggerSendVoiceChunk()}
+            className="mt-2 py-1 px-3 rounded-full bg-cyan-600/80 hover:bg-cyan-500 text-white font-semibold text-[11px] shadow transition flex items-center gap-1.5 border border-cyan-400/40"
+          >
+            <Mic className="w-3 h-3 animate-pulse text-cyan-200" />
+            <span>Envoyer la parole maintenant</span>
+          </button>
+        )}
+
         {/* Transcript preview */}
         {transcript && state !== 'speaking' && (
           <div className="mt-2 text-xs font-mono text-cyan-300/90 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 max-w-xs truncate">
