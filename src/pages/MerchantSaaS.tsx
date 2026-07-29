@@ -683,8 +683,7 @@ const MerchantSaaS = () => {
         break;
     }
     
-    // AcomZone is now isolated in the header directly, not injected in tabs list
-    tabs.unshift({ id: 'ai_demo', label: '✨ Acom IA Démo', icon: Sparkles });
+    // AcomZone and Acom IA Démo are now isolated in the header directly, not injected in tabs list
     return tabs;
   };
 
