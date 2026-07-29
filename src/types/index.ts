@@ -508,6 +508,15 @@ export interface SiteSettings {
 
 // SaaS Merchant Types
 export type MerchantPlan = 'FREE' | 'BASIC' | 'STANDARD' | 'PREMIUM' | 'LOCAL';
+export type SaasAccessStatus = 'active' | 'suspended' | 'subscription_required' | 'removed';
+
+export interface SaasSubscription {
+  saasType: string;
+  status: SaasAccessStatus;
+  plan?: MerchantPlan;
+  addedAt: any;
+  updatedAt?: any;
+}
 
 export interface Merchant {
   id: string;
@@ -518,6 +527,8 @@ export interface Merchant {
   licenseType?: 'local' | 'cloud';
   subscriptionStatus?: 'active' | 'expired' | 'none';
   status?: 'active' | 'suspended';
+  allowedSaas?: string[]; // List of active SaaS types assigned to this merchant
+  saasSubscriptions?: Record<string, SaasSubscription>; // Multi-SaaS status tracking per module
   description?: string;
   logo?: string;
   address?: string;

@@ -53,6 +53,7 @@ class VoiceSessionManagerService {
   private mediaRecorder: MediaRecorder | null = null;
   private autoStopTimer: ReturnType<typeof setTimeout> | null = null;
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  private isProcessingAudio = false;
 
   private startProcessingWatchdog(lang: 'fr' | 'wo' = 'fr', maxMs = 12000): void {
     this.clearWatchdog();
@@ -201,14 +202,8 @@ class VoiceSessionManagerService {
     this.notify();
   }
 
-  private mediaStream: MediaStream | null = null;
-  private mediaRecorder: MediaRecorder | null = null;
-  private autoStopTimer: any = null;
-
   /**
-   * Internal Listening loop controller with dual engine support:
-   * Engine 1: Native Web Speech API SpeechRecognition
-   * Engine 2: Universal MediaRecorder + Gemini 2.0 Flash STT (/api/stt)
+   * Internal Listening loop controller with MediaRecorder + Gemini STT
    */
   private startListeningLoop(lang: 'fr' | 'wo' = 'fr'): void {
     if (!this.active) return;
@@ -223,114 +218,7 @@ class VoiceSessionManagerService {
     }
     this.notify();
 
-    const SpeechClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    // If native Web Speech API class exists, attempt native speech recognition first
-    if (SpeechClass) {
-      try {
-        if (this.recognitionInstance) {
-          try { this.recognitionInstance.stop(); } catch {}
-        }
-
-        const recognition = new SpeechClass();
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.lang = lang === 'wo' ? 'fr-FR' : 'fr-FR';
-
-        this.recognitionInstance = recognition;
-
-        recognition.onstart = () => {
-          if (!this.active) return;
-          if (this.state !== 'awaiting_confirmation') {
-            this.state = 'listening';
-          }
-          this.notify();
-        };
-
-        recognition.onspeechstart = () => {
-          if (!this.active) return;
-          this.state = 'speech_detected';
-          this.statusText = 'Détection vocale...';
-          this.notify();
-        };
-
-        recognition.onresult = (event: any) => {
-          if (!this.active) return;
-          let finalTranscript = '';
-          let interimTranscript = '';
-
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            } else {
-              interimTranscript += event.results[i][0].transcript;
-            }
-          }
-
-          const text = (finalTranscript || interimTranscript).trim();
-          this.currentTranscript = text;
-
-          if (finalTranscript) {
-            this.state = 'transcribing';
-            this.statusText = `Récitation : "${text}"`;
-            this.notify();
-
-            try { recognition.stop(); } catch {}
-            this.recognitionInstance = null;
-
-            this.handleUserTranscript(text, lang);
-          } else {
-            this.notify();
-          }
-        };
-
-        recognition.onerror = (event: any) => {
-          if (!this.active) return;
-          const errType = event?.error;
-          console.warn('[VoiceSessionManager] Native recognition error:', errType);
-
-          // If native speech recognition fails due to browser policy or missing service, fallback to MediaRecorder
-          if (errType === 'not-allowed' || errType === 'service-not-allowed' || errType === 'audio-capture' || errType === 'network') {
-            if (navigator.mediaDevices && typeof MediaRecorder !== 'undefined') {
-              console.log('[VoiceSessionManager] Falling back to MediaRecorder + Gemini STT...');
-              this.startMediaRecorderLoop(lang);
-              return;
-            }
-            this.state = 'error';
-            this.errorMessage = 'Accès au microphone bloqué ou refusé par le navigateur. Cliquez sur l\'icône de cadenas ou de micro dans la barre d\'adresse pour autoriser.';
-            this.statusText = 'Microphone bloqué';
-            this.notify();
-            return;
-          }
-
-          if (errType === 'no-speech' || errType === 'aborted') {
-            setTimeout(() => {
-              if (this.active && (this.state === 'listening' || this.state === 'speech_detected' || this.state === 'awaiting_confirmation')) {
-                this.startListeningLoop(lang);
-              }
-            }, 300);
-          }
-        };
-
-        recognition.onend = () => {
-          if (!this.active) return;
-          if (this.state === 'listening' || this.state === 'speech_detected' || this.state === 'awaiting_confirmation') {
-            setTimeout(() => {
-              if (this.active && (this.state === 'listening' || this.state === 'awaiting_confirmation')) {
-                this.startListeningLoop(lang);
-              }
-            }, 200);
-          }
-        };
-
-        recognition.start();
-        return;
-      } catch (e) {
-        console.warn('[VoiceSessionManager] Failed native recognition start, falling back to MediaRecorder', e);
-      }
-    }
-
-    // Fallback: Use MediaRecorder + Gemini 2.0 Flash STT endpoint
+    // Universal MediaRecorder + Gemini 2.0 Flash STT endpoint
     if (navigator.mediaDevices && typeof MediaRecorder !== 'undefined') {
       this.startMediaRecorderLoop(lang);
       return;
@@ -375,14 +263,18 @@ class VoiceSessionManagerService {
       const audioChunks: Blob[] = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
+        if (e.data.size > 0) {
+          console.log(`[VOICE] DATA_AVAILABLE size=${e.data.size}`);
+          audioChunks.push(e.data);
+        }
       };
 
       recorder.onstart = () => {
         if (!this.active) return;
-        console.log('[VOICE][01] RECORDING_STARTED');
+        console.log('[VOICE] RECORDING_STARTED');
+        console.log('[VOICE] SPEECH_DETECTED');
         this.state = 'speech_detected';
-        this.statusText = 'Enregistrement vocal en cours...';
+        this.statusText = 'Je vous entends... (Parlez librement)';
         this.notify();
       };
 
@@ -392,36 +284,57 @@ class VoiceSessionManagerService {
           this.autoStopTimer = null;
         }
 
-        console.log('[VOICE][04] RECORDER_STOPPED');
-        console.log(`[VOICE][05] AUDIO_CHUNKS = ${audioChunks.length}`);
+        console.log('[VOICE] UTTERANCE_COMPLETE');
+        console.log('[VOICE] RECORDER_STOPPED');
+        console.log(`[VOICE] AUDIO_CHUNKS = ${audioChunks.length}`);
+
+        if (this.isProcessingAudio) {
+          console.log('[VOICE] Audio processing already in progress, skipping duplicate onstop');
+          return;
+        }
 
         if (!this.active || audioChunks.length === 0) {
-          console.warn('[VOICE] No audio chunks available, restarting listening loop');
+          console.warn('[VOICE] NO_SPEECH - No audio chunks recorded');
           if (this.active) {
-            this.state = 'listening';
-            this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
+            this.state = 'speaking';
+            this.statusText = 'Je ne vous ai pas entendu. Pouvez-vous répéter ?';
             this.notify();
-            setTimeout(() => this.startListeningLoop(lang), 300);
+            await LanguageEngine.speak('Je ne vous ai pas entendu. Pouvez-vous répéter ?', lang);
+            if (this.active) {
+              console.log('[VOICE] LISTENING_RESUMED');
+              this.state = 'listening';
+              this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
+              this.notify();
+              setTimeout(() => this.startListeningLoop(lang), 300);
+            }
           }
           return;
         }
 
         const audioBlob = new Blob(audioChunks, { type: mimeType });
-        console.log(`[VOICE][06] BLOB_CREATED size=${audioBlob.size} type=${mimeType}`);
+        console.log(`[VOICE] BLOB_READY size=${audioBlob.size} type=${mimeType}`);
 
         if (audioBlob.size === 0) {
-          console.warn('[VOICE] Audio blob is empty, skipping STT');
+          console.warn('[VOICE] NO_SPEECH - Empty audio blob');
           if (this.active) {
-            this.state = 'listening';
-            this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
+            this.state = 'speaking';
+            this.statusText = 'Je ne vous ai pas entendu. Pouvez-vous répéter ?';
             this.notify();
-            setTimeout(() => this.startListeningLoop(lang), 300);
+            await LanguageEngine.speak('Je ne vous ai pas entendu. Pouvez-vous répéter ?', lang);
+            if (this.active) {
+              console.log('[VOICE] LISTENING_RESUMED');
+              this.state = 'listening';
+              this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
+              this.notify();
+              setTimeout(() => this.startListeningLoop(lang), 300);
+            }
           }
           return;
         }
 
+        this.isProcessingAudio = true;
         this.state = 'transcribing';
-        this.statusText = 'Transcription Acom IA en cours...';
+        this.statusText = 'Demande reçue. Transcription Acom IA en cours...';
         this.notify();
 
         const cleanMime = mimeType.split(';')[0].trim();
@@ -431,7 +344,7 @@ class VoiceSessionManagerService {
         reader.onloadend = async () => {
           const base64Audio = reader.result as string;
           try {
-            console.log('[STT][07] REQUEST_STARTED');
+            console.log('[STT] REQUEST_STARTED');
             this.startProcessingWatchdog(lang, 15000);
             const res = await fetch('/api/stt', {
               method: 'POST',
@@ -439,21 +352,32 @@ class VoiceSessionManagerService {
               body: JSON.stringify({ audioBase64: base64Audio, mimeType: cleanMime, lang })
             });
             const data = await res.json();
-            console.log(`[STT][08] REQUEST_COMPLETED status=${res.status}`);
+            console.log(`[STT] RESPONSE_RECEIVED status=${res.status}`);
 
             if (data.transcript && data.transcript.trim()) {
-              console.log(`[STT][09] TRANSCRIPT_READY text="${data.transcript}"`);
+              console.log(`[STT] TRANSCRIPT_READY text="${data.transcript}"`);
               this.currentTranscript = data.transcript;
               this.notify();
               await this.handleUserTranscript(data.transcript, lang);
             } else {
-              console.warn('[STT] Empty or missing transcript in response');
+              console.warn('[STT] UNRECOGNIZED - Empty or unreadable transcript');
               this.clearWatchdog();
               if (this.active) {
-                this.state = 'listening';
-                this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
+                const unrecMsg = 'Je vous ai entendu, mais je n\'ai pas réussi à comprendre votre demande. Pouvez-vous la répéter ?';
+                this.state = 'speaking';
+                this.statusText = unrecMsg;
                 this.notify();
-                setTimeout(() => this.startListeningLoop(lang), 300);
+                console.log('[TTS] STARTED');
+                await LanguageEngine.speak(unrecMsg, lang);
+                console.log('[TTS] COMPLETED');
+
+                if (this.active) {
+                  console.log('[VOICE] LISTENING_RESUMED');
+                  this.state = 'listening';
+                  this.statusText = 'À votre écoute... (Parlez librement)';
+                  this.notify();
+                  setTimeout(() => this.startListeningLoop(lang), 300);
+                }
               }
             }
           } catch (err) {
@@ -465,6 +389,8 @@ class VoiceSessionManagerService {
               this.notify();
               setTimeout(() => this.startListeningLoop(lang), 500);
             }
+          } finally {
+            this.isProcessingAudio = false;
           }
         };
       };
@@ -495,12 +421,44 @@ class VoiceSessionManagerService {
    * Stop recording manually and process speech immediately
    */
   public triggerSendVoiceChunk(): void {
-    console.log('[VOICE][02] SEND_NOW_CLICKED');
+    console.log('[VOICE] SEND_NOW_CLICKED');
+
+    if (this.isProcessingAudio) {
+      console.warn('[VOICE] Audio processing already in progress, ignoring duplicate send');
+      return;
+    }
+
+    if (this.state === 'speech_detected' || this.state === 'listening') {
+      this.state = 'transcribing';
+      this.statusText = 'Préparation de votre message...';
+      this.notify();
+    }
+
+    if (this.recognitionInstance) {
+      console.log('[VOICE] STOP_REQUESTED (SpeechRecognition)');
+      try {
+        this.recognitionInstance.stop();
+      } catch {}
+      const text = this.currentTranscript;
+      this.recognitionInstance = null;
+      if (text && text.trim()) {
+        this.handleUserTranscript(text);
+      } else {
+        if (this.active) {
+          this.state = 'listening';
+          this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
+          this.notify();
+          setTimeout(() => this.startListeningLoop(), 300);
+        }
+      }
+      return;
+    }
+
     if (this.mediaRecorder && (this.mediaRecorder.state === 'recording' || this.mediaRecorder.state === 'paused')) {
       try {
-        console.log('[VOICE][03] STOP_REQUESTED');
-        if (typeof this.mediaRecorder.requestData === 'function') {
-          this.mediaRecorder.requestData();
+        console.log('[VOICE] STOP_REQUESTED');
+        if (typeof (this.mediaRecorder as any).requestData === 'function') {
+          (this.mediaRecorder as any).requestData();
         }
         this.mediaRecorder.stop();
       } catch (e) {
@@ -508,6 +466,11 @@ class VoiceSessionManagerService {
       }
     } else {
       console.warn('[VOICE] triggerSendVoiceChunk called but MediaRecorder state is:', this.mediaRecorder?.state);
+      if (this.active && this.state !== 'understanding' && this.state !== 'processing' && this.state !== 'speaking') {
+        this.state = 'listening';
+        this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
+        this.notify();
+      }
     }
   }
 
@@ -516,7 +479,7 @@ class VoiceSessionManagerService {
    */
   private async handleUserTranscript(text: string, lang: 'fr' | 'wo' = 'fr'): Promise<void> {
     if (!text || !this.active) return;
-    console.log(`[AI][10] MESSAGE_SUBMITTED text="${text}"`);
+    console.log(`[AI] MESSAGE_RECEIVED text="${text}"`);
 
     // Check if user asks to stop voice conversation
     const lower = text.toLowerCase();
@@ -525,9 +488,9 @@ class VoiceSessionManagerService {
       this.state = 'speaking';
       this.statusText = stopText;
       this.notify();
-      console.log('[TTS][14] SPEAKING_STARTED');
+      console.log('[TTS] STARTED');
       await LanguageEngine.speak(stopText, lang);
-      console.log('[TTS][15] SPEAKING_COMPLETED');
+      console.log('[TTS] COMPLETED');
       this.stopSession();
       return;
     }
@@ -541,9 +504,9 @@ class VoiceSessionManagerService {
     // 2. Standard Voice Command Processing
     this.startProcessingWatchdog(lang, 20000);
     try {
-      console.log('[AI][11] INTENT_PROCESSING');
+      console.log('[AI] PROCESSING');
       this.state = 'understanding';
-      this.statusText = `Analyse : "${text}"`;
+      this.statusText = `J'analyse votre demande : "${text}"`;
       this.notify();
 
       // Log user message to conversation history
@@ -558,7 +521,7 @@ class VoiceSessionManagerService {
       // NLU Parse
       const saasContext = ContextEngine.getContext();
       const intent = await IntentEngine.parseIntent(processedPrompt, saasContext);
-      console.log(`[AI][12] INTENT_RESOLVED intentId="${intent.intentId}" confidence=${intent.confidence}`);
+      console.log(`[AI] INTENT_UNDERSTOOD intentId="${intent.intentId}" confidence=${intent.confidence}`);
 
       // Check for missing parameters requirement
       if (intent.missingParameters && intent.missingParameters.length > 0) {
@@ -567,9 +530,9 @@ class VoiceSessionManagerService {
         this.state = 'speaking';
         this.statusText = messageFr;
         this.notify();
-        console.log('[TTS][14] SPEAKING_STARTED');
+        console.log('[TTS] STARTED');
         await LanguageEngine.speak(messageFr, lang);
-        console.log('[TTS][15] SPEAKING_COMPLETED');
+        console.log('[TTS] COMPLETED');
         return;
       }
 
@@ -586,10 +549,11 @@ class VoiceSessionManagerService {
 
       // Execute via ActionRouter
       const result = await ActionRouter.dispatchIntent(intent, saasContext);
+      console.log('[AI] ACTION_EXECUTED');
 
       // Check message to speak
       const responseText = lang === 'wo' ? (result.messageWolof || result.messageFr) : result.messageFr;
-      console.log(`[AI][13] RESPONSE_READY text="${responseText}"`);
+      console.log(`[AI] RESPONSE_READY text="${responseText}"`);
 
       // Log assistant response in ConversationContext
       ConversationContext.addAssistantMessage(
@@ -605,22 +569,22 @@ class VoiceSessionManagerService {
       this.statusText = responseText;
       this.notify();
 
-      console.log('[TTS][14] SPEAKING_STARTED');
+      console.log('[TTS] STARTED');
       await LanguageEngine.speak(responseText, lang);
-      console.log('[TTS][15] SPEAKING_COMPLETED');
+      console.log('[TTS] COMPLETED');
     } catch (err: any) {
       console.error('[AI][ERROR] Voice transcript handling failed:', err);
       const errResponse = "Une erreur s'est produite lors du traitement. Reprenons.";
       this.state = 'speaking';
       this.statusText = errResponse;
       this.notify();
-      console.log('[TTS][14] SPEAKING_STARTED');
+      console.log('[TTS] STARTED');
       await LanguageEngine.speak(errResponse, lang);
-      console.log('[TTS][15] SPEAKING_COMPLETED');
+      console.log('[TTS] COMPLETED');
     } finally {
       this.clearWatchdog();
       if (this.active) {
-        console.log('[VOICE][16] LISTENING_RESUMED');
+        console.log('[VOICE] LISTENING_RESUMED');
         this.state = 'listening';
         this.statusText = 'Enregistrement vocal actif... (Parlez librement)';
         this.notify();

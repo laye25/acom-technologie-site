@@ -133,6 +133,8 @@ import { ActionConfirmationModal } from '../ai-demo/components/ActionConfirmatio
 import { TutorialOverlay } from '../ai-demo/components/TutorialOverlay';
 import { AcomAIAssistantWidget } from '../ai-demo/components/AcomAIAssistantWidget';
 import { AIDemoConsolePage } from '../ai-demo/components/AIDemoConsolePage';
+import { SaaSSelectorDropdown } from '../components/SaaSSelectorDropdown';
+import { SaaSManagerModal } from '../components/SaaSManagerModal';
 
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
@@ -905,6 +907,17 @@ const MerchantSaaS = () => {
             
             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <NetworkStatusIndicator position="inline" plan={merchant.plan} />
+
+              <SaaSSelectorDropdown 
+                merchant={merchant} 
+                onUpdateMerchant={(updated) => {
+                  setMerchant(updated);
+                  setOverrideType(null);
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.set('type', updated.type || 'stock');
+                  setSearchParams(newParams, { replace: true });
+                }} 
+              />
               
               <button
                 onClick={() => setActiveTab('ai_demo')}

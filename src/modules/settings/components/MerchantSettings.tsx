@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Save, Loader2, Store, Printer, HardDrive, Database, CheckCircle, Upload, MapPin, AlertCircle, Zap, Download, MessageSquare, Settings } from 'lucide-react';
+import { Save, Loader2, Store, Printer, HardDrive, Database, CheckCircle, Upload, MapPin, AlertCircle, Zap, Download, MessageSquare, Settings, Layers, Sparkles, ArrowRight } from 'lucide-react';
 import { dbService } from '../../../services/dbService';
 import { syncService } from '../../../services/syncService';
 import { Merchant } from '../../../types';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { db } from '../../../db/db';
-// removed sqliteService import
+import { SaaSManagerModal } from '../../../components/SaaSManagerModal';
+import { saasSubscriptionService, SAAS_CATALOG } from '../../../services/saasSubscriptionService';
 import toast from 'react-hot-toast';
 
 const MerchantSettings = ({ 
@@ -27,6 +28,11 @@ const MerchantSettings = ({
   });
   const [saving, setSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [showSaaSModal, setShowSaaSModal] = useState(false);
+
+  const activeSaasTypes = saasSubscriptionService.getActiveSaasTypes(merchant);
+  const activeSaasCount = activeSaasTypes.length;
+  const maxSaasAllowed = saasSubscriptionService.getMaxAllowedSaasForPlan(merchant.plan);
 
   const handleExportLocalData = async () => {
     setIsExporting(true);
@@ -130,6 +136,65 @@ const MerchantSettings = ({
       exit={{ opacity: 0, x: -20 }}
       className="max-w-4xl mx-auto"
     >
+      {/* Multi-SaaS & Subscriptions Manager Card */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 md:p-10 rounded-[3rem] text-white shadow-xl mb-12 border border-slate-700/50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+          <Layers className="w-48 h-48 text-white" />
+        </div>
+
+        <div className="relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-violet-500/20 rounded-2xl flex items-center justify-center border border-violet-400/30 text-violet-300">
+                <Layers className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-white tracking-tight">Solutions SaaS & Abonnements</h3>
+                <p className="text-[10px] font-mono text-slate-300 uppercase tracking-[0.2em] mt-1">
+                  Plan {merchant.plan || 'FREE'} • {activeSaasCount} / {maxSaasAllowed} SaaS actif(s)
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowSaaSModal(true)}
+              className="px-6 py-4 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 fill-white" />
+              Gérer mes SaaS & Accès
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-300 leading-relaxed mb-6 max-w-2xl">
+            Passez librement d'une solution métier à une autre (Commerce, Pressing, Couture, Santé, Éducation, BTP, etc.), ajoutez de nouveaux modules à votre compte ou suspendez un accès à tout moment sans jamais perdre vos données.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {activeSaasTypes.map((st) => {
+              const cat = SAAS_CATALOG[st];
+              return (
+                <span key={st} className="px-3 py-1.5 bg-white/10 border border-white/20 rounded-xl text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  {cat?.label.split('(')[0].trim() || st}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {showSaaSModal && (
+        <SaaSManagerModal
+          merchant={merchant}
+          onClose={() => setShowSaaSModal(false)}
+          onUpdateMerchant={(updated) => {
+            onUpdate(updated);
+            setFormData(updated);
+          }}
+        />
+      )}
+
       <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
