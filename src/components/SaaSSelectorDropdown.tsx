@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Merchant } from '../types';
 import { saasSubscriptionService, SAAS_CATALOG } from '../services/saasSubscriptionService';
+import { getSaasRouteConfig, isSaasType } from '../utils/saasRoutes';
 import { SaaSManagerModal } from './SaaSManagerModal';
 import toast from 'react-hot-toast';
 
@@ -17,13 +18,19 @@ interface SaaSSelectorDropdownProps {
 
 const ICON_MAP: Record<string, any> = {
   stock: Store,
+  boutique: Store,
   pressing: Shirt,
   couture: Scissors,
+  tailleur: Scissors,
   medical: Stethoscope,
   school: GraduationCap,
+  scolaire: GraduationCap,
   transport: Car,
+  flotte: Car,
   rh: Users,
-  btp: HardHat
+  btp: HardHat,
+  chantier: HardHat,
+  entreprise: HardHat
 };
 
 export const SaaSSelectorDropdown: React.FC<SaaSSelectorDropdownProps> = ({
@@ -37,9 +44,10 @@ export const SaaSSelectorDropdown: React.FC<SaaSSelectorDropdownProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const activeSaasTypes = saasSubscriptionService.getActiveSaasTypes(merchant);
-  const currentType = merchant.type || 'stock';
-  const currentCatalog = SAAS_CATALOG[currentType] || SAAS_CATALOG.stock;
-  const CurrentIcon = ICON_MAP[currentType] || Store;
+  const currentConfig = getSaasRouteConfig(merchant.type);
+  const currentType = currentConfig.type;
+  const currentCatalog = SAAS_CATALOG[currentType] || SAAS_CATALOG[merchant.type] || SAAS_CATALOG.stock;
+  const CurrentIcon = ICON_MAP[currentType] || ICON_MAP[merchant.type] || Store;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -53,7 +61,7 @@ export const SaaSSelectorDropdown: React.FC<SaaSSelectorDropdownProps> = ({
   }, []);
 
   const handleSelectSaas = async (targetType: string) => {
-    if (targetType === currentType) {
+    if (isSaasType(merchant.type, targetType)) {
       setIsOpen(false);
       return;
     }
@@ -116,7 +124,7 @@ export const SaaSSelectorDropdown: React.FC<SaaSSelectorDropdownProps> = ({
                 {activeSaasTypes.map((typeKey) => {
                   const cat = SAAS_CATALOG[typeKey] || { label: typeKey };
                   const IconComp = ICON_MAP[typeKey] || Store;
-                  const isSelected = typeKey === currentType;
+                  const isSelected = isSaasType(merchant.type, typeKey);
 
                   return (
                     <button

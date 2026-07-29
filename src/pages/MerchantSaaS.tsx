@@ -108,6 +108,7 @@ import { showMailSuccessToast } from '../components/MailSuccessToast';
 import { getApiUrl, sendEmailDirectlyOrViaBackend } from '../lib/api';
 import { triggerAcomAlert, AcomAlertEventProvider } from '../components/AcomAlertEventProvider';
 import { AcomZoneMerchantPanel } from '../components/AcomZoneMerchantPanel';
+import { getSaasRouteConfig, isSaasType } from '../utils/saasRoutes';
 import { DetergentSale, PressingTicket } from '../modules/pressing/types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -201,11 +202,32 @@ const MerchantSaaS = () => {
     if (activeTab) {
       ContextEngine.updateContext({
         currentPage: activeTab,
-        activeSaaS: (merchant?.type as any) || 'pressing'
+        activeSaaS: (merchant?.type as any) || 'boutique'
       });
       TutorialEngine.onPageSelected(activeTab);
     }
   }, [activeTab, merchant]);
+
+  // Diagnostic logging for UI rendering on SaaS switch
+  useEffect(() => {
+    if (merchant?.type) {
+      const config = getSaasRouteConfig(merchant.type);
+      console.log(`[SAAS_SWITCH] UI_RENDERED: ${config.type} (merchant.type=${merchant.type}, activeTab=${activeTab})`);
+    }
+  }, [merchant?.type, activeTab]);
+
+  // Ensure activeTab is valid for current SaaS type; reset to 'dashboard' if invalid
+  useEffect(() => {
+    if (merchant?.type) {
+      const currentTabs = getTabs(merchant.type, merchant.plan || '');
+      const validTabIds = currentTabs.map(t => t.id);
+      const globalTabs = ['acom_zone', 'ai_demo'];
+      if (!validTabIds.includes(activeTab) && !globalTabs.includes(activeTab)) {
+        console.log(`[SAAS_SWITCH] Resetting invalid activeTab '${activeTab}' for SaaS '${merchant.type}' -> 'dashboard'`);
+        setActiveTab('dashboard');
+      }
+    }
+  }, [merchant?.type]);
 
   useEffect(() => {
     if (merchant?.managerNotifications?.apiBaseUrl) {
@@ -552,21 +574,16 @@ const MerchantSaaS = () => {
 
   const getTabs = (type: string, plan: string) => {
     let tabs: any[] = [];
+    const norm = getSaasRouteConfig(type).type;
 
-    switch (type) {
+    switch (norm) {
+      case 'btp':
+      case 'chantier':
       case 'entreprise':
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
-          { id: 'interventions', label: 'Interventions', icon: Wrench },
-          { id: 'accounting', label: 'Compta', icon: BarChart3 },
-          { id: 'reports', label: 'Rapports', icon: FileText },
-          { id: 'settings', label: 'Réglages', icon: Settings },
-        ];
-        break;
-      case 'chantier':
-        tabs = [
-          { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'projects', label: 'Projets', icon: HardHat },
+          { id: 'interventions', label: 'Interventions', icon: Wrench },
           { id: 'inventory', label: 'Matériel', icon: Package },
           { id: 'accounting', label: 'Compta', icon: BarChart3 },
           { id: 'reports', label: 'Rapports', icon: FileText },
@@ -574,6 +591,7 @@ const MerchantSaaS = () => {
         ];
         break;
       case 'transport':
+      case 'flotte':
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'vehicles', label: 'Véhicules', icon: Car },
@@ -584,6 +602,7 @@ const MerchantSaaS = () => {
         ];
         break;
       case 'rh':
+      case 'recrutement':
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'employees', label: 'Employés', icon: Users },
@@ -591,7 +610,9 @@ const MerchantSaaS = () => {
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
         break;
+      case 'school':
       case 'scolaire':
+      case 'ecole':
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart, group: 'Général' },
           { id: 'students', label: 'Administration', icon: GraduationCap, group: 'Administration Scolaire' },
@@ -619,6 +640,8 @@ const MerchantSaaS = () => {
         ];
         break;
       case 'medical':
+      case 'sante':
+      case 'clinique':
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'patients', label: 'Patients', icon: Stethoscope },
@@ -630,6 +653,8 @@ const MerchantSaaS = () => {
         ];
         break;
       case 'pressing':
+      case 'laverie':
+      case 'blanchisserie':
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'pressing_receipt', label: '🧺 Fiche Réception', icon: ClipboardList },
@@ -643,6 +668,7 @@ const MerchantSaaS = () => {
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
         break;
+      case 'couture':
       case 'tailleur':
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
@@ -668,7 +694,10 @@ const MerchantSaaS = () => {
           { id: 'settings', label: 'Réglages', icon: Settings },
         ];
         break;
-      default: // boutique
+      case 'stock':
+      case 'boutique':
+      case 'commerce':
+      default:
         tabs = [
           { id: 'dashboard', label: 'Aperçu', icon: PieChart },
           { id: 'pos', label: 'Caisse POS', icon: ShoppingCart },
@@ -973,7 +1002,8 @@ const MerchantSaaS = () => {
                       merchant={merchant} 
                       onUpdateMerchant={(updated) => {
                         setMerchant(updated);
-                        setOverrideType(null);
+                        setOverrideType(updated.type || null);
+                        setActiveTab('dashboard');
                         const newParams = new URLSearchParams(searchParams);
                         newParams.set('type', updated.type || 'stock');
                         setSearchParams(newParams, { replace: true });

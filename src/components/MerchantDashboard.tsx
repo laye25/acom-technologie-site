@@ -31,6 +31,7 @@ import {
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Merchant, MerchantSale, MerchantExpense } from '../types';
+import { isSaasType, getSaasRouteConfig } from '../utils/saasRoutes';
 import { RestoreResult } from '../services/sqliteService';
 import { triggerAcomAlert } from './AcomAlertEventProvider';
 import { sendEmailDirectlyOrViaBackend } from '../lib/api';
@@ -65,39 +66,42 @@ export const MerchantDashboard = ({
   const [restoreLogResult, setRestoreLogResult] = useState<RestoreResult | null>(null);
   const [dashboardSelectedMonth, setDashboardSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7));
 
-  // Load tailleur-specific data if merchant type is tailleur
+  // Load tailleur-specific data if merchant type is tailleur or couture
+  const isCoutureSaas = isSaasType(merchant.type, 'couture');
+  const isPressingSaas = isSaasType(merchant.type, 'pressing');
+
   const tailleurClients = useMemo<any[]>(() => {
-    if (merchant.type !== 'tailleur') return [];
+    if (!isCoutureSaas) return [];
     try {
       const saved = localStorage.getItem(`tailleur_clients_${merchant.id}`);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
-  }, [merchant.id, merchant.type]);
+  }, [merchant.id, isCoutureSaas]);
 
   const tailleurOrders = useMemo<any[]>(() => {
-    if (merchant.type !== 'tailleur') return [];
+    if (!isCoutureSaas) return [];
     try {
       const saved = localStorage.getItem(`tailleur_orders_${merchant.id}`);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
-  }, [merchant.id, merchant.type]);
+  }, [merchant.id, isCoutureSaas]);
 
   const tailleurTissus = useMemo<any[]>(() => {
-    if (merchant.type !== 'tailleur') return [];
+    if (!isCoutureSaas) return [];
     try {
       const saved = localStorage.getItem(`tailleur_tissus_${merchant.id}`);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
-  }, [merchant.id, merchant.type]);
+  }, [merchant.id, isCoutureSaas]);
 
   const tailleurDashboardStats = useMemo(() => {
-    if (merchant.type !== 'tailleur') return null;
+    if (!isCoutureSaas) return null;
 
     const filteredOrders = dashboardSelectedMonth
       ? tailleurOrders.filter(o => o.createdAt && o.createdAt.startsWith(dashboardSelectedMonth))
@@ -118,11 +122,11 @@ export const MerchantDashboard = ({
       clientsCount: tailleurClients.length,
       tissusCount: tailleurTissus.length
     };
-  }, [tailleurClients, tailleurOrders, tailleurTissus, merchant.type, dashboardSelectedMonth]);
+  }, [tailleurClients, tailleurOrders, tailleurTissus, isCoutureSaas, dashboardSelectedMonth]);
 
   // Load pressing-specific data if merchant type is pressing
   const pressingTickets = useMemo<PressingTicket[]>(() => {
-    if (merchant.type !== 'pressing') return [];
+    if (!isPressingSaas) return [];
     try {
       const saved = localStorage.getItem(`pressing_tickets_${merchant.id}`);
       return saved ? JSON.parse(saved) : [];
@@ -1080,14 +1084,14 @@ export const MerchantDashboard = ({
         />
       )}
       <>
-        {(merchant.type === 'boutique' || !merchant.type) && (
+        {isSaasType(merchant.type, 'stock') && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
             <StatCard title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
             <StatCard title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
           </div>
         )}
           
-        {(merchant.type === 'boutique' || !merchant.type || merchant.type === 'pressing') && (
+        {(isSaasType(merchant.type, 'stock') || isSaasType(merchant.type, 'pressing')) && (
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex items-center gap-2 text-violet-600 font-bold">
               <Calendar className="w-5 h-5 text-violet-600" />
@@ -1105,9 +1109,9 @@ export const MerchantDashboard = ({
             </div>
           </div>
         )}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${(merchant.type === 'boutique' || !merchant.type) ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-4'}`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 gap-6 ${isSaasType(merchant.type, 'stock') ? 'lg:grid-cols-3 xl:grid-cols-4' : 'lg:grid-cols-4'}`}>
 
-        {merchant.type === 'boutique' || !merchant.type ? (
+        {isSaasType(merchant.type, 'stock') ? (
           <>
             <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
             <StatCard title="Flux de Trésorerie" value={stats.cashFlowMonth} currency={merchant.currency} icon={Banknote} color={stats.cashFlowMonth >= 0 ? "text-indigo-600" : "text-rose-600"} bgColor={stats.cashFlowMonth >= 0 ? "bg-indigo-50" : "bg-rose-50"} description="Entrées - Sorties" />
@@ -1120,43 +1124,37 @@ export const MerchantDashboard = ({
           </>
         ) : (
           <>
-            {merchant.type === 'chantier' && (
+            {isSaasType(merchant.type, 'btp') && (
               <>
                 <StatCard title="Chantiers Actifs" value={stats.specialized.projects} icon={HardHat} color="text-amber-600" bgColor="bg-amber-50" description="En cours" />
                 <StatCard title="Budget Total" value={projects.reduce((acc: number, p: any) => acc + p.budget, 0)} currency={merchant.currency} icon={TrendingUp} color="text-blue-600" bgColor="bg-blue-50" description="Tous projets" />
               </>
             )}
-            {merchant.type === 'transport' && (
+            {isSaasType(merchant.type, 'transport') && (
               <>
                 <StatCard title="Véhicules Actifs" value={stats.specialized.vehicles} icon={Car} color="text-blue-600" bgColor="bg-blue-50" description="En service" />
                 <StatCard title="Revenu Total" value={stats.revenue.total} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description="Cumulé" />
               </>
             )}
-            {merchant.type === 'rh' && (
+            {isSaasType(merchant.type, 'rh') && (
               <>
                 <StatCard title="Total Employés" value={stats.specialized.employees} icon={Users} color="text-indigo-600" bgColor="bg-indigo-50" description="Effectif total" />
                 <StatCard title="Masse Salariale" value={employees.reduce((acc: number, e: any) => acc + e.salary, 0)} currency={merchant.currency} icon={BarChart3} color="text-red-600" bgColor="bg-red-50" description="Mensuel estimé" />
               </>
             )}
-            {merchant.type === 'scolaire' && (
+            {isSaasType(merchant.type, 'school') && (
               <>
                 <StatCard title="Total Élèves" value={stats.specialized.students} icon={GraduationCap} color="text-emerald-600" bgColor="bg-emerald-50" description="Inscrits" />
                 <StatCard title="Frais Scolarité" value={stats.revenue.total} currency={merchant.currency} icon={TrendingUp} color="text-blue-600" bgColor="bg-blue-50" description="Revenu total" />
               </>
             )}
-            {merchant.type === 'medical' && (
+            {isSaasType(merchant.type, 'medical') && (
               <>
                 <StatCard title="Total Patients" value={stats.specialized.patients} icon={Stethoscope} color="text-rose-600" bgColor="bg-rose-50" description="Dossiers" />
                 <StatCard title="RDV Aujourd'hui" value={stats.specialized.appointmentsToday} icon={Calendar} color="text-blue-600" bgColor="bg-blue-50" description="Prévus" />
               </>
             )}
-            {merchant.type === 'entreprise' && (
-              <>
-                <StatCard title="Interventions" value={stats.specialized.interventions} icon={Wrench} color="text-blue-600" bgColor="bg-blue-50" description="En cours" />
-                <StatCard title="Revenu Total" value={stats.revenue.total} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description="Cumulé" />
-              </>
-            )}
-            {merchant.type === 'pressing' && (
+            {isSaasType(merchant.type, 'pressing') && (
               <>
                 <StatCard 
                   title="Recettes Pressing" 
@@ -1180,7 +1178,7 @@ export const MerchantDashboard = ({
                 />
               </>
             )}
-            {merchant.type === 'tailleur' && (
+            {isSaasType(merchant.type, 'couture') && (
               <>
                 <StatCard 
                   title="Commandes Couture" 

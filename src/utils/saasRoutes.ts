@@ -81,6 +81,17 @@ export function getSaasRouteConfig(rawType?: string): SaasRouteConfig {
 }
 
 /**
+ * Checks if a given raw SaaS type matches a target category or alias.
+ */
+export function isSaasType(rawType: string | undefined, targetCategory: string): boolean {
+  if (!rawType && (targetCategory === 'stock' || targetCategory === 'boutique')) return true;
+  if (!rawType) return false;
+  const currentConfig = getSaasRouteConfig(rawType);
+  const targetConfig = getSaasRouteConfig(targetCategory);
+  return currentConfig.type === targetConfig.type;
+}
+
+/**
  * Returns the exact route for a given SaaS and optional Merchant ID.
  */
 export function getSaasClientRoute(rawType?: string, merchantId?: string): string {

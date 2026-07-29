@@ -10,6 +10,8 @@ import { saasSubscriptionService, SAAS_CATALOG } from '../services/saasSubscript
 import { PlanUpgradeModal } from './PlanUpgradeModal';
 import toast from 'react-hot-toast';
 
+import { getSaasRouteConfig, isSaasType } from '../utils/saasRoutes';
+
 interface SaaSManagerModalProps {
   merchant: Merchant;
   onClose: () => void;
@@ -216,7 +218,7 @@ export const SaaSManagerModal: React.FC<SaaSManagerModalProps> = ({
                 const sub = subscriptions[saasKey] || { status: 'subscription_required' };
                 const IconComponent = ICON_MAP[saasKey] || Store;
                 const colors = COLOR_MAP[saasKey] || COLOR_MAP.stock;
-                const isCurrentActive = merchant.type === saasKey;
+                const isCurrentActive = isSaasType(merchant.type, saasKey);
 
                 if (activeFilter === 'active' && sub.status !== 'active') return null;
 

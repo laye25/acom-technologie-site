@@ -150,15 +150,17 @@ class SaasSubscriptionService {
    * Switch the active SaaS module for a merchant
    */
   public async switchActiveSaas(merchant: Merchant, targetSaasType: string, userName?: string): Promise<Merchant> {
+    console.log(`[SAAS_SWITCH] REQUESTED: ${targetSaasType}`);
     const config = getSaasRouteConfig(targetSaasType);
     const normalizedTarget = config.type;
 
     const subs = this.getMerchantSaasSubscriptions(merchant);
-    const targetSub = subs[normalizedTarget];
+    const targetSub = subs[normalizedTarget] || subs[targetSaasType];
 
     if (!targetSub || targetSub.status !== 'active') {
       throw new Error(`Accès refusé : Le SaaS "${config.label}" n'est pas actif pour votre compte.`);
     }
+    console.log(`[SAAS_SWITCH] AUTHORIZED: ${normalizedTarget}`);
 
     const updatedMerchant: Merchant = {
       ...merchant,
@@ -167,6 +169,8 @@ class SaasSubscriptionService {
     };
 
     await dbService.merchants.save(updatedMerchant);
+    console.log(`[SAAS_SWITCH] ACTIVE_SAAS_UPDATED: ${normalizedTarget}`);
+    console.log(`[SAAS_SWITCH] CONFIG_LOADED: ${config.label}`);
 
     // Update global AI context
     ContextEngine.updateContext({
@@ -175,12 +179,14 @@ class SaasSubscriptionService {
       merchantName: merchant.name
     });
 
+    const route = `${config.dashboardRoute}?merchantId=${merchant.id}&type=${normalizedTarget}`;
     logSaasNavigation(
       userName || merchant.name || 'Utilisateur',
       normalizedTarget,
       merchant.name,
-      `${config.dashboardRoute}?merchantId=${merchant.id}&type=${normalizedTarget}`
+      route
     );
+    console.log(`[SAAS_SWITCH] ROUTE_UPDATED: ${route}`);
 
     return updatedMerchant;
   }
