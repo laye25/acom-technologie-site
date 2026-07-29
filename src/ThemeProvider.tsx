@@ -1,14 +1,63 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { dbService as db } from './services/dbService';
 
+export type ThemeMode = 'light' | 'dark';
+
 interface ThemeContextType {
   primaryColor: string;
+  themeMode: ThemeMode;
+  isDark: boolean;
+  setThemeMode: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextType>({ primaryColor: '#7c3aed' });
+const ThemeContext = createContext<ThemeContextType>({
+  primaryColor: '#7c3aed',
+  themeMode: 'light',
+  isDark: false,
+  setThemeMode: () => {},
+  toggleTheme: () => {},
+});
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [primaryColor, setPrimaryColor] = useState('#7c3aed');
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('acom_theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+    }
+    return 'light';
+  });
+
+  const isDark = themeMode === 'dark';
+
+  const setThemeMode = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('acom_theme', mode);
+    }
+  };
+
+  const toggleTheme = () => {
+    setThemeMode(themeMode === 'light' ? 'dark' : 'light');
+  };
+
+  // Sync DOM classes and attributes whenever themeMode changes
+  useEffect(() => {
+    const root = document.documentElement;
+    if (themeMode === 'dark') {
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+      root.style.colorScheme = 'dark';
+    } else {
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+      root.style.colorScheme = 'light';
+    }
+  }, [themeMode]);
 
   useEffect(() => {
     const applyTheme = (color: string) => {
@@ -60,10 +109,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return (
-    <ThemeContext.Provider value={{ primaryColor }}>
+    <ThemeContext.Provider value={{ primaryColor, themeMode, isDark, setThemeMode, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
 };
 
 export const useTheme = () => useContext(ThemeContext);
+

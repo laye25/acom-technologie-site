@@ -137,6 +137,7 @@ import { AIDemoConsolePage } from '../ai-demo/components/AIDemoConsolePage';
 import { SaaSSelectorDropdown } from '../components/SaaSSelectorDropdown';
 import { SaaSManagerModal } from '../components/SaaSManagerModal';
 import { NotificationCenter } from '../components/NotificationCenter';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 const isDesktop = typeof window !== 'undefined' && (
   ('__TAURI__' in window) || 
@@ -866,11 +867,13 @@ const MerchantSaaS = () => {
                 </div>
               </div>
 
-              {/* Right: Notifications & User Profile */}
-              <div className="flex items-center gap-4 self-end lg:self-auto shrink-0">
+              {/* Right: Theme Toggle, Notifications & User Profile */}
+              <div className="flex items-center gap-3 sm:gap-4 self-end lg:self-auto shrink-0">
+                <ThemeToggle showLabel={true} />
+
                 <NotificationCenter />
 
-                <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+                <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
 
                 <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 px-3.5 py-1.5 rounded-2xl transition-all cursor-pointer">
                   <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-sm shrink-0">

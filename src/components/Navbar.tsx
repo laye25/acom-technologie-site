@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDataCache } from '../context/CacheContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import { NotificationCenter } from './NotificationCenter';
+import { ThemeToggle } from './ThemeToggle';
 import { dbService } from '../services/dbService';
 import { LayoutDashboard, LogOut, Menu, X, ShoppingBag, MessageSquare, User, ChevronRight, Calculator, Store, Palette } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -196,7 +197,8 @@ const Navbar = () => {
           </div>
 
           {/* Actions */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-3">
+            <ThemeToggle />
             <LanguageSwitcher light={useWhiteText} />
             {user && <NotificationCenter />}
             {user ? (
@@ -251,6 +253,7 @@ const Navbar = () => {
 
           {/* Mobile Toggle */}
           <div className="flex items-center space-x-2 md:hidden">
+            <ThemeToggle />
             <LanguageSwitcher light={useWhiteText} />
             {user && <NotificationCenter />}
             <button
