@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ProfessionalColorPalette } from './ProfessionalColorPalette';
 import { 
   Cpu, Upload, Download, Play, Pause, RotateCcw, ZoomIn, ZoomOut, 
   Sparkles, Info, RefreshCw, ImagePlus, X, Plus, Trash2, Eye, EyeOff,
@@ -610,6 +611,171 @@ export function getLayerBoundingBox(layer: EmbroideryLayer): { minX: number; max
 }
 
 /**
+ * Geometric helper: distance from point (px, py) to line segment (ax, ay)-(bx, by)
+ */
+export function distanceToSegment(
+  px: number, py: number,
+  ax: number, ay: number,
+  bx: number, by: number
+): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) {
+    return Math.hypot(px - ax, py - ay);
+  }
+  let t = ((px - ax) * dx + (py - ay) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const projX = ax + t * dx;
+  const projY = ay + t * dy;
+  return Math.hypot(px - projX, py - projY);
+}
+
+/**
+ * Geometric helper: Ray-casting Point-in-Polygon algorithm for filled shapes
+ */
+export function isPointInPolygon(px: number, py: number, polygon: { x: number; y: number }[]): boolean {
+  if (polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect =
+      (yi > py) !== (yj > py) &&
+      px < ((xj - xi) * (py - yi)) / (yj - yi + 1e-12) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Geometric helper: Segment-segment intersection test
+ */
+export function doSegmentsIntersect(
+  ax: number, ay: number, bx: number, by: number,
+  cx: number, cy: number, dx: number, dy: number
+): boolean {
+  function ccw(p1x: number, p1y: number, p2x: number, p2y: number, p3x: number, p3y: number): number {
+    const val = (p2y - p1y) * (p3x - p2x) - (p2x - p1x) * (p3y - p2y);
+    if (Math.abs(val) < 1e-9) return 0;
+    return val > 0 ? 1 : 2;
+  }
+  const o1 = ccw(ax, ay, bx, by, cx, cy);
+  const o2 = ccw(ax, ay, bx, by, dx, dy);
+  const o3 = ccw(cx, cy, dx, dy, ax, ay);
+  const o4 = ccw(cx, cy, dx, dy, bx, by);
+
+  if (o1 !== o2 && o3 !== o4) return true;
+
+  function onSegment(px: number, py: number, qx: number, qy: number, rx: number, ry: number): boolean {
+    return (
+      qx <= Math.max(px, rx) && qx >= Math.min(px, rx) &&
+      qy <= Math.max(py, ry) && qy >= Math.min(py, ry)
+    );
+  }
+
+  if (o1 === 0 && onSegment(ax, ay, cx, cy, bx, by)) return true;
+  if (o2 === 0 && onSegment(ax, ay, dx, dy, bx, by)) return true;
+  if (o3 === 0 && onSegment(cx, cy, ax, ay, dx, dy)) return true;
+  if (o4 === 0 && onSegment(cx, cy, bx, by, dx, dy)) return true;
+
+  return false;
+}
+
+/**
+ * Geometric helper: Check if segment (ax, ay)-(bx, by) intersects an axis-aligned box
+ */
+export function isSegmentIntersectingBox(
+  ax: number, ay: number, bx: number, by: number,
+  box: { minX: number; maxX: number; minY: number; maxY: number }
+): boolean {
+  if (
+    (ax >= box.minX && ax <= box.maxX && ay >= box.minY && ay <= box.maxY) ||
+    (bx >= box.minX && bx <= box.maxX && by >= box.minY && by <= box.maxY)
+  ) {
+    return true;
+  }
+
+  if (doSegmentsIntersect(ax, ay, bx, by, box.minX, box.minY, box.maxX, box.minY)) return true;
+  if (doSegmentsIntersect(ax, ay, bx, by, box.minX, box.maxY, box.maxX, box.maxY)) return true;
+  if (doSegmentsIntersect(ax, ay, bx, by, box.minX, box.minY, box.minX, box.maxY)) return true;
+  if (doSegmentsIntersect(ax, ay, bx, by, box.maxX, box.minY, box.maxX, box.maxY)) return true;
+
+  return false;
+}
+
+/**
+ * Check if a point (px, py) in world coordinates hits a layer's exact geometry
+ */
+export function isPointInLayer(
+  px: number,
+  py: number,
+  layer: EmbroideryLayer,
+  zoom: number = 1
+): boolean {
+  if (!layer.visible) return false;
+
+  const bbox = getLayerBoundingBox(layer);
+  const margin = Math.max(10, 15 / zoom);
+  if (
+    px < bbox.minX - margin ||
+    px > bbox.maxX + margin ||
+    py < bbox.minY - margin ||
+    py > bbox.maxY + margin
+  ) {
+    return false;
+  }
+
+  const paths =
+    layer.subpaths && layer.subpaths.length > 0
+      ? layer.subpaths
+      : layer.points && layer.points.length > 0
+      ? [layer.points]
+      : [];
+
+  const strokeTol = Math.max(3, 10 / zoom);
+  const vertexTol = Math.max(4, 12 / zoom);
+
+  for (const path of paths) {
+    if (!path || path.length === 0) continue;
+
+    if (path.length === 1) {
+      if (Math.hypot(px - path[0].x, py - path[0].y) <= vertexTol) {
+        return true;
+      }
+      continue;
+    }
+
+    for (const pt of path) {
+      if (Math.hypot(px - pt.x, py - pt.y) <= vertexTol) {
+        return true;
+      }
+    }
+
+    const isClosed =
+      path.length >= 3 &&
+      (layer.stitchType === 'tatami' ||
+        layer.stitchType === 'satin' ||
+        layer.stitchType === 'zigzag');
+    const segCount = isClosed ? path.length : path.length - 1;
+
+    for (let i = 0; i < segCount; i++) {
+      const p1 = path[i];
+      const p2 = path[(i + 1) % path.length];
+      if (distanceToSegment(px, py, p1.x, p1.y, p2.x, p2.y) <= strokeTol) {
+        return true;
+      }
+    }
+
+    if (isClosed && isPointInPolygon(px, py, path)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Check if a layer falls within or intersects a marquee selection rectangle in world coordinates
  */
 export function isLayerInMarquee(
@@ -628,16 +794,64 @@ export function isLayerInMarquee(
     lBox.minY > box.maxY
   );
 
-  if (bboxIntersects) return true;
+  if (!bboxIntersects) return false;
 
-  // Check individual points inside box
-  const allPoints: EmbroideryPoint[] = [];
-  if (layer.points) allPoints.push(...layer.points);
-  if (layer.subpaths) layer.subpaths.forEach(sub => allPoints.push(...sub));
+  const paths =
+    layer.subpaths && layer.subpaths.length > 0
+      ? layer.subpaths
+      : layer.points && layer.points.length > 0
+      ? [layer.points]
+      : [];
 
-  return allPoints.some(pt => 
-    pt.x >= box.minX && pt.x <= box.maxX && pt.y >= box.minY && pt.y <= box.maxY
-  );
+  // 1. Check if any vertex point is inside marquee box
+  for (const path of paths) {
+    for (const pt of path) {
+      if (
+        pt.x >= box.minX &&
+        pt.x <= box.maxX &&
+        pt.y >= box.minY &&
+        pt.y <= box.maxY
+      ) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Check if any line segment intersects marquee box
+  for (const path of paths) {
+    if (path.length < 2) continue;
+    const isClosed =
+      path.length >= 3 &&
+      (layer.stitchType === 'tatami' ||
+        layer.stitchType === 'satin' ||
+        layer.stitchType === 'zigzag');
+    const count = isClosed ? path.length : path.length - 1;
+
+    for (let i = 0; i < count; i++) {
+      const p1 = path[i];
+      const p2 = path[(i + 1) % path.length];
+      if (isSegmentIntersectingBox(p1.x, p1.y, p2.x, p2.y, box)) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Check if marquee center is inside a filled polygon
+  const centerX = (box.minX + box.maxX) / 2;
+  const centerY = (box.minY + box.maxY) / 2;
+  if (
+    layer.stitchType === 'tatami' ||
+    layer.stitchType === 'satin' ||
+    layer.stitchType === 'zigzag'
+  ) {
+    for (const path of paths) {
+      if (path.length >= 3 && isPointInPolygon(centerX, centerY, path)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 
@@ -2700,21 +2914,17 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         const dy = Math.abs(marqueeCurrentRef.current.y - marqueeStartRef.current.y);
 
         if (dx < 6 && dy < 6) {
-          // Single point click: select clicked layer or toggle selection
+          // Single point click: select top-most clicked layer or toggle selection using exact geometric hit testing
           const clickWorldX = currX;
           const clickWorldY = currY;
-          const clickedLayer = layers.find(l => {
-            if (!l.visible) return false;
-            const box = getLayerBoundingBox(l);
-            return clickWorldX >= box.minX - 10 && clickWorldX <= box.maxX + 10 &&
-                   clickWorldY >= box.minY - 10 && clickWorldY <= box.maxY + 10;
-          });
+          const visibleLayersReverse = [...layers].reverse().filter(l => l.visible);
+          const clickedLayer = visibleLayersReverse.find(l => isPointInLayer(clickWorldX, clickWorldY, l, zoom));
 
           if (clickedLayer) {
-            if (e?.shiftKey) {
+            if (e?.shiftKey || e?.ctrlKey || e?.metaKey) {
               if (selectedLayerIds.includes(clickedLayer.id)) {
                 const nextIds = selectedLayerIds.filter(id => id !== clickedLayer.id);
-                setSelectedLayerIds(nextIds.length > 0 ? nextIds : [layers[0]?.id || 'l1']);
+                setSelectedLayerIds(nextIds.length > 0 ? nextIds : [clickedLayer.id]);
               } else {
                 setSelectedLayerIds([...selectedLayerIds, clickedLayer.id]);
               }
@@ -2735,7 +2945,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
             .map(l => l.id);
 
           if (matchedLayerIds.length > 0) {
-            if (e?.shiftKey) {
+            if (e?.shiftKey || e?.ctrlKey || e?.metaKey) {
               const combined = Array.from(new Set([...selectedLayerIds, ...matchedLayerIds]));
               setSelectedLayerIds(combined);
             } else {
@@ -2835,9 +3045,34 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   }, [isDrawing, stitches.length, speed]);
 
   // Layer manipulation utilities
+  const applyColorToSelectedLayers = useCallback((colorHex: string, colorName?: string) => {
+    const targetIds = (selectedLayerIds && selectedLayerIds.length > 0)
+      ? selectedLayerIds
+      : (selectedLayerId ? [selectedLayerId] : []);
+
+    if (targetIds.length === 0) return;
+
+    pushHistory(layers);
+    setLayers(prev =>
+      prev.map(l =>
+        targetIds.includes(l.id)
+          ? {
+              ...l,
+              color: colorHex,
+              ...(colorName ? { colorName } : {})
+            }
+          : l
+      )
+    );
+  }, [selectedLayerIds, selectedLayerId, layers, pushHistory]);
+
   const updateLayerParam = (layerId: string, updates: Partial<EmbroideryLayer>) => {
     pushHistory(layers);
-    setLayers(prev => prev.map(l => l.id === layerId ? { ...l, ...updates } : l));
+    if (selectedLayerIds.length > 1 && selectedLayerIds.includes(layerId)) {
+      setLayers(prev => prev.map(l => selectedLayerIds.includes(l.id) ? { ...l, ...updates } : l));
+    } else {
+      setLayers(prev => prev.map(l => l.id === layerId ? { ...l, ...updates } : l));
+    }
   };
 
   const handleAddLayer = () => {
@@ -4231,28 +4466,13 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
             </div>
           )}
 
-          {/* Color palette */}
-          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/80 space-y-3">
-            <div className="flex items-center gap-2 text-xs font-bold text-violet-400">
-              <Palette className="w-4 h-4" />
-              <span>Nuancier Madeira Polyneon</span>
-            </div>
-            <div className="grid grid-cols-4 gap-2">
-              {THREAD_COLORS.map((hex, idx) => (
-                <button 
-                  key={idx} 
-                  onClick={() => {
-                    if (activeLayer) updateLayerParam(activeLayer.id, { color: hex });
-                  }}
-                  className={`w-8 h-8 rounded-full border-2 transition-transform cursor-pointer relative ${activeLayer?.color === hex ? 'border-white scale-110 shadow-lg' : 'border-slate-800 hover:scale-105'}`}
-                  style={{ backgroundColor: hex }}
-                  title={`Color thread ${idx}`}
-                >
-                  {activeLayer?.color === hex && <Check className="w-4 h-4 text-black absolute inset-0 m-auto filter invert" />}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* Professional Color Palette */}
+          <ProfessionalColorPalette 
+            layers={layers}
+            selectedLayerId={selectedLayerId}
+            selectedLayerIds={selectedLayerIds}
+            applyColorToSelectedLayers={applyColorToSelectedLayers}
+          />
         </div>
 
         {/* Center Canvas & Timeline Area */}
@@ -4398,6 +4618,34 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                   >
                     Sommets
                   </button>
+                </div>
+
+                {/* Quick Color Applicator Overlay for Canvas */}
+                <div className="bg-slate-900/95 backdrop-blur border border-slate-700/50 p-1 rounded-xl flex items-center gap-1.5 shadow-xl text-[10px] font-bold pointer-events-auto">
+                  <div className="flex items-center gap-1 px-1.5 text-violet-300">
+                    <Palette className="w-3.5 h-3.5 text-violet-400" />
+                    <span className="hidden sm:inline">
+                      Couleur ({selectedLayerIds.length > 1 ? `${selectedLayerIds.length} elem.` : activeLayer?.name || '1 elem.'}):
+                    </span>
+                  </div>
+                  <input
+                    type="color"
+                    value={activeLayer?.color || '#A855F7'}
+                    onChange={(e) => applyColorToSelectedLayers(e.target.value)}
+                    className="w-5 h-5 rounded border border-slate-700 bg-transparent cursor-pointer p-0 shrink-0"
+                    title="Changer la couleur de tous les éléments sélectionnés"
+                  />
+                  <div className="hidden md:flex gap-1">
+                    {THREAD_COLORS.slice(0, 6).map((c, i) => (
+                      <button
+                        key={i}
+                        onClick={() => applyColorToSelectedLayers(c)}
+                        className="w-4 h-4 rounded-full border border-slate-700 hover:scale-110 transition-transform cursor-pointer shrink-0"
+                        style={{ backgroundColor: c }}
+                        title={`Appliquer ${c} à la sélection`}
+                      />
+                    ))}
+                  </div>
                 </div>
 
 
@@ -4836,21 +5084,51 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                 </div>
 
                 {selectedLayerIds.length > 1 && (
-                  <div className="p-2 bg-violet-950/40 border border-violet-800/40 rounded-xl flex items-center justify-between gap-1 text-[10px]">
-                    <span className="font-bold text-violet-300">Action groupe ({selectedLayerIds.length}):</span>
-                    <button
-                      onClick={() => {
-                        if (layers.length > selectedLayerIds.length) {
-                          const remaining = layers.filter(l => !selectedLayerIds.includes(l.id));
-                          setLayers(remaining);
-                          setSelectedLayerIds([remaining[0].id]);
-                        }
-                      }}
-                      className="px-2 py-0.5 bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600 hover:text-white rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Supprimer</span>
-                    </button>
+                  <div className="p-2.5 bg-violet-950/50 border border-violet-800/60 rounded-2xl space-y-2 text-[10px]">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-violet-300 flex items-center gap-1">
+                        <Palette className="w-3.5 h-3.5 text-violet-400" />
+                        <span>Action de groupe ({selectedLayerIds.length} calques)</span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (layers.length > selectedLayerIds.length) {
+                            const remaining = layers.filter(l => !selectedLayerIds.includes(l.id));
+                            setLayers(remaining);
+                            setSelectedLayerIds([remaining[0].id]);
+                          }
+                        }}
+                        className="px-2 py-0.5 bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600 hover:text-white rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1"
+                        title="Supprimer la sélection"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Supprimer</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-violet-900/40">
+                      <span className="text-gray-300 font-medium">Appliquer couleur au groupe:</span>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="color"
+                          value={layers.find(l => selectedLayerIds.includes(l.id))?.color || '#A855F7'}
+                          onChange={(e) => applyColorToSelectedLayers(e.target.value)}
+                          className="w-6 h-6 rounded-md border border-violet-600/50 bg-transparent cursor-pointer p-0 shrink-0"
+                          title="Recolorer tous les calques sélectionnés"
+                        />
+                        <div className="flex gap-1 overflow-x-auto max-w-[120px] py-0.5">
+                          {THREAD_COLORS.slice(0, 5).map((c, i) => (
+                            <button
+                              key={i}
+                              onClick={() => applyColorToSelectedLayers(c)}
+                              className="w-4 h-4 rounded-full border border-slate-700 hover:scale-110 transition-transform cursor-pointer shrink-0"
+                              style={{ backgroundColor: c }}
+                              title={`Appliquer ${c} à tout le groupe`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -4875,7 +5153,29 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                         className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${isSelected ? 'bg-violet-600/20 border-violet-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-850 text-gray-400 hover:text-white'}`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-3 h-3 rounded-full shrink-0 border border-slate-700" style={{ backgroundColor: layer.color }} />
+                          <label 
+                            onClick={(e) => e.stopPropagation()} 
+                            className="relative cursor-pointer shrink-0" 
+                            title="Modifier la couleur du calque / de la sélection"
+                          >
+                            <span 
+                              className="w-3.5 h-3.5 rounded-full block border border-slate-600 shadow-sm transition-transform hover:scale-125" 
+                              style={{ backgroundColor: layer.color }} 
+                            />
+                            <input
+                              type="color"
+                              value={layer.color || '#FFFFFF'}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                if (selectedLayerIds.includes(layer.id) && selectedLayerIds.length > 1) {
+                                  applyColorToSelectedLayers(e.target.value);
+                                } else {
+                                  updateLayerParam(layer.id, { color: e.target.value });
+                                }
+                              }}
+                              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                            />
+                          </label>
                           <div className="min-w-0 flex flex-col">
                             <p className="text-xs font-bold truncate flex items-center gap-1">
                               <span>{layer.name}</span>
