@@ -72,33 +72,54 @@ export class SemanticAnalyzer {
           center: { x: bbox.minX + w/2, y: bbox.minY + h/2 },
           radius: Math.max(w, h) / 2
         },
-        suggestedStitchType: w > 10 ? 'tatami' : 'satin'
+        suggestedStitchType: Math.min(w, h) > 30 ? 'tatami' : 'satin'
       };
     }
 
-    // Heuristic 2: Is it a stem (long, thin, continuous)?
+    // Physical Embroidery Rules for Satin vs Tatami:
+    // Satin is only suitable for narrow columns (width < 3.2mm or 32 units) with high aspect ratio.
+    // Wide shapes (min dimension >= 3.2mm) or filled closed regions MUST use Tatami fill to prevent thread loops & fabric puckering.
+    const minDim = Math.min(w, h);
+    const maxDim = Math.max(w, h);
+    const aspectRatio = maxDim / Math.max(minDim, 0.1);
     const thickness = this.estimateThickness(points, bbox);
-    if (Math.max(w, h) > thickness * 5 && thickness < 30) {
+
+    // Heuristic 2: Is it a stem (long, very thin continuous line/ribbon)?
+    // A stem must be very elongated (aspectRatio >= 5.0) and thin (minDim < 25 / thickness < 20).
+    if (aspectRatio >= 5.0 && thickness < 20 && minDim < 25) {
        return {
         id: `sem_${Date.now()}_${Math.floor(Math.random()*1000)}`,
         className: 'stem',
-        confidence: 0.75,
+        confidence: 0.80,
         boundingBox: bbox,
         rawPoints: points,
         parameters: { thickness },
-        suggestedStitchType: thickness < 15 ? 'running' : 'satin'
+        suggestedStitchType: thickness < 12 ? 'running' : 'satin'
       };
     }
 
-    // Fallback
+    // Heuristic 3: Narrow Satin column
+    if (minDim < 32 && aspectRatio >= 2.5) {
+      return {
+        id: `sem_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+        className: 'leaf',
+        confidence: 0.70,
+        boundingBox: bbox,
+        rawPoints: points,
+        parameters: { thickness },
+        suggestedStitchType: 'satin'
+      };
+    }
+
+    // Fallback: Wide shapes, petals, loops, and complex polygons default to Tatami
     return {
       id: `sem_${Date.now()}_${Math.floor(Math.random()*1000)}`,
       className: 'unknown',
-      confidence: 0.1,
+      confidence: 0.60,
       boundingBox: bbox,
       rawPoints: points,
       parameters: { thickness },
-      suggestedStitchType: area < 2500 ? 'satin' : 'tatami'
+      suggestedStitchType: 'tatami'
     };
   }
 

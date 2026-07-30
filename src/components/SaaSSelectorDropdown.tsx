@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ChevronDown, Layers, Plus, Check, ShieldCheck,
-  Shirt, Store, Scissors, Stethoscope, GraduationCap, Car, Users, HardHat
+  Shirt, Store, Scissors, Stethoscope, GraduationCap, Car, Users, HardHat, Cpu
 } from 'lucide-react';
 import { Merchant } from '../types';
 import { saasSubscriptionService, SAAS_CATALOG } from '../services/saasSubscriptionService';
@@ -22,6 +22,8 @@ const ICON_MAP: Record<string, any> = {
   pressing: Shirt,
   couture: Scissors,
   tailleur: Scissors,
+  broderie: Cpu,
+  creative_studio: Cpu,
   medical: Stethoscope,
   school: GraduationCap,
   scolaire: GraduationCap,

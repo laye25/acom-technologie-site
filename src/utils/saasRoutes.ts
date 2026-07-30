@@ -23,10 +23,17 @@ export const SAAS_ROUTES: Record<string, SaasRouteConfig> = {
   },
   couture: {
     type: 'couture',
-    aliases: ['couture', 'tailleur', 'broderie'],
+    aliases: ['couture', 'tailleur'],
     label: 'Gestion Couture',
     dashboardRoute: '/tailor-dashboard',
     clientViewTitle: 'Interface Client - Couture & Sur-Mesure'
+  },
+  broderie: {
+    type: 'broderie',
+    aliases: ['broderie', 'creative_studio', 'embroidery', 'studio'],
+    label: 'Acom Creative Studio',
+    dashboardRoute: '/tailor-dashboard',
+    clientViewTitle: 'Interface Client - Acom Creative Studio'
   },
   medical: {
     type: 'medical',

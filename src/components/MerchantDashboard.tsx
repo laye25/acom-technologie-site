@@ -1200,6 +1200,26 @@ export const MerchantDashboard = ({
                 />
               </>
             )}
+            {isSaasType(merchant.type, 'broderie') && (
+              <>
+                <StatCard 
+                  title="Acom Creative Studio" 
+                  value="AEE v4.0" 
+                  icon={Cpu} 
+                  color="text-amber-600" 
+                  bgColor="bg-amber-50" 
+                  description="Studio CAO/FAO Active" 
+                />
+                <StatCard 
+                  title="Numérisation & Vector" 
+                  value="Formats DST/PES" 
+                  icon={Sparkles} 
+                  color="text-purple-600" 
+                  bgColor="bg-purple-50" 
+                  description="Broderie Haute Précision" 
+                />
+              </>
+            )}
             <StatCard title="Dépenses" value={stats.expenses.total} currency={merchant.currency} icon={BarChart3} color="text-red-600" bgColor="bg-red-50" description="Total cumulé" />
             <StatCard title="Bénéfice Net" value={stats.netProfit} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description="Total cumulé" />
           </>

@@ -198,6 +198,35 @@ const MerchantSaaS = () => {
   const [loggedParentProfile, setLoggedParentProfile] = useState<any>(null);
   const [loggedStudentProfile, setLoggedStudentProfile] = useState<any>(null);
 
+  const executeSaasSwitch = useCallback((targetType: string) => {
+    const fromType = merchant?.type || 'boutique';
+    const config = getSaasRouteConfig(targetType);
+    const resolvedType = config.type;
+
+    console.log(`[SAAS_SWITCH] REQUESTED\nfrom = ${fromType}\nto = ${targetType}`);
+    console.log(`[SAAS_SWITCH] AUTHORIZED\nsaas = ${resolvedType}`);
+    
+    setOverrideType(resolvedType);
+    console.log(`[SAAS_SWITCH] ACTIVE_UPDATED\nsaas = ${resolvedType}`);
+    console.log(`[SAAS_SWITCH] CONFIG_LOADED\nsaas = ${resolvedType}`);
+
+    const newTabs = getTabs(resolvedType, merchant?.plan || '');
+    console.log(`[SAAS_SWITCH] NAVIGATION_LOADED\nsaas = ${resolvedType}`);
+
+    const defaultPage = newTabs[0]?.id || 'dashboard';
+    console.log(`[SAAS_SWITCH] DEFAULT_PAGE\npage = ${defaultPage}`);
+
+    setActiveTab(defaultPage);
+
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('type', resolvedType);
+    setSearchParams(newParams, { replace: true });
+
+    toast.success(`Logiciel SaaS activé : ${resolvedType.toUpperCase()}`);
+
+    console.log(`[SAAS_SWITCH] UI_RENDERED\nsaas = ${resolvedType}\npage = ${defaultPage}`);
+  }, [merchant, searchParams, setSearchParams]);
+
   useEffect(() => {
     if (activeTab) {
       ContextEngine.updateContext({
@@ -212,19 +241,22 @@ const MerchantSaaS = () => {
   useEffect(() => {
     if (merchant?.type) {
       const config = getSaasRouteConfig(merchant.type);
-      console.log(`[SAAS_SWITCH] UI_RENDERED: ${config.type} (merchant.type=${merchant.type}, activeTab=${activeTab})`);
+      console.log(`[SAAS_SWITCH] UI_RENDERED\nsaas = ${config.type}\npage = ${activeTab}`);
     }
   }, [merchant?.type, activeTab]);
 
-  // Ensure activeTab is valid for current SaaS type; reset to 'dashboard' if invalid
+  // Ensure activeTab is valid for current SaaS type; reset to default page if invalid
   useEffect(() => {
     if (merchant?.type) {
+      const config = getSaasRouteConfig(merchant.type);
       const currentTabs = getTabs(merchant.type, merchant.plan || '');
       const validTabIds = currentTabs.map(t => t.id);
       const globalTabs = ['acom_zone', 'ai_demo'];
       if (!validTabIds.includes(activeTab) && !globalTabs.includes(activeTab)) {
-        console.log(`[SAAS_SWITCH] Resetting invalid activeTab '${activeTab}' for SaaS '${merchant.type}' -> 'dashboard'`);
-        setActiveTab('dashboard');
+        const defaultPage = currentTabs[0]?.id || 'dashboard';
+        console.log(`[SAAS_SWITCH] Resetting invalid activeTab '${activeTab}' for SaaS '${config.type}' -> '${defaultPage}'`);
+        setActiveTab(defaultPage);
+        console.log(`[SAAS_SWITCH] UI_RENDERED\nsaas = ${config.type}\npage = ${defaultPage}`);
       }
     }
   }, [merchant?.type]);
@@ -974,13 +1006,7 @@ const MerchantSaaS = () => {
                       <select
                         value={merchant.type || 'boutique'}
                         onChange={(e) => {
-                          const selected = e.target.value;
-                          setOverrideType(selected);
-                          setActiveTab('dashboard');
-                          const newParams = new URLSearchParams(searchParams);
-                          newParams.set('type', selected);
-                          setSearchParams(newParams, { replace: true });
-                          toast.success(`Logiciel SaaS activé : ${selected.toUpperCase()}`);
+                          executeSaasSwitch(e.target.value);
                         }}
                         className="bg-transparent border-none text-xs font-bold text-slate-800 focus:outline-none cursor-pointer outline-none p-0 pr-2 truncate"
                         title="Changer de logiciel de gestion SaaS"
@@ -1002,11 +1028,9 @@ const MerchantSaaS = () => {
                       merchant={merchant} 
                       onUpdateMerchant={(updated) => {
                         setMerchant(updated);
-                        setOverrideType(updated.type || null);
-                        setActiveTab('dashboard');
-                        const newParams = new URLSearchParams(searchParams);
-                        newParams.set('type', updated.type || 'stock');
-                        setSearchParams(newParams, { replace: true });
+                        if (updated.type) {
+                          executeSaasSwitch(updated.type);
+                        }
                       }} 
                     />
                   )}

@@ -4114,9 +4114,15 @@ export class StitchEngine {
     let cover: EmbroideryPoint[] = [];
     let diagCenterline: EmbroideryPoint[] = [];
     let diagFillLines: EmbroideryPoint[][] = [];
-    const isTopological = obj.name.toLowerCase().includes('tige') || obj.name.toLowerCase().includes('stem') || obj.classification === 'tige';
+    const isTopological = (obj.name.toLowerCase().includes('tige') || obj.name.toLowerCase().includes('stem') || obj.classification === 'tige') &&
+                          !obj.name.toLowerCase().includes('svg shape') &&
+                          !obj.name.toLowerCase().includes('(ai)') &&
+                          !obj.name.toLowerCase().includes('trace') &&
+                          !obj.name.toLowerCase().includes('vector') &&
+                          !obj.segments &&
+                          obj.stitchType !== 'tatami';
     
-    if (isTopological && (obj.stitchType === 'satin' || obj.stitchType === 'tatami' || obj.stitchType === 'running' || obj.stitchType === 'zigzag')) {
+    if (isTopological && (obj.stitchType === 'satin' || obj.stitchType === 'running' || obj.stitchType === 'zigzag')) {
       const topo = TopologicalEngine.getMedialAxis(physicalPoints);
       diagCenterline = topo.centerline;
       if (obj.stitchType === 'running') {
@@ -4179,20 +4185,44 @@ export class StitchEngine {
                         obj.name.toLowerCase().includes('letter_') ||
                         obj.segments !== undefined);
       if (isClosed) {
-        // High-density satin slicing stitches
-        const stepDist = Math.max(1.2, Math.round(adjustedDensity * 3.5));
-        // Stitches for petals and leaves look best and avoid numerical singularities when stitched ACROSS the main axis (+90 degrees)
-        const isPetalOrLeaf = obj.classification === 'pétale' || obj.classification === 'feuille';
-        const calcAngle = isPetalOrLeaf ? (obj.angle + 90) % 360 : obj.angle;
-        const segments = getSatinSlicingStitches(physicalSegments || physicalPoints, stepDist, calcAngle);
-        diagFillLines = segments;
-        const boundaryPolygons = physicalSegments || [physicalPoints];
-        const combined = combineCloseSegments(segments, 15.0, boundaryPolygons);
-        combined.forEach(seg => {
-          if (seg.length > 0) {
-            list.push({ points: seg, type: 'stitch' });
-          }
+        let pMinX = Infinity, pMinY = Infinity, pMaxX = -Infinity, pMaxY = -Infinity;
+        (physicalPoints || []).forEach(p => {
+          if (p.x < pMinX) pMinX = p.x;
+          if (p.y < pMinY) pMinY = p.y;
+          if (p.x > pMaxX) pMaxX = p.x;
+          if (p.y > pMaxY) pMaxY = p.y;
         });
+        const shapeMinDim = Math.min(pMaxX - pMinX, pMaxY - pMinY);
+
+        // Standard embroidery safety: if a closed region's min dimension >= 3.2mm (32 units),
+        // satin stitches will pull the fabric and deform. Fallback to Tatami fill for perfect structure.
+        if (shapeMinDim >= 32) {
+          const stepDist = Math.max(1.0, Math.round(adjustedDensity * 3.0));
+          const segments = getTatamiStitches(physicalSegments || physicalPoints, stepDist, obj.angle);
+          diagFillLines = segments;
+          const boundaryPolygons = physicalSegments || [physicalPoints];
+          const combined = combineCloseSegments(segments, 15.0, boundaryPolygons);
+          combined.forEach(seg => {
+            if (seg.length > 0) {
+              list.push({ points: seg, type: 'stitch' });
+            }
+          });
+        } else {
+          // High-density satin slicing stitches for narrow regions (< 3.2mm)
+          const stepDist = Math.max(1.2, Math.round(adjustedDensity * 3.5));
+          // Stitches for petals and leaves look best and avoid numerical singularities when stitched ACROSS the main axis (+90 degrees)
+          const isPetalOrLeaf = obj.classification === 'pétale' || obj.classification === 'feuille';
+          const calcAngle = isPetalOrLeaf ? (obj.angle + 90) % 360 : obj.angle;
+          const segments = getSatinSlicingStitches(physicalSegments || physicalPoints, stepDist, calcAngle);
+          diagFillLines = segments;
+          const boundaryPolygons = physicalSegments || [physicalPoints];
+          const combined = combineCloseSegments(segments, 15.0, boundaryPolygons);
+          combined.forEach(seg => {
+            if (seg.length > 0) {
+              list.push({ points: seg, type: 'stitch' });
+            }
+          });
+        }
       } else {
         // Clean, crisp, thin outline borders (14 units = 1.4mm) instead of bulky 3.2mm lines, keeping drawings premium
         const outlineWidth = obj.name.toLowerCase().includes('contour') || obj.name.toLowerCase().includes('outline') ? 14 : 26;

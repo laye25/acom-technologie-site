@@ -33,9 +33,17 @@ export const SAAS_CATALOG: Record<string, SaasCatalogItem> = {
   couture: {
     type: 'couture',
     label: 'Gestion Couture & Sur-Mesure (Tailleur)',
-    description: 'Carnet de mesures clients, gestion d\'atelier, broderie AEE, mercerie et commandes de sur-mesure.',
+    description: 'Carnet de mesures clients, gestion d\'atelier, mercerie et commandes de sur-mesure.',
     dashboardRoute: '/tailor-dashboard',
-    aliases: ['tailleur', 'broderie'],
+    aliases: ['tailleur'],
+    minPlan: 'BASIC'
+  },
+  broderie: {
+    type: 'broderie',
+    label: 'Acom Creative Studio (Broderie CAO/FAO)',
+    description: 'Studio de création, numérisation, vectorisation et simulation de broderie AEE.',
+    dashboardRoute: '/tailor-dashboard',
+    aliases: ['creative_studio', 'embroidery', 'studio'],
     minPlan: 'BASIC'
   },
   medical: {

@@ -5,7 +5,9 @@ import {
   Settings, Save, FilePlus, Layers, Sliders, Palette, ChevronDown, Check,
   Workflow, Compass, AlertCircle, GitBranch, Copy, Maximize, Activity, Terminal,
   PlusCircle, FolderHeart, PictureInPicture, Ruler, Brain, Beaker, BookOpen,
-  CheckCircle2, HelpCircle, Lightbulb, ArrowRight, Moon
+  CheckCircle2, HelpCircle, Lightbulb, ArrowRight, Moon,
+  BoxSelect, MousePointer, Hand, Move, AlignLeft, AlignCenter, AlignRight,
+  Minimize2, Maximize2, Monitor, Square
 } from 'lucide-react';
 import { Fingerprint } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -136,6 +138,57 @@ import { AeosVisionInspector } from './AeosVisionInspector';
 import { AeosLearningEngine } from './AeosLearningEngine';
 import { EmbroideryLayer, EmbroideryPoint } from '../services/embroideryServices';
 import { GeometryAutopsyService } from '../services/GeometryAutopsyService';
+
+export type PipSizeLevel = 'compact' | 'moyen' | 'grand' | 'fullscreen';
+
+export interface PipSizeConfig {
+  id: PipSizeLevel;
+  label: string;
+  shortLabel: string;
+  width: number | string;
+  height: number | string;
+  dimensionsText: string;
+  description: string;
+}
+
+export const PIP_SIZE_CONFIGS: Record<PipSizeLevel, PipSizeConfig> = {
+  compact: {
+    id: 'compact',
+    label: 'Compact',
+    shortLabel: 'Comp.',
+    width: 540,
+    height: 435,
+    dimensionsText: '540 × 435',
+    description: 'Format discret pour libérer la vue',
+  },
+  moyen: {
+    id: 'moyen',
+    label: 'Moyen',
+    shortLabel: 'Moy.',
+    width: 720,
+    height: 580,
+    dimensionsText: '720 × 580',
+    description: 'Format équilibré par défaut',
+  },
+  grand: {
+    id: 'grand',
+    label: 'Grand',
+    shortLabel: 'Grand',
+    width: 980,
+    height: 780,
+    dimensionsText: '980 × 780',
+    description: 'Grande surface de travail vectorielle',
+  },
+  fullscreen: {
+    id: 'fullscreen',
+    label: 'Plein écran',
+    shortLabel: 'Plein',
+    width: 'calc(100vw - 32px)',
+    height: 'calc(100vh - 32px)',
+    dimensionsText: 'Plein écran (100%)',
+    description: 'Immersion totale sur tout l’écran',
+  },
+};
 
 // Interfaces for CAD/CAM Embroidery Engine
 interface Stitch {
@@ -525,6 +578,70 @@ const PRESET_PROJECTS = [
   }
 ];
 
+/**
+ * Helper to get bounding box of an EmbroideryLayer in world coordinates
+ */
+export function getLayerBoundingBox(layer: EmbroideryLayer): { minX: number; maxX: number; minY: number; maxY: number } {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  const allPoints: EmbroideryPoint[] = [];
+  if (layer.points && layer.points.length > 0) {
+    allPoints.push(...layer.points);
+  }
+  if (layer.subpaths && layer.subpaths.length > 0) {
+    layer.subpaths.forEach(sub => allPoints.push(...sub));
+  }
+
+  if (allPoints.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  }
+
+  allPoints.forEach(pt => {
+    if (pt.x < minX) minX = pt.x;
+    if (pt.x > maxX) maxX = pt.x;
+    if (pt.y < minY) minY = pt.y;
+    if (pt.y > maxY) maxY = pt.y;
+  });
+
+  return { minX, maxX, minY, maxY };
+}
+
+/**
+ * Check if a layer falls within or intersects a marquee selection rectangle in world coordinates
+ */
+export function isLayerInMarquee(
+  layer: EmbroideryLayer,
+  box: { minX: number; maxX: number; minY: number; maxY: number }
+): boolean {
+  if (!layer.visible) return false;
+
+  const lBox = getLayerBoundingBox(layer);
+
+  // Axis-aligned bounding box intersection check
+  const bboxIntersects = !(
+    lBox.maxX < box.minX ||
+    lBox.minX > box.maxX ||
+    lBox.maxY < box.minY ||
+    lBox.minY > box.maxY
+  );
+
+  if (bboxIntersects) return true;
+
+  // Check individual points inside box
+  const allPoints: EmbroideryPoint[] = [];
+  if (layer.points) allPoints.push(...layer.points);
+  if (layer.subpaths) layer.subpaths.forEach(sub => allPoints.push(...sub));
+
+  return allPoints.some(pt => 
+    pt.x >= box.minX && pt.x <= box.maxX && pt.y >= box.minY && pt.y <= box.maxY
+  );
+}
+
+
+
 export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [pendingValidations, setPendingValidations] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'studio' | 'vision' | 'rules' | 'graph' | 'physics' | 'learning' | 'marketplace' | 'api' | 'gallery' | 'diagnostic' | 'tatami'>('studio');
@@ -532,8 +649,32 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [projectName, setProjectName] = useState<string>('Écusson Royal d\'Afrique');
   const [selectedFabric, setSelectedFabric] = useState<string>('cotton');
   const [selectedMachine, setSelectedMachine] = useState<string>('tajima');
+  const [canvasTool, setCanvasTool] = useState<'select' | 'pan'>('select');
   const [layers, setLayers] = useState<EmbroideryLayer[]>(PRESET_PROJECTS[0].layers);
-  const [selectedLayerId, setSelectedLayerId] = useState<string>('l1');
+  const [selectedLayerIdState, setSelectedLayerIdState] = useState<string>('l1');
+  const [selectedLayerIdsState, setSelectedLayerIdsState] = useState<string[]>(['l1']);
+
+  const selectedLayerId = selectedLayerIdState;
+  const selectedLayerIds = selectedLayerIdsState;
+
+  const setSelectedLayerId = useCallback((id: string | null) => {
+    if (id) {
+      setSelectedLayerIdState(id);
+      setSelectedLayerIdsState([id]);
+    } else {
+      setSelectedLayerIdState('');
+      setSelectedLayerIdsState([]);
+    }
+  }, []);
+
+  const setSelectedLayerIds = useCallback((ids: string[]) => {
+    setSelectedLayerIdsState(ids);
+    if (ids.length > 0) {
+      setSelectedLayerIdState(ids[0]);
+    } else {
+      setSelectedLayerIdState('');
+    }
+  }, []);
   const [sidebarTab, setSidebarTab] = useState<'layers' | 'library' | 'create' | 'validation'>('layers');
   const [createMode, setCreateMode] = useState<'shape' | 'text'>('shape');
   const [isTesting, setIsTesting] = useState<boolean>(false);
@@ -544,6 +685,8 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [showNightResearch, setShowNightResearch] = useState<boolean>(false);
   const [showPassportModal, setShowPassportModal] = useState<boolean>(false);
   const [showMorningReport, setShowMorningReport] = useState<boolean>(false);
+
+
 
   // Scientific Textile Asset for strict Data Lineage
   const [scientificAsset, setScientificAsset] = useState<any>(null);
@@ -1327,19 +1470,107 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const lastPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const animationFrameRef = useRef<number | null>(null);
 
+  // Marquee (Click-and-drag Zone Selection) refs
+  const isMarqueeSelectingRef = useRef<boolean>(false);
+  const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const marqueeCurrentRef = useRef<{ x: number; y: number } | null>(null);
+
   // Picture-in-Picture (PiP) Incrustation state & drag handlers
   const [isPipActive, setIsPipActive] = useState<boolean>(false);
-  const [pipPosition, setPipPosition] = useState<{ x: number; y: number }>({ x: 400, y: 150 });
+  const [pipPosition, setPipPosition] = useState<{ x: number; y: number }>({ x: 380, y: 120 });
+  const [pipSizeLevel, setPipSizeLevel] = useState<PipSizeLevel>('moyen');
+  const [previousPipSizeLevel, setPreviousPipSizeLevel] = useState<PipSizeLevel>('moyen');
+  const [savedNormalPosition, setSavedNormalPosition] = useState<{ x: number; y: number }>({ x: 380, y: 120 });
   const [isDraggingPip, setIsDraggingPip] = useState<boolean>(false);
   const dragStartOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  const changePipSizeLevel = useCallback((newLevel: PipSizeLevel) => {
+    setPipSizeLevel(current => {
+      if (newLevel === current) return current;
+
+      if (current !== 'fullscreen' && newLevel === 'fullscreen') {
+        // Switching to fullscreen: save normal position and level
+        setSavedNormalPosition(pipPosition);
+        setPreviousPipSizeLevel(current);
+      } else if (current === 'fullscreen' && newLevel !== 'fullscreen') {
+        // Leaving fullscreen: restore saved normal position
+        setPipPosition(() => {
+          const targetConfig = PIP_SIZE_CONFIGS[newLevel];
+          const w = typeof targetConfig.width === 'number' ? targetConfig.width : 720;
+          const h = typeof targetConfig.height === 'number' ? targetConfig.height : 580;
+          const maxX = Math.max(10, window.innerWidth - w - 20);
+          const maxY = Math.max(10, window.innerHeight - h - 20);
+          return {
+            x: Math.max(10, Math.min(savedNormalPosition.x, maxX)),
+            y: Math.max(10, Math.min(savedNormalPosition.y, maxY)),
+          };
+        });
+        setPreviousPipSizeLevel('fullscreen');
+      } else {
+        // Switching between non-fullscreen size levels
+        setPreviousPipSizeLevel(current);
+        const targetConfig = PIP_SIZE_CONFIGS[newLevel];
+        if (typeof targetConfig.width === 'number' && typeof targetConfig.height === 'number') {
+          setPipPosition(prev => {
+            const maxX = Math.max(10, window.innerWidth - (targetConfig.width as number) - 20);
+            const maxY = Math.max(10, window.innerHeight - (targetConfig.height as number) - 20);
+            return {
+              x: Math.max(10, Math.min(prev.x, maxX)),
+              y: Math.max(10, Math.min(prev.y, maxY)),
+            };
+          });
+        }
+      }
+
+      return newLevel;
+    });
+  }, [pipPosition, savedNormalPosition]);
+
+  const restorePreviousPipSize = useCallback(() => {
+    const target = (previousPipSizeLevel && previousPipSizeLevel !== 'fullscreen') ? previousPipSizeLevel : 'moyen';
+    changePipSizeLevel(target);
+  }, [previousPipSizeLevel, changePipSizeLevel]);
+
+  // Keyboard shortcut (Escape key) to exit fullscreen or PiP
+  useEffect(() => {
+    if (!isPipActive) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (pipSizeLevel === 'fullscreen') {
+          e.preventDefault();
+          e.stopPropagation();
+          restorePreviousPipSize();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isPipActive, pipSizeLevel, restorePreviousPipSize]);
+
   const handlePipMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.pip-drag-handle')) {
+      if (pipSizeLevel === 'fullscreen') {
+        const targetLevel = previousPipSizeLevel && previousPipSizeLevel !== 'fullscreen' ? previousPipSizeLevel : 'grand';
+        changePipSizeLevel(targetLevel);
+      }
       setIsDraggingPip(true);
       dragStartOffset.current = {
         x: e.clientX - pipPosition.x,
         y: e.clientY - pipPosition.y,
       };
+    }
+  };
+
+  const handlePipHeaderDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (pipSizeLevel === 'fullscreen') {
+      restorePreviousPipSize();
+    } else {
+      changePipSizeLevel('fullscreen');
     }
   };
 
@@ -1986,7 +2217,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
     if (visualizationMode === 'cad_contour' || visualizationMode === 'cad_points') {
       // 3. Render raw CAD shapes & coordinates of all layers in their designated colors
       layers.forEach((l) => {
-        const isSelected = l.id === selectedLayerId;
+        const isSelected = selectedLayerIds.includes(l.id) || l.id === selectedLayerId;
         ctx.strokeStyle = l.color || '#C084FC';
         ctx.lineWidth = isSelected ? (4.0 / zoom) : (1.8 / zoom);
         
@@ -2019,12 +2250,14 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           });
         }
       });
+
     } else {
-      // 3. Render vector anchor lines of selected layer
-      const activeLayer = layers.find(l => l.id === selectedLayerId);
-      if (activeLayer && activeLayer.points.length > 0) {
-        ctx.strokeStyle = 'rgba(168, 85, 247, 0.5)';
-        ctx.lineWidth = 2 / zoom;
+      // 3. Render vector anchor lines of selected layers
+      const activeLayers = layers.filter(l => (selectedLayerIds.includes(l.id) || l.id === selectedLayerId) && l.visible);
+      activeLayers.forEach(activeLayer => {
+        if (!activeLayer || activeLayer.points.length === 0) return;
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.6)';
+        ctx.lineWidth = 2.2 / zoom;
         ctx.beginPath();
         activeLayer.points.forEach((pt, i) => {
           if (i === 0) ctx.moveTo(pt.x, pt.y);
@@ -2032,8 +2265,6 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         });
         ctx.stroke();
 
-        // Anchor handles - skip if too many points or if it's an auto-vectorized layer with medium density
-        // Auto-vectorized layers usually have "Vector" or "Trace" in their name
         const isAutoLayer = activeLayer.name.includes('Vector') || activeLayer.name.includes('Trace') || activeLayer.name.includes('SVG Shape');
         const handleThreshold = isAutoLayer ? 40 : 150;
         
@@ -2041,11 +2272,11 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           ctx.fillStyle = '#C084FC';
           activeLayer.points.forEach(pt => {
             ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 1.0 / zoom, 0, Math.PI * 2);
+            ctx.arc(pt.x, pt.y, 1.2 / zoom, 0, Math.PI * 2);
             ctx.fill();
           });
         }
-      }
+      });
 
       // 4. Render compiled stitches in a highly optimized way
 
@@ -2176,13 +2407,147 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
       }
     }
 
+    // 5.5. Render selection bounding box frame and badge for selected layers
+    const selectedLayersList = layers.filter(l => (selectedLayerIds.includes(l.id) || l.id === selectedLayerId) && l.visible);
+    if (selectedLayersList.length > 0) {
+      let selMinX = Infinity, selMaxX = -Infinity, selMinY = Infinity, selMaxY = -Infinity;
+      let hasValidPts = false;
+
+      selectedLayersList.forEach(l => {
+        const bbox = getLayerBoundingBox(l);
+        if (bbox.minX !== bbox.maxX || bbox.minY !== bbox.maxY) {
+          hasValidPts = true;
+          if (bbox.minX < selMinX) selMinX = bbox.minX;
+          if (bbox.maxX > selMaxX) selMaxX = bbox.maxX;
+          if (bbox.minY < selMinY) selMinY = bbox.minY;
+          if (bbox.maxY > selMaxY) selMaxY = bbox.maxY;
+        }
+      });
+
+      if (hasValidPts && selMinX < Infinity) {
+        const pad = Math.max(6, 10 / zoom);
+        const bX = selMinX - pad;
+        const bY = selMinY - pad;
+        const bW = (selMaxX - selMinX) + pad * 2;
+        const bH = (selMaxY - selMinY) + pad * 2;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(168, 85, 247, 0.05)';
+        ctx.fillRect(bX, bY, bW, bH);
+
+        ctx.strokeStyle = '#A855F7';
+        ctx.lineWidth = 1.8 / zoom;
+        ctx.setLineDash([6 / zoom, 4 / zoom]);
+        ctx.strokeRect(bX, bY, bW, bH);
+        ctx.setLineDash([]);
+
+        ctx.strokeStyle = 'rgba(192, 132, 252, 0.4)';
+        ctx.lineWidth = 0.8 / zoom;
+        ctx.strokeRect(bX, bY, bW, bH);
+
+        const handleSize = 6 / zoom;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#7C3AED';
+        ctx.lineWidth = 1.5 / zoom;
+
+        const handles = [
+          { x: bX, y: bY },
+          { x: bX + bW, y: bY },
+          { x: bX, y: bY + bH },
+          { x: bX + bW, y: bY + bH },
+          { x: bX + bW / 2, y: bY },
+          { x: bX + bW / 2, y: bY + bH },
+          { x: bX, y: bY + bH / 2 },
+          { x: bX + bW, y: bY + bH / 2 }
+        ];
+
+        handles.forEach(h => {
+          ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+          ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+        });
+
+        const dimW = ((selMaxX - selMinX) / 10).toFixed(1);
+        const dimH = ((selMaxY - selMinY) / 10).toFixed(1);
+        const badgeText = selectedLayersList.length > 1
+          ? `✦ ${selectedLayersList.length} motifs sélectionnés (${dimW} × ${dimH} mm)`
+          : `✦ ${selectedLayersList[0].name} (${dimW} × ${dimH} mm)`;
+
+        ctx.font = `bold ${Math.max(10, Math.round(11 / zoom))}px sans-serif`;
+        ctx.fillStyle = '#C084FC';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(badgeText, bX, bY - 6 / zoom);
+        ctx.shadowBlur = 0;
+
+        ctx.restore();
+      }
+    }
+
+    // 5.6. Render active Marquee Selection rectangle during click-and-drag
+    if (isMarqueeSelectingRef.current && marqueeStartRef.current && marqueeCurrentRef.current) {
+      const startX = (marqueeStartRef.current.x - canvas.width / 2 - pan.x) / zoom;
+      const startY = (marqueeStartRef.current.y - canvas.height / 2 - pan.y) / zoom;
+      const currX = (marqueeCurrentRef.current.x - canvas.width / 2 - pan.x) / zoom;
+      const currY = (marqueeCurrentRef.current.y - canvas.height / 2 - pan.y) / zoom;
+
+      const mMinX = Math.min(startX, currX);
+      const mMaxX = Math.max(startX, currX);
+      const mMinY = Math.min(startY, currY);
+      const mMaxY = Math.max(startY, currY);
+
+      const mWidth = mMaxX - mMinX;
+      const mHeight = mMaxY - mMinY;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.16)';
+      ctx.fillRect(mMinX, mMinY, mWidth, mHeight);
+
+      ctx.strokeStyle = '#A855F7';
+      ctx.lineWidth = 1.6 / zoom;
+      ctx.setLineDash([6 / zoom, 4 / zoom]);
+      ctx.strokeRect(mMinX, mMinY, mWidth, mHeight);
+      ctx.setLineDash([]);
+
+      ctx.strokeStyle = 'rgba(236, 72, 153, 0.4)';
+      ctx.lineWidth = 0.8 / zoom;
+      ctx.strokeRect(mMinX, mMinY, mWidth, mHeight);
+
+      const gripSize = 5 / zoom;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#7C3AED';
+      ctx.lineWidth = 1.2 / zoom;
+
+      const grips = [
+        { x: mMinX, y: mMinY },
+        { x: mMaxX, y: mMinY },
+        { x: mMinX, y: mMaxY },
+        { x: mMaxX, y: mMaxY }
+      ];
+      grips.forEach(g => {
+        ctx.fillRect(g.x - gripSize / 2, g.y - gripSize / 2, gripSize, gripSize);
+        ctx.strokeRect(g.x - gripSize / 2, g.y - gripSize / 2, gripSize, gripSize);
+      });
+
+      const liveBox = { minX: mMinX, maxX: mMaxX, minY: mMinY, maxY: mMaxY };
+      const countInZone = layers.filter(l => isLayerInMarquee(l, liveBox)).length;
+
+      if (mWidth > 10 / zoom && mHeight > 10 / zoom) {
+        ctx.font = `bold ${Math.max(9, Math.round(11 / zoom))}px sans-serif`;
+        ctx.fillStyle = '#E9D5FF';
+        const textLabel = `Zone: ${countInZone} motif${countInZone > 1 ? 's' : ''}`;
+        ctx.fillText(textLabel, mMinX + 4 / zoom, mMinY - 5 / zoom);
+      }
+
+      ctx.restore();
+    }
+
     ctx.restore();
 
     // 6. Draw HUD Rulers
     if (showRulers) {
       drawRulersHUD(ctx, canvas);
     }
-  }, [stitches, zoom, pan, drawProgress, layers, selectedLayerId, showGrid, showRulers, enable3DEffect, visualizationMode]);
+  }, [stitches, zoom, pan, drawProgress, layers, selectedLayerId, selectedLayerIds, canvasTool, showGrid, showRulers, enable3DEffect, visualizationMode]);
 
   // Left & Top ruler drawers in millimeters
   const drawRulersHUD = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
@@ -2247,49 +2612,193 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
     drawCanvas();
   }, [drawCanvas, activeTab]);
 
-  // Adjust canvas bounds on resize
+  // Adjust canvas bounds on resize or container size change (e.g., PiP level changes)
   useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current;
-      if (canvas && canvas.parentElement) {
-        const w = canvas.parentElement.clientWidth;
-        const h = canvas.parentElement.clientHeight || 580;
-        if (w > 0) {
-          canvas.width = w;
-          canvas.height = h;
+    const canvas = canvasRef.current;
+    if (!canvas || !canvas.parentElement) return;
+
+    const parent = canvas.parentElement;
+
+    const updateCanvasSize = () => {
+      if (parent.clientWidth > 0 && parent.clientHeight > 0) {
+        if (canvas.width !== parent.clientWidth || canvas.height !== parent.clientHeight) {
+          canvas.width = parent.clientWidth;
+          canvas.height = parent.clientHeight;
           drawCanvas();
         }
       }
     };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [drawCanvas, isPipActive, activeTab]);
 
-  // Mouse pan triggers
+    updateCanvasSize();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        updateCanvasSize();
+      });
+      resizeObserver.observe(parent);
+    }
+
+    window.addEventListener('resize', updateCanvasSize);
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener('resize', updateCanvasSize);
+    };
+  }, [drawCanvas, isPipActive, activeTab, pipSizeLevel]);
+
+  // Mouse interactions (Pan & Marquee Zone Selection)
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Check if clicked inside drawing zone
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
     if (clickX < 24 || clickY < 24) return; // ignore ruler areas
 
-    isDraggingRef.current = true;
-    lastPanRef.current = { x: e.clientX, y: e.clientY };
+    if (canvasTool === 'pan' || e.button === 1) {
+      isDraggingRef.current = true;
+      lastPanRef.current = { x: e.clientX, y: e.clientY };
+    } else {
+      isMarqueeSelectingRef.current = true;
+      marqueeStartRef.current = { x: clickX, y: clickY };
+      marqueeCurrentRef.current = { x: clickX, y: clickY };
+      drawCanvas();
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDraggingRef.current) return;
-    const dx = e.clientX - lastPanRef.current.x;
-    const dy = e.clientY - lastPanRef.current.y;
-    setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-    lastPanRef.current = { x: e.clientX, y: e.clientY };
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    if (isDraggingRef.current) {
+      const dx = e.clientX - lastPanRef.current.x;
+      const dy = e.clientY - lastPanRef.current.y;
+      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      lastPanRef.current = { x: e.clientX, y: e.clientY };
+    } else if (isMarqueeSelectingRef.current) {
+      marqueeCurrentRef.current = { x: clickX, y: clickY };
+      drawCanvas();
+    }
   };
 
-  const handleMouseUpOrLeave = () => {
-    isDraggingRef.current = false;
+  const handleMouseUpOrLeave = (e?: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+    }
+
+    if (isMarqueeSelectingRef.current) {
+      isMarqueeSelectingRef.current = false;
+      const canvas = canvasRef.current;
+      if (canvas && marqueeStartRef.current && marqueeCurrentRef.current) {
+        const startX = (marqueeStartRef.current.x - canvas.width / 2 - pan.x) / zoom;
+        const startY = (marqueeStartRef.current.y - canvas.height / 2 - pan.y) / zoom;
+        const currX = (marqueeCurrentRef.current.x - canvas.width / 2 - pan.x) / zoom;
+        const currY = (marqueeCurrentRef.current.y - canvas.height / 2 - pan.y) / zoom;
+
+        const dx = Math.abs(marqueeCurrentRef.current.x - marqueeStartRef.current.x);
+        const dy = Math.abs(marqueeCurrentRef.current.y - marqueeStartRef.current.y);
+
+        if (dx < 6 && dy < 6) {
+          // Single point click: select clicked layer or toggle selection
+          const clickWorldX = currX;
+          const clickWorldY = currY;
+          const clickedLayer = layers.find(l => {
+            if (!l.visible) return false;
+            const box = getLayerBoundingBox(l);
+            return clickWorldX >= box.minX - 10 && clickWorldX <= box.maxX + 10 &&
+                   clickWorldY >= box.minY - 10 && clickWorldY <= box.maxY + 10;
+          });
+
+          if (clickedLayer) {
+            if (e?.shiftKey) {
+              if (selectedLayerIds.includes(clickedLayer.id)) {
+                const nextIds = selectedLayerIds.filter(id => id !== clickedLayer.id);
+                setSelectedLayerIds(nextIds.length > 0 ? nextIds : [layers[0]?.id || 'l1']);
+              } else {
+                setSelectedLayerIds([...selectedLayerIds, clickedLayer.id]);
+              }
+            } else {
+              setSelectedLayerId(clickedLayer.id);
+            }
+          }
+        } else {
+          // Marquee drag selection: compute all intersecting layers
+          const mMinX = Math.min(startX, currX);
+          const mMaxX = Math.max(startX, currX);
+          const mMinY = Math.min(startY, currY);
+          const mMaxY = Math.max(startY, currY);
+
+          const marqueeBox = { minX: mMinX, maxX: mMaxX, minY: mMinY, maxY: mMaxY };
+          const matchedLayerIds = layers
+            .filter(l => isLayerInMarquee(l, marqueeBox))
+            .map(l => l.id);
+
+          if (matchedLayerIds.length > 0) {
+            if (e?.shiftKey) {
+              const combined = Array.from(new Set([...selectedLayerIds, ...matchedLayerIds]));
+              setSelectedLayerIds(combined);
+            } else {
+              setSelectedLayerIds(matchedLayerIds);
+            }
+          }
+        }
+      }
+      marqueeStartRef.current = null;
+      marqueeCurrentRef.current = null;
+      drawCanvas();
+    }
   };
+
+  // Global Keyboard Shortcuts (Ctrl+A select all, Delete, Arrow keys)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input or textarea
+      const targetTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (targetTag === 'input' || targetTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setSelectedLayerIds(layers.map(l => l.id));
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedLayerIds.length > 0 && layers.length > 1) {
+          e.preventDefault();
+          const remaining = layers.filter(l => !selectedLayerIds.includes(l.id));
+          if (remaining.length > 0) {
+            setLayers(remaining);
+            setSelectedLayerIds([remaining[0].id]);
+          }
+        }
+      } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (selectedLayerIds.length > 0) {
+          e.preventDefault();
+          const step = e.shiftKey ? 1 : 10;
+          let dx = 0;
+          let dy = 0;
+          if (e.key === 'ArrowLeft') dx = -step;
+          if (e.key === 'ArrowRight') dx = step;
+          if (e.key === 'ArrowUp') dy = -step;
+          if (e.key === 'ArrowDown') dy = step;
+
+          setLayers(prev => prev.map(l => {
+            if (selectedLayerIds.includes(l.id)) {
+              return {
+                ...l,
+                points: l.points.map(pt => ({ x: pt.x + dx, y: pt.y + dy })),
+                subpaths: l.subpaths ? l.subpaths.map(sub => sub.map(pt => ({ x: pt.x + dx, y: pt.y + dy }))) : undefined
+              };
+            }
+            return l;
+          }));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [layers, selectedLayerIds, setSelectedLayerIds]);
 
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault(); // Prevent page scrolling
@@ -2826,11 +3335,26 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                          l.angle = libShape.angle || 0;
                      }
                  } else if (forceStitchType === 'tatami' || true) {
-                     l.stitchType = semanticObj.suggestedStitchType || l.stitchType;
-                     if (semanticObj.className === 'stem') {
+                     let lMinX = Infinity, lMinY = Infinity, lMaxX = -Infinity, lMaxY = -Infinity;
+                     (l.points || []).forEach(p => {
+                         if (p.x < lMinX) lMinX = p.x;
+                         if (p.y < lMinY) lMinY = p.y;
+                         if (p.x > lMaxX) lMaxX = p.x;
+                         if (p.y > lMaxY) lMaxY = p.y;
+                     });
+                     const lMinDim = Math.min(lMaxX - lMinX, lMaxY - lMinY);
+
+                     let assignedType = semanticObj.suggestedStitchType || l.stitchType;
+                     if (lMinDim >= 30 || (l.subpaths && l.subpaths.length > 0)) {
+                         assignedType = 'tatami';
+                     }
+                     l.stitchType = assignedType;
+
+                     if (semanticObj.className === 'stem' && lMinDim < 25) {
                          l.name = `TIGE (Topologique)`;
                      } else if (!l.name.includes('Bézier') && !l.name.includes('Substitué')) {
-                         l.name = `${semanticObj.className.toUpperCase()} (AI)`;
+                         const labelClass = (semanticObj.className === 'stem' && lMinDim >= 25) ? 'FORME' : semanticObj.className.toUpperCase();
+                         l.name = `${labelClass} (AI)`;
                      }
                      if (l.stitchType === 'running') {
                          l.underlay = false;
@@ -3194,6 +3718,8 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
     if (modelImages.length === 0) return;
     ATCPCompiler.run({ mode: 'svg' });
   };
+
+
 
   const handleSemanticVisionAnalysis = async () => {
     if (modelImages.length === 0) {
@@ -3819,15 +4345,38 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           <div className="bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 relative flex flex-col justify-between">
             
             {/* Top Toolbar overlay inside Canvas */}
-            <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
+            <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 pointer-events-auto">
-                <div className="bg-slate-900/90 backdrop-blur border border-slate-700/50 px-3.5 py-1.5 rounded-xl text-[10px] font-mono font-bold flex items-center gap-2 shadow-xl">
+                <div className="bg-slate-900/90 backdrop-blur border border-slate-700/50 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold flex items-center gap-2 shadow-xl">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
                   <span>Hoop 200mm | Règle Métrique</span>
                 </div>
 
+                {/* Marquee Selection vs Pan Tool Toggle */}
                 <div className="bg-slate-900/95 backdrop-blur border border-slate-700/50 p-1 rounded-xl flex items-center gap-1 shadow-xl text-[10px] font-bold">
-                  <span className="text-gray-400 px-2 text-[9px] uppercase tracking-wider font-mono">Vue:</span>
+                  <button
+                    onClick={() => setCanvasTool('select')}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${canvasTool === 'select' ? 'bg-violet-600 text-white shadow-md font-extrabold' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                    title="Sélection par Zone (Glisser-Déposer / Marquee Rectangle)"
+                    id="btn-tool-select-zone"
+                  >
+                    <BoxSelect className="w-3.5 h-3.5" />
+                    <span>Zone (Marquee)</span>
+                  </button>
+                  <button
+                    onClick={() => setCanvasTool('pan')}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${canvasTool === 'pan' ? 'bg-violet-600 text-white shadow-md font-extrabold' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                    title="Déplacement Panoramique (Main)"
+                    id="btn-tool-pan"
+                  >
+                    <Hand className="w-3.5 h-3.5" />
+                    <span>Main / Pan</span>
+                  </button>
+                </div>
+
+                {/* View Modes */}
+                <div className="bg-slate-900/95 backdrop-blur border border-slate-700/50 p-1 rounded-xl flex items-center gap-1 shadow-xl text-[10px] font-bold">
+                  <span className="text-gray-400 px-1.5 text-[9px] uppercase tracking-wider font-mono">Vue:</span>
                   <button
                     onClick={() => setVisualizationMode('embroidery')}
                     className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${visualizationMode === 'embroidery' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
@@ -3840,16 +4389,18 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                     className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${visualizationMode === 'cad_contour' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
                     id="btn-view-cad-contour"
                   >
-                    Contours CAD
+                    Contours
                   </button>
                   <button
                     onClick={() => setVisualizationMode('cad_points')}
                     className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${visualizationMode === 'cad_points' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
                     id="btn-view-cad-points"
                   >
-                    Sommets CAD
+                    Sommets
                   </button>
                 </div>
+
+
               </div>
 
               {/* View options */}
@@ -4259,59 +4810,109 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-bold text-violet-400">
                     <Layers className="w-4 h-4" />
-                    <span>Calques de Broderie</span>
+                    <span>Calques ({layers.length})</span>
+                    {selectedLayerIds.length > 1 && (
+                      <span className="text-[9px] bg-violet-500/20 text-violet-300 font-extrabold px-1.5 py-0.5 rounded-full border border-violet-500/30">
+                        {selectedLayerIds.length} sel.
+                      </span>
+                    )}
                   </div>
-                  <button 
-                    onClick={handleAddLayer}
-                    className="p-1 bg-violet-600/20 text-violet-400 border border-violet-500/20 rounded-lg hover:bg-violet-600 hover:text-white transition-all cursor-pointer"
-                    title="Ajouter calque"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setSelectedLayerIds(layers.map(l => l.id))}
+                      className="text-[9px] font-bold px-2 py-0.5 bg-slate-800 text-gray-300 hover:text-white rounded-lg transition-all cursor-pointer"
+                      title="Tout sélectionner (Ctrl+A)"
+                    >
+                      Tout
+                    </button>
+                    <button 
+                      onClick={handleAddLayer}
+                      className="p-1 bg-violet-600/20 text-violet-400 border border-violet-500/20 rounded-lg hover:bg-violet-600 hover:text-white transition-all cursor-pointer"
+                      title="Ajouter calque"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                  {layers.map((layer, idx) => (
-                    <div 
-                      key={layer.id}
-                      onClick={() => setSelectedLayerId(layer.id)}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${selectedLayerId === layer.id ? 'bg-violet-600/10 border-violet-500 text-white' : 'bg-slate-900/60 border-slate-850 text-gray-400 hover:text-white'}`}
+                {selectedLayerIds.length > 1 && (
+                  <div className="p-2 bg-violet-950/40 border border-violet-800/40 rounded-xl flex items-center justify-between gap-1 text-[10px]">
+                    <span className="font-bold text-violet-300">Action groupe ({selectedLayerIds.length}):</span>
+                    <button
+                      onClick={() => {
+                        if (layers.length > selectedLayerIds.length) {
+                          const remaining = layers.filter(l => !selectedLayerIds.includes(l.id));
+                          setLayers(remaining);
+                          setSelectedLayerIds([remaining[0].id]);
+                        }
+                      }}
+                      className="px-2 py-0.5 bg-red-600/20 text-red-300 border border-red-500/30 hover:bg-red-600 hover:text-white rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-3 h-3 rounded-full shrink-0 border border-slate-700" style={{ backgroundColor: layer.color }} />
-                        <div className="min-w-0 flex flex-col">
-                          <p className="text-xs font-bold truncate">{layer.name}</p>
-                          {layer.qualityScore !== undefined && (
-                            <span className="inline-block self-start mt-0.5 text-[9px] px-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-mono font-medium">
-                              QA: {layer.qualityScore.toFixed(1)}%
-                            </span>
-                          )}
+                      <Trash2 className="w-3 h-3" />
+                      <span>Supprimer</span>
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                  {layers.map((layer) => {
+                    const isSelected = selectedLayerIds.includes(layer.id) || selectedLayerId === layer.id;
+                    return (
+                      <div 
+                        key={layer.id}
+                        onClick={(e) => {
+                          if (e.shiftKey) {
+                            if (selectedLayerIds.includes(layer.id)) {
+                              const next = selectedLayerIds.filter(id => id !== layer.id);
+                              setSelectedLayerIds(next.length > 0 ? next : [layers[0]?.id || 'l1']);
+                            } else {
+                              setSelectedLayerIds([...selectedLayerIds, layer.id]);
+                            }
+                          } else {
+                            setSelectedLayerId(layer.id);
+                          }
+                        }}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${isSelected ? 'bg-violet-600/20 border-violet-500 text-white shadow-md' : 'bg-slate-900/60 border-slate-850 text-gray-400 hover:text-white'}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-3 h-3 rounded-full shrink-0 border border-slate-700" style={{ backgroundColor: layer.color }} />
+                          <div className="min-w-0 flex flex-col">
+                            <p className="text-xs font-bold truncate flex items-center gap-1">
+                              <span>{layer.name}</span>
+                              {isSelected && <span className="text-[8px] text-violet-400 font-extrabold">●</span>}
+                            </p>
+                            {layer.qualityScore !== undefined && (
+                              <span className="inline-block self-start mt-0.5 text-[9px] px-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-mono font-medium">
+                                QA: {layer.qualityScore.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateLayerParam(layer.id, { visible: !layer.visible });
+                            }}
+                            className="p-1 text-gray-400 hover:text-white rounded"
+                          >
+                            {layer.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-gray-600" />}
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteLayer(layer.id);
+                            }}
+                            disabled={layers.length <= 1}
+                            className="p-1 text-red-400 hover:text-red-300 disabled:opacity-30 rounded"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateLayerParam(layer.id, { visible: !layer.visible });
-                          }}
-                          className="p-1 text-gray-400 hover:text-white rounded"
-                        >
-                          {layer.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-gray-600" />}
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteLayer(layer.id);
-                          }}
-                          disabled={layers.length <= 1}
-                          className="p-1 text-red-400 hover:text-red-300 disabled:opacity-30 rounded"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -5071,6 +5672,8 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                     {isGenerating ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Workflow className="w-3 h-3" />}
                     <span>Tracé HD (SVG)</span>
                   </button>
+
+
                   <button 
                     onClick={handleSemanticVisionAnalysis}
                     disabled={isGenerating || modelImages.length === 0}
@@ -5090,6 +5693,8 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                 </div>
               </div>
             </div>
+
+
 
             {/* Compiled Logs Console */}
             {aiLog.length > 0 && (
@@ -6120,47 +6725,108 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
       {isPipActive && (
         <div 
           onMouseDown={handlePipMouseDown}
-          className="fixed z-50 bg-slate-950 border border-slate-800 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col select-none border-t border-t-violet-500/20"
-          style={{
-            width: '720px',
-            height: '580px',
+          className={`fixed bg-slate-950 border border-slate-800 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col select-none border-t border-t-violet-500/30 transition-all duration-200 ease-out z-[9999] ${
+            pipSizeLevel === 'fullscreen' ? 'inset-3 w-[calc(100vw-24px)] h-[calc(100vh-24px)]' : ''
+          }`}
+          style={pipSizeLevel === 'fullscreen' ? {
+            top: '12px',
+            left: '12px',
+            width: 'calc(100vw - 24px)',
+            height: 'calc(100vh - 24px)',
+            zIndex: 9999,
+          } : {
+            width: typeof PIP_SIZE_CONFIGS[pipSizeLevel].width === 'number' ? `${PIP_SIZE_CONFIGS[pipSizeLevel].width}px` : PIP_SIZE_CONFIGS[pipSizeLevel].width,
+            height: typeof PIP_SIZE_CONFIGS[pipSizeLevel].height === 'number' ? `${PIP_SIZE_CONFIGS[pipSizeLevel].height}px` : PIP_SIZE_CONFIGS[pipSizeLevel].height,
             top: `${pipPosition.y}px`,
             left: `${pipPosition.x}px`,
+            zIndex: 9999,
           }}
         >
-          {/* Header Bar */}
-          <div className="pip-drag-handle cursor-move bg-slate-900/95 px-4 py-2.5 flex items-center justify-between border-b border-slate-800/80">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-violet-500 rounded-full animate-pulse" />
-              <div className="flex items-center gap-1 text-xs font-bold text-gray-200 font-sans">
-                <PictureInPicture className="w-3.5 h-3.5 text-violet-400" />
-                <span>Incrustation du Canvas (PiP)</span>
+          {/* Header Bar - Fixed z-30 relative overlay above canvas */}
+          <div 
+            onDoubleClick={handlePipHeaderDoubleClick}
+            className="pip-drag-handle cursor-move bg-slate-900/98 px-3.5 py-2 flex items-center justify-between border-b border-slate-800/90 gap-2 relative z-30 shrink-0 select-none shadow-md"
+            title="Glisser pour déplacer • Double-cliquer pour basculer plein écran"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 bg-violet-500 rounded-full animate-pulse flex-shrink-0" />
+              <div className="flex items-center gap-1 text-xs font-bold text-gray-100 font-sans truncate">
+                <PictureInPicture className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+                <span className="truncate hidden xs:inline">Incrustation</span>
+                <span className="truncate xs:hidden">PiP</span>
               </div>
-              <span className="text-[9px] text-gray-500 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 font-sans font-medium">
-                Glisser pour déplacer
+              <span className="hidden sm:inline-flex text-[9px] text-gray-300 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800 font-mono font-semibold flex-shrink-0">
+                {PIP_SIZE_CONFIGS[pipSizeLevel].dimensionsText}
               </span>
+              {pipSizeLevel === 'fullscreen' && (
+                <span className="hidden md:inline-flex text-[9px] text-violet-300 bg-violet-950/80 px-2 py-0.5 rounded-md border border-violet-700/60 font-sans font-bold flex-shrink-0">
+                  Plein Écran
+                </span>
+              )}
             </div>
 
-            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+            {/* Progressive Size Selector (Compact -> Moyen -> Grand -> Plein) */}
+            <div className="flex items-center gap-1 bg-slate-950/95 p-1 rounded-2xl border border-slate-800/90 shadow-inner" onClick={(e) => e.stopPropagation()}>
+              {(Object.keys(PIP_SIZE_CONFIGS) as PipSizeLevel[]).map((level) => {
+                const cfg = PIP_SIZE_CONFIGS[level];
+                const isActive = pipSizeLevel === level;
+                return (
+                  <button
+                    key={level}
+                    onClick={() => changePipSizeLevel(level)}
+                    className={`px-2 py-1 text-[10px] font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1 select-none ${
+                      isActive
+                        ? 'bg-violet-600 text-white shadow-md shadow-violet-900/40 font-semibold scale-[1.02]'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                    title={`${cfg.label} (${cfg.dimensionsText}) - ${cfg.description}`}
+                  >
+                    {level === 'compact' && <Minimize2 className="w-3 h-3" />}
+                    {level === 'moyen' && <Square className="w-3 h-3" />}
+                    {level === 'grand' && <Maximize2 className="w-3 h-3" />}
+                    {level === 'fullscreen' && <Monitor className="w-3 h-3" />}
+                    <span className="hidden lg:inline">{cfg.label}</span>
+                    <span className="inline lg:hidden">{cfg.shortLabel}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+              {/* Dedicated "Réduire" button when in Fullscreen mode */}
+              {pipSizeLevel === 'fullscreen' && (
+                <button
+                  onClick={restorePreviousPipSize}
+                  className="px-2.5 py-1.5 bg-violet-950/90 hover:bg-violet-900 text-violet-200 border border-violet-600/60 rounded-xl font-bold text-[10px] flex items-center gap-1 transition-all cursor-pointer shadow-sm"
+                  title={`Quitter le plein écran et revenir à la taille ${PIP_SIZE_CONFIGS[previousPipSizeLevel && previousPipSizeLevel !== 'fullscreen' ? previousPipSizeLevel : 'moyen'].label} (Échap)`}
+                >
+                  <Minimize2 className="w-3 h-3 text-violet-300" />
+                  <span>Réduire</span>
+                </button>
+              )}
+
               <button 
                 onClick={() => { setZoom(1.2); setPan({ x: 0, y: 0 }); }}
                 className="p-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-gray-400 hover:text-white rounded-xl transition-colors cursor-pointer"
-                title="Centrer la vue"
+                title="Centrer la vue du canvas"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
+
               <button 
                 onClick={() => setIsPipActive(false)}
-                className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-[10px] font-bold text-white rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
-                title="Restaurer le canvas"
+                className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-[10px] font-bold text-white rounded-xl flex items-center gap-1 transition-colors cursor-pointer shadow-sm"
+                title="Restaurer le canvas dans la grille principale"
               >
                 <Maximize className="w-3 h-3" />
-                <span>Restaurer</span>
+                <span className="hidden sm:inline">Restaurer</span>
               </button>
+
               <button 
                 onClick={() => setIsPipActive(false)}
                 className="p-1.5 bg-slate-950 hover:bg-red-950/45 border border-slate-800 hover:border-red-900/40 text-gray-400 hover:text-red-400 rounded-xl transition-colors cursor-pointer"
-                title="Fermer"
+                title="Fermer l'incrustation"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -6171,8 +6837,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           <div 
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleFileDrop}
-            className="relative w-full flex-1 overflow-hidden bg-slate-950 cursor-grab active:cursor-grabbing"
-            style={{ height: 'calc(100% - 44px)' }}
+            className="relative w-full flex-1 overflow-hidden bg-slate-950 cursor-grab active:cursor-grabbing shrink"
             onClick={(e) => e.stopPropagation()}
           >
             <canvas 
