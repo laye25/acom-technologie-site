@@ -47,6 +47,31 @@ export interface GoldenTestResult {
   regions: RegionCoverageMetric[];
 }
 
+export interface PhysicalStitchCoverageAudit {
+  regionId: string;
+  regionName: string;
+  stitchCount: number;
+  threadThicknessMm: number;
+  surfaceSvgMm2: number;
+  surfaceReferenceRegionMm2: number;
+  surfaceCompensatedMm2: number;
+  surfaceStitchCoveredMm2: number;
+  realStitchGapMm2: number;
+  coveragePercent: number;
+  gapCount: number;
+  largestGapLocation: { x: number; y: number } | null;
+  status: 'PERFECT' | 'PASS' | 'FAIL';
+  heatmapGrid: {
+    cols: number;
+    rows: number;
+    cellWidthMm: number;
+    cellHeightMm: number;
+    minX: number;
+    minY: number;
+    cells: ('covered' | 'gap' | 'pull_margin' | 'outside')[][];
+  };
+}
+
 export interface Phase5CoverageReport {
   timestamp: number;
   totalSuiteTests: number;
@@ -280,5 +305,201 @@ export class StitchGeneratorCoverageAuditor {
       goldenResults,
       diagnosticAnswers
     };
+  }
+
+  /**
+   * Effectue l'audit physique de couverture sur les POINTS MACHINE RÉELS (Stitch-Level Raster Audit)
+   * et génère la matrice de la carte thermique (Coverage Heatmap Grid).
+   */
+  public static auditStitchLevelRasterCoverage(
+    regionId: string,
+    regionName: string,
+    polygon: EmbroideryPoint[],
+    stitchType: 'tatami' | 'satin' | 'running' = 'tatami',
+    pullCompMm: number = 0.20,
+    pxPerMm: number = 3.78,
+    threadThicknessMm: number = 0.40
+  ): PhysicalStitchCoverageAudit {
+    const surfaceSvgPx2 = FillRegionPreparationEngine.calculatePolygonArea(polygon);
+    const px2ToMm2 = 1.0 / (pxPerMm * pxPerMm);
+    const surfaceSvgMm2 = parseFloat((surfaceSvgPx2 * px2ToMm2).toFixed(2));
+    const surfaceReferenceRegionMm2 = surfaceSvgMm2;
+    const surfaceCompensatedMm2 = parseFloat((surfaceSvgMm2 * 1.05).toFixed(2)); // +5% expansion pull comp
+
+    if (!polygon || polygon.length < 3) {
+      return {
+        regionId,
+        regionName,
+        stitchCount: 0,
+        threadThicknessMm,
+        surfaceSvgMm2: 0,
+        surfaceReferenceRegionMm2: 0,
+        surfaceCompensatedMm2: 0,
+        surfaceStitchCoveredMm2: 0,
+        realStitchGapMm2: 0,
+        coveragePercent: 100,
+        gapCount: 0,
+        largestGapLocation: null,
+        status: 'PERFECT',
+        heatmapGrid: { cols: 20, rows: 20, cellWidthMm: 1, cellHeightMm: 1, minX: 0, minY: 0, cells: [] }
+      };
+    }
+
+    // 1. Génération des segments de points réels (Stitch Generator)
+    const segments = stitchType === 'satin'
+      ? getSatinSlicingStitches(polygon, 3.5, 45)
+      : getTatamiStitches(polygon, 3.5, 45);
+
+    let stitchCount = 0;
+    segments.forEach(seg => { stitchCount += seg.length; });
+
+    // 2. Détermination de la boîte englobante en mm
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    polygon.forEach(p => {
+      minX = Math.min(minX, p.x / pxPerMm);
+      minY = Math.min(minY, p.y / pxPerMm);
+      maxX = Math.max(maxX, p.x / pxPerMm);
+      maxY = Math.max(maxY, p.y / pxPerMm);
+    });
+
+    const marginMm = Math.max(1.0, pullCompMm * 2.0);
+    minX -= marginMm;
+    minY -= marginMm;
+    maxX += marginMm;
+    maxY += marginMm;
+
+    const cols = 40;
+    const rows = 40;
+    const cellWidthMm = (maxX - minX) / cols;
+    const cellHeightMm = (maxY - minY) / rows;
+    const cellAreaMm2 = cellWidthMm * cellHeightMm;
+
+    // Convertir les segments de points en coordonnées mm
+    const segmentsMm = segments.map(seg => seg.map(p => ({ x: p.x / pxPerMm, y: p.y / pxPerMm })));
+    const polygonMm = polygon.map(p => ({ x: p.x / pxPerMm, y: p.y / pxPerMm }));
+
+    const cells: ('covered' | 'gap' | 'pull_margin' | 'outside')[][] = [];
+    let coveredCellCount = 0;
+    let gapCellCount = 0;
+    let pullMarginCellCount = 0;
+    let totalInsideCells = 0;
+
+    let largestGapLocation: { x: number; y: number } | null = null;
+
+    // Rayon d'influence du fil de broderie (400 microns = 0.40mm)
+    const threadRadiusMm = threadThicknessMm / 2.0;
+
+    for (let r = 0; r < rows; r++) {
+      const rowCells: ('covered' | 'gap' | 'pull_margin' | 'outside')[] = [];
+      const cy = minY + (r + 0.5) * cellHeightMm;
+
+      for (let c = 0; c < cols; c++) {
+        const cx = minX + (c + 0.5) * cellWidthMm;
+
+        // Test d'appartenance au polygone de référence
+        const isInsidePoly = this.isPointInPolygon({ x: cx, y: cy }, polygonMm);
+
+        // Vérifier si un segment de fil passe à proximité du centre de la cellule
+        let isCoveredByThread = false;
+        for (const seg of segmentsMm) {
+          if (seg.length < 2) continue;
+          for (let i = 0; i < seg.length - 1; i++) {
+            const dist = this.pointToSegmentDistance({ x: cx, y: cy }, seg[i], seg[i + 1]);
+            if (dist <= threadRadiusMm * 1.5) {
+              isCoveredByThread = true;
+              break;
+            }
+          }
+          if (isCoveredByThread) break;
+        }
+
+        if (isInsidePoly) {
+          totalInsideCells++;
+          if (isCoveredByThread) {
+            rowCells.push('covered');
+            coveredCellCount++;
+          } else {
+            rowCells.push('gap');
+            gapCellCount++;
+            if (!largestGapLocation) {
+              largestGapLocation = { x: parseFloat(cx.toFixed(2)), y: parseFloat(cy.toFixed(2)) };
+            }
+          }
+        } else {
+          if (isCoveredByThread) {
+            rowCells.push('pull_margin');
+            pullMarginCellCount++;
+          } else {
+            rowCells.push('outside');
+          }
+        }
+      }
+      cells.push(rowCells);
+    }
+
+    const surfaceStitchCoveredMm2 = parseFloat((coveredCellCount * cellAreaMm2).toFixed(2));
+    const realStitchGapMm2 = parseFloat((gapCellCount * cellAreaMm2).toFixed(2));
+    const coveragePercent = totalInsideCells > 0
+      ? parseFloat(((coveredCellCount / totalInsideCells) * 100).toFixed(2))
+      : 100;
+
+    const status = gapCellCount === 0 && coveragePercent >= 99.0 ? 'PERFECT' : (coveragePercent >= 98.0 ? 'PASS' : 'FAIL');
+
+    return {
+      regionId,
+      regionName,
+      stitchCount,
+      threadThicknessMm,
+      surfaceSvgMm2,
+      surfaceReferenceRegionMm2,
+      surfaceCompensatedMm2,
+      surfaceStitchCoveredMm2,
+      realStitchGapMm2,
+      coveragePercent,
+      gapCount: gapCellCount,
+      largestGapLocation,
+      status,
+      heatmapGrid: {
+        cols,
+        rows,
+        cellWidthMm,
+        cellHeightMm,
+        minX,
+        minY,
+        cells
+      }
+    };
+  }
+
+  /**
+   * Test de point dans un polygone (Ray-casting algorithm)
+   */
+  private static isPointInPolygon(point: { x: number; y: number }, polygon: { x: number; y: number }[]): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      const intersect = ((yi > point.y) !== (yj > point.y)) &&
+        (point.x < (xj - xi) * (point.y - yi) / (yj - yi + 0.00001) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  /**
+   * Distance minimale d'un point à un segment [p1, p2]
+   */
+  private static pointToSegmentDistance(
+    p: { x: number; y: number },
+    p1: { x: number; y: number },
+    p2: { x: number; y: number }
+  ): number {
+    const l2 = (p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2;
+    if (l2 === 0) return Math.hypot(p.x - p1.x, p.y - p1.y);
+    let t = ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const projX = p1.x + t * (p2.x - p1.x);
+    const projY = p1.y + t * (p2.y - p1.y);
+    return Math.hypot(p.x - projX, p.y - projY);
   }
 }

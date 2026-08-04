@@ -20,6 +20,7 @@
 
 import { EmbroideryLayer, EmbroideryPoint } from './embroideryServices';
 import { SvgTopologyGraphBuilder, InputPathItem, SvgTopologyGraph } from './SvgTopologyGraphBuilder';
+import { AEEReferenceRegionEngine } from './AEEReferenceRegionEngine';
 
 export type StitchStrategyType = EmbroideryLayer['stitchType'];
 
@@ -266,19 +267,19 @@ export class FillRegionPreparationEngine {
         strategyReason = `Tracé linéaire ouvert, brodé au point de piqûre (Running contour).`;
       }
 
-      // Construction et synchronisation systématique de la région de support de référence (backing region)
-      let originalPoints = layer.originalPoints && layer.originalPoints.length >= 3
-        ? [...layer.originalPoints]
-        : points.map(p => ({ x: p.x, y: p.y }));
-
-      if (isClosed && (!layer.originalPoints || layer.originalPoints.length !== points.length)) {
-        originalPoints = points.map(p => ({ x: p.x, y: p.y }));
-      }
-
+      // Construction et synchronisation systématique via AEEReferenceRegionEngine (Reference Fill Region)
       const pullComp = layer.pullComp !== undefined ? layer.pullComp : (isClosed ? 0.20 : 0);
-      const backingRegionArea = this.calculatePolygonArea(originalPoints);
+      
+      const refRegion = AEEReferenceRegionEngine.buildReferenceRegion(
+        points,
+        { pullCompensationMm: pullComp },
+        layer.subpaths || []
+      );
 
-      // Mettre à jour le calque avec les propriétés de remplissage garanties et la région de référence synchronisée
+      const originalPoints = refRegion.boundaryPoints;
+      const backingRegionArea = refRegion.areaPx2;
+
+      // Mettre à jour le calque avec la région de référence géométriquement congruente
       const updatedLayer: EmbroideryLayer = {
         ...layer,
         stitchType: assignedStrategy,
