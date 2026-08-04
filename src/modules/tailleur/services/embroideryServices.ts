@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 // @ts-ignore
 import ImageTracer from 'imagetracerjs';
+import type { GeometricSignature } from './GeometricSignatureEngine';
 
 export interface EmbroideryPoint {
   x: number;
@@ -25,6 +26,16 @@ export interface EmbroideryLayer {
   subpaths?: { x: number; y: number }[][];
   stitchCount?: number;
   qualityScore?: number;
+  originalPoints?: { x: number; y: number }[];
+  originalSubpaths?: { x: number; y: number }[][];
+  reconstruction?: {
+    applied: boolean;
+    sourceObjectId: string;
+    primitiveType: string;
+    precisionScore?: number;
+    decision: string;
+  };
+  geometricSignature?: GeometricSignature;
 }
 
 export interface EmbroideryObject {
@@ -40,6 +51,7 @@ export interface EmbroideryObject {
   underlay: boolean;
   pullComp: number; // in mm
   points: EmbroideryPoint[];
+  subpaths?: EmbroideryPoint[][];
   segments?: EmbroideryPoint[][];
   library?: string;
   scale?: number;
@@ -262,30 +274,70 @@ const isLeft = (P0: EmbroideryPoint, P1: EmbroideryPoint, P2: EmbroideryPoint) =
   return (P1.x - P0.x) * (P2.y - P0.y) - (P2.x - P0.x) * (P1.y - P0.y);
 };
 
-export const isPointInPolygons = (p: EmbroideryPoint, polygons: EmbroideryPoint[][]): boolean => {
-  // Add a tiny coordinate perturbation (epsilon shift) to prevent horizontal, vertical, 
-  // and vertex-aligned lines from triggering floating point ray-casting boundary failures.
+export const isPointInSinglePolygon = (p: EmbroideryPoint, polygon: EmbroideryPoint[]): boolean => {
+  const len = polygon.length;
+  if (len < 3) return false;
   const px = p.x + 1e-7;
   const py = p.y + 1e-7;
   let inside = false;
-  for (const polygon of polygons) {
-    const len = polygon.length;
-    if (len < 3) continue;
-    for (let i = 0, j = len - 1; i < len; j = i++) {
-      const xi = polygon[i].x, yi = polygon[i].y;
-      const xj = polygon[j].x, yj = polygon[j].y;
-      
-      const diffY = yj - yi;
-      if (Math.abs(diffY) > 1e-9) {
-        const intersect = ((yi > py) !== (yj > py))
-            && (px < (xj - xi) * (py - yi) / diffY + xi);
-        if (intersect) {
-          inside = !inside;
-        }
+  for (let i = 0, j = len - 1; i < len; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    
+    const diffY = yj - yi;
+    if (Math.abs(diffY) > 1e-9) {
+      const intersect = ((yi > py) !== (yj > py))
+          && (px < (xj - xi) * (py - yi) / diffY + xi);
+      if (intersect) {
+        inside = !inside;
       }
     }
   }
   return inside;
+};
+
+export const computePolygonDepths = (polygons: EmbroideryPoint[][]): number[] => {
+  const depths: number[] = new Array(polygons.length).fill(0);
+  for (let i = 0; i < polygons.length; i++) {
+    const polyI = polygons[i];
+    if (polyI.length < 3) continue;
+    let cx = 0, cy = 0;
+    for (const pt of polyI) { cx += pt.x; cy += pt.y; }
+    cx /= polyI.length;
+    cy /= polyI.length;
+    const repPt = { x: cx, y: cy };
+
+    for (let j = 0; j < polygons.length; j++) {
+      if (i === j) continue;
+      if (isPointInSinglePolygon(repPt, polygons[j])) {
+        depths[i]++;
+      }
+    }
+  }
+  return depths;
+};
+
+export const isPointInPolygons = (
+  p: EmbroideryPoint, 
+  polygons: EmbroideryPoint[][],
+  precomputedDepths?: number[]
+): boolean => {
+  if (!polygons || polygons.length === 0) return false;
+  if (polygons.length === 1) return isPointInSinglePolygon(p, polygons[0]);
+
+  const polyDepths = precomputedDepths || computePolygonDepths(polygons);
+  let maxDepth = -1;
+
+  for (let i = 0; i < polygons.length; i++) {
+    if (isPointInSinglePolygon(p, polygons[i])) {
+      if (polyDepths[i] > maxDepth) {
+        maxDepth = polyDepths[i];
+      }
+    }
+  }
+
+  if (maxDepth < 0) return false;
+  return maxDepth % 2 === 0;
 };
 
 
@@ -846,13 +898,28 @@ export const getSatinSlicingStitches = (pointsOrPolygons: EmbroideryPoint[] | Em
 
   if (minY >= maxY) return segments;
 
-  const rows = Math.floor((maxY - minY) / step);
   const backRad = (calcAngle * Math.PI) / 180;
   const backCos = Math.cos(backRad);
   const backSin = Math.sin(backRad);
 
-  for (let r = 0; r <= rows; r++) {
-    const yVal = minY + r * step + 0.12345;
+  const yValues: number[] = [];
+  const startY = minY + Math.min(step * 0.5, (maxY - minY) * 0.5);
+  for (let y = startY; y < maxY; y += step) {
+    yValues.push(y);
+  }
+  if (yValues.length > 0) {
+    const lastY = yValues[yValues.length - 1];
+    if (maxY - lastY > step * 0.3) {
+      yValues.push(Math.min(maxY - 0.1, lastY + step * 0.8));
+    }
+  } else {
+    yValues.push((minY + maxY) / 2);
+  }
+
+  const polyDepths = computePolygonDepths(rotatedPolygons);
+
+  for (let r = 0; r < yValues.length; r++) {
+    const yVal = yValues[r];
     const intersections: number[] = [];
 
     for (const poly of rotatedPolygons) {
@@ -877,17 +944,24 @@ export const getSatinSlicingStitches = (pointsOrPolygons: EmbroideryPoint[] | Em
     }
 
     if (intersections.length >= 2) {
-      const sorted = [...intersections].sort((a, b) => a - b);
+      const rawSorted = [...intersections].sort((a, b) => a - b);
+      const sorted: number[] = [];
+      for (const xVal of rawSorted) {
+        if (sorted.length === 0 || xVal - sorted[sorted.length - 1] > 0.01) {
+          sorted.push(xVal);
+        }
+      }
+
       const fillSegments: { start: number, end: number }[] = [];
 
-      // Direct Winding-Number Point-in-Polygon Check in Rotated Space: Determine perfectly which segments are solid
+      // Direct Point-in-Polygon Check in Rotated Space: Determine perfectly which segments are solid
       for (let i = 0; i < sorted.length - 1; i++) {
         const start = sorted[i];
         const end = sorted[i + 1];
         if (end - start < 0.2) continue; // skip tiny slivers
 
-        // Check if point is inside by checking intersections to the right (O(1) parity)
-        if ((sorted.length - 1 - i) % 2 !== 0) {
+        const pMid = { x: (start + end) / 2, y: yVal };
+        if (isPointInPolygons(pMid, rotatedPolygons, polyDepths)) {
           fillSegments.push({ start, end });
         }
       }
@@ -905,15 +979,8 @@ export const getSatinSlicingStitches = (pointsOrPolygons: EmbroideryPoint[] | Em
         let xMax = fillSegments[k].end;
         let stitchDist = xMax - xMin;
 
-        // Entonnoir (Funnel) Tapering: pull endpoints inward slightly in narrow corners
-        if (stitchDist < 12.0) {
-          const inset = Math.min(1.8, stitchDist * 0.15);
-          xMin += inset;
-          xMax -= inset;
-          stitchDist = xMax - xMin;
-        }
-
-        if (stitchDist < 0.4) continue;
+        // Full boundary fidelity: keep endpoints exact without artificial inward insets
+        if (stitchDist < 0.2) continue;
 
         const segmentPts: EmbroideryPoint[] = [];
 
@@ -1005,8 +1072,24 @@ export const getTatamiStitches = (pointsOrPolygons: EmbroideryPoint[] | Embroide
 
   const stitchLength = 25;
 
-  for (let r = 0; r <= rows; r++) {
-    const yVal = minY + r * density + 0.12345;
+  const yValues: number[] = [];
+  const startY = minY + Math.min(density * 0.5, (maxY - minY) * 0.5);
+  for (let y = startY; y < maxY; y += density) {
+    yValues.push(y);
+  }
+  if (yValues.length > 0) {
+    const lastY = yValues[yValues.length - 1];
+    if (maxY - lastY > density * 0.3) {
+      yValues.push(Math.min(maxY - 0.1, lastY + density * 0.8));
+    }
+  } else {
+    yValues.push((minY + maxY) / 2);
+  }
+
+  const polyDepths = computePolygonDepths(rotatedPolygons);
+
+  for (let r = 0; r < yValues.length; r++) {
+    const yVal = yValues[r];
     const isEven = r % 2 === 0;
     const staggerOffset = ((r % 4) * 0.25) * stitchLength;
     const intersections: number[] = [];
@@ -1033,17 +1116,24 @@ export const getTatamiStitches = (pointsOrPolygons: EmbroideryPoint[] | Embroide
     }
 
     if (intersections.length >= 2) {
-      const sorted = [...intersections].sort((a, b) => a - b);
+      const rawSorted = [...intersections].sort((a, b) => a - b);
+      const sorted: number[] = [];
+      for (const xVal of rawSorted) {
+        if (sorted.length === 0 || xVal - sorted[sorted.length - 1] > 0.01) {
+          sorted.push(xVal);
+        }
+      }
+
       const fillSegments: { start: number, end: number }[] = [];
 
-      // Direct Winding-Number Point-in-Polygon Check in Rotated Space: Determine perfectly which segments are solid
+      // Direct Point-in-Polygon Check in Rotated Space: Determine perfectly which segments are solid
       for (let i = 0; i < sorted.length - 1; i++) {
         const start = sorted[i];
         const end = sorted[i + 1];
         if (end - start < 0.2) continue; // skip tiny slivers
 
-        // Check if point is inside by checking intersections to the right (O(1) parity)
-        if ((sorted.length - 1 - i) % 2 !== 0) {
+        const pMid = { x: (start + end) / 2, y: yVal };
+        if (isPointInPolygons(pMid, rotatedPolygons, polyDepths)) {
           fillSegments.push({ start, end });
         }
       }
@@ -1061,15 +1151,8 @@ export const getTatamiStitches = (pointsOrPolygons: EmbroideryPoint[] | Embroide
         let xEnd = seg.end;
         let stitchDist = xEnd - xStart;
 
-        // Entonnoir (Funnel) Tapering: pull endpoints inward slightly in narrow corners
-        if (stitchDist < 15.0) {
-          const inset = Math.min(2.0, stitchDist * 0.15);
-          xStart += inset;
-          xEnd -= inset;
-          stitchDist = xEnd - xStart;
-        }
-
-        if (stitchDist < 0.4) continue;
+        // Full boundary fidelity: keep endpoints exact without artificial inward insets
+        if (stitchDist < 0.2) continue;
 
         const currentSegment: EmbroideryPoint[] = [];
         const firstK = Math.ceil((xStart - minX - staggerOffset) / stitchLength);
@@ -2143,7 +2226,7 @@ export class ObjectDetectionService {
                   extracted.push({
                     name: `Forme #${layerCounter}`,
                     color: color,
-                    points: allFlatPts,
+                    points: allSubpathsPts[0] || allFlatPts,
                     subpaths: allSubpathsPts
                   });
                   layerCounter++;
@@ -2230,53 +2313,7 @@ export class ObjectDetectionService {
                 return !(isBgSize && isBgColor);
               });
 
-              const whiteLayers = active.filter(l => isNearWhite(l.color));
-              const darkLayers = active.filter(l => !isNearWhite(l.color));
-
-              whiteLayers.forEach(wl => {
-                const centroid = getCentroid(wl.points);
-                const wlBox = getBoundingBox(wl.points);
-                let bestDl: any = null;
-                let bestDlArea = Infinity;
-
-                for (const dl of darkLayers) {
-                  const dlBox = getBoundingBox(dl.points);
-                  const interMinX = Math.max(wlBox.minX, dlBox.minX);
-                  const interMaxX = Math.min(wlBox.maxX, dlBox.maxX);
-                  const interMinY = Math.max(wlBox.minY, dlBox.minY);
-                  const interMaxY = Math.min(wlBox.maxY, dlBox.maxY);
-
-                  let isMostlyInsideBox = false;
-                  if (interMaxX > interMinX && interMaxY > interMinY) {
-                    const interArea = (interMaxX - interMinX) * (interMaxY - interMinY);
-                    const wlArea = (wlBox.maxX - wlBox.minX) * (wlBox.maxY - wlBox.minY);
-                    if (wlArea > 0 && (interArea / wlArea) > 0.90) {
-                      isMostlyInsideBox = true;
-                    }
-                  }
-
-                  const hasPointInside = isPointInPoly(centroid, dl.points) || 
-                                         isPointInPoly(wl.points[0], dl.points) ||
-                                         isPointInPoly(wl.points[Math.floor(wl.points.length / 2)], dl.points);
-
-                  if (hasPointInside || isMostlyInsideBox) {
-                    const dlArea = (dlBox.maxX - dlBox.minX) * (dlBox.maxY - dlBox.minY);
-                    if (dlArea < bestDlArea) {
-                      bestDl = dl;
-                      bestDlArea = dlArea;
-                    }
-                  }
-                }
-
-                if (bestDl) {
-                  if (!bestDl.subpaths) {
-                    bestDl.subpaths = [bestDl.points];
-                  }
-                  bestDl.subpaths.push(wl.points);
-                }
-              });
-
-              const finalDarkLayers = darkLayers.length > 0 ? darkLayers : active;
+              const finalDarkLayers = active;
 
               let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
               finalDarkLayers.forEach(l => l.points.forEach((p: any) => {
@@ -3949,15 +3986,21 @@ export class TopologicalEngine {
     const path1 = [];
     const path2 = [];
     
+    if (!points || points.length === 0 || idxA < 0 || idxB < 0 || idxA >= points.length || idxB >= points.length) {
+      return { centerline: points || [], averageWidth: 10 };
+    }
+
     let curr = idxA;
-    while (curr !== idxB) {
+    let stepGuard1 = points.length + 2;
+    while (curr !== idxB && stepGuard1-- > 0) {
       path1.push(points[curr]);
       curr = (curr + 1) % points.length;
     }
     path1.push(points[idxB]);
 
     curr = idxA;
-    while (curr !== idxB) {
+    let stepGuard2 = points.length + 2;
+    while (curr !== idxB && stepGuard2-- > 0) {
       path2.push(points[curr]);
       curr = (curr - 1 + points.length) % points.length;
     }
@@ -4030,8 +4073,8 @@ export class TopologicalEngine {
 export class StitchEngine {
   static compileToStitchPath(obj: EmbroideryObject, fabric: string): { points: EmbroideryPoint[]; type: 'stitch' | 'underlay' }[] {
         if (obj.stitchType === 'manual') {
-      const segs = obj.segments && obj.segments.length > 0 ? obj.segments : [obj.points];
-      return segs.map(seg => ({ points: seg, type: 'stitch' as const }));
+      const subpathsOrSegs = (obj.subpaths && obj.subpaths.length > 0) ? obj.subpaths : (obj.segments && obj.segments.length > 0 ? obj.segments : [obj.points]);
+      return subpathsOrSegs.map(seg => ({ points: seg, type: 'stitch' as const }));
     }
     const list: { points: EmbroideryPoint[]; type: 'stitch' | 'underlay' }[] = [];
     const adjustedDensity = DensityEngine.computeFabricDensity(obj.density, fabric);
@@ -4091,7 +4134,8 @@ export class StitchEngine {
     };
 
     const physicalPoints = obj.points.map(projectPoint);
-    const physicalSegments = obj.segments ? obj.segments.map(poly => poly.map(projectPoint)) : undefined;
+    const subpathsOrSegments = obj.subpaths || (obj as any).segments;
+    const physicalSegments = subpathsOrSegments ? subpathsOrSegments.map(poly => poly.map(projectPoint)) : undefined;
 
     // 1. Generate Stabilizer Underlay (Étape 8)
     if (obj.underlay && physicalPoints.length > 2) {
@@ -4120,6 +4164,7 @@ export class StitchEngine {
                           !obj.name.toLowerCase().includes('trace') &&
                           !obj.name.toLowerCase().includes('vector') &&
                           !obj.segments &&
+                          !obj.subpaths &&
                           obj.stitchType !== 'tatami';
     
     if (isTopological && (obj.stitchType === 'satin' || obj.stitchType === 'running' || obj.stitchType === 'zigzag')) {
@@ -4183,6 +4228,7 @@ export class StitchEngine {
                         obj.name.toLowerCase().includes('vector') ||
                         obj.name.toLowerCase().includes('trace') ||
                         obj.name.toLowerCase().includes('letter_') ||
+                        obj.subpaths !== undefined ||
                         obj.segments !== undefined);
       if (isClosed) {
         let pMinX = Infinity, pMinY = Infinity, pMaxX = -Infinity, pMaxY = -Infinity;
@@ -4194,9 +4240,35 @@ export class StitchEngine {
         });
         const shapeMinDim = Math.min(pMaxX - pMinX, pMaxY - pMinY);
 
+        // Dynamic physical thickness estimator (Area / Max Length)
+        const estThickness = (pts: EmbroideryPoint[]) => {
+          if (pts.length < 3) return 0;
+          let area = 0;
+          const n = pts.length;
+          for (let i = 0; i < n; i++) {
+            const p1 = pts[i];
+            const p2 = pts[(i + 1) % n];
+            area += (p1.x * p2.y - p2.x * p1.y);
+          }
+          area = Math.abs(area / 2);
+          
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          pts.forEach(p => {
+            if (p.x < minX) minX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y > maxY) maxY = p.y;
+          });
+          const maxDim = Math.max(maxX - minX, maxY - minY, 1);
+          return area / maxDim;
+        };
+
+        const shapeThickness = estThickness(physicalPoints);
+
         // Standard embroidery safety: if a closed region's min dimension >= 3.2mm (32 units),
         // satin stitches will pull the fabric and deform. Fallback to Tatami fill for perfect structure.
-        if (shapeMinDim >= 32) {
+        // For thin curved shapes (e.g. curved stems/laurels), shapeThickness will be < 35, so they are filled with high-fidelity satin instead.
+        if (shapeMinDim >= 32 && shapeThickness >= 35) {
           const stepDist = Math.max(1.0, Math.round(adjustedDensity * 3.0));
           const segments = getTatamiStitches(physicalSegments || physicalPoints, stepDist, obj.angle);
           diagFillLines = segments;

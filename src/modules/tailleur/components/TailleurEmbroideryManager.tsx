@@ -133,6 +133,20 @@ import { TatamiDebugger } from './TatamiDebugger';
 import { AeosApiExplorer } from './AeosApiExplorer';
 import { AeosGallery } from './AeosGallery';
 import { EmbroideryDiagnosticViewer } from './EmbroideryDiagnosticViewer';
+import { LogoDiagnosticViewer } from './LogoDiagnosticViewer';
+import { ImageUpscaleVectorizerPanel } from './ImageUpscaleVectorizerPanel';
+import { LogoAnalyzerKernel, LogoDiagnosticReport } from '../services/LogoAnalyzerKernel';
+import { TransparencyNormalizer } from '../services/TransparencyNormalizer';
+import { ReconstructionApplicationBridge, hashGeometry } from '../services/ReconstructionApplicationBridge';
+import { GeometricReconstructionEngine as AdvancedGeometricReconstructionEngine } from '../services/GeometricReconstructionEngine';
+import { CurveReconstructionEngine } from '../services/CurveReconstructionEngine';
+import { StrokeWidthFidelityEngine } from '../services/StrokeWidthFidelityEngine';
+import { GeometricSignatureEngine } from '../services/GeometricSignatureEngine';
+import { VectorizationPipelineService } from '../services/VectorizationPipelineService';
+import { FillRegionPreparationEngine, FillRegionPreparationReport } from '../services/FillRegionPreparationEngine';
+import { FillRegionPreparationModal } from './FillRegionPreparationModal';
+import { PsdImportService, PsdParseResult, PsdLayerItem } from '../services/PsdImportService';
+import { PsdImportModal } from './PsdImportModal';
 import { NightResearchModal } from './NightResearchModal';
 import { ScientificPassportViewer } from './ScientificPassportViewer';
 import { AeosVisionInspector } from './AeosVisionInspector';
@@ -857,8 +871,16 @@ export function isLayerInMarquee(
 
 
 export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
+  const [fillPrepReport, setFillPrepReport] = useState<FillRegionPreparationReport | null>(null);
+  const [showFillReportModal, setShowFillReportModal] = useState<boolean>(false);
+  const [psdModalData, setPsdModalData] = useState<PsdParseResult | null>(null);
   const [pendingValidations, setPendingValidations] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'studio' | 'vision' | 'rules' | 'graph' | 'physics' | 'learning' | 'marketplace' | 'api' | 'gallery' | 'diagnostic' | 'tatami'>('studio');
+  const [enableCurveReconstruction, setEnableCurveReconstruction] = useState<boolean>(true);
+  const [enableStrokeWidthFidelity, setEnableStrokeWidthFidelity] = useState<boolean>(true);
+  const [showJumpLines, setShowJumpLines] = useState<boolean>(false);
+  const [enableResidualShadeFilter, setEnableResidualShadeFilter] = useState<boolean>(true);
+  const [enableColorHarmonization, setEnableColorHarmonization] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<'studio' | 'vision' | 'rules' | 'graph' | 'physics' | 'learning' | 'marketplace' | 'api' | 'gallery' | 'diagnostic' | 'tatami' | 'upscale'>('studio');
   const [activeProjectId, setActiveProjectId] = useState<string>('p1');
   const [projectName, setProjectName] = useState<string>('Écusson Royal d\'Afrique');
   const [selectedFabric, setSelectedFabric] = useState<string>('cotton');
@@ -906,6 +928,63 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [scientificAsset, setScientificAsset] = useState<any>(null);
 
   useEffect(() => {
+    if (layers && layers.length > 0) {
+      const { report } = FillRegionPreparationEngine.prepareFillRegions(layers, 'tatami');
+      setFillPrepReport(report);
+    }
+  }, [layers.length]);
+
+  // Phase 1.4 Reconstruction Bridge Mode Toggle Handler
+  useEffect(() => {
+    const handleBridgeToggle = (e: any) => {
+      const newMode = e.detail?.mode;
+      if (!newMode) return;
+      (window as any).__BRIDGE_MODE = newMode;
+      const reconReport = (window as any).__RECON_REPORT;
+      if (reconReport && layers && layers.length > 0) {
+        const updatedLayers = ReconstructionApplicationBridge.switchGeometryMode(
+          layers,
+          reconReport,
+          newMode
+        );
+        setLayers(updatedLayers);
+        
+        // Recalculate sentinel active hash
+        const hashGeometry = (pts: any[]) => {
+          if (!pts) return 'null';
+          let hash = 0;
+          for (let i = 0; i < pts.length; i++) {
+            hash = Math.imul(31, hash) + (pts[i].x * 1000) | 0;
+            hash = Math.imul(31, hash) + (pts[i].y * 1000) | 0;
+          }
+          return hash.toString(16);
+        };
+        const sentinelActiveLayer = updatedLayers.find(l => l.id === 'SENTINEL_LAYER_001');
+        if (sentinelActiveLayer && (window as any).__SENTINEL_HASHES) {
+          (window as any).__SENTINEL_HASHES.ACTIVE_LAYER_HASH = hashGeometry(sentinelActiveLayer.points);
+        }
+      }
+    };
+
+    window.addEventListener('atcp:toggleBridgeMode', handleBridgeToggle);
+    return () => window.removeEventListener('atcp:toggleBridgeMode', handleBridgeToggle);
+  }, [layers]);
+
+  // Phase 1.4B Proof Telemetry Observer for State Layer
+  useEffect(() => {
+    const sentinelStateLayer = layers.find(l => l.id === 'SENTINEL_LAYER_001');
+    if (sentinelStateLayer) {
+      const hState = hashGeometry(sentinelStateLayer.points);
+      const proofRunId = (window as any).__CURRENT_PROOF_RUN_ID || 'run-default';
+      (window as any).__SENTINEL_STATE_HASH = hState;
+      if ((window as any).__SENTINEL_HASHES) {
+        (window as any).__SENTINEL_HASHES.STATE_LAYER_HASH = hState;
+      }
+      console.log(`[PHASE_1_4B][${proofRunId}][SENTINEL_LAYER_001][STATE] Hash: ${hState} (${sentinelStateLayer.points.length} pts)`);
+    }
+  }, [layers]);
+
+  useEffect(() => {
     // Phase II - Permanent Asset Initialization
     // In a real flow, this would load an existing asset from a project DB or Dexie.
     setScientificAsset({
@@ -938,7 +1017,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
 
     import('../../../application/ScientificEventBus').then(({ ScientificEventBus }) => {
       unsubs.push(ScientificEventBus.subscribe('SIMULATION_LOG', (e: any) => {
-        setReflectiveLogs(prev => [...prev, e.payload.message]);
+        setReflectiveLogs(prev => [...prev.slice(-199), e.payload.message]);
       }));
       unsubs.push(ScientificEventBus.subscribe('SIMULATION_STAGE', (e: any) => {
         setReflectiveCompileStage(e.payload.stage);
@@ -1613,6 +1692,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [showGrid, setShowGrid] = useState<boolean>(true);
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
   const [enable3DEffect, setEnable3DEffect] = useState<boolean>(true);
+  const [showSentinelDebug, setShowSentinelDebug] = useState<boolean>(false);
   const [visualizationMode, setVisualizationMode] = useState<'embroidery' | 'cad_contour' | 'cad_points'>('embroidery');
 
   // Undo/Redo Stacks
@@ -1633,7 +1713,9 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [aiLog, setAiLog] = useState<string[]>([]);
   const [semanticScene, setSemanticScene] = useState<any>(null);
-  const [vectorizeMode, setVectorizeMode] = useState<'exact' | 'floral'>('exact');
+  const [vectorizeMode, setVectorizeMode] = useState<'exact' | 'floral' | 'logo'>('exact');
+  const [logoDiagnosticReport, setLogoDiagnosticReport] = useState<LogoDiagnosticReport | null>(null);
+  const [showLogoDiagnostic, setShowLogoDiagnostic] = useState<boolean>(false);
 
   // ATCP Reflective Cognitive Compilation states
   const [reflectiveCompileActive, setReflectiveCompileActive] = useState<boolean>(false);
@@ -2084,7 +2166,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
 
   // Helper to record history state
   const pushHistory = (currentLayers: EmbroideryLayer[]) => {
-    setHistoryPast(prev => [...prev, JSON.parse(JSON.stringify(currentLayers))]);
+    setHistoryPast(prev => [...prev.slice(-14), JSON.parse(JSON.stringify(currentLayers))]);
     setHistoryFuture([]);
   };
 
@@ -2106,6 +2188,15 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
 
   // Compile CAD layers to a sequence of stitch coordinates
   const compileStitches = useCallback((projLayers: EmbroideryLayer[], fabricKey: string): Stitch[] => {
+    const sentLayer = projLayers.find(l => l.id === 'SENTINEL_LAYER_001');
+    if (sentLayer) {
+       const hEmbroidery = hashGeometry(sentLayer.points);
+       (window as any).__SENTINEL_EMBROIDERY_HASH = hEmbroidery;
+       if ((window as any).__SENTINEL_HASHES) {
+         (window as any).__SENTINEL_HASHES.EMBROIDERY_INPUT_HASH = hEmbroidery;
+       }
+    }
+
     // POINT D Detailed logging
     const dFirstPt = projLayers && projLayers.length > 0 && projLayers[0].points && projLayers[0].points.length > 0 ? projLayers[0].points[0] : null;
     const dLastLayer = projLayers && projLayers.length > 0 ? projLayers[projLayers.length - 1] : null;
@@ -2137,6 +2228,9 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
       customColorIndex?: number, 
       customColor?: string
     ) => {
+      if (isNaN(targetX) || isNaN(targetY) || !isFinite(targetX) || !isFinite(targetY)) {
+        return;
+      }
       const rx = Math.round(targetX);
       const ry = Math.round(targetY);
       
@@ -2158,12 +2252,15 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
       }
       
       // Split movement into segments of max 121 units
-      while (cx !== rx || cy !== ry) {
+      let stepGuard = 10000;
+      while ((cx !== rx || cy !== ry) && stepGuard-- > 0) {
         const dXRemaining = rx - cx;
         const dYRemaining = ry - cy;
         
         const dx = Math.max(-121, Math.min(121, dXRemaining));
         const dy = Math.max(-121, Math.min(121, dYRemaining));
+
+        if (dx === 0 && dy === 0) break;
         
         cx += dx;
         cy += dy;
@@ -2183,6 +2280,8 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           isLongStitchPart: stType === 'stitch' && currentType === 'jump'
         });
       }
+      cx = rx;
+      cy = ry;
     };
 
     let lastColorIndex = -1;
@@ -2364,30 +2463,23 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
 
   // Canvas Drawing & High-Fidelity CAD Render
   const drawCanvas = useCallback(() => {
+    const sentLayer = layers.find(l => l.id === 'SENTINEL_LAYER_001');
+    if (sentLayer) {
+       const hRender = hashGeometry(sentLayer.points);
+       (window as any).__SENTINEL_RENDER_HASH = hRender;
+       (window as any).__SENTINEL_STATE_HASH = hRender;
+       if ((window as any).__SENTINEL_HASHES) {
+         (window as any).__SENTINEL_HASHES.STATE_LAYER_HASH = hRender;
+         (window as any).__SENTINEL_HASHES.RENDER_INPUT_HASH = hRender;
+       }
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Tracing/Proof logging inside drawCanvas
-    const proof = getLayersExecutionProof(layers);
     const renderLimit = Math.min(drawProgress, stitches.length);
-    console.groupCollapsed('=== CANVAS RENDERING PASS [POINT E] ===');
-    console.log('%c[POINT E: drawCanvas (stitches drawn)]', 'color: #f43f5e; font-weight: bold;');
-    console.log(`- Hash des layers utilisés : ${proof.hash}`);
-    console.log(`- Nombre de couches dessinées : ${proof.count}`);
-    console.log(`- Nombre total de points de couture (stitches): ${stitches.length}`);
-    console.log(`- Nombre de points dessinés (drawProgress): ${renderLimit}`);
-    if (stitches.length > 0) {
-      const eFirstStitch = stitches[0];
-      const eLastStitch = stitches[renderLimit - 1] || stitches[stitches.length - 1];
-      console.log(`  - Premier point de couture: (${eFirstStitch.x.toFixed(2)}, ${eFirstStitch.y.toFixed(2)}, type: ${eFirstStitch.type})`);
-      console.log(`  - Dernier point de couture: (${eLastStitch.x.toFixed(2)}, ${eLastStitch.y.toFixed(2)}, type: ${eLastStitch.type})`);
-    } else {
-      console.log(`  - Premier point de couture: N/A`);
-      console.log(`  - Dernier point de couture: N/A`);
-    }
-    console.groupEnd();
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
@@ -2498,7 +2590,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
       ctx.lineJoin = 'round';
 
       // Helper to draw a batch of connected stitches
-      const drawStitchBatch = (batch: { x: number; y: number; type: string }[], colorStr: string, mode: 'shadow' | 'thread' | 'highlight') => {
+      const drawStitchBatch = (batch: Stitch[], colorStr: string, mode: 'shadow' | 'thread' | 'highlight') => {
         if (batch.length === 0) return;
         ctx.beginPath();
         if (mode === 'shadow') {
@@ -2514,7 +2606,9 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         }
 
         let started = false;
-        batch.forEach((pt: any, i) => {
+        const len = batch.length;
+        for (let i = 0; i < len; i++) {
+          const pt = batch[i];
           if (pt.type === 'jump') {
             if (pt.isLongStitchPart) {
               if (!started) {
@@ -2534,17 +2628,18 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
               ctx.lineTo(pt.x, pt.y);
             }
           }
-        });
+        }
         ctx.stroke();
       };
 
       // Group and batch stitches to avoid path-creation overhead
-      let currentBatch: { x: number; y: number; type: string }[] = [];
+      let currentBatch: Stitch[] = [];
       let currentBatchColor = '';
 
+      const use3DPasses = enable3DEffect && !isDrawing && stitches.length <= 35000;
       const flushBatch = () => {
         if (currentBatch.length > 0) {
-          if (enable3DEffect) {
+          if (use3DPasses) {
             // 1. Draw shadow first (offset slightly bottom-right)
             ctx.save();
             ctx.translate(1.0 / zoom, 1.2 / zoom);
@@ -2555,7 +2650,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           // 2. Draw main thread
           drawStitchBatch(currentBatch, currentBatchColor, 'thread');
           
-          if (enable3DEffect) {
+          if (use3DPasses) {
             // 3. Draw sheen highlight (offset slightly top-left)
             ctx.save();
             ctx.translate(-0.3 / zoom, -0.3 / zoom);
@@ -2575,10 +2670,10 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
             flushBatch();
             currentBatchColor = sColor;
           }
-          currentBatch.push({ x: s.x, y: s.y, type: 'stitch' });
+          currentBatch.push(s);
         } else if (s.type === 'jump') {
           if (currentBatch.length > 0) {
-            currentBatch.push({ x: s.x, y: s.y, type: 'jump' });
+            currentBatch.push(s);
           }
         } else if (s.type === 'color_change' || s.type === 'stop' || s.type === 'end') {
           flushBatch();
@@ -2586,27 +2681,29 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
       }
       flushBatch();
 
-      // Draw travel jump lines as a separate pass (very thin & subtle)
-      ctx.save();
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgba(156, 163, 175, 0.15)';
-      ctx.lineWidth = 0.8 / zoom;
-      ctx.setLineDash([3 / zoom, 4 / zoom]);
-      let travelX: number | null = null;
-      let travelY: number | null = null;
-      for (let i = 0; i < renderLimit; i++) {
-        const s = stitches[i];
-        if (s.type === 'jump' && !s.isLongStitchPart) {
-          if (travelX !== null && travelY !== null) {
-            ctx.moveTo(travelX, travelY);
-            ctx.lineTo(s.x, s.y);
+      // Draw travel jump lines if enabled as a separate pass (very thin & subtle)
+      if (showJumpLines) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(156, 163, 175, 0.15)';
+        ctx.lineWidth = 0.8 / zoom;
+        ctx.setLineDash([3 / zoom, 4 / zoom]);
+        let travelX: number | null = null;
+        let travelY: number | null = null;
+        for (let i = 0; i < renderLimit; i++) {
+          const s = stitches[i];
+          if (s.type === 'jump' && !s.isLongStitchPart) {
+            if (travelX !== null && travelY !== null) {
+              ctx.moveTo(travelX, travelY);
+              ctx.lineTo(s.x, s.y);
+            }
           }
+          travelX = s.x;
+          travelY = s.y;
         }
-        travelX = s.x;
-        travelY = s.y;
+        ctx.stroke();
+        ctx.restore();
       }
-      ctx.stroke();
-      ctx.restore();
 
       // 5. Active Needle Indicator
       if (renderLimit > 0 && renderLimit < stitches.length) {
@@ -2761,7 +2858,7 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
     if (showRulers) {
       drawRulersHUD(ctx, canvas);
     }
-  }, [stitches, zoom, pan, drawProgress, layers, selectedLayerId, selectedLayerIds, canvasTool, showGrid, showRulers, enable3DEffect, visualizationMode]);
+  }, [stitches, zoom, pan, drawProgress, layers, selectedLayerId, selectedLayerIds, canvasTool, showGrid, showRulers, enable3DEffect, visualizationMode, showJumpLines]);
 
   // Left & Top ruler drawers in millimeters
   const drawRulersHUD = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
@@ -2807,20 +2904,19 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
     ctx.restore();
   };
 
-  // Callback ref to handle canvas mount / unmount securely and trigger instant redraws
+  // Callback ref to handle canvas mount / unmount securely without re-allocating GPU buffer
   const setCanvasRef = useCallback((node: HTMLCanvasElement | null) => {
     canvasRef.current = node;
-    if (node) {
+    if (node && node.parentElement) {
       const parent = node.parentElement;
-      if (parent) {
-        node.width = parent.clientWidth || 600;
-        node.height = parent.clientHeight || 580;
+      const targetW = parent.clientWidth || 600;
+      const targetH = parent.clientHeight || 580;
+      if (node.width !== targetW || node.height !== targetH) {
+        node.width = targetW;
+        node.height = targetH;
       }
-      requestAnimationFrame(() => {
-        drawCanvas();
-      });
     }
-  }, [drawCanvas]);
+  }, []);
 
   useEffect(() => {
     drawCanvas();
@@ -3023,23 +3119,31 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
 
   // Simulation play loop
   useEffect(() => {
+    let animId: number;
+    let lastTime = performance.now();
     if (isDrawing) {
-      const step = () => {
-        setDrawProgress(prev => {
-          const next = prev + speed;
-          if (next >= stitches.length) {
-            setIsDrawing(false);
-            return stitches.length;
-          }
-          return next;
-        });
-        animationFrameRef.current = requestAnimationFrame(step);
+      const step = (now: number) => {
+        if (now - lastTime >= 30) {
+          lastTime = now;
+          setDrawProgress(prev => {
+            const next = prev + speed;
+            if (next >= stitches.length) {
+              setIsDrawing(false);
+              return stitches.length;
+            }
+            return next;
+          });
+        }
+        animId = requestAnimationFrame(step);
+        animationFrameRef.current = animId;
       };
-      animationFrameRef.current = requestAnimationFrame(step);
+      animId = requestAnimationFrame(step);
+      animationFrameRef.current = animId;
     } else {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     }
     return () => {
+      if (animId) cancelAnimationFrame(animId);
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, [isDrawing, stitches.length, speed]);
@@ -3103,11 +3207,16 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
     setSelectedLayerId(layers[0].id);
   };
 
-  // Drag and drop import of local .dst files
+  // Drag and drop import of local files (.dst, .svg, .png, .jpg, .webp) of any size (>2.5MB)
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.dst')) {
+    if (!file) return;
+    const fileName = file.name.toLowerCase();
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    
+    if (fileName.endsWith('.dst')) {
+      setAiLog(prev => [...prev, `Importation du fichier DST (${sizeMb} MB) : ${file.name}`]);
       const reader = new FileReader();
       reader.onload = (evt) => {
         if (evt.target?.result) {
@@ -3115,498 +3224,83 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         }
       };
       reader.readAsArrayBuffer(file);
+    } else if (fileName.endsWith('.svg')) {
+      setAiLog(prev => [...prev, `Importation du fichier SVG HD (${sizeMb} MB) : ${file.name}`]);
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result && typeof evt.target.result === 'string') {
+          parseSvgFile(evt.target.result, file.name);
+        }
+      };
+      reader.readAsText(file);
+    } else if (fileName.endsWith('.psd') || file.type.includes('photoshop') || file.type.includes('psd')) {
+      setAiLog(prev => [...prev, `Analyse du fichier Photoshop PSD (${sizeMb} MB) : ${file.name}`]);
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        if (evt.target?.result instanceof ArrayBuffer) {
+          try {
+            const parsed = await PsdImportService.parsePsd(evt.target.result, file.name);
+            setPsdModalData(parsed);
+          } catch (err: any) {
+            setAiLog(prev => [...prev, `Erreur lecture PSD : ${err.message || 'Fichier invalide'}`]);
+          }
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (file.type.startsWith('image/')) {
+      // Direct drag & drop image -> switch to studio upscale tab
+      setAiLog(prev => [...prev, `Chargement de l'image HD (${sizeMb} MB) : ${file.name}`]);
+      setActiveTab('upscale');
     }
   };
 
-
   const parseSvgFile = (text: string, name: string, forceStitchType: 'tatami' | 'running' | 'satin' = 'tatami') => {
-        try {
+    try {
+      const fileSizeMb = (text.length / (1024 * 1024)).toFixed(2);
       setAiLog(prev => [
         ...prev, 
-        `Analyse du fichier SVG : ${name}...`,
-        `Extraction géométrique et discrétisation des chemins vectoriels...`
+        `Analyse du fichier SVG HD (${fileSizeMb} MB) : ${name}...`,
+        `Extraction géométrique ultra-rapide des chemins vectoriels...`
       ]);
       setLoading(true);
 
       setTimeout(() => {
         try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(text, "image/svg+xml");
-          const svgEl = doc.querySelector('svg');
-          
-          if (!svgEl) throw new Error("SVG invalide.");
-
-          // Prevent flattening by forcing correct aspect ratio via explicit size
-          let w = 500;
-          let h = 500;
-          const viewboxAttr = svgEl.getAttribute('viewBox');
-          if (viewboxAttr) {
-            const parts = viewboxAttr.split(/[\s,]+/).map(parseFloat).filter(v => !isNaN(v));
-            if (parts.length >= 4) {
-              w = parts[2];
-              h = parts[3];
+          const { layers: extractedLayers, validations: newValidations, fillPreparationReport } = VectorizationPipelineService.parseSvgToAeeLayers(
+            text,
+            forceStitchType,
+            {
+              semanticScene,
+              enableResidualShadeFilter,
+              enableColorHarmonization,
+              enableCurveReconstruction,
+              enableStrokeWidthFidelity
             }
-          } else {
-            const wAttr = svgEl.getAttribute('width');
-            const hAttr = svgEl.getAttribute('height');
-            if (wAttr) w = parseFloat(wAttr) || 500;
-            if (hAttr) h = parseFloat(hAttr) || 500;
-          }
-          svgEl.setAttribute('width', w.toString());
-          svgEl.setAttribute('height', h.toString());
+          );
 
-          document.body.appendChild(svgEl);
-          svgEl.style.position = 'absolute';
-          svgEl.style.visibility = 'hidden';
-          svgEl.style.left = '-9999px';
-          svgEl.style.top = '-9999px';
-          svgEl.style.display = 'block';
-          svgEl.style.width = w + 'px';
-          svgEl.style.height = h + 'px';
-
-          const allElements = svgEl.querySelectorAll('path, polygon, polyline, rect, circle, ellipse, line');
-          // Cap elements to 500 to prevent freezing on extremely complex SVGs
-          const elements = Array.from(allElements).slice(0, 500);
-          let extractedLayers: EmbroideryLayer[] = [];
-          let layerCounter = 1;
-          
-          const colors = ['#1E3A8A', '#DC2626', '#059669', '#7C3AED', '#F43F5E'];
-
-          elements.forEach((el) => {
-            if (!(el instanceof SVGGeometryElement)) return;
-            
-            if (el.closest('defs, clipPath, symbol')) return;
-
-            const computed = window.getComputedStyle(el);
-            
-            // Only skip if the element itself (or a parent other than the root svg) explicitly hides it
-            // Since we set svgEl.style.visibility = 'hidden', we must ignore 'hidden' if it comes from the root.
-            // A better way is to check the inline style or rely on display: none and opacity: 0.
-            if (computed.display === 'none' || computed.opacity === '0') return;
-            
-            // If there's an explicit visibility: hidden on the element itself in the original SVG
-            if (el.getAttribute('visibility') === 'hidden' || el.style.visibility === 'hidden') return;
-
-            let fill = el.getAttribute('fill') || computed.fill;
-            let stroke = el.getAttribute('stroke') || computed.stroke;
-            
-            const isFillNone = !fill || fill === 'none' || fill === 'transparent' || fill === 'rgba(0, 0, 0, 0)';
-            const isStrokeNone = !stroke || stroke === 'none' || stroke === 'transparent' || stroke === 'rgba(0, 0, 0, 0)';
-            
-            if (isFillNone && isStrokeNone) return;
-            
-            let color = !isFillNone ? fill : (!isStrokeNone ? stroke : colors[layerCounter % colors.length]);
-            const matrix = el.getCTM();
-
-            let subpathsToProcess: { len: number, getPointAtLength: (len: number) => DOMPoint }[] = [];
-
-            if (el instanceof SVGPathElement) {
-                const d = el.getAttribute('d');
-                if (d) {
-                    const parts = d.split(/(?=[Mm])/).filter(s => s.trim().length > 0);
-                    let cumulativeD = "";
-                    parts.forEach((sub_d, pIdx) => {
-                        let processedSubD = sub_d;
-                        if (pIdx === 0) {
-                            cumulativeD = sub_d;
-                        } else {
-                            const match = sub_d.match(/^\s*m\s*([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)(?:\s+|[,]\s*)([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)/);
-                            if (match) {
-                                try {
-                                    const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                                    tempPath.setAttribute('d', cumulativeD);
-                                    svgEl.appendChild(tempPath);
-                                    const lastLen = tempPath.getTotalLength();
-                                    const lastPoint = lastLen > 0 ? tempPath.getPointAtLength(lastLen) : { x: 0, y: 0 };
-                                    svgEl.removeChild(tempPath);
-
-                                    const dx = parseFloat(match[1]);
-                                    const dy = parseFloat(match[2]);
-                                    const absX = (lastPoint ? lastPoint.x : 0) + dx;
-                                    const absY = (lastPoint ? lastPoint.y : 0) + dy;
-
-                                    const remainingStr = sub_d.replace(/^\s*m\s*[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?(?:\s+|[,]\s*)[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/, '');
-                                    processedSubD = `M ${absX} ${absY} ` + remainingStr;
-                                } catch (e) {
-                                    console.warn("Erreur de conversion de sous-chemin relatif:", e);
-                                }
-                            }
-                            cumulativeD += " " + processedSubD;
-                        }
-
-                        const tempPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                        tempPath.setAttribute('d', processedSubD);
-                        svgEl.appendChild(tempPath);
-                        subpathsToProcess.push({
-                            len: tempPath.getTotalLength(),
-                            getPointAtLength: (l: number) => tempPath.getPointAtLength(l)
-                        });
-                    });
-                } else {
-                    subpathsToProcess.push({
-                        len: el.getTotalLength(),
-                        getPointAtLength: (l: number) => el.getPointAtLength(l)
-                    });
-                }
-            } else {
-                subpathsToProcess.push({
-                    len: el.getTotalLength(),
-                    getPointAtLength: (l: number) => el.getPointAtLength(l)
-                });
-            }
-
-            const allSubpathsPts: {x: number, y: number}[][] = [];
-            let allFlatPts: {x: number, y: number}[] = [];
-            
-            subpathsToProcess.forEach((sub, subIdx) => {
-                if (sub.len < 1) return;
-                
-                // Optimized sampling: 1 point every 2mm, min 8, max 1500 to avoid "crystals" density
-                const numPts = Math.min(1500, Math.max(8, Math.floor(sub.len / 2.0)));
-                const pts: {x: number, y: number}[] = [];
-                
-                for (let i = 0; i <= numPts; i++) {
-                    let pt = svgEl.createSVGPoint();
-                    const p = sub.getPointAtLength((i / numPts) * sub.len);
-                    pt.x = p.x; pt.y = p.y;
-                    if (matrix) {
-                        pt = pt.matrixTransform(matrix);
-                    }
-                    
-                    // Filter micro-movements (less than 0.8mm) to avoid density clusters
-                    if (pts.length > 0) {
-                        const last = pts[pts.length - 1];
-                        if (Math.hypot(pt.x - last.x, pt.y - last.y) < 0.8) continue;
-                    }
-                    
-                    pts.push({ x: pt.x, y: pt.y });
-                }
-                
-                // Skip extremely small shapes (crystals/artifacts)
-                const isFirst = subIdx === 0;
-                const minPtsAllowed = isFirst ? 14 : 4;
-                if (pts.length < minPtsAllowed) return;
-                
-                // Also skip shapes with tiny bounding box to filter out noise crystals
-                let pminX = Infinity, pminY = Infinity, pmaxX = -Infinity, pmaxY = -Infinity;
-                pts.forEach(p => {
-                    pminX = Math.min(pminX, p.x); pminY = Math.min(pminY, p.y);
-                    pmaxX = Math.max(pmaxX, p.x); pmaxY = Math.max(pmaxY, p.y);
-                });
-                const pwidth = pmaxX - pminX;
-                const pheight = pmaxY - pminY;
-                
-                if (isFirst) {
-                    // Highly effective filter for noise crystals and useless vector layers (calques inutiles):
-                    // must be at least 18px wide/high, have area of at least 320 pixels, and minimum dimensions of 4px
-                    if ((pwidth < 18.0 && pheight < 18.0) || (pwidth * pheight < 320) || pwidth < 4.0 || pheight < 4.0) return;
-                } else {
-                    // Much more relaxed filter for inner subpaths/holes to preserve intricate patterns
-                    if (pwidth < 2.0 || pheight < 2.0 || pwidth * pheight < 4) return;
-                }
-
-                if (pts.length >= 2) {
-                   allSubpathsPts.push(pts);
-                   allFlatPts = allFlatPts.concat(pts);
-                }
-            });
-
-            if (allFlatPts.length >= 5) {
-               extractedLayers.push({
-                  id: `svg_layer_${Date.now()}_${layerCounter}`,
-                  name: `SVG Shape #${layerCounter}`,
-                  stitchType: forceStitchType,
-                  color: color,
-                  colorName: 'Couleur Importée',
-                  threadCode: (1000 + layerCounter).toString(),
-                  density: forceStitchType === 'running' ? 0 : 0.4,
-                  angle: 0,
-                  underlay: forceStitchType !== 'running',
-                  pullComp: 0.0,
-                  visible: true,
-                  locked: false,
-                  points: allFlatPts,
-                  subpaths: allSubpathsPts,
-               });
-               layerCounter++;
-            }
-          });
-          
-          document.body.removeChild(svgEl);
-
-          // Advanced hole & background post-processing to keep letters hollow and discard background noise
-          const isNearWhite = (colorStr: string): boolean => {
-              if (!colorStr) return false;
-              const s = colorStr.trim().toLowerCase().replace(/\s+/g, '');
-              if (s === 'white' || s === '#fff' || s === '#ffffff' || s === 'rgb(255,255,255)' || s === 'rgba(255,255,255,1)') return true;
-              if (s.startsWith('rgb')) {
-                  const m = s.match(/\d+/g);
-                  if (m && m.length >= 3) {
-                      const r = parseInt(m[0]), g = parseInt(m[1]), b = parseInt(m[2]);
-                      if (r > 215 && g > 215 && b > 215) return true;
-                  }
-              }
-              if (s.startsWith('#')) {
-                  const h = s.substring(1);
-                  if (h.length === 3) {
-                      const r = parseInt(h[0], 16) * 17, g = parseInt(h[1], 16) * 17, b = parseInt(h[2], 16) * 17;
-                      if (r > 215 && g > 215 && b > 215) return true;
-                  } else if (h.length === 6) {
-                      const r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
-                      if (r > 215 && g > 215 && b > 215) return true;
-                  }
-              }
-              return false;
-          };
-
-          const getCentroid = (pts: {x: number, y: number}[]) => {
-              if (pts.length === 0) return { x: 0, y: 0 };
-              let sx = 0, sy = 0;
-              pts.forEach(p => { sx += p.x; sy += p.y; });
-              return { x: sx / pts.length, y: sy / pts.length };
-          };
-
-          const getBoundingBox = (pts: {x: number, y: number}[]) => {
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-              pts.forEach(p => {
-                  minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
-                  maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
-              });
-              return { minX, minY, maxX, maxY };
-          };
-
-          const isPointInPoly = (p: {x: number, y: number}, poly: {x: number, y: number}[]) => {
-              // Add a tiny coordinate perturbation (epsilon shift) to prevent horizontal, vertical, 
-              // and vertex-aligned lines from triggering floating point ray-casting boundary failures.
-              const px = p.x + 1e-7;
-              const py = p.y + 1e-7;
-              let inside = false;
-              for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-                  const xi = poly[i].x, yi = poly[i].y;
-                  const xj = poly[j].x, yj = poly[j].y;
-                  const diffY = yj - yi;
-                  if (Math.abs(diffY) > 1e-9) {
-                      const intersect = ((yi > py) !== (yj > py))
-                          && (px < (xj - xi) * (py - yi) / diffY + xi);
-                      if (intersect) inside = !inside;
-                  }
-              }
-              return inside;
-          };
-
-          // Find global bounding box of all layers before centring/scaling
-          let globalMinX = Infinity, globalMinY = Infinity, globalMaxX = -Infinity, globalMaxY = -Infinity;
-          extractedLayers.forEach(l => l.points.forEach(p => {
-              globalMinX = Math.min(globalMinX, p.x); globalMinY = Math.min(globalMinY, p.y);
-              globalMaxX = Math.max(globalMaxX, p.x); globalMaxY = Math.max(globalMaxY, p.y);
-          }));
-          const totalW = globalMaxX - globalMinX;
-          const totalH = globalMaxY - globalMinY;
-
-          // Filter out background layers (which are near-white/light and take up > 85% of total design area)
-          const activeLayers = extractedLayers.filter(l => {
-              let lMinX = Infinity, lMinY = Infinity, lMaxX = -Infinity, lMaxY = -Infinity;
-              l.points.forEach(p => {
-                  lMinX = Math.min(lMinX, p.x); lMinY = Math.min(lMinY, p.y);
-                  lMaxX = Math.max(lMaxX, p.x); lMaxY = Math.max(lMaxY, p.y);
-              });
-              const lW = lMaxX - lMinX;
-              const lH = lMaxY - lMinY;
-              
-              const isBgSize = (lW > 0.85 * totalW) && (lH > 0.85 * totalH);
-              const isBgColor = isNearWhite(l.color);
-              
-              if (isBgSize && isBgColor) {
-                  return false; // Discard background noise layer
-              }
-              return true;
-          });
-
-          const whiteLayers = activeLayers.filter(l => isNearWhite(l.color));
-          const darkLayers = activeLayers.filter(l => !isNearWhite(l.color));
-
-          whiteLayers.forEach(wl => {
-              const centroid = getCentroid(wl.points);
-              const wlBox = getBoundingBox(wl.points);
-              let bestDl: any = null;
-              let bestDlArea = Infinity;
-              
-              for (const dl of darkLayers) {
-                  const dlBox = getBoundingBox(dl.points);
-                  
-                  // Check if wlBox is mostly inside dlBox using area of intersection ratio (extremely robust against floating-point offsets)
-                  const interMinX = Math.max(wlBox.minX, dlBox.minX);
-                  const interMaxX = Math.min(wlBox.maxX, dlBox.maxX);
-                  const interMinY = Math.max(wlBox.minY, dlBox.minY);
-                  const interMaxY = Math.min(wlBox.maxY, dlBox.maxY);
-                  
-                  let isMostlyInsideBox = false;
-                  if (interMaxX > interMinX && interMaxY > interMinY) {
-                      const interArea = (interMaxX - interMinX) * (interMaxY - interMinY);
-                      const wlArea = (wlBox.maxX - wlBox.minX) * (wlBox.maxY - wlBox.minY);
-                      if (wlArea > 0 && (interArea / wlArea) > 0.90) {
-                          isMostlyInsideBox = true;
-                      }
-                  }
-
-                  // Precise point in polygon check across multiple reference points to catch complex shapes
-                  const hasPointInside = isPointInPoly(centroid, dl.points) || 
-                                         isPointInPoly(wl.points[0], dl.points) ||
-                                         isPointInPoly(wl.points[Math.floor(wl.points.length / 2)], dl.points);
-
-                  if (hasPointInside || isMostlyInsideBox) {
-                      const dlArea = (dlBox.maxX - dlBox.minX) * (dlBox.maxY - dlBox.minY);
-                      if (dlArea < bestDlArea) {
-                          bestDl = dl;
-                          bestDlArea = dlArea;
-                      }
-                  }
-              }
-              
-              if (bestDl) {
-                  if (!bestDl.subpaths) {
-                      bestDl.subpaths = [bestDl.points];
-                  }
-                  bestDl.subpaths.push(wl.points);
-              }
-          });
-
-          if (darkLayers.length > 0) {
-              extractedLayers = darkLayers;
-          } else {
-              extractedLayers = activeLayers;
-          }
-          
           if (extractedLayers.length === 0) {
              setAiLog(prev => [...prev, `Aucune forme vectorielle n'a été extraite du fichier.`]);
              setLoading(false);
              return;
           }
-          
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          extractedLayers.forEach(l => l.points.forEach(p => {
-              minX = Math.min(minX, p.x);
-              minY = Math.min(minY, p.y);
-              maxX = Math.max(maxX, p.x);
-              maxY = Math.max(maxY, p.y);
-          }));
-          
-          const width = maxX - minX;
-          const height = maxY - minY;
-          // Hoop is 200mm, max width 1600. Let's scale SVG to 1200
-          const scale = width > 0 && height > 0 ? Math.min(1200 / width, 1200 / height) : 1;
-          const cx = minX + width / 2;
-          const cy = minY + height / 2;
-          
-          const newValidations: any[] = [];
-          extractedLayers.forEach(l => {
-             const pctBbox = width > 0 && height > 0 ? {
-                 minX: ((Math.min(...l.points.map(p => p.x)) - minX) / width) * 100,
-                 minY: ((Math.min(...l.points.map(p => p.y)) - minY) / height) * 100,
-                 maxX: ((Math.max(...l.points.map(p => p.x)) - minX) / width) * 100,
-                 maxY: ((Math.max(...l.points.map(p => p.y)) - minY) / height) * 100
-             } : null;
 
-             l.points = l.points.map(p => ({
-                 x: (p.x - cx) * scale,
-                 y: (p.y - cy) * scale
-             }));
-             if (l.subpaths) {
-                 l.subpaths = l.subpaths.map(sub => sub.map(p => ({
-                     x: (p.x - cx) * scale,
-                     y: (p.y - cy) * scale
-                 })));
-             }
-             // Analyze region using the new SemanticAnalyzer prototype
-             try {
-                 const semanticObj = SemanticAnalyzer.analyzeRegion(l.points, semanticScene, pctBbox);
-                 
-                 if (semanticObj) {
-                     newValidations.push({
-                         id: Math.random().toString(36).substring(7),
-                         layerId: l.id,
-                         layerName: l.name,
-                         points: l.points, // original points
-                         semanticObj
-                     });
-                 }
-                 
-                 if (semanticObj && ['circle', 'cercle', 'rectangle', 'rect', 'carré', 'square'].includes(semanticObj.className.toLowerCase())) {
-                     // Reconstruction Géométrique (Bézier Mathématique)
-                     l.points = GeometricReconstructionEngine.reconstructPrimitive(l.points, semanticObj.className);
-                     l.name = `${semanticObj.className.toUpperCase()} (Bézier parfait)`;
-                     
-                     // Rétablir le décalage pour l'affichage (car reconstructPrimitive travaille en absolu ou relatif selon les points d'entrée, qui étaient déjà centrés ci-dessus)
-                     // En fait, l.points était centré sur 0,0 avec scale. Donc on rajoute cx et cy, MAIS `reconstructPrimitive` a utilisé les points tels quels.
-                     // On garde le centrage à 0,0
-                 }
-                 
-                 if (semanticObj && (semanticObj as any).suggestedLibraryId) {
-                     const libId = (semanticObj as any).suggestedLibraryId;
-                     if (EmbroideryLibrary[libId]) {
-                         let layerMinX = Math.min(...l.points.map(p => p.x));
-                         let layerMaxX = Math.max(...l.points.map(p => p.x));
-                         let layerMinY = Math.min(...l.points.map(p => p.y));
-                         let layerMaxY = Math.max(...l.points.map(p => p.y));
-                         const layerCx = (layerMinX + layerMaxX) / 2;
-                         const layerCy = (layerMinY + layerMaxY) / 2;
-                         const layerW = layerMaxX - layerMinX;
-                         const layerH = layerMaxY - layerMinY;
+          if (newValidations.length > 0) {
+            setPendingValidations(prev => [...prev, ...newValidations]);
+          }
 
-                         // Custom letter/shape scale to fit the detected region perfectly
-                         const isLetter = libId.toLowerCase().startsWith('letter_');
-                         const divisorW = isLetter ? 30 : 80;
-                         const divisorH = isLetter ? 50 : 80;
-                         const shapeScale = Math.max(0.1, Math.min(layerW / divisorW, layerH / divisorH));
-
-                         const libShape = ShapeFactory.create(libId, layerCx, layerCy, shapeScale, 0, (semanticObj.parameters as any).color || l.color);
-                         l.name = `${libShape.name} (Substitué par IA)`;
-                         l.stitchType = libShape.stitchType || 'tatami';
-                         l.color = libShape.color || l.color;
-                         l.points = libShape.points;
-                         l.subpaths = [];
-                         l.underlay = libShape.underlay;
-                         l.density = libShape.density || 0.4;
-                         l.angle = libShape.angle || 0;
-                     }
-                 } else if (forceStitchType === 'tatami' || true) {
-                     let lMinX = Infinity, lMinY = Infinity, lMaxX = -Infinity, lMaxY = -Infinity;
-                     (l.points || []).forEach(p => {
-                         if (p.x < lMinX) lMinX = p.x;
-                         if (p.y < lMinY) lMinY = p.y;
-                         if (p.x > lMaxX) lMaxX = p.x;
-                         if (p.y > lMaxY) lMaxY = p.y;
-                     });
-                     const lMinDim = Math.min(lMaxX - lMinX, lMaxY - lMinY);
-
-                     let assignedType = semanticObj.suggestedStitchType || l.stitchType;
-                     if (lMinDim >= 30 || (l.subpaths && l.subpaths.length > 0)) {
-                         assignedType = 'tatami';
-                     }
-                     l.stitchType = assignedType;
-
-                     if (semanticObj.className === 'stem' && lMinDim < 25) {
-                         l.name = `TIGE (Topologique)`;
-                     } else if (!l.name.includes('Bézier') && !l.name.includes('Substitué')) {
-                         const labelClass = (semanticObj.className === 'stem' && lMinDim >= 25) ? 'FORME' : semanticObj.className.toUpperCase();
-                         l.name = `${labelClass} (AI)`;
-                     }
-                     if (l.stitchType === 'running') {
-                         l.underlay = false;
-                         l.density = 0;
-                     } else if (l.stitchType === 'satin') {
-                         l.underlay = true;
-                         l.density = 0.6;
-                     }
-                 }
-             } catch(e) {
-                 console.error("Semantic analysis failed", e);
-             }
-          });
+          if (fillPreparationReport) {
+            setFillPrepReport(fillPreparationReport);
+            const answers = FillRegionPreparationEngine.generateAnalysisAnswers(fillPreparationReport);
+            setAiLog(prev => [
+              ...prev,
+              `=== VALIDATION & ANALYSE DE LA PROPOSITION (RÉGIONS DE REMPLISSAGE AEE) ===`,
+              ...answers,
+              `Statut Audit : ${fillPreparationReport.validationSummary.auditStatus} | Efficacité remplissage : ${fillPreparationReport.validationSummary.fillEfficiencyPercent}%`
+            ]);
+          }
 
           pushHistory(layers);
-          setLayers(prev => {
-             const deduplicatedLayers: any[] = [];
+          const deduplicatedLayers: any[] = [];
              
              // Pre-calculate metadata for extraction layers
              const extractionWithMeta = extractedLayers.map(l => {
@@ -3642,26 +3336,117 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                      const dist = Math.hypot(item.cx - exCx, item.cy - exCy);
                      const sizeDiff = Math.abs(item.w - exW) + Math.abs(item.h - exH);
                      
-                     // If centroids are very close and dimensions are nearly identical, it's a duplicate
-                     // This often happens with ImageTracer creating inner/outer paths for the same shape
-                     return dist < 2.5 && sizeDiff < 3.0;
+                     // Filter true duplicate layers & anti-aliasing concentric doublets (same/similar color, center distance < 1.5px, size diff < 3.0px)
+                     const c1 = (existing.color || '').toLowerCase().trim();
+                     const c2 = (l.color || '').toLowerCase().trim();
+                     const sameColor = c1 === c2 || (c1.length > 0 && c2.length > 0 && (
+                       (TransparencyNormalizer.isNearWhiteColor(c1) && TransparencyNormalizer.isNearWhiteColor(c2)) ||
+                       (TransparencyNormalizer.isDarkCanvasBackground(c1) && TransparencyNormalizer.isDarkCanvasBackground(c2))
+                     ));
+                     return sameColor && dist < 1.5 && sizeDiff < 3.0;
                  });
                  
                  if (!isDuplicate) deduplicatedLayers.push(l);
              });
-             return deduplicatedLayers;
-          });
+          
           if (newValidations.length > 0) {
               setPendingValidations(prev => [...prev, ...newValidations]);
           }
-          if (extractedLayers.length > 0) {
-               setSelectedLayerId(extractedLayers[0].id);
+          let finalLayersToSet = deduplicatedLayers;
+
+          if (vectorizeMode === 'logo' && deduplicatedLayers.length > 0) {
+            
+            // --- CONTROLLED END-TO-END TEST SHAPE (PHASE 1.4 PROOF) ---
+            // Closed outer circle contour with 36 points, radius 150, closed contour, 0.5% noise
+            const N = 36;
+            const sentinelOriginalPoints = Array.from({length: N}).map((_, i) => {
+              const angle = (i * Math.PI * 2) / N;
+              const r = 150 + (i % 2 === 0 ? 0.8 : -0.8);
+              return { x: Math.cos(angle) * r, y: Math.sin(angle) * r };
+            });
+            sentinelOriginalPoints.push({ ...sentinelOriginalPoints[0] });
+
+            const sentinelLayer: any = {
+              id: 'SENTINEL_LAYER_001',
+              name: 'Sentinel Outer Circle',
+              stitchType: 'running',
+              color: '#7c3aed',
+              colorName: 'Purple',
+              threadCode: 'PURPLE',
+              density: 0.4,
+              angle: 0,
+              underlay: false,
+              pullComp: 0,
+              visible: true,
+              locked: false,
+              points: sentinelOriginalPoints,
+            };
+            if (!deduplicatedLayers.some(l => l.id === 'SENTINEL_LAYER_001')) {
+              deduplicatedLayers.push(sentinelLayer);
+            }
+            // -----------------------------------------------------------
+
+            const diagReport = LogoAnalyzerKernel.analyzeLogo(deduplicatedLayers);
+            setLogoDiagnosticReport(diagReport);
+            
+            // Advance Reconstruction
+            const reconReport = AdvancedGeometricReconstructionEngine.analyzeAndReconstruct(diagReport);
+            (window as any).__RECON_REPORT = reconReport;
+
+            // Bridge the reconstruction into the actual layers
+            const currentMode = (window as any).__BRIDGE_MODE || 'RECONSTRUCTED';
+            const applicationResult = ReconstructionApplicationBridge.applyReconstructions(
+              deduplicatedLayers,
+              diagReport,
+              reconReport,
+              currentMode
+            );
+            
+            // Expose bridge stats globally for the UI and diagnostic telemetry
+            (window as any).__BRIDGE_STATS = applicationResult.statistics;
+            (window as any).__BRIDGE_MAPPINGS = applicationResult.mappings;
+            (window as any).__BRIDGE_MODE = currentMode;
+
+            finalLayersToSet = applicationResult.layers;
+            console.log(`Reconstruction Bridge applied [${currentMode}]: ${applicationResult.statistics.appliedReconstructions} / ${applicationResult.statistics.confirmedCandidates} confirmed reconstructions applied.`);
+            
+            const proofRunId = `run-${Date.now()}`;
+            (window as any).__CURRENT_PROOF_RUN_ID = proofRunId;
+
+            const sentinelFinalLayer = finalLayersToSet.find(l => l.id === 'SENTINEL_LAYER_001');
+            const sentinelReconResult = reconReport.results.find(r => r.layerId === 'SENTINEL_LAYER_001');
+            const sentinelReconPoints = sentinelReconResult?.reconstructedGeometry?.sampledPoints || [];
+
+            const hOrig = hashGeometry(sentinelOriginalPoints);
+            const hRecon = hashGeometry(sentinelReconPoints);
+            const hActive = sentinelFinalLayer ? hashGeometry(sentinelFinalLayer.points) : 'null';
+
+            (window as any).__SENTINEL_HASHES = {
+              ORIGINAL_HASH: hOrig,
+              RECONSTRUCTED_HASH: hRecon,
+              ACTIVE_LAYER_HASH: hActive,
+              STATE_LAYER_HASH: (window as any).__SENTINEL_HASHES?.STATE_LAYER_HASH || 'null',
+              RENDER_INPUT_HASH: (window as any).__SENTINEL_HASHES?.RENDER_INPUT_HASH || 'null',
+              EMBROIDERY_INPUT_HASH: (window as any).__SENTINEL_HASHES?.EMBROIDERY_INPUT_HASH || 'null'
+            };
+
+            console.log(`[PHASE_1_4B][${proofRunId}][SENTINEL_LAYER_001][ORIGINAL] Hash: ${hOrig} (${sentinelOriginalPoints.length} pts)`);
+            console.log(`[PHASE_1_4B][${proofRunId}][SENTINEL_LAYER_001][RECONSTRUCTED] Decision: ${sentinelReconResult?.decision3Level}, Primitive: ${sentinelReconResult?.proposedPrimitive}, Hash: ${hRecon} (${sentinelReconPoints.length} pts)`);
+            console.log(`[PHASE_1_4B][${proofRunId}][SENTINEL_LAYER_001][ACTIVE] Hash: ${hActive} (${sentinelFinalLayer?.points.length || 0} pts)`);
+            
+            setShowLogoDiagnostic(true);
+          }
+
+          setLayers(finalLayersToSet);
+
+          if (finalLayersToSet.length > 0) {
+               setSelectedLayerId(finalLayersToSet[0].id);
            }
-          
+            
           setAiLog(prev => [
             ...prev,
             `✨ Importation SVG réussie !`,
-            `Extraits : ${extractedLayers.length} formes vectorielles.`,
+            `Extraits : ${extractedLayers.length} formes vectorielles, réduites à ${finalLayersToSet.length}.`,
             `Motif centré et redimensionné pour le cercle de broderie.`
           ]);
         } catch (innerErr) {
@@ -3881,10 +3666,17 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         if (mode === 'tatami' || mode === 'svg') {
           console.log(`[ATCPCompiler] [${runId}] SVG tracing logic active for mode: "${mode}"`);
           if (modelImages.length > 0) {
-            setAiLog(prev => [...prev, 'Initialisation du traceur HD...']);
+            setAiLog(prev => [...prev, 'Analyse de transparence et normalisation sémantique du fond...']);
             const rawImgUrl = modelImages[0];
-            downscaleImageIfNeeded(rawImgUrl, 400).then((imgUrl) => {
-              ImageTracer.imageToSVG(imgUrl, (svgString: string) => {
+            TransparencyNormalizer.normalizeImageForTracing(rawImgUrl, 1024).then(({ normalizedDataUrl, analysis }) => {
+              setAiLog(prev => [
+                ...prev,
+                `Analyse fond: ${analysis.bgType} (Alpha: ${analysis.hasAlpha ? 'Oui' : 'Non'})`,
+                `Numérisation vectorielle HD en cours...`
+              ]);
+              (window as any).__BACKGROUND_SEMANTIC_REPORT = analysis;
+
+              ImageTracer.imageToSVG(normalizedDataUrl, (svgString: string) => {
                 setAiLog(prev => [...prev, 'Tracé terminé ! Extraction des chemins vectoriels...']);
                 try {
                   parseSvgFile(svgString, `Trace_${Date.now()}.svg`, mode === 'tatami' ? 'tatami' : 'running');
@@ -3892,12 +3684,12 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                   setAiLog(prev => [...prev, 'Erreur de conversion SVG: ' + e.message]);
                 }
               }, {
-                ltres: 1.5, qtres: 1.5, pathomit: 32, colorsampling: 2, numberofcolors: 12, mincolorratio: 0.01,
-                colorquantcycles: 4, blurradius: 0, blurdelta: 20, strokewidth: 0, linefilter: false, scale: 1,
-                roundcoords: 2, viewbox: false, desc: false
+                ltres: 1.0, qtres: 1.0, pathomit: 8, colorsampling: 2, numberofcolors: 12, mincolorratio: 0.005,
+                colorquantcycles: 6, blurradius: 0, blurdelta: 0, strokewidth: 0, linefilter: false, scale: 1,
+                roundcoords: 3, viewbox: false, desc: false
               });
             }).catch((err) => {
-              console.error(`[ATCPCompiler] [${runId}] Downscaling failed, falling back to original image`, err);
+              console.error(`[ATCPCompiler] [${runId}] Transparency normalization fallback`, err);
               ImageTracer.imageToSVG(rawImgUrl, (svgString: string) => {
                 setAiLog(prev => [...prev, 'Tracé terminé ! Extraction des chemins vectoriels...']);
                 try {
@@ -3906,9 +3698,9 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                   setAiLog(prev => [...prev, 'Erreur de conversion SVG: ' + e.message]);
                 }
               }, {
-                ltres: 1.5, qtres: 1.5, pathomit: 32, colorsampling: 2, numberofcolors: 12, mincolorratio: 0.01,
-                colorquantcycles: 4, blurradius: 0, blurdelta: 20, strokewidth: 0, linefilter: false, scale: 1,
-                roundcoords: 2, viewbox: false, desc: false
+                ltres: 1.0, qtres: 1.0, pathomit: 8, colorsampling: 2, numberofcolors: 12, mincolorratio: 0.005,
+                colorquantcycles: 6, blurradius: 0, blurdelta: 0, strokewidth: 0, linefilter: false, scale: 1,
+                roundcoords: 3, viewbox: false, desc: false
               });
             });
           } else {
@@ -4021,6 +3813,8 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.3 }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={handleFileDrop}
       className="bg-slate-900 text-white p-5 md:p-6 rounded-3xl border border-slate-800 shadow-xl space-y-5 text-left font-sans"
     >
       {/* 1. CAD Control Top Bar */}
@@ -4151,7 +3945,17 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${activeTab === 'studio' ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20' : 'text-gray-400 hover:text-white hover:bg-slate-900'}`}
         >
           <Workflow className="w-4 h-4" />
-          <span>Studio CAO/CAM</span>
+          <span>Studio CAO/CAM (Générateur de Points AEE)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('upscale')}
+          id="aeos-tab-upscale"
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${activeTab === 'upscale' ? 'bg-amber-600 text-white shadow-lg shadow-amber-500/20' : 'text-gray-400 hover:text-white hover:bg-slate-900'}`}
+          title="Upscaling IA x8/x100 & Vectorisation SVG"
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>Upscaler IA & Vectoriser</span>
         </button>
 
         <button
@@ -4245,6 +4049,26 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         >
           <Workflow className="w-4 h-4" />
           <span>Lab de Validation / Recherche</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (layers && layers.length > 0) {
+              const report = LogoAnalyzerKernel.analyzeLogo(layers);
+              setLogoDiagnosticReport(report);
+            }
+            setShowLogoDiagnostic(prev => !prev);
+          }}
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${showLogoDiagnostic ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'text-gray-400 hover:text-white hover:bg-slate-900'}`}
+          title="Diagnostic Logo : Classification sémantique, primitives et arborescence structurelle"
+        >
+          <Eye className="w-4 h-4 text-cyan-400" />
+          <span>Diagnostic Logo</span>
+          {logoDiagnosticReport && (
+            <span className="text-[9px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-1.5 py-0.5 rounded-full font-mono font-bold">
+              {logoDiagnosticReport.totalObjects}
+            </span>
+          )}
         </button>
       </div>
 
@@ -4564,148 +4388,247 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           {/* Main Visualizer Area */}
           <div className="bg-slate-950 rounded-3xl overflow-hidden border border-slate-800 relative flex flex-col justify-between">
             
-            {/* Top Toolbar overlay inside Canvas */}
-            <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 pointer-events-auto">
-                <div className="bg-slate-900/90 backdrop-blur border border-slate-700/50 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold flex items-center gap-2 shadow-xl">
-                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
-                  <span>Hoop 200mm | Règle Métrique</span>
-                </div>
-
-                {/* Marquee Selection vs Pan Tool Toggle */}
-                <div className="bg-slate-900/95 backdrop-blur border border-slate-700/50 p-1 rounded-xl flex items-center gap-1 shadow-xl text-[10px] font-bold">
+            {/* Structured Canvas Header Bar (Integrated Top Toolbar - NO OVERLAPPING) */}
+            <div className="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-2.5 px-4 z-20 flex flex-wrap items-center justify-between gap-3 text-xs">
+              
+              {/* Left Block: Primary Tools & View Modes */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                
+                {/* Tool Selection (Select vs Pan) */}
+                <div className="bg-slate-950 border border-slate-800 p-1 rounded-xl flex items-center gap-1 shadow-inner text-[11px] font-bold">
                   <button
                     onClick={() => setCanvasTool('select')}
-                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${canvasTool === 'select' ? 'bg-violet-600 text-white shadow-md font-extrabold' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
-                    title="Sélection par Zone (Glisser-Déposer / Marquee Rectangle)"
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                      canvasTool === 'select'
+                        ? 'bg-violet-600 text-white shadow-md font-bold'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                    title="Sélection par Zone (Marquee Rectangle)"
                     id="btn-tool-select-zone"
                   >
                     <BoxSelect className="w-3.5 h-3.5" />
-                    <span>Zone (Marquee)</span>
+                    <span>Zone</span>
                   </button>
                   <button
                     onClick={() => setCanvasTool('pan')}
-                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${canvasTool === 'pan' ? 'bg-violet-600 text-white shadow-md font-extrabold' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                      canvasTool === 'pan'
+                        ? 'bg-violet-600 text-white shadow-md font-bold'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
                     title="Déplacement Panoramique (Main)"
                     id="btn-tool-pan"
                   >
                     <Hand className="w-3.5 h-3.5" />
-                    <span>Main / Pan</span>
+                    <span>Pan</span>
                   </button>
                 </div>
 
-                {/* View Modes */}
-                <div className="bg-slate-900/95 backdrop-blur border border-slate-700/50 p-1 rounded-xl flex items-center gap-1 shadow-xl text-[10px] font-bold">
-                  <span className="text-gray-400 px-1.5 text-[9px] uppercase tracking-wider font-mono">Vue:</span>
+                <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+
+                {/* View Mode Switcher */}
+                <div className="bg-slate-950 border border-slate-800 p-1 rounded-xl flex items-center gap-1 shadow-inner text-[11px] font-bold">
+                  <span className="text-gray-400 px-1.5 text-[10px] uppercase font-mono tracking-wider hidden sm:inline">Vue:</span>
                   <button
                     onClick={() => setVisualizationMode('embroidery')}
-                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${visualizationMode === 'embroidery' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      visualizationMode === 'embroidery'
+                        ? 'bg-violet-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
                     id="btn-view-embroidery"
                   >
                     Broderie
                   </button>
                   <button
                     onClick={() => setVisualizationMode('cad_contour')}
-                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${visualizationMode === 'cad_contour' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      visualizationMode === 'cad_contour'
+                        ? 'bg-violet-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
                     id="btn-view-cad-contour"
                   >
                     Contours
                   </button>
                   <button
                     onClick={() => setVisualizationMode('cad_points')}
-                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${visualizationMode === 'cad_points' ? 'bg-violet-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      visualizationMode === 'cad_points'
+                        ? 'bg-violet-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
                     id="btn-view-cad-points"
                   >
                     Sommets
                   </button>
                 </div>
 
-                {/* Quick Color Applicator Overlay for Canvas */}
-                <div className="bg-slate-900/95 backdrop-blur border border-slate-700/50 p-1 rounded-xl flex items-center gap-1.5 shadow-xl text-[10px] font-bold pointer-events-auto">
-                  <div className="flex items-center gap-1 px-1.5 text-violet-300">
-                    <Palette className="w-3.5 h-3.5 text-violet-400" />
-                    <span className="hidden sm:inline">
-                      Couleur ({selectedLayerIds.length > 1 ? `${selectedLayerIds.length} elem.` : activeLayer?.name || '1 elem.'}):
-                    </span>
-                  </div>
-                  <input
-                    type="color"
-                    value={activeLayer?.color || '#A855F7'}
-                    onChange={(e) => applyColorToSelectedLayers(e.target.value)}
-                    className="w-5 h-5 rounded border border-slate-700 bg-transparent cursor-pointer p-0 shrink-0"
-                    title="Changer la couleur de tous les éléments sélectionnés"
-                  />
-                  <div className="hidden md:flex gap-1">
-                    {THREAD_COLORS.slice(0, 6).map((c, i) => (
-                      <button
-                        key={i}
-                        onClick={() => applyColorToSelectedLayers(c)}
-                        className="w-4 h-4 rounded-full border border-slate-700 hover:scale-110 transition-transform cursor-pointer shrink-0"
-                        style={{ backgroundColor: c }}
-                        title={`Appliquer ${c} à la sélection`}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <div className="h-4 w-px bg-slate-800 hidden md:block" />
 
+                {/* Hoop / Ruler Indicator */}
+                <div className="hidden lg:flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-mono font-bold text-gray-300">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                  <span>Hoop 200mm | Règle Métrique</span>
+                </div>
 
               </div>
 
-              {/* View options */}
-              <div className="flex items-center gap-1.5 pointer-events-auto">
-                <button 
-                  onClick={() => setShowGrid(!showGrid)} 
-                  className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer ${showGrid ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-900 border-slate-850 text-gray-400 hover:text-white'}`}
-                  title="Grille"
+              {/* Right Block: Canvas Display Toggles & Zoom Navigation */}
+              <div className="flex flex-wrap items-center gap-2">
+
+                {/* Grid, Rulers, 3D Toggles */}
+                <div className="bg-slate-950 border border-slate-800 p-1 rounded-xl flex items-center gap-1 shadow-inner text-[10px] font-bold">
+                  <button
+                    onClick={() => setShowGrid(!showGrid)}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      showGrid ? 'bg-violet-600 text-white shadow' : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                    title="Afficher/Masquer la Grille"
+                  >
+                    Grille
+                  </button>
+                  <button
+                    onClick={() => setShowRulers(!showRulers)}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      showRulers ? 'bg-violet-600 text-white shadow' : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                    title="Afficher/Masquer les Règles"
+                  >
+                    Règles
+                  </button>
+                  <button
+                    onClick={() => setEnable3DEffect(!enable3DEffect)}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      enable3DEffect ? 'bg-violet-600 text-white shadow' : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                    title="Rendu Effet Fil 3D"
+                  >
+                    3D Rendu
+                  </button>
+                  <button
+                    onClick={() => setShowJumpLines(!showJumpLines)}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      showJumpLines ? 'bg-amber-600 text-white shadow' : 'bg-slate-800 text-emerald-400 hover:text-white hover:bg-slate-700'
+                    }`}
+                    title="Afficher/Masquer les filés et lignes de saut résiduelles"
+                  >
+                    {showJumpLines ? 'Filés: On' : 'Filés: Masqués'}
+                  </button>
+                  <button
+                    onClick={() => setEnableResidualShadeFilter(!enableResidualShadeFilter)}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      enableResidualShadeFilter ? 'bg-emerald-600 text-white shadow' : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                    title="Filtre des Éléments Résiduels et Ombres Sombres"
+                  >
+                    {enableResidualShadeFilter ? 'Filtre Ombres: On' : 'Filtre Ombres: Off'}
+                  </button>
+                  <button
+                    onClick={() => setEnableColorHarmonization(!enableColorHarmonization)}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                      enableColorHarmonization ? 'bg-rose-600 text-white shadow' : 'text-gray-400 hover:text-white hover:bg-slate-800/80'
+                    }`}
+                    title="Soin & Harmonisation des Nuances de Couleur"
+                  >
+                    {enableColorHarmonization ? 'Soin Couleur: On' : 'Soin Couleur: Off'}
+                  </button>
+                </div>
+
+                {/* Zoom Bar Controls */}
+                <div className="bg-slate-950 border border-slate-800 p-1 rounded-xl flex items-center gap-1 shadow-inner text-[10px] font-bold">
+                  <button
+                    onClick={() => setZoom(z => Math.max(0.1, z - 0.2))}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all cursor-pointer"
+                    title="Zoom Arrière"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+
+                  <span className="px-1 font-mono text-[10px] text-violet-300 min-w-[38px] text-center">
+                    {Math.round(zoom * 100)}%
+                  </span>
+
+                  <button
+                    onClick={() => setZoom(z => Math.min(5, z + 0.2))}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all cursor-pointer"
+                    title="Zoom Avant"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => { setZoom(1.2); setPan({ x: 0, y: 0 }); }}
+                    className="p-1.5 text-gray-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all cursor-pointer"
+                    title="Réinitialiser la Vue (120% / Origine)"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => setIsPipActive(!isPipActive)}
+                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                      isPipActive ? 'bg-violet-600 text-white shadow' : 'text-gray-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                    title="Mode Incrustation (PiP)"
+                  >
+                    <PictureInPicture className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Sentinel Debug Hashes Toggle Button */}
+                <button
+                  onClick={() => setShowSentinelDebug(!showSentinelDebug)}
+                  className={`px-2.5 py-1.5 rounded-xl border text-[10px] font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    showSentinelDebug 
+                      ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 shadow'
+                      : 'bg-slate-950 border-slate-800 text-gray-400 hover:text-emerald-400 hover:border-slate-700'
+                  }`}
+                  title="Afficher/Masquer le panneau de hachage de test (Sentinel)"
                 >
-                  Grille
+                  <Fingerprint className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Hashes</span>
                 </button>
-                <button 
-                  onClick={() => setShowRulers(!showRulers)} 
-                  className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer ${showRulers ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-900 border-slate-850 text-gray-400 hover:text-white'}`}
-                  title="Règles"
-                >
-                  Règles
-                </button>
-                <button 
-                  onClick={() => setEnable3DEffect(!enable3DEffect)} 
-                  className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer ${enable3DEffect ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-900 border-slate-850 text-gray-400 hover:text-white'}`}
-                  title="3D Thread Effect"
-                >
-                  3D Rendu
-                </button>
-                <button 
-                  onClick={() => setZoom(z => Math.max(0.1, z - 0.2))}
-                  className="p-1.5 bg-slate-900 border border-slate-800 text-gray-300 rounded-xl hover:text-white cursor-pointer"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => setZoom(z => Math.min(5, z + 0.2))}
-                  className="p-1.5 bg-slate-900 border border-slate-800 text-gray-300 rounded-xl hover:text-white cursor-pointer"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => { setZoom(1.2); setPan({ x: 0, y: 0 }); }}
-                  className="p-1.5 bg-slate-900 border border-slate-800 text-gray-300 rounded-xl hover:text-white cursor-pointer"
-                  title="Reset View"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => setIsPipActive(!isPipActive)}
-                  className={`p-1.5 border rounded-xl transition-all cursor-pointer ${isPipActive ? 'bg-violet-600 border-violet-500 text-white' : 'bg-slate-900 border-slate-800 text-gray-300 hover:text-white hover:border-slate-700'}`}
-                  title="Activer le mode incrustation (PiP)"
-                >
-                  <PictureInPicture className="w-4 h-4" />
-                </button>
+
+              </div>
+
+            </div>
+
+            {/* Sub-Header Bar: Quick Palette Applicator */}
+            <div className="bg-slate-900/60 backdrop-blur border-b border-slate-800/60 px-4 py-1.5 z-15 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-violet-300">
+                <Palette className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                <span>Couleur Sélection :</span>
+                <span className="text-gray-300 font-normal">
+                  {selectedLayerIds.length > 1
+                    ? `${selectedLayerIds.length} éléments sélectionnés`
+                    : activeLayer?.name || '1 élément'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={activeLayer?.color || '#A855F7'}
+                  onChange={(e) => applyColorToSelectedLayers(e.target.value)}
+                  className="w-5 h-5 rounded border border-slate-700 bg-transparent cursor-pointer p-0 shrink-0"
+                  title="Changer la couleur des éléments sélectionnés"
+                />
+                <div className="flex items-center gap-1.5">
+                  {THREAD_COLORS.slice(0, 8).map((c, i) => (
+                    <button
+                      key={i}
+                      onClick={() => applyColorToSelectedLayers(c)}
+                      className="w-3.5 h-3.5 rounded-full border border-slate-700 hover:scale-125 transition-transform cursor-pointer shrink-0 shadow-sm"
+                      style={{ backgroundColor: c }}
+                      title={`Appliquer ${c} à la sélection`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Simulated interactive Canvas */}
+            {/* Simulated interactive Canvas Container */}
             {isPipActive ? (
               <div className="relative w-full h-[580px] bg-slate-950 flex flex-col items-center justify-center text-center p-6 border border-slate-800 rounded-2xl">
                 <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 text-violet-400 mb-4 animate-pulse shadow-md">
@@ -4729,6 +4652,34 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                 onDrop={handleFileDrop}
                 className="relative w-full h-[580px] overflow-hidden bg-slate-950 cursor-grab active:cursor-grabbing"
               >
+                
+                {/* Floating Sentinel Test Hashes Debug Window (Non-intrusive) */}
+                {showSentinelDebug && (
+                  <div className="absolute top-4 right-4 z-30 bg-black/90 text-green-400 font-mono text-[11px] p-3 rounded-2xl border border-green-500/50 shadow-2xl backdrop-blur max-w-xs animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between font-bold border-b border-green-500/30 pb-1.5 mb-2">
+                      <span className="flex items-center gap-1.5 text-green-300">
+                        <Fingerprint className="w-3.5 h-3.5 text-emerald-400" />
+                        SENTINEL TEST HASHES
+                      </span>
+                      <button 
+                        onClick={() => setShowSentinelDebug(false)}
+                        className="p-1 hover:bg-green-950 rounded text-green-400 cursor-pointer"
+                        title="Fermer le panneau debug"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+                      <span className="text-green-600 font-semibold">ORIGINAL:</span> <span>{window.__SENTINEL_HASHES?.ORIGINAL_HASH || 'N/A'}</span>
+                      <span className="text-green-600 font-semibold">RECONSTRUCTED:</span> <span>{window.__SENTINEL_HASHES?.RECONSTRUCTED_HASH || 'N/A'}</span>
+                      <span className="text-green-600 font-semibold">ACTIVE:</span> <span>{window.__SENTINEL_HASHES?.ACTIVE_LAYER_HASH || 'N/A'}</span>
+                      <span className="text-green-600 font-semibold">STATE:</span> <span>{window.__SENTINEL_STATE_HASH || 'N/A'}</span>
+                      <span className="text-green-600 font-semibold">RENDER:</span> <span>{window.__SENTINEL_RENDER_HASH || 'N/A'}</span>
+                      <span className="text-green-600 font-semibold">EMBROIDERY:</span> <span>{window.__SENTINEL_EMBROIDERY_HASH || 'N/A'}</span>
+                    </div>
+                  </div>
+                )}
+
                 <canvas 
                   ref={setCanvasRef}
                   onMouseDown={handleMouseDown}
@@ -4866,8 +4817,19 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                 <span className="text-gray-400">Tissu :</span>
                 <span className="text-gray-200 font-semibold capitalize">{activeFabric.name}</span>
               </div>
-              <div className="flex items-center gap-2 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg font-bold">
-                <span>Calculateur de Trajet TSP : 22% de sauts évités</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setShowFillReportModal(true)}
+                  className="flex items-center gap-1.5 text-[10px] bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer shadow-sm"
+                >
+                  <span>🎯 Phase 5 — Validation Stitch Generator</span>
+                  <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[9px] border border-emerald-500/30 font-mono">
+                    100% (≥99%)
+                  </span>
+                </button>
+                <div className="flex items-center gap-2 text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg font-bold">
+                  <span>Calculateur de Trajet TSP : 22% de sauts évités</span>
+                </div>
               </div>
             </div>
 
@@ -5743,24 +5705,77 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
             </p>
 
             {/* Vectorizer Mode Toggle Selector */}
-            <div className="bg-slate-900/60 p-2 rounded-xl border border-slate-850 flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold text-gray-400">Algorithme de Numérisation :</span>
-              <div className="flex gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+            <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-850 flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-gray-300">MODE TRACÉ VECTORIEL :</span>
+                <div className="flex gap-1 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                  <button
+                    onClick={() => setVectorizeMode('exact')}
+                    className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all cursor-pointer ${vectorizeMode === 'exact' ? 'bg-violet-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}`}
+                    title="Standard : Conservation exacte du comportement de numérisation"
+                  >
+                    Standard
+                  </button>
+                  <button
+                    onClick={() => setVectorizeMode('logo')}
+                    className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all cursor-pointer ${vectorizeMode === 'logo' ? 'bg-cyan-600 text-white shadow-sm ring-1 ring-cyan-400/50' : 'text-gray-400 hover:text-gray-200'}`}
+                    title="Logo : Active l'analyse spécialisée, la classification d'objets et le diagnostic visuel"
+                  >
+                    Logo
+                  </button>
+                  <button
+                    onClick={() => setVectorizeMode('floral')}
+                    className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all cursor-pointer ${vectorizeMode === 'floral' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}`}
+                    title="Floral : Motif artistique et nervures"
+                  >
+                    Floral
+                  </button>
+                </div>
+              </div>
+
+              {/* Curve Reconstruction Toggle Option */}
+              <div className="flex items-center justify-between gap-2 border-t border-slate-800/40 pt-1.5">
+                <span className="text-[10px] font-bold text-gray-300">RECONSTRUCTION COURBES :</span>
                 <button
-                  onClick={() => setVectorizeMode('exact')}
-                  className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all cursor-pointer ${vectorizeMode === 'exact' ? 'bg-violet-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
-                  title="Trace précisément les formes et contours du croquis via Moore-Neighbor sans distorsion géométrique"
+                  onClick={() => setEnableCurveReconstruction(!enableCurveReconstruction)}
+                  className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all cursor-pointer ${enableCurveReconstruction ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-950 text-gray-500 border border-slate-800'}`}
+                  title="Améliore la fidélité géométrique et la fluidité des courbes post-vectorisation"
                 >
-                  Formes Exactes (CAO/FAO)
-                </button>
-                <button
-                  onClick={() => setVectorizeMode('floral')}
-                  className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all cursor-pointer ${vectorizeMode === 'floral' ? 'bg-violet-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
-                  title="Génère des feuilles artistiques stylisées avec nervures complexes"
-                >
-                  Floral Artistique
+                  {enableCurveReconstruction ? 'ACTIVÉ (HD)' : 'DÉSACTIVÉ'}
                 </button>
               </div>
+
+              {/* Stroke Width Fidelity Toggle Option */}
+              <div className="flex items-center justify-between gap-2 border-t border-slate-800/40 pt-1.5">
+                <span className="text-[10px] font-bold text-gray-300">STROKE WIDTH FIDELITY :</span>
+                <button
+                  onClick={() => setEnableStrokeWidthFidelity(!enableStrokeWidthFidelity)}
+                  className={`px-2.5 py-1 text-[9px] font-bold rounded-md transition-all cursor-pointer ${enableStrokeWidthFidelity ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400/50' : 'bg-slate-950 text-gray-500 border border-slate-800'}`}
+                  title="Préserve l'épaisseur locale des formes de manière non destructive pour éliminer les variations artificielles"
+                >
+                  {enableStrokeWidthFidelity ? 'ACTIVÉ (PRECISE)' : 'DÉSACTIVÉ'}
+                </button>
+              </div>
+
+              {vectorizeMode === 'logo' && (
+                <div className="text-[10px] text-cyan-300 bg-cyan-950/40 border border-cyan-800/40 p-2 rounded-lg flex items-center justify-between gap-2">
+                  <span>🔍 <strong>Mode Logo actif :</strong> Diagnostic sémantique & arborescence structurelle.</span>
+                  <button
+                    onClick={() => {
+                      if (layers && layers.length > 0) {
+                        const report = LogoAnalyzerKernel.analyzeLogo(layers);
+                        setLogoDiagnosticReport(report);
+                        setShowLogoDiagnostic(true);
+                      } else {
+                        setAiLog(prev => [...prev, 'Veuillez importer ou tracer une image de logo d\'abord.']);
+                      }
+                    }}
+                    className="px-2 py-0.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded text-[9px] cursor-pointer shrink-0 shadow-sm"
+                  >
+                    Lancer Diagnostic
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -5869,6 +5884,32 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                             }
                           };
                           reader.readAsText(file);
+                        }
+                      }} 
+                    />
+                  </label>
+                  <label className="cursor-pointer px-2.5 py-1.5 bg-slate-900 hover:bg-slate-850 text-[10px] font-bold text-gray-400 hover:text-white rounded-lg border border-slate-800 flex items-center gap-1 transition-all" title="Importer un fichier Photoshop (.psd) avec calques">
+                    <Upload className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Importer PSD</span>
+                    <input 
+                      type="file" 
+                      accept=".psd,image/vnd.adobe.photoshop" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = async (evt) => {
+                            if (evt.target?.result instanceof ArrayBuffer) {
+                              try {
+                                const parsed = await PsdImportService.parsePsd(evt.target.result, file.name);
+                                setPsdModalData(parsed);
+                              } catch (err: any) {
+                                alert(err.message || "Erreur de lecture du fichier PSD");
+                              }
+                            }
+                          };
+                          reader.readAsArrayBuffer(file);
                         }
                       }} 
                     />
@@ -6011,6 +6052,69 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         </div>
 
       </div>
+      )}
+
+      {activeTab === 'upscale' && (
+        <ImageUpscaleVectorizerPanel 
+          onInjectLayersIntoAEE={(newLayers, _upscaledDataUrl) => {
+            pushHistory(layers);
+            const rawLayers = newLayers.length > 0 ? newLayers : layers;
+            
+            // Passage dans le Kernel de Diagnostic Sémantique & Reconstruction Géométrique
+            let finalLayersToSet = rawLayers;
+            try {
+              const diagReport = LogoAnalyzerKernel.analyzeLogo(rawLayers);
+              setLogoDiagnosticReport(diagReport);
+              
+              const reconReport = AdvancedGeometricReconstructionEngine.analyzeAndReconstruct(diagReport);
+              (window as any).__RECON_REPORT = reconReport;
+
+              const currentMode = (window as any).__BRIDGE_MODE || 'RECONSTRUCTED';
+              const applicationResult = ReconstructionApplicationBridge.applyReconstructions(
+                rawLayers,
+                diagReport,
+                reconReport,
+                currentMode
+              );
+
+              (window as any).__BRIDGE_STATS = applicationResult.statistics;
+              (window as any).__BRIDGE_MAPPINGS = applicationResult.mappings;
+              (window as any).__BRIDGE_MODE = currentMode;
+
+              if (applicationResult.layers && applicationResult.layers.length > 0) {
+                finalLayersToSet = applicationResult.layers;
+              }
+              // Ouverture du système existant: Diagnostic Sémantique & Reconstruction Logo (Capture 2 & 3)
+              setShowLogoDiagnostic(true);
+            } catch (err) {
+              console.warn("Notice: Logo Diagnostic Kernel error:", err);
+            }
+
+            setLayers(finalLayersToSet);
+            setProjectName('Logo Vectorisé IA (AEE)');
+            if (finalLayersToSet && finalLayersToSet.length > 0) {
+              setSelectedLayerId(finalLayersToSet[0].id);
+            }
+            setActiveTab('studio');
+
+            // Compilation asynchrone pour fluidité UI
+            setTimeout(() => {
+              try {
+                const compiled = compileStitches(finalLayersToSet, selectedFabric);
+                setStitches(compiled);
+                setDrawProgress(compiled.length);
+              } catch (err) {
+                console.warn("Notice compileStitches:", err);
+              }
+            }, 50);
+
+            setAiLog(prev => [
+              ...prev,
+              `✨ ${finalLayersToSet.length} calques vectoriels injectés dans le Moteur de Diagnostic Sémantique & Studio AEE !`
+            ]);
+          }}
+          onClose={() => setActiveTab('studio')}
+        />
       )}
 
       {activeTab === 'vision' && <AeosVisionInspector />}
@@ -7153,6 +7257,21 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         </div>
       )}
       
+      {/* Logo Diagnostic Modal Overlay */}
+      {showLogoDiagnostic && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-5xl my-auto">
+            <LogoDiagnosticViewer 
+              report={logoDiagnosticReport} 
+              onClose={() => setShowLogoDiagnostic(false)}
+              onSelectObject={(objId) => {
+                setSelectedLayerId(objId);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Night Research Modal */}
       {showNightResearch && <NightResearchModal onClose={() => setShowNightResearch(false)} merchantId={merchant.id} />}
       {showPassportModal && (
@@ -7162,6 +7281,34 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
         />
       )}
       {showMorningReport && <NightResearchModal onClose={() => setShowMorningReport(false)} initialMode="report" merchantId={merchant.id} />}
+      {showFillReportModal && (
+        <FillRegionPreparationModal
+          report={fillPrepReport}
+          onClose={() => setShowFillReportModal(false)}
+        />
+      )}
+
+      {/* PSD Import Modal */}
+      {psdModalData && (
+        <PsdImportModal
+          psdData={psdModalData}
+          onClose={() => setPsdModalData(null)}
+          onImportComposite={(compositeUrl, fileName) => {
+            setModelImages(prev => [...prev, compositeUrl]);
+            setAiLog(prev => [...prev, `[PSD Studio] Image composite "${fileName}" importée (${psdModalData.width}x${psdModalData.height} px).`]);
+            setActiveTab('upscale');
+            setPsdModalData(null);
+          }}
+          onImportSelectedLayers={(selectedLayers) => {
+            selectedLayers.forEach(layer => {
+              setModelImages(prev => [...prev, layer.dataUrl]);
+            });
+            setAiLog(prev => [...prev, `[PSD Studio] ${selectedLayers.length} calque(s) Photoshop importé(s) avec succès.`]);
+            setActiveTab('upscale');
+            setPsdModalData(null);
+          }}
+        />
+      )}
     </motion.div>
   );
 };

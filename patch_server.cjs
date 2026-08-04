@@ -1,0 +1,1 @@
+import fs from "fs"; const code = fs.readFileSync("server.ts", "utf8"); fs.writeFileSync("server.ts", code.replace(/app\.listen\([^)]+\)/g, "app.listen(3000, \"0.0.0.0\", () => console.log(\"Server running\")); //"));

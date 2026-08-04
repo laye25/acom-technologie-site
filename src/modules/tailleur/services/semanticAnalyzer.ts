@@ -1,4 +1,5 @@
-import { EmbroideryPoint } from './embroideryServices';
+import { EmbroideryLayer, EmbroideryPoint } from './embroideryServices';
+import { GeometricSignatureEngine, GeometricSignature } from './GeometricSignatureEngine';
 
 export type SemanticClass = 'circle' | 'letter' | 'stem' | 'leaf' | 'flower_center' | 'unknown';
 
@@ -60,8 +61,15 @@ export class SemanticAnalyzer {
          }
     }
     
+    // Compute oriented bounding box for rotation invariance
+    const obb = this.calculateOrientedBoundingBox(points);
+    const minDim = obb.minDim;
+    const maxDim = obb.maxDim;
+    const aspectRatio = maxDim / Math.max(minDim, 0.1);
+    const thickness = this.estimateThickness(points, maxDim);
+
     // Heuristic 1: Is it a circle?
-    if (this.isCircular(points, bbox)) {
+    if (this.isCircular(points, obb)) {
       return {
         id: `sem_${Date.now()}_${Math.floor(Math.random()*1000)}`,
         className: 'circle',
@@ -70,23 +78,20 @@ export class SemanticAnalyzer {
         rawPoints: points,
         parameters: {
           center: { x: bbox.minX + w/2, y: bbox.minY + h/2 },
-          radius: Math.max(w, h) / 2
+          radius: Math.max(w, h) / 2,
+          thickness
         },
-        suggestedStitchType: Math.min(w, h) > 30 ? 'tatami' : 'satin'
+        suggestedStitchType: minDim > 30 ? 'tatami' : 'satin'
       };
     }
 
     // Physical Embroidery Rules for Satin vs Tatami:
     // Satin is only suitable for narrow columns (width < 3.2mm or 32 units) with high aspect ratio.
     // Wide shapes (min dimension >= 3.2mm) or filled closed regions MUST use Tatami fill to prevent thread loops & fabric puckering.
-    const minDim = Math.min(w, h);
-    const maxDim = Math.max(w, h);
-    const aspectRatio = maxDim / Math.max(minDim, 0.1);
-    const thickness = this.estimateThickness(points, bbox);
 
-    // Heuristic 2: Is it a stem (long, very thin continuous line/ribbon)?
-    // A stem must be very elongated (aspectRatio >= 5.0) and thin (minDim < 25 / thickness < 20).
-    if (aspectRatio >= 5.0 && thickness < 20 && minDim < 25) {
+    // Heuristic 2: Is it a stem (long, thin continuous line/ribbon/branch, can be curved)?
+    // A curved stem has a lower bounding box aspect ratio, so we lower the aspect ratio threshold to 1.8, while keeping thickness < 22 and minDim < 50.
+    if (aspectRatio >= 1.8 && thickness < 22 && minDim < 50) {
        return {
         id: `sem_${Date.now()}_${Math.floor(Math.random()*1000)}`,
         className: 'stem',
@@ -196,9 +201,9 @@ Ne mets absolument AUCUN texte avant ou après le JSON. Renvoie UNIQUEMENT l'obj
     return { minX, minY, maxX, maxY };
   }
 
-  static isCircular(points: EmbroideryPoint[], bbox: {minX: number, minY: number, maxX: number, maxY: number}) {
-    const w = bbox.maxX - bbox.minX;
-    const h = bbox.maxY - bbox.minY;
+  static isCircular(points: EmbroideryPoint[], obb: { minDim: number, maxDim: number }) {
+    const w = obb.maxDim;
+    const h = obb.minDim;
     
     // Circle should have roughly equal width and height
     const ratio = Math.max(w, h) / Math.max(Math.min(w, h), 1);
@@ -209,7 +214,7 @@ Ne mets absolument AUCUN texte avant ou après le JSON. Renvoie UNIQUEMENT l'obj
     return false; // Disabled by default in heuristic prototype, to be replaced by Vision API
   }
 
-  static estimateThickness(points: EmbroideryPoint[], bbox: {minX: number, minY: number, maxX: number, maxY: number}) {
+  static estimateThickness(points: EmbroideryPoint[], maxDim: number) {
     // Rough estimation: Area / Max Length
     // For a real prototype, use the polygon area
     let area = 0;
@@ -219,6 +224,218 @@ Ne mets absolument AUCUN texte avant ou après le JSON. Renvoie UNIQUEMENT l'obj
         area += (p1.x * p2.y - p2.x * p1.y);
     }
     area = Math.abs(area / 2);
-    return area / Math.max(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY, 1);
+    return area / Math.max(maxDim, 1);
+  }
+
+  /**
+   * Computes the Minimal Oriented Bounding Box (OMBB) dimensions for a set of points.
+   * This provides rotation-invariant width, height, minDim, and maxDim.
+   */
+  static calculateOrientedBoundingBox(points: EmbroideryPoint[]): { width: number; height: number; minDim: number; maxDim: number } {
+    if (!points || points.length === 0) {
+      return { width: 0, height: 0, minDim: 0, maxDim: 0 };
+    }
+
+    let minArea = Infinity;
+    let bestW = 0;
+    let bestH = 0;
+
+    // Use 90 orientations from 0 to 180 degrees (in steps of 2 degrees)
+    // This is computationally very light (~sub-millisecond) and extremely accurate for OBB dimensions.
+    const numAngles = 90;
+    const angleStep = Math.PI / numAngles;
+
+    for (let i = 0; i < numAngles; i++) {
+      const theta = i * angleStep;
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+
+      let minXPrime = Infinity;
+      let maxXPrime = -Infinity;
+      let minYPrime = Infinity;
+      let maxYPrime = -Infinity;
+
+      for (let j = 0; j < points.length; j++) {
+        const p = points[j];
+        const xPrime = p.x * cosT + p.y * sinT;
+        const yPrime = -p.x * sinT + p.y * cosT;
+
+        if (xPrime < minXPrime) minXPrime = xPrime;
+        if (xPrime > maxXPrime) maxXPrime = xPrime;
+        if (yPrime < minYPrime) minYPrime = yPrime;
+        if (yPrime > maxYPrime) maxYPrime = yPrime;
+      }
+
+      const w = maxXPrime - minXPrime;
+      const h = maxYPrime - minYPrime;
+      const area = w * h;
+
+      if (area < minArea) {
+        minArea = area;
+        bestW = w;
+        bestH = h;
+      }
+    }
+
+    const minDim = Math.min(bestW, bestH);
+    const maxDim = Math.max(bestW, bestH);
+
+    return { width: bestW, height: bestH, minDim, maxDim };
+  }
+
+  /**
+   * Identifies congruent (identical or highly similar) shapes across layers (using rotation/scale invariant signatures)
+   * and unifies their semantic classification and stitch settings to ensure pristine aesthetic uniformity.
+   */
+  static unifyCongruentLayers(layers: EmbroideryLayer[]): void {
+    if (!layers || layers.length <= 1) return;
+
+    interface LayerWithFeatures {
+      layer: EmbroideryLayer;
+      aspectRatio: number;
+      compactness: number;
+      solidity: number;
+      normalizedThickness: number;
+      minDim: number;
+      maxDim: number;
+    }
+
+    const featureList: LayerWithFeatures[] = [];
+
+    for (const l of layers) {
+      if (!l.points || l.points.length < 3) continue;
+
+      const obb = this.calculateOrientedBoundingBox(l.points);
+      const minDim = obb.minDim;
+      const maxDim = obb.maxDim;
+      const aspectRatio = maxDim / Math.max(minDim, 0.1);
+
+      // Compute polygon area (Shoelace formula)
+      let area = 0;
+      const pts = l.points;
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % pts.length];
+        area += (p1.x * p2.y - p2.x * p1.y);
+      }
+      area = Math.abs(area / 2);
+
+      // Compute perimeter
+      let perimeter = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const p1 = pts[i];
+        const p2 = pts[(i + 1) % pts.length];
+        perimeter += Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      }
+
+      const compactness = (perimeter * perimeter) / Math.max(area, 0.1);
+      const solidity = area / Math.max(maxDim * minDim, 0.1);
+      const thickness = this.estimateThickness(l.points, maxDim);
+      const normalizedThickness = thickness / Math.max(maxDim, 0.1);
+
+      featureList.push({
+        layer: l,
+        aspectRatio,
+        compactness,
+        solidity,
+        normalizedThickness,
+        minDim,
+        maxDim
+      });
+    }
+
+    // Build connected components using threshold similarity
+    const visited = new Set<number>();
+    const clusters: LayerWithFeatures[][] = [];
+
+    for (let i = 0; i < featureList.length; i++) {
+      if (visited.has(i)) continue;
+
+      const cluster: LayerWithFeatures[] = [];
+      const queue: number[] = [i];
+      visited.add(i);
+
+      while (queue.length > 0) {
+        const currIdx = queue.shift()!;
+        const f1 = featureList[currIdx];
+        cluster.push(f1);
+
+        for (let j = 0; j < featureList.length; j++) {
+          if (visited.has(j)) continue;
+
+          const f2 = featureList[j];
+
+          // Rotation & scale invariant difference metric
+          const da = Math.abs(f1.aspectRatio - f2.aspectRatio) / Math.max(f1.aspectRatio, f2.aspectRatio, 1);
+          const ds = Math.abs(f1.solidity - f2.solidity) / Math.max(f1.solidity, f2.solidity, 0.1);
+          const dc = Math.abs(f1.compactness - f2.compactness) / Math.max(f1.compactness, f2.compactness, 1);
+          const dt = Math.abs(f1.normalizedThickness - f2.normalizedThickness) / Math.max(f1.normalizedThickness, f2.normalizedThickness, 0.1);
+
+          const distance = da * 0.35 + ds * 0.35 + dc * 0.20 + dt * 0.10;
+
+          // Highly congruent if distance < 0.15
+          if (distance < 0.15) {
+            visited.add(j);
+            queue.push(j);
+          }
+        }
+      }
+
+      clusters.push(cluster);
+    }
+
+    // Process each congruent cluster to enforce pristine uniformity
+    for (const cluster of clusters) {
+      if (cluster.length <= 1) continue;
+
+      // Unify classifications and stitch types via majority voting / specific selection
+      const stitchCounts: Record<string, number> = {};
+      const nameCounts: Record<string, number> = {};
+      
+      let maxStitchCount = 0;
+      let consensusStitch = '';
+      let maxNameCount = 0;
+      let consensusName = '';
+
+      cluster.forEach(item => {
+        const l = item.layer;
+        
+        // Count stitch type
+        stitchCounts[l.stitchType] = (stitchCounts[l.stitchType] || 0) + 1;
+        if (stitchCounts[l.stitchType] > maxStitchCount) {
+          maxStitchCount = stitchCounts[l.stitchType];
+          consensusStitch = l.stitchType;
+        }
+
+        // Count layer name, giving higher weight to specific names over generic UNKNOWN/FORME
+        const name = l.name || '';
+        const isGeneric = name.toUpperCase().includes('UNKNOWN') || name.toUpperCase().includes('FORME');
+        const weight = isGeneric ? 1 : 12; // strongly bias toward actual recognized shapes like TIGE, LEAF, or primitives
+        nameCounts[name] = (nameCounts[name] || 0) + weight;
+        if (nameCounts[name] > maxNameCount) {
+          maxNameCount = nameCounts[name];
+          consensusName = name;
+        }
+      });
+
+      // Override and apply the consensus layout uniformly to all elements in this cluster
+      cluster.forEach(item => {
+        const l = item.layer;
+        l.stitchType = consensusStitch as any;
+        l.name = consensusName;
+
+        // Synchronize underlay and density parameters to the unified consensus stitch
+        if (l.stitchType === 'running') {
+          l.underlay = false;
+          l.density = 0;
+        } else if (l.stitchType === 'satin') {
+          l.underlay = true;
+          l.density = 0.6;
+        } else if (l.stitchType === 'tatami') {
+          l.underlay = true;
+          l.density = 0.8;
+        }
+      });
+    }
   }
 }

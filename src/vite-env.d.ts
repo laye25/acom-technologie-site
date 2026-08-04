@@ -8,3 +8,12 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+
+interface Window {
+  __BRIDGE_STATS?: any;
+  __SENTINEL_HASHES?: any;
+  __SENTINEL_STATE_HASH?: any;
+  __SENTINEL_RENDER_HASH?: any;
+  __SENTINEL_EMBROIDERY_HASH?: any;
+}

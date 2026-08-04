@@ -804,6 +804,78 @@ FORMAT DE RÉPONSE STRICTEMENT JSON:
     }
   });
 
+  // Gemini AI Vision Super-Resolution & Logo Restoration Endpoint
+  app.post("/api/gemini/upscale-image", async (req, res) => {
+    try {
+      const { imageBase64, scaleFactor = 4, denoiseLevel = 30, sharpness = 75 } = req.body || {};
+
+      if (!imageBase64 || typeof imageBase64 !== "string") {
+        return res.status(400).json({ error: "L'image base64 est requise" });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY2;
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY ou GEMINI_API_KEY2 non configuré sur le serveur" });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+
+      const cleanBase64 = imageBase64.replace(/^data:image\/[a-z0-9-+.]+;base64,/, "");
+      let mimeType = "image/png";
+      const mimeMatch = imageBase64.match(/^data:(image\/[a-z0-9-+.]+);base64,/);
+      if (mimeMatch) {
+        mimeType = mimeMatch[1];
+      }
+
+      const prompt = `Tu es le moteur d'IA Acom Embroidery Engine (AEE) spécialisé dans la super-résolution et la restauration géométrique de logos et motifs textiles très basse résolution.
+Analyse cette image de logo/motif textile (facteur d'agrandissement demandé : x${scaleFactor}).
+Détermine les paramètres d'upscaling optimaux pour éliminer le flou et les bruits sans déformer le texte ou les contours.
+
+Réponds STRICTEMENT sous forme d'objet JSON respectant ce schéma :
+{
+  "suggestedColorsCount": 4,
+  "detectedEdgeComplexity": "Faible" | "Moyenne" | "Élevée",
+  "optimalDenoise": 25,
+  "optimalSharpness": 85,
+  "recommendation": "Description précise des améliorations géométriques et vectorielles recommandées pour la broderie.",
+  "dominantPalette": ["#FFFFFF", "#000000"],
+  "vectorEdgeSnapping": true
+}`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            inlineData: {
+              mimeType,
+              data: cleanBase64
+            }
+          },
+          { text: prompt }
+        ],
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const responseText = response.text || "{}";
+      const analysisData = JSON.parse(responseText);
+
+      return res.json({ success: true, aiVision: analysisData });
+    } catch (err: any) {
+      console.error("[Gemini Upscale AI Error]", err);
+      return res.status(500).json({ error: err.message || "Échec du raffinement AI Vision" });
+    }
+  });
+
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
       const { amount, currency = 'xof', orderId } = req.body;
