@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="400" height="400" style="background: #1e293b;">
+            <!-- Heatmap gradient simulation -->
+            <defs>
+              <radialGradient id="heat" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.8" />
+                <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.5" />
+                <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.1" />
+              </radialGradient>
+            </defs>
+            <path d="M50 100 A50 50 0 1 1 150 100 A50 50 0 1 1 50 100" fill="none" stroke="url(#heat)" stroke-width="8" />
+          </svg>

@@ -1,0 +1,16 @@
+{
+  "id": "Motif K - Center Complex (CENTER_COMPLEX_001)",
+  "responsibleEngine": "Geometry",
+  "overallScore": 12.205311401091963,
+  "metrics": {
+    "Geometry": -487.8453284474708,
+    "Topology": 100,
+    "Ribbon": 93.69908496840273,
+    "Tatami": 98,
+    "Satin": 97.1834232867118,
+    "Travel": 99.4,
+    "Physics": 85
+  },
+  "warnings": [],
+  "executionTimeMs": 162.69359699999995
+}

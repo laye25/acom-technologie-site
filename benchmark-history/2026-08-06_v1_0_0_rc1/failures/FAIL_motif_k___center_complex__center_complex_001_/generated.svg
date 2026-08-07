@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="400" height="400" style="background: #1e293b;">
+            <path d="M52 105 A48 53 0 1 1 145 102 A51 49 0 1 1 52 105" fill="none" stroke="#38bdf8" stroke-width="1.5" />
+            <!-- Simulated stitches -->
+            <path d="M52 105 L60 90 L65 105 L75 85 L80 110 L90 80 L95 115 L105 75 L110 115 L120 80 L125 110 L135 85 L140 105 L145 102" fill="none" stroke="#38bdf8" stroke-width="1" opacity="0.5" />
+          </svg>

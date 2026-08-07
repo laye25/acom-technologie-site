@@ -1,0 +1,18 @@
+{
+  "version": "v1.0.0-rc1",
+  "timestamp": "2026-08-06T23:38:16.914Z",
+  "overallScore": 84.87,
+  "moduleScores": {
+    "geometry": 43.677518740800814,
+    "topology": 100,
+    "ribbon": 97.75579838402186,
+    "tatami": 98,
+    "satin": 99.5202315547199,
+    "travel": 99.39999999999999,
+    "physics": 96.63636363636364,
+    "performance": 44.22882227272728
+  },
+  "passed": 10,
+  "failed": 1,
+  "total": 11
+}

@@ -49,17 +49,24 @@ The central core operates on pure mathematical entities defined in a single, uni
 - `FabricProfile`: Physical properties of the backing/material (stretch, density, thickness, friction).
 - `MachineProfile`: Operational limits of the targeted hardware (max jump length, tension curve, trim command encoding).
 
-### B. Core Engines Responsibility Mapping
+### B. AEE Textile Kernel Engines & Knowledge Layer Mapping
 
-| Engine Name | Role & Scope | Key Mathematical / Algorithmic Focus |
+All vectorization, CAD/CAM, and compilation features are organized into **11 Specialized Engines** supported by a transversal **Knowledge Layer**:
+
+| Engine Name | Single Responsibility | Key Algorithmic / Mathematical Scope |
 | :--- | :--- | :--- |
-| **Geometry Engine** | Raw shape analysis & Bézier curves | Step-adaptive spline sampling, Local normal vectors, Width estimation, Self-intersection detection. |
-| **Pattern Engine** | Pattern Intelligence (Acom PI) | Structural recognition of monograms, arabesques, coptic knots, African Wax motifs, lace patterns. |
-| **Simulation Engine** | Fabric Physics Model (Acom Phys) | Push-pull deformation vectors, micro-tension modeling, fabric shrinkage pre-compensation. |
-| **Embroidery Core Engine** | Stitch Compilation & Toolpathing | Underlay generation (contour/grid), satin-fill column generation, tatami-fill raycasting, thread path sorting (TSP). |
-| **Quality Engine** | CAD Verification & Correction | Counter-form detection, hole repairing, automatic overlap generation, density checks to prevent needle break. |
-| **Export Engine** | Hardware serialization & Profiles | DST 3-byte delta coordinate compression, PES format blocks, JEF headers, Machine profiles. |
-| **Benchmark Engine** | Software quality & efficiency | Geometric fidelity scoring, stitch-count ratio vs Industry leaders (Wilcom, Tajima DG, Pulse). |
+| **1. Raster Analysis Engine** | Image preprocessing & noise reduction | Bilateral filtering, adaptive Gaussian blur, contrast equalization. |
+| **2. Region Segmentation Engine** | Homogeneous color region extraction | CIELAB $\Delta E_{CIE2000}$ distance, Watershed gradient flooding (AEE-002). |
+| **3. Vectorization Engine** | Raster-to-Vector path conversion | Polygon boundary extraction, VTracer path conversion. |
+| **4. Topology Engine** | Topological relations & hierarchy | Hole detection, winding rules, topology consolidation (AEE-001 FROZEN), anti-gap stacking (AEE-003). |
+| **5. Geometry Optimization Engine** | Curve fitting & Bézier smoothing | Splice point detection (AEE-004), 4-point subdivision (AEE-005), adaptive Bézier fitting (AEE-006). |
+| **6. Embroidery Planning Engine** | Color sequencing & thread pathing | Travelling Salesman Problem (TSP) path sorting, trim minimisation. |
+| **7. Stitch Generator Engine** | Needle penetration path calculation | Underlay (grid/contour), Satin column generation, Tatami raycasting. |
+| **8. Physics Engine** | Textile & thread mechanics | Push-pull deformation compensation, thread tension & stretch modeling. |
+| **9. Quality Engine** | CAD verification & needle protection | Density checks, counter-form preservation, needle collision prevention. |
+| **10. Benchmark Engine** | Automated metrology & scoring | CLI execution, Golden Dataset v1.0 validation, GFI / TPI / SEI metrics. |
+| **11. Export Engine** | Hardware serialization | DST 3-byte delta encoding, PES blocks, JEF headers, machine profiles. |
+| **Transversal: Knowledge Layer** | Scientific memory & anti-overfitting | Golden Dataset, ADRs, Benchmark History, Failure History, Innovation Library. |
 
 ---
 

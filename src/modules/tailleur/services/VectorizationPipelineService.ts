@@ -663,6 +663,9 @@ export class VectorizationPipelineService {
       }
     }
 
+    // AEE-001 : Consolidation Topologique des Régions (ASVP-07)
+    extractedLayers = VectorizationPipelineService.consolidateTopologicalRegions(extractedLayers, 12.0);
+
     // ÉTAPE DE PRÉPARATION DES RÉGIONS DE REMPLISSAGE (Validation et Analyse AEE)
     const { preparedLayers, report: fillPreparationReport } = FillRegionPreparationEngine.prepareFillRegions(
       extractedLayers,
@@ -686,6 +689,179 @@ export class VectorizationPipelineService {
       globalBounds: { minX, minY, maxX, maxY, width, height },
       fillPreparationReport
     };
+  }
+
+  /**
+   * AEE-001 : Consolidation Topologique des Régions (Fonction Unique ASVP-07)
+   * Fusionne les micro-fragments adjacents de couleur similaire et résorbe les micro-trous
+   * sans altérer la frontière géométrique globale.
+   */
+  private static consolidateTopologicalRegions(
+    layers: EmbroideryLayer[],
+    minAreaThreshold: number = 12.0
+  ): EmbroideryLayer[] {
+    if (!layers || layers.length <= 1) return layers;
+
+    // Calcul de surface polygonale (Formule du lacet / Shoelace)
+    const computeArea = (pts: { x: number; y: number }[]): number => {
+      if (!pts || pts.length < 3) return 0;
+      let area = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const j = (i + 1) % pts.length;
+        area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+      }
+      return Math.abs(area) / 2.0;
+    };
+
+    // Calcul des bornes englobantes
+    const computeBounds = (pts: { x: number; y: number }[]) => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of pts) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+      return { minX, minY, maxX, maxY, width: Math.max(0, maxX - minX), height: Math.max(0, maxY - minY) };
+    };
+
+    // Conversion hex de couleur et distance RVB
+    const parseColorHex = (hexStr: string): { r: number; g: number; b: number } => {
+      if (!hexStr || hexStr === 'none') return { r: 128, g: 128, b: 128 };
+      let clean = hexStr.replace('#', '');
+      if (clean.length === 3) {
+        clean = clean.split('').map(c => c + c).join('');
+      }
+      const num = parseInt(clean, 16);
+      if (isNaN(num)) return { r: 128, g: 128, b: 128 };
+      return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+    };
+
+    const colorDistance = (c1: string, c2: string): number => {
+      const rgb1 = parseColorHex(c1);
+      const rgb2 = parseColorHex(c2);
+      return Math.hypot(rgb1.r - rgb2.r, rgb1.g - rgb2.g, rgb1.b - rgb2.b);
+    };
+
+    // Détection des éléments typographiques ou graphiques protégés (points sur le 'i', accents...)
+    const isProtectedElement = (layer: EmbroideryLayer, area: number): boolean => {
+      const pts = layer.points;
+      if (!pts || pts.length < 3) return false;
+      const bounds = computeBounds(pts);
+      const minDim = Math.min(bounds.width, bounds.height);
+      const maxDim = Math.max(bounds.width, bounds.height);
+      if (maxDim <= 0) return false;
+
+      const aspectRatio = minDim / maxDim;
+      // Élément ponctuel intègre (ex: point sur le 'i')
+      if (aspectRatio >= 0.65 && area >= 4.0) return true;
+
+      // Filigrane / ligne très fine protégée
+      let perimeter = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const curr = pts[i];
+        const next = pts[(i + 1) % pts.length];
+        perimeter += Math.hypot(next.x - curr.x, next.y - curr.y);
+      }
+      if (area > 0 && (perimeter * perimeter) / area > 30.0) return true;
+
+      return false;
+    };
+
+    // Calcul de longueur de frontière commune estimée entre 2 sous-chemins
+    const computeSharedBoundary = (pts1: { x: number; y: number }[], pts2: { x: number; y: number }[]): number => {
+      if (!pts1 || !pts2 || pts1.length < 2 || pts2.length < 2) return 0;
+      let sharedLength = 0;
+      const thresholdSq = 2.25; // 1.5px tolérance au carré
+
+      for (let i = 0; i < pts1.length; i++) {
+        const p1 = pts1[i];
+        const p1Next = pts1[(i + 1) % pts1.length];
+        const segLen = Math.hypot(p1Next.x - p1.x, p1Next.y - p1.y);
+
+        let minDistSq = Infinity;
+        for (const p2 of pts2) {
+          const distSq = (p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2;
+          if (distSq < minDistSq) minDistSq = distSq;
+        }
+
+        if (minDistSq <= thresholdSq) {
+          sharedLength += segLen;
+        }
+      }
+      return sharedLength;
+    };
+
+    // 1. Classification
+    const microFragments: { layer: EmbroideryLayer; area: number; bounds: ReturnType<typeof computeBounds> }[] = [];
+    const mainLayers: EmbroideryLayer[] = [];
+
+    for (const layer of layers) {
+      const area = computeArea(layer.points);
+      const bounds = computeBounds(layer.points);
+
+      if (area < minAreaThreshold) {
+        if (isProtectedElement(layer, area)) {
+          mainLayers.push(layer);
+        } else {
+          microFragments.push({ layer, area, bounds });
+        }
+      } else {
+        mainLayers.push(layer);
+      }
+    }
+
+    if (microFragments.length === 0) return mainLayers;
+
+    // 2. Fusion spatiale sur la région hôte idéale
+    const retainedLayers: EmbroideryLayer[] = [...mainLayers];
+
+    for (const frag of microFragments) {
+      let bestTarget: EmbroideryLayer | null = null;
+      let maxScore = -1.0;
+
+      for (const target of retainedLayers) {
+        const tBounds = computeBounds(target.points);
+        if (
+          frag.bounds.maxX + 3.0 < tBounds.minX ||
+          frag.bounds.minX - 3.0 > tBounds.maxX ||
+          frag.bounds.maxY + 3.0 < tBounds.minY ||
+          frag.bounds.minY - 3.0 > tBounds.maxY
+        ) {
+          continue;
+        }
+
+        const distCol = colorDistance(frag.layer.color, target.color);
+        if (distCol <= 60.0) {
+          const sharedLen = computeSharedBoundary(frag.layer.points, target.points);
+          if (sharedLen > 0) {
+            const score = sharedLen * Math.exp(-0.02 * distCol);
+            if (score > maxScore) {
+              maxScore = score;
+              bestTarget = target;
+            }
+          }
+        }
+      }
+
+      if (bestTarget) {
+        if (!bestTarget.subpaths || bestTarget.subpaths.length === 0) {
+          bestTarget.subpaths = [bestTarget.points];
+        }
+        if (frag.layer.subpaths && frag.layer.subpaths.length > 0) {
+          bestTarget.subpaths.push(...frag.layer.subpaths);
+        } else {
+          bestTarget.subpaths.push(frag.layer.points);
+        }
+        let mergedFlat: { x: number; y: number }[] = [];
+        bestTarget.subpaths.forEach(sub => { mergedFlat = mergedFlat.concat(sub); });
+        bestTarget.points = mergedFlat;
+      } else if (frag.area >= 6.0) {
+        retainedLayers.push(frag.layer);
+      }
+    }
+
+    return retainedLayers;
   }
 
   private static generateFallbackSvg(w: number, h: number, numColors: number): string {

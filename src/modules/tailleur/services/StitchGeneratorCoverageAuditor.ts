@@ -47,6 +47,30 @@ export interface GoldenTestResult {
   regions: RegionCoverageMetric[];
 }
 
+export interface ScanlineLineDetail {
+  index: number;
+  lengthMm: number;
+  pointCount: number;
+  avgPointDistanceMm: number;
+  threadLengthMm: number;
+  theoreticalCoverageMm2: number;
+}
+
+export interface ScanlineInstrumentationReport {
+  regionId: string;
+  regionName: string;
+  totalScanlines: number;
+  totalPoints: number;
+  totalThreadLengthMm: number;
+  totalThreadLengthMeters: number;
+  threadThicknessMm: number;
+  theoreticalTextileSurfaceMm2: number;
+  rasterMeasuredSurfaceMm2: number;
+  surfaceDiscrepancyPercent: number;
+  isModelConcordant: boolean;
+  scanlineDetails: ScanlineLineDetail[];
+}
+
 export interface PhysicalStitchCoverageAudit {
   regionId: string;
   regionName: string;
@@ -501,5 +525,85 @@ export class StitchGeneratorCoverageAuditor {
     const projX = p1.x + t * (p2.x - p1.x);
     const projY = p1.y + t * (p2.y - p1.y);
     return Math.hypot(p.x - projX, p.y - projY);
+  }
+
+  /**
+   * Instrumente le générateur Tatami ligne par ligne (Scanline-by-Scanline Tracing)
+   * et compare la surface textile théorique calculée par fil avec la carte thermique matricielle.
+   */
+  public static auditScanlineByScanline(
+    regionId: string,
+    regionName: string,
+    polygon: EmbroideryPoint[],
+    pullCompMm: number = 0.20,
+    pxPerMm: number = 3.78,
+    threadThicknessMm: number = 0.40
+  ): ScanlineInstrumentationReport {
+    const segments = getTatamiStitches(polygon, 3.5, 45);
+    const physicalAudit = this.auditStitchLevelRasterCoverage(
+      regionId,
+      regionName,
+      polygon,
+      'tatami',
+      pullCompMm,
+      pxPerMm,
+      threadThicknessMm
+    );
+
+    const scanlineDetails: ScanlineLineDetail[] = [];
+    let totalPoints = 0;
+    let totalThreadLengthMm = 0;
+
+    segments.forEach((seg, idx) => {
+      if (seg.length < 2) return;
+      const pointCount = seg.length;
+      totalPoints += pointCount;
+
+      let lineThreadMm = 0;
+      for (let i = 0; i < seg.length - 1; i++) {
+        const dPx = Math.hypot(seg[i + 1].x - seg[i].x, seg[i + 1].y - seg[i].y);
+        lineThreadMm += dPx / pxPerMm;
+      }
+      totalThreadLengthMm += lineThreadMm;
+
+      const firstPt = seg[0];
+      const lastPt = seg[seg.length - 1];
+      const directLenMm = Math.hypot(lastPt.x - firstPt.x, lastPt.y - firstPt.y) / pxPerMm;
+      const avgPointDistanceMm = pointCount > 1 ? lineThreadMm / (pointCount - 1) : 0;
+      const theoreticalCoverageMm2 = lineThreadMm * threadThicknessMm;
+
+      scanlineDetails.push({
+        index: idx + 1,
+        lengthMm: parseFloat(directLenMm.toFixed(2)),
+        pointCount,
+        avgPointDistanceMm: parseFloat(avgPointDistanceMm.toFixed(2)),
+        threadLengthMm: parseFloat(lineThreadMm.toFixed(2)),
+        theoreticalCoverageMm2: parseFloat(theoreticalCoverageMm2.toFixed(2))
+      });
+    });
+
+    const theoreticalTextileSurfaceMm2 = parseFloat((totalThreadLengthMm * threadThicknessMm).toFixed(2));
+    const rasterMeasuredSurfaceMm2 = physicalAudit.surfaceStitchCoveredMm2;
+
+    const surfaceDiscrepancyPercent = theoreticalTextileSurfaceMm2 > 0
+      ? parseFloat((Math.abs(rasterMeasuredSurfaceMm2 - theoreticalTextileSurfaceMm2) / theoreticalTextileSurfaceMm2 * 100).toFixed(2))
+      : 0;
+
+    const isModelConcordant = surfaceDiscrepancyPercent <= 10.0;
+
+    return {
+      regionId,
+      regionName,
+      totalScanlines: scanlineDetails.length,
+      totalPoints,
+      totalThreadLengthMm: parseFloat(totalThreadLengthMm.toFixed(2)),
+      totalThreadLengthMeters: parseFloat((totalThreadLengthMm / 1000.0).toFixed(3)),
+      threadThicknessMm,
+      theoreticalTextileSurfaceMm2,
+      rasterMeasuredSurfaceMm2,
+      surfaceDiscrepancyPercent,
+      isModelConcordant,
+      scanlineDetails
+    };
   }
 }

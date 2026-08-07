@@ -27,6 +27,15 @@ export const FillRegionPreparationModal: React.FC<FillRegionPreparationModalProp
     3.78,
     0.40
   );
+
+  const scanlineAudit = StitchGeneratorCoverageAuditor.auditScanlineByScanline(
+    `shape_${selectedShapeIndex + 1}`,
+    activeShape.name,
+    activeShape.polygon,
+    0.20,
+    3.78,
+    0.40
+  );
   if (!report) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -303,6 +312,87 @@ export const FillRegionPreparationModal: React.FC<FillRegionPreparationModalProp
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Line-by-Line Scanline Tracing Instrumentation Block */}
+              <div className="bg-slate-950 rounded-xl p-5 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-violet-400" />
+                      Instrumentation Ligne par Ligne du Moteur Tatami ({scanlineAudit.totalScanlines} Scanlines Générées)
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Traçabilité exhaustive : Longueur de fil (L_thread), points par scanline, surface textile théorique vs mesure raster.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 font-mono">
+                    <span className="text-gray-400">Écart Modèle:</span>
+                    <span className={`font-bold ${scanlineAudit.isModelConcordant ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {scanlineAudit.surfaceDiscrepancyPercent}% ({scanlineAudit.isModelConcordant ? 'CONCORDANT' : 'ÉCART'})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Instrumentation Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+                  <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                    <span className="text-gray-400 block font-sans text-[10px] uppercase font-bold">1. Longueur Totale Fil</span>
+                    <div className="text-base font-bold text-violet-400 mt-0.5">
+                      {scanlineAudit.totalThreadLengthMm} mm <span className="text-[10px] text-gray-400">({scanlineAudit.totalThreadLengthMeters} m)</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                    <span className="text-gray-400 block font-sans text-[10px] uppercase font-bold">2. Points Générés</span>
+                    <div className="text-base font-bold text-white mt-0.5">
+                      {scanlineAudit.totalPoints} pts
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                    <span className="text-gray-400 block font-sans text-[10px] uppercase font-bold">3. Surface Textile Théorique</span>
+                    <div className="text-base font-bold text-sky-400 mt-0.5">
+                      {scanlineAudit.theoreticalTextileSurfaceMm2} mm²
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+                    <span className="text-gray-400 block font-sans text-[10px] uppercase font-bold">4. Mesure Raster Heatmap</span>
+                    <div className="text-base font-bold text-emerald-400 mt-0.5">
+                      {scanlineAudit.rasterMeasuredSurfaceMm2} mm²
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scanline Detail Table */}
+                <div className="overflow-x-auto max-h-60 rounded-lg border border-slate-800">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-slate-900 text-gray-300 uppercase text-[10px] sticky top-0 border-b border-slate-800">
+                      <tr>
+                        <th className="px-3 py-2">Scanline #</th>
+                        <th className="px-3 py-2">Longueur Géométrique (mm)</th>
+                        <th className="px-3 py-2">Points (N_i)</th>
+                        <th className="px-3 py-2">Pas Moyen (mm)</th>
+                        <th className="px-3 py-2">Fil Déposé (L_fil mm)</th>
+                        <th className="px-3 py-2">Surface Théorique (mm²)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 bg-slate-950 text-gray-300">
+                      {scanlineAudit.scanlineDetails.map((line) => (
+                        <tr key={line.index} className="hover:bg-slate-900/50 transition-colors">
+                          <td className="px-3 py-1.5 font-bold text-violet-400">#{line.index}</td>
+                          <td className="px-3 py-1.5">{line.lengthMm} mm</td>
+                          <td className="px-3 py-1.5 font-bold text-white">{line.pointCount}</td>
+                          <td className="px-3 py-1.5">{line.avgPointDistanceMm} mm</td>
+                          <td className="px-3 py-1.5 text-emerald-400">{line.threadLengthMm} mm</td>
+                          <td className="px-3 py-1.5 text-sky-400">{line.theoreticalCoverageMm2} mm²</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </>
