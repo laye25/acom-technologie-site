@@ -20,7 +20,6 @@
 
 import { EmbroideryLayer, EmbroideryPoint } from './embroideryServices';
 import { SvgTopologyGraphBuilder, InputPathItem, SvgTopologyGraph } from './SvgTopologyGraphBuilder';
-import { AEEReferenceRegionEngine } from './AEEReferenceRegionEngine';
 
 export type StitchStrategyType = EmbroideryLayer['stitchType'];
 
@@ -39,8 +38,6 @@ export interface PreparedFillRegion {
   color: string;
   isIgnored: boolean;
   ignoreReason?: string;
-  referenceRegionSynchronized?: boolean;
-  backingRegionArea?: number;
 }
 
 export interface ParentChildRelation {
@@ -267,26 +264,12 @@ export class FillRegionPreparationEngine {
         strategyReason = `Tracé linéaire ouvert, brodé au point de piqûre (Running contour).`;
       }
 
-      // Construction et synchronisation systématique via AEEReferenceRegionEngine (Reference Fill Region)
-      const pullComp = layer.pullComp !== undefined ? layer.pullComp : (isClosed ? 0.20 : 0);
-      
-      const refRegion = AEEReferenceRegionEngine.buildReferenceRegion(
-        points,
-        { pullCompensationMm: pullComp },
-        layer.subpaths || []
-      );
-
-      const originalPoints = refRegion.boundaryPoints;
-      const backingRegionArea = refRegion.areaPx2;
-
-      // Mettre à jour le calque avec la région de référence géométriquement congruente
+      // Mettre à jour le calque avec les propriétés de remplissage garanties
       const updatedLayer: EmbroideryLayer = {
         ...layer,
         stitchType: assignedStrategy,
         underlay: assignedStrategy !== 'running',
-        density: assignedStrategy === 'running' ? 0 : (assignedStrategy === 'satin' ? 0.6 : 0.45),
-        originalPoints,
-        pullComp
+        density: assignedStrategy === 'running' ? 0 : (assignedStrategy === 'satin' ? 0.6 : 0.45)
       };
 
       preparedLayers.push(updatedLayer);
@@ -307,9 +290,7 @@ export class FillRegionPreparationEngine {
         holesCount,
         counterFormsCount: 0,
         color: layer.color || '#000000',
-        isIgnored: false,
-        referenceRegionSynchronized: isClosed,
-        backingRegionArea
+        isIgnored: false
       });
     });
 
@@ -355,14 +336,12 @@ export class FillRegionPreparationEngine {
    * Formate les réponses claires et quantitatives aux 5 questions de diagnostic.
    */
   public static generateAnalysisAnswers(report: FillRegionPreparationReport): string[] {
-    const synchronizedBackingCount = report.regions.filter(r => r.referenceRegionSynchronized).length;
     return [
       `[Validation 1 - Surfaces Fermées Importées] Oui, 100% des ${report.totalSvgClosedSurfaces} formes fermées valides du SVG sont importées comme régions de remplissage dans AEE (${report.totalFillRegionsCreated} surfaces de remplissage créées).`,
       `[Validation 2 - Filtrage Contour] Non, plus aucun filtrage ne transforme une surface fermée en simple contour. La règle anti-régression a corrigé ${report.convertedToContourCount} forme(s) précédemment dégradée(s) en contour par le seuil d'épaisseur.`,
       `[Validation 3 - Comptage SVG] Le fichier SVG analysé contient exactement ${report.totalSvgClosedSurfaces} surfaces fermées distinctes et ${report.totalSvgLayersAnalyzed - report.totalSvgClosedSurfaces} tracé(s) ouvert(s).`,
       `[Validation 4 - Surfaces Remplies dans AEE] Exactement ${report.totalFillRegionsCreated} surfaces de remplissage (Tatami ou Satin) sont créées et transmises au générateur de points.`,
-      `[Validation 5 - Synchronisation Surface de Référence (Backing Region)] 100% (${synchronizedBackingCount}/${report.totalFillRegionsCreated}) des surfaces fermées possèdent une région de référence géométriquement congruente (originalPoints + compensation d'étirement) garantissant un remplissage continu et sans interruption.`,
-      `[Validation 6 - Régions Ignorées] ${report.ignoredClosedRegionsCount} région(s) fermée(s) infime(s) (< 1.5 px², micro-artefacts) ont été filtrée(s) pour éviter l'agglutination de fil.`
+      `[Validation 5 - Régions Ignorées] ${report.ignoredClosedRegionsCount} région(s) fermée(s) infime(s) (< 1.5 px², micro-artefacts) ont été filtrée(s) pour éviter l'agglutination de fil.`
     ];
   }
 }

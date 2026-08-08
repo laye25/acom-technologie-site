@@ -5,23 +5,6 @@ export interface RegionNode {
   type: 'island' | 'hole';
   points: EmbroideryPoint[];
   children: RegionNode[];
-  shapeAnalysis?: {
-    medialAxis?: EmbroideryPoint[];
-    localWidthMinMm?: number;
-    localWidthMaxMm?: number;
-    localWidthAvgMm?: number;
-    principalAngleDeg?: number;
-    curvatureIndex?: number;
-    isConvex?: boolean;
-    aspectRatio?: number;
-  };
-  decisionLayer?: {
-    recommendedStitchType: 'satin' | 'tatami' | 'running' | 'underlay' | 'border';
-    recommendedDensityMm: number;
-    recommendedAngleDeg: number;
-    pullCompensationMm: number;
-    underlayType?: 'contour' | 'tatami-grid' | 'satin-center-line' | 'none';
-  };
 }
 
 export interface ATIR {
