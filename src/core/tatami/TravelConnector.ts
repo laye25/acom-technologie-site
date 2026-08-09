@@ -5,24 +5,26 @@ export class TravelConnector {
      * Minimizes jumps by sorting and flipping segments
      */
     public static connect(segments: EmbroideryPoint[][]): EmbroideryPoint[][] {
-        if (segments.length <= 1) return segments;
+        const validSegments = segments.filter(seg => seg && seg.length > 0);
+        if (validSegments.length <= 1) return validSegments;
         
         const connected: EmbroideryPoint[][] = [];
-        let remaining = [...segments];
+        let remaining = [...validSegments];
         
         // Start with the first segment
         let currentSeg = remaining.shift()!;
         connected.push(currentSeg);
         
         while (remaining.length > 0) {
-            let lastPt = currentSeg[currentSeg.length - 1];
+            let lastPt = currentSeg[currentSeg.length - 1] || { x: 0, y: 0 };
             
-            let bestIdx = -1;
+            let bestIdx = 0;
             let bestDist = Infinity;
             let bestShouldFlip = false;
             
             for (let i = 0; i < remaining.length; i++) {
                 const seg = remaining[i];
+                if (!seg || seg.length === 0) continue;
                 const startPt = seg[0];
                 const endPt = seg[seg.length - 1];
                 
@@ -42,12 +44,18 @@ export class TravelConnector {
                 }
             }
             
-            let nextSeg = remaining.splice(bestIdx, 1)[0];
-            if (bestShouldFlip) {
-                nextSeg.reverse();
+            if (bestIdx < 0 || bestIdx >= remaining.length) {
+                bestIdx = 0;
             }
-            connected.push(nextSeg);
-            currentSeg = nextSeg;
+            
+            let nextSeg = remaining.splice(bestIdx, 1)[0];
+            if (nextSeg) {
+                if (bestShouldFlip) {
+                    nextSeg.reverse();
+                }
+                connected.push(nextSeg);
+                currentSeg = nextSeg;
+            }
         }
         
         return connected;

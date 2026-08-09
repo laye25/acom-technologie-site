@@ -1054,7 +1054,7 @@ const MerchantSaaS = () => {
             </div>
 
             {/* ROW 3: ACCÈS RAPIDES STRIP */}
-            <div>
+            <div data-acom-id="dashboard.quick_access.bar">
               <h3 className="text-[10px] font-mono font-black uppercase tracking-[0.2em] text-slate-400 mb-2.5 px-1">
                 ACCÈS RAPIDES
               </h3>
@@ -1062,6 +1062,7 @@ const MerchantSaaS = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 {/* 1. ACOM IA DÉMO */}
                 <button
+                  data-acom-id="dashboard.quick_access.ai_demo_btn"
                   onClick={() => setActiveTab('ai_demo')}
                   className={`group p-3.5 rounded-2xl flex items-center justify-between text-left transition-all shadow-sm cursor-pointer ${
                     activeTab === 'ai_demo' 
@@ -1088,6 +1089,7 @@ const MerchantSaaS = () => {
 
                 {/* 2. ACOMZONE */}
                 <button
+                  data-acom-id="dashboard.quick_access.acomzone_btn"
                   onClick={() => {
                     console.trace("[ACOMZONE-NAVIGATION]", {
                       source: 'MerchantSaaS Header Button',
@@ -1120,6 +1122,7 @@ const MerchantSaaS = () => {
 
                 {/* 3. APP DESKTOP */}
                 <button
+                  data-acom-id="dashboard.quick_access.desktop_btn"
                   onClick={() => setActiveTab('build')}
                   className={`group p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
                     activeTab === 'build' 
@@ -1146,6 +1149,7 @@ const MerchantSaaS = () => {
 
                 {/* 4. DOCUMENTATION */}
                 <button
+                  data-acom-id="dashboard.quick_access.docs_btn"
                   onClick={() => setActiveTab('settings')}
                   className={`group p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all cursor-pointer ${
                     activeTab === 'settings' 
@@ -1172,6 +1176,7 @@ const MerchantSaaS = () => {
 
                 {/* 5. DÉCONNEXION */}
                 <button
+                  data-acom-id="dashboard.quick_access.logout_btn"
                   onClick={() => signOut()}
                   className="group p-3.5 rounded-2xl bg-rose-50/80 hover:bg-rose-100 text-rose-700 border border-rose-100 flex items-center justify-between text-left transition-all cursor-pointer hover:scale-[1.01]"
                   title="Quitter la session"
@@ -1213,6 +1218,7 @@ const MerchantSaaS = () => {
                     <div key={tab.id} className="snap-start shrink-0">
                       <TabButton 
                         active={activeTab === tab.id} 
+                        tabId={tab.id}
                         onClick={() => {
                           setActiveTab(tab.id);
                           ContextEngine.updateContext({
@@ -1310,9 +1316,11 @@ const MerchantSaaS = () => {
   );
 };
 
-const TabButton = ({ active, onClick, icon: Icon, label }: any) => (
+const TabButton = ({ active, onClick, icon: Icon, label, tabId }: any) => (
   <button
     onClick={onClick}
+    data-acom-id={`nav-${tabId}`}
+    data-tutorial-id={tabId}
     className={`flex items-center space-x-2.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
       active 
         ? 'bg-ink text-white shadow-xl shadow-ink/20 scale-105' 

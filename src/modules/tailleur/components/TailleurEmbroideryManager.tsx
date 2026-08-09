@@ -138,7 +138,11 @@ import { ImageUpscaleVectorizerPanel } from './ImageUpscaleVectorizerPanel';
 import { LogoAnalyzerKernel, LogoDiagnosticReport } from '../services/LogoAnalyzerKernel';
 import { TransparencyNormalizer } from '../services/TransparencyNormalizer';
 import { ReconstructionApplicationBridge, hashGeometry } from '../services/ReconstructionApplicationBridge';
-import { GeometricReconstructionEngine as AdvancedGeometricReconstructionEngine } from '../services/GeometricReconstructionEngine';
+import { 
+  GeometricReconstructionEngine as AdvancedGeometricReconstructionEngine 
+} from '../services/GeometricReconstructionEngine';
+import { PhyllotaxisStudy, StudyResult } from '@/src/core/tatami/PhyllotaxisStudy';
+import { TatamiConfig } from '@/src/core/tatami/types';
 import { CurveReconstructionEngine } from '../services/CurveReconstructionEngine';
 import { StrokeWidthFidelityEngine } from '../services/StrokeWidthFidelityEngine';
 import { GeometricSignatureEngine } from '../services/GeometricSignatureEngine';
@@ -1054,6 +1058,10 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [isCheckingValidation, setIsCheckingValidation] = useState<boolean>(false);
   const [activePipelineStage, setActivePipelineStage] = useState<string | null>(null);
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
+  
+  const [phyllotaxisResult, setPhyllotaxisResult] = useState<StudyResult | null>(null);
+  const [showPhyllotaxisPreview, setShowPhyllotaxisPreview] = useState<boolean>(false);
+  const [isComputingPhyllotaxis, setIsComputingPhyllotaxis] = useState<boolean>(false);
   
   type GlobalCompilationState = 'Image' | 'En cours' | 'Compilé' | 'Validé' | 'Certifié' | 'Archivé' | 'Production';
   const [globalState, setGlobalState] = useState<GlobalCompilationState>('Image');
@@ -2519,6 +2527,38 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
     ctx.arc(0, 0, 300, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // Experimental Phyllotaxis Preview Layer
+    if (showPhyllotaxisPreview && phyllotaxisResult) {
+      const block = phyllotaxisResult.correctedBlock;
+      ctx.fillStyle = '#60a5fa'; // Blue-ish for experimental
+      block.points.forEach(row => {
+        row.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 1.4 / zoom, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+
+      // Highlight the region boundary
+      const activeLayer = layers.find(l => l.id === phyllotaxisResult.regionId);
+      if (activeLayer) {
+        ctx.strokeStyle = '#f97316'; // Orange highlight
+        ctx.lineWidth = 2.5 / zoom;
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
+        const paths = activeLayer.subpaths && activeLayer.subpaths.length > 0 ? activeLayer.subpaths : [activeLayer.points];
+        paths.forEach(path => {
+          ctx.beginPath();
+          path.forEach((pt, i) => {
+            if (i === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          });
+          if (path.length > 2) ctx.closePath();
+          ctx.stroke();
+        });
+        ctx.setLineDash([]);
+      }
+    }
 
     if (visualizationMode === 'cad_contour' || visualizationMode === 'cad_points') {
       // 3. Render raw CAD shapes & coordinates of all layers in their designated colors
@@ -4680,6 +4720,50 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                   </div>
                 )}
 
+                {/* Phyllotaxis Results Overlay */}
+                {showPhyllotaxisPreview && phyllotaxisResult && (
+                  <div className="absolute top-4 left-4 z-30 bg-slate-900/95 p-3 rounded-2xl border border-orange-500/50 shadow-2xl backdrop-blur max-w-xs animate-in slide-in-from-left duration-300">
+                    <div className="flex items-center justify-between font-bold border-b border-orange-500/30 pb-1.5 mb-2">
+                      <span className="flex items-center gap-1.5 text-orange-400 text-[11px] uppercase">
+                        <Beaker className="w-3.5 h-3.5" />
+                        Rapport 137.5° Expérimental
+                      </span>
+                      <button 
+                        onClick={() => setShowPhyllotaxisPreview(false)}
+                        className="p-1 hover:bg-orange-950 rounded text-orange-400 cursor-pointer"
+                        title="Fermer la prévisualisation"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="space-y-1.5 text-[10px] font-mono">
+                      <div className="flex justify-between border-b border-slate-800 pb-1">
+                        <span className="text-gray-400">Surface traitée :</span>
+                        <span className="text-white font-bold">{phyllotaxisResult.originalMetrics.area.toFixed(0)} mm²</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-1">
+                        <span className="text-gray-400">Surface couverte :</span>
+                        <span className="text-emerald-400 font-bold">{(100 - phyllotaxisResult.correctedMetrics.gaps).toFixed(2)}%</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-1 text-red-400">
+                        <span className="text-gray-400">Sous-couverte :</span>
+                        <span className="font-bold">{phyllotaxisResult.correctedMetrics.gaps.toFixed(2)}%</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-1">
+                        <span className="text-gray-400">Points :</span>
+                        <span className="text-white font-bold">{phyllotaxisResult.correctedMetrics.stitchCount}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-800 pb-1">
+                        <span className="text-gray-400">Gain de densité :</span>
+                        <span className="text-indigo-400 font-bold">+{(phyllotaxisResult.gain * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="pt-2 text-[9px] text-gray-500 italic leading-tight">
+                        Verdict : {phyllotaxisResult.gain > 0.1 ? "Optimisation validée (GO)" : "Stabilité préférée (NO-GO)"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <canvas 
                   ref={setCanvasRef}
                   onMouseDown={handleMouseDown}
@@ -6031,6 +6115,93 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
                     {isGenerating ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                     <span>Vectoriser IA</span>
                   </button>
+
+                  <button 
+                    onClick={() => {
+                      if (showPhyllotaxisPreview) {
+                        setShowPhyllotaxisPreview(false);
+                        return;
+                      }
+
+                      const activeLayer = layers.find(l => l.id === selectedLayerId);
+                      if (!activeLayer) {
+                        setAiLog(prev => [...prev, "Sélectionnez d'abord une forme ou une région à remplir."]);
+                        return;
+                      }
+
+                      setIsComputingPhyllotaxis(true);
+                      setAiLog(prev => [...prev, `Démarrage de l'analyse phyllotactique 137.5° sur "${activeLayer.name}"...`]);
+
+                      setTimeout(() => {
+                        try {
+                          const startTime = performance.now();
+                          const testConfig: TatamiConfig = {
+                            density: activeLayer.density || 1.2,
+                            angle: activeLayer.angle || 45,
+                            stitchLength: 3.0,
+                            offset: 0.25,
+                            underlay: (activeLayer.underlay ? 'edge' : 'none') as any
+                          };
+                          
+                          const rawPoly = activeLayer.points && activeLayer.points.length > 0 
+                            ? activeLayer.points 
+                            : (activeLayer.subpaths && activeLayer.subpaths[0]) || [];
+                            
+                          const poly = rawPoly.filter(p => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y));
+                            
+                          if (poly.length < 3) {
+                            setAiLog(prev => [...prev, "Erreur: La géométrie sélectionnée est invalide ou trop simple."]);
+                            setIsComputingPhyllotaxis(false);
+                            return;
+                          }
+
+                          const graph = {
+                            regions: [{
+                              id: activeLayer.id || 'active_region',
+                              polygon: poly,
+                              children: [],
+                              holes: [],
+                              isHole: false,
+                              isIsland: true,
+                              color: activeLayer.color || '#000000',
+                              area: 0,
+                              orientation: 'CW' as any,
+                              bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+                            }],
+                            adjacency: [],
+                            metrics: { eulerCharacteristic: 1, holesCount: 0, islandsCount: 1, maxDepth: 1, componentsCount: 1 }
+                          };
+                          
+                          const studyResults = PhyllotaxisStudy.runStudy(graph, testConfig);
+                          const elapsedTime = (performance.now() - startTime).toFixed(1);
+
+                          if (studyResults.length > 0) {
+                            const res = studyResults[0];
+                            setPhyllotaxisResult(res);
+                            setShowPhyllotaxisPreview(true);
+                            
+                            setAiLog(prev => [
+                              ...prev,
+                              "✨ Remplissage 137,5° généré avec succès.",
+                              `📊 Surface couverte: ${(100 - res.correctedMetrics.gaps).toFixed(2)}% (+${(res.gain * 100).toFixed(1)}%)`,
+                              `📌 Points: ${res.correctedMetrics.stitchCount} (Delta: +${res.correctedMetrics.stitchCount - res.originalMetrics.stitchCount})`,
+                              `⏱️ Temps calcul: ${elapsedTime}ms`
+                            ]);
+                          }
+                        } catch (error) {
+                          console.error('Phyllotaxis study failed:', error);
+                          setAiLog(prev => [...prev, "Échec du calcul phyllotactique."]);
+                        } finally {
+                          setIsComputingPhyllotaxis(false);
+                        }
+                      }, 500);
+                    }}
+                    className={`px-3.5 py-1.5 ${showPhyllotaxisPreview ? 'bg-orange-800' : 'bg-orange-600 hover:bg-orange-700'} text-[10px] font-bold text-white rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-lg ring-1 ring-orange-400/30`}
+                    title="Déclencher le calcul expérimental du remplissage phyllotactique à 137.5° sur la forme sélectionnée"
+                  >
+                    {isComputingPhyllotaxis ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Beaker className="w-3 h-3" />}
+                    <span>{showPhyllotaxisPreview ? 'Masquer 137.5°' : 'Remplissage 137.5°'}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -7244,6 +7415,31 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
             className="relative w-full flex-1 overflow-hidden bg-slate-950 cursor-grab active:cursor-grabbing shrink"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Phyllotaxis Results Overlay (PiP) */}
+            {showPhyllotaxisPreview && phyllotaxisResult && (
+              <div className="absolute top-4 left-4 z-30 bg-slate-900/95 p-3 rounded-2xl border border-orange-500/50 shadow-2xl backdrop-blur max-w-[180px] animate-in slide-in-from-left duration-300">
+                <div className="flex items-center justify-between font-bold border-b border-orange-500/30 pb-1.5 mb-2">
+                  <span className="flex items-center gap-1.5 text-orange-400 text-[10px] uppercase">
+                    <Beaker className="w-3 h-3" />
+                    Rapport 137.5°
+                  </span>
+                </div>
+                <div className="space-y-1 text-[9px] font-mono">
+                  <div className="flex justify-between border-b border-slate-800 pb-0.5">
+                    <span className="text-gray-400">Couverture:</span>
+                    <span className="text-emerald-400 font-bold">{(100 - phyllotaxisResult.correctedMetrics.gaps).toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-800 pb-0.5">
+                    <span className="text-gray-400">Gain:</span>
+                    <span className="text-indigo-400 font-bold">+{(phyllotaxisResult.gain * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between pt-1">
+                    <span className="text-gray-400">Points:</span>
+                    <span className="text-white font-bold">{phyllotaxisResult.correctedMetrics.stitchCount}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <canvas 
               ref={setCanvasRef}
               onMouseDown={handleMouseDown}

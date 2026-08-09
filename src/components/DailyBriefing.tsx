@@ -61,6 +61,7 @@ export const DailyBriefing: React.FC<DailyBriefingProps> = ({ merchantId, data }
 
   return (
     <motion.div
+      data-acom-id="dashboard.briefing.card"
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className="relative overflow-hidden bg-white border border-black/5 rounded-2xl md:rounded-[2.5rem] p-5 md:p-8 mb-8 md:mb-12 shadow-sm group hover:shadow-md transition-all"
@@ -86,11 +87,11 @@ export const DailyBriefing: React.FC<DailyBriefingProps> = ({ merchantId, data }
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm md:text-xl font-display font-medium md:font-bold text-gray-900 leading-relaxed">
+            <p data-acom-id="dashboard.briefing.message" className="text-sm md:text-xl font-display font-medium md:font-bold text-gray-900 leading-relaxed">
               {briefing}
             </p>
             <div className="flex items-center gap-4 pt-4 border-t border-gray-50">
-              <button className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-primary-hover flex items-center transition-colors">
+              <button data-acom-id="dashboard.briefing.action_btn" className="text-[10px] font-black uppercase tracking-widest text-primary hover:text-primary-hover flex items-center transition-colors">
                 Voir le rapport détaillé
                 <ChevronRight className="w-4 h-4 ml-1" />
               </button>

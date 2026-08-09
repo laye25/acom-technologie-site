@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { motion } from 'motion/react';
 import { dbService } from '../../../services/dbService';
 import { AcomAlertPopup } from '../../../components/AcomAlertPopup';
+import { EventBus } from '../../../ai-demo/BusinessEvents/EventBus';
 import { 
     Save, X, Loader2, Trash2, Printer, Search, 
     Filter, FileText, Check, DollarSign, Clock,
@@ -144,19 +145,24 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
   const [newArticleName, setNewArticleName] = useState('');
   const [newArticlePrice, setNewArticlePrice] = useState<number | ''>('');
   const [newArticleCost, setNewArticleCost] = useState<number | ''>('');
+  const [newArticleUnit, setNewArticleUnit] = useState('Unité (Par Pièce)');
   const [newArticleImage, setNewArticleImage] = useState('');
   const [showAddArticle, setShowAddArticle] = useState(false);
 
   const [newPoidsName, setNewPoidsName] = useState('');
   const [newPoidsPrice, setNewPoidsPrice] = useState<number | ''>('');
   const [newPoidsCost, setNewPoidsCost] = useState<number | ''>('');
+  const [newPoidsUnit, setNewPoidsUnit] = useState('Par Kilogramme (Kg)');
   const [showAddPoids, setShowAddPoids] = useState(false);
 
   const [newSupplementName, setNewSupplementName] = useState('');
   const [newSupplementDesc, setNewSupplementDesc] = useState('');
   const [newSupplementPrice, setNewSupplementPrice] = useState<number | ''>('');
   const [newSupplementCost, setNewSupplementCost] = useState<number | ''>('');
+  const [newSupplementUnit, setNewSupplementUnit] = useState('Par Article');
   const [showAddSupplement, setShowAddSupplement] = useState(false);
+
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleAddArticle = (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,6 +400,18 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
 
       await Promise.all([...promises, ...weightProducts]);
 
+      EventBus.emit({
+        type: 'PRICING_CONFIG_SAVED',
+        saas: 'pressing',
+        merchantId: merchant.id,
+        triggeredBy: 'user',
+        payload: {
+          merchantId: merchant.id,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      setSavedSuccess(true);
       showAlert('Enregistrement Réussi', 'Les tarifs de pressing et prestations optionnelles ont été sauvegardés avec succès !', 'success', undefined, false, "D'ACCORD", "SAAS PRESSING");
     } catch (e) {
       showAlert('Erreur de sauvegarde', 'Erreur lors de la synchronisation de vos tarifs.', 'error');
@@ -419,15 +437,32 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
         <button
           onClick={handleSave}
           disabled={syncing}
+          data-acom-id="btn-save-pricing"
           className="px-6 py-3 bg-[#5c2197] hover:bg-[#481977] text-white rounded-full font-bold text-xs uppercase tracking-widest shadow-lg shadow-purple-900/10 transition-all flex items-center gap-2 disabled:opacity-50"
         >
           <Save className="w-4 h-4" /> Enregistrer les Tarifs
         </button>
       </div>
 
+      {savedSuccess && (
+        <div
+          data-acom-id="pricing-saved-confirmation"
+          className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-center gap-3 shadow-sm animate-fade-in"
+        >
+          <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+          <div>
+            <span className="font-bold text-xs block uppercase tracking-wider">Confirmation de sauvegarde</span>
+            <span className="text-xs text-emerald-700">Vos grilles tarifaires et prestations optionnelles ont été enregistrées avec succès.</span>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Article Billing */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between overflow-hidden">
+        <div 
+          data-acom-id="zone-control-articles"
+          className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between overflow-hidden"
+        >
           <div className="space-y-6">
             <div className="border-b border-gray-100 pb-4 flex justify-between items-center bg-white">
               <div>
@@ -582,33 +617,50 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                     )}
                   </div>
                   
-                  <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du vêtement</label>
                       <input
                         type="text"
                         required
-                        placeholder="ex: Sac"
+                        data-acom-id="input-article-name"
+                        placeholder="ex: Costume 3 pièces"
                         value={newArticleName}
                         onChange={e => setNewArticleName(e.target.value)}
                         className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix Client (FCFA)</label>
+                      <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix de Vente Unitaire (FCFA)</label>
                       <input
                         type="number"
                         required
-                        placeholder="ex: 1500"
+                        data-acom-id="input-article-price"
+                        placeholder="ex: 3500"
                         value={newArticlePrice}
                         onChange={e => setNewArticlePrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
                         className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none"
                       />
                     </div>
                     <div>
+                      <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Unité de Tarification</label>
+                      <select
+                        data-acom-id="select-article-unit"
+                        value={newArticleUnit}
+                        onChange={e => setNewArticleUnit(e.target.value)}
+                        className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold text-ink outline-none cursor-pointer"
+                      >
+                        <option value="Unité (Par Pièce)">Unité (Par Pièce)</option>
+                        <option value="Paire">Paire</option>
+                        <option value="Ensemble">Ensemble / Costume</option>
+                        <option value="Pièce Spéciale">Pièce Spéciale</option>
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût Intrant (FCFA)</label>
                       <input
                         type="number"
+                        data-acom-id="input-article-cost"
                         placeholder="ex: 200"
                         value={newArticleCost}
                         onChange={e => setNewArticleCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
@@ -621,6 +673,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
+                    data-acom-id="btn-cancel-article"
                     onClick={() => { setShowAddArticle(false); setNewArticleName(''); setNewArticlePrice(''); setNewArticleCost(''); setNewArticleImage(''); }}
                     className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
                   >
@@ -628,6 +681,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                   </button>
                   <button
                     type="submit"
+                    data-acom-id="btn-submit-article"
                     className="px-4 py-2 text-[10px] font-bold text-white bg-[#5c2197] hover:bg-[#481977] rounded-lg flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ajouter
@@ -637,6 +691,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             ) : (
               <button
                 type="button"
+                data-acom-id="btn-add-article"
                 onClick={() => setShowAddArticle(true)}
                 className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-purple-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-[#5c2197] transition-all bg-gray-50/10 hover:bg-purple-500/5 pb-4"
               >
@@ -647,7 +702,10 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
         </div>
 
         {/* Weight Billing (Kg) */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between">
+        <div 
+          data-acom-id="zone-control-kg"
+          className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 flex flex-col justify-between"
+        >
           <div className="space-y-6">
             <div className="border-b border-gray-100 pb-4">
               <h3 className="text-lg font-black text-ink flex items-center gap-2">
@@ -725,33 +783,50 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             {showAddPoids ? (
               <form onSubmit={handleAddPoids} className="p-5 bg-gray-50/50 rounded-2xl border border-gray-200/60 space-y-4">
                 <span className="text-[10px] uppercase tracking-widest text-[#5c2197] font-bold block">➕ Nouveau Forfait / Formule Kilogramme</span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Désignation (ex: Express 12h)</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du format</label>
                     <input
                       type="text"
                       required
-                      placeholder="ex: Lavage Ultra-Rapide, Literie"
+                      data-acom-id="input-kg-name"
+                      placeholder="ex: Express Linge Vrac"
                       value={newPoidsName}
                       onChange={e => setNewPoidsName(e.target.value)}
                       className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix par Kilo (FCFA/Kg)</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix par Kilogramme (FCFA/Kg)</label>
                     <input
                       type="number"
                       required
-                      placeholder="ex: 1200"
+                      data-acom-id="input-kg-price"
+                      placeholder="ex: 1500"
                       value={newPoidsPrice}
                       onChange={e => setNewPoidsPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
                       className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 font-mono text-xs font-bold text-ink text-right pr-4 outline-none"
                     />
                   </div>
                   <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Unité / Tarif de Référence</label>
+                    <select
+                      data-acom-id="select-kg-unit"
+                      value={newPoidsUnit}
+                      onChange={e => setNewPoidsUnit(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold text-ink outline-none cursor-pointer"
+                    >
+                      <option value="Par Kilogramme (Kg)">Par Kilogramme (Kg)</option>
+                      <option value="Sac de 5 Kg">Sac de 5 Kg</option>
+                      <option value="Sac de 10 Kg">Sac de 10 Kg</option>
+                      <option value="Forfait Blanchisserie">Forfait Blanchisserie</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût par Kilo (FCFA/Kg)</label>
                     <input
                       type="number"
+                      data-acom-id="input-kg-cost"
                       placeholder="ex: 300"
                       value={newPoidsCost}
                       onChange={e => setNewPoidsCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
@@ -762,6 +837,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
+                    data-acom-id="btn-cancel-kg"
                     onClick={() => { setShowAddPoids(false); setNewPoidsName(''); setNewPoidsPrice(''); setNewPoidsCost(''); }}
                     className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
                   >
@@ -769,6 +845,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                   </button>
                   <button
                     type="submit"
+                    data-acom-id="btn-submit-kg"
                     className="px-4 py-2 text-[10px] font-bold text-white bg-[#5c2197] hover:bg-[#481977] rounded-lg flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ajouter
@@ -778,17 +855,21 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             ) : (
               <button
                 type="button"
+                data-acom-id="btn-add-kg-format"
                 onClick={() => setShowAddPoids(true)}
                 className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-purple-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-[#5c2197] transition-all bg-gray-50/10 hover:bg-purple-500/5 pb-4"
               >
-                <Plus className="w-4 h-4 text-[#5c2197]" /> AJOUTER UN FORFAIT KG
+                <Plus className="w-4 h-4 text-[#5c2197]" /> AJOUTER UN FORMAT KG
               </button>
             )}
           </div>
         </div>
 
         {/* Supplements Billing (Prestations Optionnelles) */}
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 lg:col-span-2">
+        <div 
+          data-acom-id="zone-control-supplements"
+          className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6 lg:col-span-2"
+        >
           <div className="border-b border-gray-100 pb-4">
             <h3 className="text-lg font-black text-ink flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" /> Tarifs des Prestations Optionnelles (Suppléments)
@@ -882,13 +963,14 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                 <span className="text-[10px] uppercase tracking-widest text-[#5c2197] font-bold block flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 animate-spin-slow text-[#5c2197]" /> Nouvelle Prestation Optionnelle (Supplément)
                 </span>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom du service</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Nom de la prestation</label>
                     <input
                       type="text"
                       required
-                      placeholder="ex: Parfumage, Pliage sous vide"
+                      data-acom-id="input-supplement-name"
+                      placeholder="ex: Parfumage Royal"
                       value={newSupplementName}
                       onChange={e => setNewSupplementName(e.target.value)}
                       className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
@@ -898,17 +980,19 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                     <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Description / Détails</label>
                     <input
                       type="text"
-                      placeholder="ex: Parfum de luxe"
+                      data-acom-id="input-supplement-description"
+                      placeholder="ex: Essence naturelle de fleur d'oranger"
                       value={newSupplementDesc}
                       onChange={e => setNewSupplementDesc(e.target.value)}
                       className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold font-sans text-ink outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Tarif Supplément (FCFA)</label>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Prix / Tarif (FCFA)</label>
                     <input
                       type="number"
                       required
+                      data-acom-id="input-supplement-price"
                       placeholder="ex: 500"
                       value={newSupplementPrice}
                       onChange={e => setNewSupplementPrice(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
@@ -916,9 +1000,24 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                     />
                   </div>
                   <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Paramètre de Tarification</label>
+                    <select
+                      data-acom-id="select-supplement-unit"
+                      value={newSupplementUnit}
+                      onChange={e => setNewSupplementUnit(e.target.value)}
+                      className="w-full px-3 py-2 bg-white rounded-xl border border-gray-200 text-xs font-bold text-ink outline-none cursor-pointer"
+                    >
+                      <option value="Par Article">Par Article</option>
+                      <option value="Par Dépôt / Commande">Par Dépôt / Commande</option>
+                      <option value="Forfait Fixe">Forfait Fixe</option>
+                      <option value="Au Kilo">Au Kilo</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">Coût Intrant (FCFA)</label>
                     <input
                       type="number"
+                      data-acom-id="input-supplement-cost"
                       placeholder="ex: 100"
                       value={newSupplementCost}
                       onChange={e => setNewSupplementCost(e.target.value === '' ? '' : Math.max(0, parseInt(e.target.value) || 0))}
@@ -929,6 +1028,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                 <div className="flex gap-2 justify-end">
                   <button
                     type="button"
+                    data-acom-id="btn-cancel-supplement"
                     onClick={() => { setShowAddSupplement(false); setNewSupplementName(''); setNewSupplementDesc(''); setNewSupplementPrice(''); setNewSupplementCost(''); }}
                     className="px-4 py-2 text-[10px] font-bold text-gray-400 hover:text-gray-600 bg-white border border-gray-100 rounded-lg"
                   >
@@ -936,6 +1036,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
                   </button>
                   <button
                     type="submit"
+                    data-acom-id="btn-submit-supplement"
                     className="px-4 py-2 text-[10px] font-bold text-white bg-[#5c2197] hover:bg-[#481977] rounded-lg flex items-center gap-1.5 shadow-sm"
                   >
                     <Plus className="w-3.5 h-3.5" /> Ajouter
@@ -945,6 +1046,7 @@ export const PressingTarifsManager = ({ merchant }: { merchant: Merchant }) => {
             ) : (
               <button
                 type="button"
+                data-acom-id="btn-add-supplement"
                 onClick={() => setShowAddSupplement(true)}
                 className="w-full py-4 border-2 border-dashed border-gray-200 hover:border-purple-400/55 rounded-2xl flex items-center justify-center gap-2 text-xs font-black text-gray-500 hover:text-[#5c2197] transition-all bg-gray-50/10 hover:bg-[#5c2197]/5 pb-4"
               >

@@ -15,6 +15,8 @@ export interface TatamiMetrics {
     densityError: number;
     gaps: number;
     stitchCount: number;
+    area: number;
+    density: number;
 }
 
 export interface TatamiBlock {

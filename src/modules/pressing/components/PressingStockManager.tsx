@@ -13,6 +13,7 @@ import { printDetergentSaleDirect, printDetergentQuoteDirect } from '../../billi
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
 import { showMailSuccessToast } from '../../../components/MailSuccessToast';
 import { jsPDF } from 'jspdf';
+import { EventBus } from '../../../ai-demo/BusinessEvents/EventBus';
 import { 
     Save, X, Loader2, Trash2, Printer, Search, 
     Filter, FileText, Check, DollarSign, Clock,
@@ -603,6 +604,13 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
       setCart([...cart, { product, quantity: 1 }]);
     }
     showAlert('Ajouté au Panier', `${product.name} ajouté au panier.`, 'success');
+    EventBus.emit({
+      type: 'PRODUCT_ADDED_TO_CART',
+      saas: 'pressing',
+      merchantId: merchant.id,
+      triggeredBy: 'user',
+      payload: { productId: product.id, productName: product.name }
+    });
   };
 
   // Update cart item quantity
@@ -734,6 +742,19 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
     if (autoEmailManager && managerEmail && managerEmail.trim()) {
       sendSilentBackgroundSaleEmailToManager(newSale);
     }
+
+    EventBus.emit({
+      type: 'SALE_RECORDED',
+      saas: 'pressing',
+      merchantId: merchant.id,
+      triggeredBy: 'user',
+      payload: {
+        saleId: newSale.id,
+        saleNumber: newSale.saleNumber,
+        total: cartTotal,
+        customerName: newSale.customerName
+      }
+    });
 
     showAlert(
       'Encaissement Validé — E-mail & WhatsApp',
@@ -1264,6 +1285,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
         {/* Local Mini Tabs selector */}
         <div className="flex bg-gray-100 p-1.5 rounded-2xl w-fit border border-black/5 shrink-0 self-end lg:self-auto">
           <button
+            data-acom-id="pressing.sales.tab_sales"
             onClick={() => { setActiveSubTab('sales'); setSelectedSale(null); }}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider tracking-wider transition-all duration-200 ${
               activeSubTab === 'sales' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
@@ -1272,6 +1294,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             💸 Encaisser Vente
           </button>
           <button
+            data-acom-id="pressing.sales.tab_inventory"
             onClick={() => { setActiveSubTab('inventory'); setEditingProduct(null); }}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
               activeSubTab === 'inventory' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
@@ -1280,6 +1303,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             🧪 Stock Produits
           </button>
           <button
+            data-acom-id="pressing.sales.tab_history"
             onClick={() => setActiveSubTab('history')}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
               activeSubTab === 'history' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
@@ -1288,6 +1312,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
             📜 Historique ({sales.length})
           </button>
           <button
+            data-acom-id="pressing.sales.tab_quotes"
             onClick={() => setActiveSubTab('quotes')}
             className={`px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-200 ${
               activeSubTab === 'quotes' ? 'bg-white text-[#5c2197] shadow-sm' : 'text-gray-500 hover:text-gray-900'
@@ -1354,6 +1379,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
+                  data-acom-id="pressing.sales.search_input"
                   placeholder="Rechercher par nom, usage, code-barres..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
@@ -1380,6 +1406,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
               </div>
               <button
                 type="button"
+                data-acom-id="pressing.sales.scanner_btn"
                 onClick={() => setShowSearchScanner(true)}
                 className="px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs rounded-2xl flex items-center gap-1.5 transition-colors uppercase tracking-wider shrink-0"
               >
@@ -1391,6 +1418,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider">Rayon :</span>
                 <select
+                  data-acom-id="pressing.sales.rayon_select"
                   value={categoryFilter}
                   onChange={e => setCategoryFilter(e.target.value)}
                   className="px-3 py-2 bg-gray-50 border border-transparent focus:border-primary/20 rounded-2xl text-xs font-black uppercase tracking-wider text-[#1e293b] outline-none"
@@ -1405,6 +1433,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-wider">Niveau :</span>
                 <select
+                  data-acom-id="pressing.sales.status_select"
                   value={stockFilter}
                   onChange={e => setStockFilter(e.target.value)}
                   className="px-3 py-2 bg-gray-50 border border-transparent focus:border-primary/20 rounded-2xl text-xs font-black uppercase tracking-wider text-[#1e293b] outline-none"
@@ -1431,6 +1460,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                 return (
                   <div 
                     key={p.id} 
+                    data-acom-id="pressing.sales.product_card"
                     className={`bg-white rounded-3xl p-4 border shadow-sm transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group hover:shadow-md ${
                       isOutOfStock ? 'opacity-75 border-rose-100 bg-gray-50/50' : isUnderStock ? 'border-amber-200 bg-amber-50/5' : 'border-gray-100'
                     }`}
@@ -1480,6 +1510,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
 
                       <button
                         type="button"
+                        data-acom-id="pressing.sales.sell_btn"
                         onClick={() => addToCart(p)}
                         disabled={isOutOfStock}
                         className="w-full py-2.5 bg-primary hover:bg-primary-hover disabled:bg-gray-100 disabled:text-gray-400 font-bold text-xs uppercase tracking-wider text-white rounded-xl transition shadow shadow-primary/15 flex items-center justify-center gap-1.5"
@@ -1503,7 +1534,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
           <div className="lg:col-span-5 space-y-4">
             <h4 className="text-xs font-black uppercase tracking-wider text-gray-400">Panier de Vente Directe</h4>
 
-            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 relative overflow-hidden">
+            <div data-acom-id="pressing.sales.cart_panel" className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 relative overflow-hidden">
               <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-cyan-500 to-indigo-500" />
 
               {cart.length === 0 ? (
@@ -1522,7 +1553,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         <p className="text-[10px] text-gray-400 font-mono font-bold mt-0.5">{(item.product.price).toLocaleString()} F/u</p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div data-acom-id="pressing.sales.cart_quantity" className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
@@ -1555,6 +1586,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nom du client</label>
                       <input
                         type="text"
+                        data-acom-id="pressing.sales.customer_name"
                         placeholder="Client de Passage"
                         value={customerName}
                         onChange={e => setCustomerName(e.target.value)}
@@ -1565,6 +1597,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Contact Téléphone</label>
                       <input
                         type="text"
+                        data-acom-id="pressing.sales.customer_phone"
                         placeholder="ex: 77 123 45 67"
                         value={customerPhone}
                         onChange={e => setCustomerPhone(e.target.value)}
@@ -1577,6 +1610,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                     <div>
                       <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Type de remise</label>
                       <select
+                        data-acom-id="pressing.sales.discount_type"
                         value={discountType}
                         onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
                         className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs font-bold ring-offset-white border border-transparent focus:ring-1 focus:ring-primary/20 outline-none"
@@ -1589,6 +1623,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       <label className="block text-[8px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">{discountType === 'percent' ? 'Valeur (%)' : 'Remise immédiate (FCFA)'}</label>
                       <input
                         type="number"
+                        data-acom-id="pressing.sales.discount_value"
                         placeholder={discountType === 'percent' ? "ex: 10" : "Remise immédiate"}
                         value={discountValue || ''}
                         onChange={e => setDiscountValue(Math.max(0, parseInt(e.target.value) || 0))}
@@ -1608,7 +1643,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                         <span className="font-mono">-{discountAmount.toLocaleString()} FCFA</span>
                       </div>
                     )}
-                    <div className="flex justify-between items-center text-xs text-ink font-black pt-2 border-t border-gray-100">
+                    <div data-acom-id="pressing.sales.total_net" className="flex justify-between items-center text-xs text-ink font-black pt-2 border-t border-gray-100">
                       <span>Total Net Encaissé :</span>
                       <span className="text-sm font-mono text-primary font-black">{(cartTotal).toLocaleString()} FCFA</span>
                     </div>
@@ -1617,12 +1652,14 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
                       type="submit"
+                      data-acom-id="pressing.sales.submit_checkout"
                       className="py-3.5 bg-[#1e293b] hover:bg-black font-bold text-xs uppercase tracking-widest text-white rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
                     >
                       🛒 Encaisser
                     </button>
                     <button
                       type="button"
+                      data-acom-id="pressing.sales.btn_quote"
                       onClick={handleGenerateQuote}
                       className="py-3.5 bg-indigo-50 hover:bg-slate-200 hover:text-indigo-700 font-extrabold text-xs uppercase tracking-widest text-indigo-600 border border-indigo-100 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
@@ -1635,7 +1672,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
               {selectedSale && (
                 <div className="flex flex-col gap-5">
                   {/* Real Paper Receipt Simulator style ticket */}
-                  <div className="space-y-4 font-mono text-[11px] text-gray-700 leading-relaxed bg-[#fbfbf9] p-5 rounded-2xl border border-dashed border-gray-200 shadow-inner">
+                  <div data-acom-id="pressing.sales.ticket_box" className="space-y-4 font-mono text-[11px] text-gray-700 leading-relaxed bg-[#fbfbf9] p-5 rounded-2xl border border-dashed border-gray-200 shadow-inner">
                     <div className="text-center pb-3 border-b border-dashed border-gray-200">
                       <p className="font-black text-xs uppercase tracking-wider text-ink block">{merchant.name || 'ACOM'}</p>
                       <p className="text-[9px] text-gray-400 mt-0.5">{merchant.address || 'Touba Mbacké'}</p>
@@ -1705,13 +1742,14 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                   </div>
 
                   {/* Cohesive Purple Action Box */}
-                  <div className="flex flex-col gap-2.5 bg-[#faf5ff] p-5 rounded-2xl border border-purple-100 shadow-inner">
+                  <div data-acom-id="pressing.sales.post_creation_panel" className="flex flex-col gap-2.5 bg-[#faf5ff] p-5 rounded-2xl border border-purple-100 shadow-inner">
                     <p className="text-xs font-black text-[#5c2197] text-center animate-pulse">🎉 Nouveau ticket enregistré : {selectedSale.saleNumber}</p>
                     
                     {/* Print buttons grid */}
-                    <div className="grid grid-cols-3 gap-1.5 mt-1">
+                    <div data-acom-id="pressing.sales.print_options" className="grid grid-cols-3 gap-1.5 mt-1">
                       <button
                         type="button"
+                        data-acom-id="pressing.sales.print_roll_80"
                         onClick={() => printDetergentSaleDirect(merchant, selectedSale, '80mm', handleDownloadSalePDF)}
                         className="bg-[#1e293b] hover:bg-black text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm cursor-pointer"
                         title="Imprimer direct Roll 80mm"
@@ -1720,6 +1758,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       </button>
                       <button
                         type="button"
+                        data-acom-id="pressing.sales.print_roll_58"
                         onClick={() => printDetergentSaleDirect(merchant, selectedSale, '58mm', handleDownloadSalePDF)}
                         className="bg-[#4b5563] hover:bg-gray-800 text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm cursor-pointer"
                         title="Imprimer direct Roll 58mm"
@@ -1728,6 +1767,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       </button>
                       <button
                         type="button"
+                        data-acom-id="pressing.sales.print_a4"
                         onClick={() => printDetergentSaleDirect(merchant, selectedSale, 'A4', handleDownloadSaleA4PDF)}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] py-3 rounded-xl flex items-center justify-center gap-1 transition text-center shadow-sm cursor-pointer"
                         title="Imprimer direct A4"
@@ -1740,6 +1780,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
+                        data-acom-id="pressing.sales.download_pdf"
                         onClick={() => handleDownloadSalePDF(selectedSale)}
                         className="py-2 px-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[10px] sm:text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm border border-gray-200 cursor-pointer"
                       >
@@ -1747,6 +1788,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                       </button>
                       <button
                         type="button"
+                        data-acom-id="pressing.sales.whatsapp_client"
                         onClick={() => handleSendSaleClientWhatsApp(selectedSale)}
                         className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] sm:text-xs font-black rounded-xl flex items-center justify-center gap-1.5 transition shadow-sm cursor-pointer"
                       >
@@ -1797,6 +1839,7 @@ export const PressingStockManager = ({ merchant }: { merchant: Merchant }) => {
                   <div>
                     <button
                       type="button"
+                      data-acom-id="pressing.sales.new_customer_btn"
                       onClick={() => {
                         setSelectedSale(null);
                         setCart([]);

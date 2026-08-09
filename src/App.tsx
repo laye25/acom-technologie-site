@@ -38,6 +38,7 @@ const OrderTracking = React.lazy(() => import('./pages/OrderTracking'));
 // Removed direct imports for lazy loading
 
 const AIDemoConsolePage = React.lazy(() => import('./ai-demo/components/AIDemoConsolePage').then(module => ({ default: module.AIDemoConsolePage })));
+const PhyllotaxisStudyLab = React.lazy(() => import('./modules/tailleur/components/PhyllotaxisStudyLab').then(module => ({ default: module.PhyllotaxisStudyLab })));
 
 const Pricing = React.lazy(() => import('./pages/Pricing'));
 const SaaSSolutions = React.lazy(() => import('./pages/SaaSSolutions'));
@@ -128,6 +129,7 @@ function AppContent() {
             <Route path="/admin/email-preview" element={<ProtectedRoute adminOnly><EmailPreview /></ProtectedRoute>} />
             <Route path="/ai-demo" element={<ProtectedRoute><AIDemoConsolePage /></ProtectedRoute>} />
             <Route path="/admin/ai-demo" element={<ProtectedRoute><AIDemoConsolePage /></ProtectedRoute>} />
+            <Route path="/phyllotaxis-lab" element={<ProtectedRoute adminOnly><PhyllotaxisStudyLab /></ProtectedRoute>} />
             <Route path="/manager/pos" element={<ProtectedRoute adminOnly><POS /></ProtectedRoute>} />
             <Route path="/merchant/saas" element={<ProtectedRoute><MerchantSaaS /></ProtectedRoute>} />
             <Route path="/portal/student" element={<ProtectedRoute><StudentPortal /></ProtectedRoute>} />

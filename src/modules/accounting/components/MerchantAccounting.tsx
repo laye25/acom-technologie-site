@@ -10,6 +10,7 @@ import { Merchant } from '../../../types';
 import { SchoolAccountingSaaS } from '../../../components/admin/SchoolAccountingSaaS';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
+import { EventBus } from '../../../ai-demo/BusinessEvents/EventBus';
 
 interface AccountingOutflow {
   id: string;
@@ -287,6 +288,23 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
 
       await dbService.merchantExpenses.save(expenseData);
       syncService.syncExpenses(merchant.id);
+
+      EventBus.emit({
+        type: 'EXPENSE_CREATED',
+        saas: 'pressing',
+        merchantId: merchant.id,
+        payload: {
+          title: newExpense.title.trim(),
+          amount: Number(newExpense.amount),
+          category: newExpense.category || 'Autres dépenses',
+          paymentMethod: newExpense.paymentMethod || 'espèces',
+          reference: newExpense.reference?.trim() || '',
+          description: newExpense.description?.trim() || '',
+          date: savedDateIso
+        },
+        triggeredBy: 'user'
+      });
+
       setIsAddingExpense(false);
 
       // --- SUIVI GÉRANT (TEMPS RÉEL) ---
@@ -450,6 +468,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
           <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des flux financiers & dépenses générales de l'atelier</p>
         </div>
         <button 
+          data-acom-id="accounting.btn.new_expense"
           onClick={() => {
             setNewExpense({
               title: '',
@@ -470,9 +489,12 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       </div>
 
       {/* KPI Stats Cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 ${merchant.type === 'transport' ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
+      <div 
+        data-acom-id="accounting.kpi_cards"
+        className={`grid grid-cols-1 sm:grid-cols-2 ${merchant.type === 'transport' ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}
+      >
         {/* Card 1: Total outflows */}
-        <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
+        <div data-acom-id="accounting.kpi.charges_totales" className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">Charges Totales</span>
@@ -490,7 +512,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
         </div>
 
         {/* Card 2: General expenses */}
-        <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
+        <div data-acom-id="accounting.kpi.depenses_generales" className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">Dépenses Générales</span>
@@ -558,7 +580,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div data-acom-id="accounting.filters_row" className="flex flex-wrap gap-2">
         {[
           { id: 'all', label: 'Tout le flux de trésorerie' },
           { id: 'general', label: 'Dépenses Générales' },
@@ -582,7 +604,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       </div>
 
       {/* Outflows List Table */}
-      <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+      <div data-acom-id="accounting.outflows_table" className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -729,6 +751,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
         {isAddingExpense && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
+              data-acom-id="accounting.expense.form_card"
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -750,6 +773,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                     Désignation / Intitulé *
                   </label>
                   <input 
+                    data-acom-id="accounting.expense.title"
                     type="text" 
                     required 
                     placeholder="Ex: Facture Senelec Janvier, Loyer Atelier, Transport coursier..." 
@@ -765,6 +789,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                       Montant ({merchant.currency}) *
                     </label>
                     <input 
+                      data-acom-id="accounting.expense.amount"
                       type="number" 
                       min="1" 
                       required 
@@ -779,6 +804,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                       Date de Dépense *
                     </label>
                     <input 
+                      data-acom-id="accounting.expense.date"
                       type="date" 
                       required 
                       value={expenseDate} 
@@ -789,7 +815,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                 </div>
 
                 {/* Catégorie */}
-                <div>
+                <div data-acom-id="accounting.expense.category_grid">
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
                     Catégorie Comptable *
                   </label>
@@ -798,6 +824,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                       <button
                         key={cat}
                         type="button"
+                        data-acom-id={`accounting.expense.cat_${cat.toLowerCase().replace(/[^a-z0-9]/g, '_')}`}
                         onClick={() => setNewExpense({ ...newExpense, category: cat })}
                         className={`py-2 px-2.5 text-[10px] font-bold rounded-xl border transition-all text-left truncate ${
                           newExpense.category === cat 
@@ -812,7 +839,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                 </div>
 
                 {/* Mode de Paiement */}
-                <div>
+                <div data-acom-id="accounting.expense.payment_methods">
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
                     Mode de Paiement *
                   </label>
@@ -821,6 +848,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                       <button
                         key={pm.id}
                         type="button"
+                        data-acom-id={`accounting.expense.pm_${pm.id}`}
                         onClick={() => setNewExpense({ ...newExpense, paymentMethod: pm.id })}
                         className={`py-2 px-2.5 text-[10px] font-bold rounded-xl border transition-all text-left truncate ${
                           newExpense.paymentMethod === pm.id 
@@ -845,6 +873,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                     N° Référence / Justificatif (Optionnel)
                   </label>
                   <input 
+                    data-acom-id="accounting.expense.reference"
                     type="text" 
                     placeholder="Ex: N° Chèque, Réf Virement, N° Reçu..." 
                     value={newExpense.reference} 
@@ -861,6 +890,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                     </label>
                   </div>
                   <textarea 
+                    data-acom-id="accounting.expense.description"
                     rows={2}
                     placeholder={
                       newExpense.category === 'Autres dépenses' 
@@ -886,7 +916,12 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                   <button type="button" onClick={() => setIsAddingExpense(false)} className="flex-1 py-3.5 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors text-xs">
                     Annuler
                   </button>
-                  <button type="submit" disabled={saving} className="flex-[2] py-3.5 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 text-xs">
+                  <button 
+                    data-acom-id="accounting.expense.submit_btn"
+                    type="submit" 
+                    disabled={saving} 
+                    className="flex-[2] py-3.5 bg-rose-500 text-white rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 text-xs"
+                  >
                     {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Enregistrer la dépense & Notifier'}
                   </button>
                 </div>

@@ -8,17 +8,18 @@ import { ActionConfirmationModal } from './ActionConfirmationModal';
 import { TutorialOverlay } from './TutorialOverlay';
 import { ActionLogger } from '../AuditLog/ActionLogger';
 import { EventBus } from '../BusinessEvents/EventBus';
-import { TutorialEngine, PRESSING_GOLDEN_TUTORIAL } from '../Tutorial/TutorialEngine';
+import { TutorialEngine, PRESSING_GOLDEN_TUTORIAL, PRESSING_TARIFS_TUTORIAL, PRESSING_STOCK_SALES_TUTORIAL, PRESSING_CLOSURE_TUTORIAL, PRESSING_ACCOUNTING_TUTORIAL, PRESSING_FINANCIAL_REPORTS_TUTORIAL, PRESSING_SETTINGS_TUTORIAL, COMMERCE_POS_TUTORIAL } from '../Tutorial/TutorialEngine';
 import { ScreenRecorder } from '../Tutorial/ScreenRecorder';
 import { ContextEngine } from '../Intelligence/ContextEngine';
 import { AcomActionLog, BusinessEvent } from '../types';
-import { Sparkles, Video, Play, Shield, Terminal, RefreshCw, Layers, CheckCircle2, AlertTriangle, ArrowRight, BookOpen, Clock } from 'lucide-react';
+import { Sparkles, Video, Play, Shield, Terminal, RefreshCw, Layers, CheckCircle2, AlertTriangle, ArrowRight, BookOpen, Clock, Lock, Receipt, BarChart3, Settings, ShoppingBag } from 'lucide-react';
 
 export const AIDemoConsolePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'copilot' | 'tutorials' | 'logs' | 'capabilities'>('copilot');
   const [logs, setLogs] = useState<AcomActionLog[]>([]);
   const [events, setEvents] = useState<BusinessEvent[]>([]);
   const [selectedSaas, setSelectedSaas] = useState<'pressing' | 'stock'>('pressing');
+  const [selectedTutorialId, setSelectedTutorialId] = useState<'reception' | 'tarifs' | 'stock' | 'closure' | 'accounting' | 'reports' | 'settings' | 'commerce_pos'>('reception');
 
   useEffect(() => {
     setLogs(ActionLogger.getLogs());
@@ -33,6 +34,27 @@ export const AIDemoConsolePage: React.FC = () => {
       unsubEvents();
     };
   }, []);
+
+  const currentScenario = 
+    selectedTutorialId === 'tarifs' 
+      ? PRESSING_TARIFS_TUTORIAL 
+      : selectedTutorialId === 'stock'
+      ? PRESSING_STOCK_SALES_TUTORIAL
+      : selectedTutorialId === 'closure'
+      ? PRESSING_CLOSURE_TUTORIAL
+      : selectedTutorialId === 'accounting'
+      ? PRESSING_ACCOUNTING_TUTORIAL
+      : selectedTutorialId === 'reports'
+      ? PRESSING_FINANCIAL_REPORTS_TUTORIAL
+      : selectedTutorialId === 'settings'
+      ? PRESSING_SETTINGS_TUTORIAL
+      : selectedTutorialId === 'commerce_pos'
+      ? COMMERCE_POS_TUTORIAL
+      : PRESSING_GOLDEN_TUTORIAL;
+
+  const handleStartTutorial = () => {
+    TutorialEngine.startTutorial(currentScenario);
+  };
 
   const handleStartGoldenTutorial = () => {
     TutorialEngine.startTutorialSelection('pressing');
@@ -184,7 +206,7 @@ export const AIDemoConsolePage: React.FC = () => {
         {/* TAB 2: INTERACTIVE TUTORIALS */}
         {activeTab === 'tutorials' && (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-4">
               <div>
                 <h3 className="text-lg font-bold text-white">Tutoriels Interactifs Guidés</h3>
                 <p className="text-xs text-slate-400">
@@ -192,25 +214,140 @@ export const AIDemoConsolePage: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={handleStartGoldenTutorial}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2"
+                onClick={handleStartTutorial}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer self-start sm:self-auto shadow-md"
               >
                 <Play className="w-4 h-4" />
-                Lancer la Démo Pressing
+                Lancer ce Tutoriel
               </button>
             </div>
 
+            {/* Scenario Picker Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setSelectedTutorialId('reception')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'reception'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>1. Fiche de Réception ({PRESSING_GOLDEN_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('tarifs')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'tarifs'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>2. Paramétrage des Tarifs ({PRESSING_TARIFS_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('stock')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'stock'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>3. Vente & Stock ({PRESSING_STOCK_SALES_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('closure')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'closure'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>4. Clôture de Caisse ({PRESSING_CLOSURE_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('accounting')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'accounting'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>5. Comptabilité & Dépense ({PRESSING_ACCOUNTING_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('reports')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'reports'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>6. Rapports Financiers ({PRESSING_FINANCIAL_REPORTS_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('settings')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'settings'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>7. Réglages & Système ({PRESSING_SETTINGS_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('commerce_pos')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'commerce_pos'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>8. Caisse POS Commerce ({COMMERCE_POS_TUTORIAL.steps.length} étapes)</span>
+              </button>
+            </div>
+
+            {/* Selected Scenario Header Details */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>{currentScenario.title}</span>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full font-bold">
+                    {currentScenario.saasModule}
+                  </span>
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">{currentScenario.description}</p>
+              </div>
+              <div className="text-xs text-slate-400 flex items-center gap-1.5 shrink-0">
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Durée estimée : ~{Math.round(currentScenario.estimatedDurationSec / 60)} min</span>
+              </div>
+            </div>
+
+            {/* Scenario Step Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {PRESSING_GOLDEN_TUTORIAL.steps.map((step) => (
+              {currentScenario.steps.map((step) => (
                 <div key={step.stepNumber} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold text-indigo-400">
                     <span>Étape {step.stepNumber}</span>
-                    <span className="font-mono text-slate-500">{step.targetAcomId}</span>
+                    <span className="font-mono text-slate-500 text-[11px]">{step.targetAcomId}</span>
                   </div>
                   <h4 className="font-bold text-sm text-white">{step.title}</h4>
                   <p className="text-xs text-slate-400">{step.description}</p>
-                  <div className="pt-2 border-t border-slate-800 text-[11px] font-mono text-emerald-400 flex items-center justify-between">
-                    <span>Attendu : {step.expectedEvent}</span>
+                  <div className="pt-2 border-t border-slate-800/80 text-[11px] flex items-center justify-between text-slate-400">
+                    <span className="font-mono text-indigo-300">Action : {step.actionToPerform}</span>
+                    {step.expectedEvent ? (
+                      <span className="font-mono text-emerald-400">Événement : {step.expectedEvent}</span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500 uppercase">{step.stepCategory || 'standard'}</span>
+                    )}
                   </div>
                 </div>
               ))}

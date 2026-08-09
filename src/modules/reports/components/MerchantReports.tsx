@@ -15,7 +15,7 @@ import { fr } from 'date-fns/locale';
 // Removed unavailable imports
 import { PressingTicket, DetergentSale } from '../../pressing/types';
 
-const ReportKPI = ({ label, value, currency, suffix, icon: Icon, trend, cardColor }: any) => {
+const ReportKPI = ({ label, value, currency, suffix, icon: Icon, trend, cardColor, acomId }: any) => {
   const colors: any = {
     primary: 'bg-primary/10 text-primary border-primary/10',
     rose: 'bg-rose-50 text-rose-500 border-rose-100',
@@ -23,10 +23,12 @@ const ReportKPI = ({ label, value, currency, suffix, icon: Icon, trend, cardColo
     blue: 'bg-blue-50 text-blue-500 border-blue-100',
     amber: 'bg-amber-50 text-amber-500 border-amber-100',
     orange: 'bg-orange-50 text-orange-500 border-orange-100',
+    cyan: 'bg-cyan-50 text-cyan-600 border-cyan-100',
+    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
   };
 
   return (
-    <div className="bg-white p-7 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-md transition-all group">
+    <div data-acom-id={acomId} className="bg-white p-7 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-md transition-all group">
       <div className="flex items-start justify-between mb-6">
         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${colors[cardColor] || 'bg-gray-50'}`}>
           <Icon className="w-6 h-6" />
@@ -569,13 +571,14 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       animate={{ opacity: 1, scale: 1 }}
       className="space-y-8"
     >
-      <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
+      <div data-acom-id="reports.header" className="flex flex-col sm:flex-row justify-between items-end gap-4">
         <div>
           <h2 className="text-3xl font-black text-ink tracking-tight">Rapports Financiers</h2>
           <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Analyse de performance et rentabilité</p>
         </div>
         <div className="flex gap-2">
           <button 
+            data-acom-id="reports.export_csv_btn"
             onClick={exportToCSV}
             className="px-5 py-2.5 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
           >
@@ -583,6 +586,7 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
             Exporter CSV
           </button>
           <button 
+            data-acom-id="reports.export_pdf_btn"
             onClick={exportToPDF}
             className="px-5 py-2.5 bg-ink text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2 cursor-pointer"
           >
@@ -592,13 +596,14 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+      <div data-acom-id="reports.period_selector" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
         <div className="flex items-center gap-2 text-violet-600 font-bold">
           <Calendar className="w-5 h-5 text-violet-600" />
           <span>Période des statistiques de vente</span>
         </div>
         <div className="relative flex items-center">
           <input
+            data-acom-id="reports.period_input"
             type="month"
             value={reportSelectedMonth}
             onChange={(e) => setReportSelectedMonth(e.target.value)}
@@ -610,21 +615,21 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
       </div>
 
       {/* Financial KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <ReportKPI cardColor="primary" label="Ventes Totales" value={financialSummary.totalRevenue} currency={merchant.currency} icon={DollarSign} />
-        <ReportKPI cardColor="emerald" label="Total Encaissé" value={financialSummary.totalCollected} currency={merchant.currency} icon={CheckCircle} />
-        <ReportKPI cardColor="amber" label="Reste à Recouvrer" value={financialSummary.totalPending} currency={merchant.currency} icon={Clock} />
-        <ReportKPI cardColor="orange" label="Coût d'Achat" value={financialSummary.totalCOGS || 0} currency={merchant.currency} icon={ShoppingCart} />
+      <div data-acom-id="reports.kpis_grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <ReportKPI acomId="reports.kpi.ventes_totales" cardColor="primary" label="Ventes Totales" value={financialSummary.totalRevenue} currency={merchant.currency} icon={DollarSign} />
+        <ReportKPI acomId="reports.kpi.total_encaisse" cardColor="emerald" label="Total Encaissé" value={financialSummary.totalCollected} currency={merchant.currency} icon={CheckCircle} />
+        <ReportKPI acomId="reports.kpi.reste_recouvrer" cardColor="amber" label="Reste à Recouvrer" value={financialSummary.totalPending} currency={merchant.currency} icon={Clock} />
+        <ReportKPI acomId="reports.kpi.cout_achat" cardColor="orange" label="Coût d'Achat" value={financialSummary.totalCOGS || 0} currency={merchant.currency} icon={ShoppingCart} />
         
-        <ReportKPI cardColor="cyan" label="Marge Brute" value={financialSummary.grossMargin || 0} currency={merchant.currency} icon={BarChart3} />
-        <ReportKPI cardColor="rose" label="Total Dépenses" value={financialSummary.totalExpenses} currency={merchant.currency} icon={TrendingDown} />
-        <ReportKPI cardColor="indigo" label="Flux de Trésorerie" value={financialSummary.cashFlow || 0} currency={merchant.currency} icon={Banknote} />
-        <ReportKPI cardColor="blue" label="Bénéfice Net" value={financialSummary.netProfit} currency={merchant.currency} icon={TrendingUp} />
+        <ReportKPI acomId="reports.kpi.marge_brute" cardColor="cyan" label="Marge Brute" value={financialSummary.grossMargin || 0} currency={merchant.currency} icon={BarChart3} />
+        <ReportKPI acomId="reports.kpi.total_depenses" cardColor="rose" label="Total Dépenses" value={financialSummary.totalExpenses} currency={merchant.currency} icon={TrendingDown} />
+        <ReportKPI acomId="reports.kpi.flux_tresorerie" cardColor="indigo" label="Flux de Trésorerie" value={financialSummary.cashFlow || 0} currency={merchant.currency} icon={Banknote} />
+        <ReportKPI acomId="reports.kpi.benefice_net" cardColor="blue" label="Bénéfice Net" value={financialSummary.netProfit} currency={merchant.currency} icon={TrendingUp} />
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
+        <div data-acom-id="reports.chart.evolution_mensuelle" className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-black text-ink uppercase tracking-widest text-xs">Évolution Mensuelle</h3>
             <div className="flex items-center gap-4">
@@ -658,7 +663,7 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
           </div>
         </div>
 
-        <div className="bg-ink p-8 rounded-[3rem] shadow-2xl flex flex-col relative overflow-hidden group">
+        <div data-acom-id="reports.chart.part_depenses" className="bg-ink p-8 rounded-[3rem] shadow-2xl flex flex-col relative overflow-hidden group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
              <BarChart3 className="w-32 h-32 text-white" />
           </div>
@@ -686,7 +691,7 @@ const MerchantReports = ({ merchant }: { merchant: Merchant }) => {
               )}
             </div>
 
-            <div className="mt-12 p-6 bg-white/5 rounded-3xl border border-white/5">
+            <div data-acom-id="reports.suggestion.optimisation" className="mt-12 p-6 bg-white/5 rounded-3xl border border-white/5">
               <p className="text-[9px] text-white/40 uppercase font-black mb-1 tracking-widest text-center">Optimisation suggérée</p>
               <p className="text-white text-[11px] font-medium text-center leading-relaxed antialiased">
                 {categoryData[0] ? (

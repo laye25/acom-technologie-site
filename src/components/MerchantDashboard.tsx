@@ -747,14 +747,14 @@ export const MerchantDashboard = ({
 
       {/* Sync Control Bar - Phase 2 */}
       {merchant.id && (
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between p-5 md:p-6 bg-white rounded-[2rem] border border-black/5 shadow-sm gap-4">
+        <div data-acom-id="dashboard.sync.card" className="flex flex-col lg:flex-row items-start lg:items-center justify-between p-5 md:p-6 bg-white rounded-[2rem] border border-black/5 shadow-sm gap-4">
           <div className="flex items-center gap-3 md:gap-4 w-full">
             <div className={`p-3 shrink-0 rounded-2xl ${navigator.onLine && (merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
               {navigator.onLine && (merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? <Database className="w-5 h-5" /> : <HardDrive className="w-5 h-5" />}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 truncate">État du Moteur de Synchronisation</p>
-              <h4 className="text-sm font-black text-ink uppercase tracking-tight truncate">
+              <h4 data-acom-id="dashboard.sync.status" className="text-sm font-black text-ink uppercase tracking-tight truncate">
                 {(merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') 
                   ? (navigator.onLine ? 'Mode Hybride (Local + Cloud)' : 'Mode Local (Hors ligne)') 
                   : `Mode Local (Plan: ${merchant.plan || 'TESTE'})`}
@@ -763,6 +763,7 @@ export const MerchantDashboard = ({
           </div>
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 w-full lg:w-auto">
             <button 
+              data-acom-id="dashboard.sync.export_btn"
               onClick={async () => {
                 const toastId = toast.loading('Génération du fichier de base de données SQLite...');
                 try {
@@ -793,7 +794,7 @@ export const MerchantDashboard = ({
               Exporter (.sqlite3)
             </button>
             
-            <label className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink hover:border-primary/30 transition-all cursor-pointer group">
+            <label data-acom-id="dashboard.sync.restore_btn" className="flex items-center gap-2 px-6 py-3 bg-white border border-black/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-ink hover:border-primary/30 transition-all cursor-pointer group">
               <Upload className="w-3.5 h-3.5" />
               Restaurer
               <input 
@@ -812,6 +813,7 @@ export const MerchantDashboard = ({
 
             {!(merchant?.plan === 'BASIC' || merchant?.plan === 'STANDARD' || merchant?.plan === 'PREMIUM') ? (
               <button 
+                data-acom-id="dashboard.sync.force_sync_btn"
                 onClick={() => setShowUpgradeModal(true)}
                 className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-hover transition-all shadow-lg shadow-primary/20"
               >
@@ -820,6 +822,7 @@ export const MerchantDashboard = ({
               </button>
             ) : (
               <button 
+                data-acom-id="dashboard.sync.force_sync_btn"
                 onClick={async () => {
                   const toastId = toast.loading('Synchronisation des données vers le cloud...');
                   try {
@@ -1092,7 +1095,7 @@ export const MerchantDashboard = ({
         )}
           
         {(isSaasType(merchant.type, 'stock') || isSaasType(merchant.type, 'pressing')) && (
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+          <div data-acom-id="dashboard.stats.period_select" className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex items-center gap-2 text-violet-600 font-bold">
               <Calendar className="w-5 h-5 text-violet-600" />
               <span>Période des statistiques de vente</span>
@@ -1113,10 +1116,10 @@ export const MerchantDashboard = ({
 
         {isSaasType(merchant.type, 'stock') ? (
           <>
-            <StatCard title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
+            <StatCard dataAcomId="dashboard.stats.pressing_revenue_card" title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
             <StatCard title="Flux de Trésorerie" value={stats.cashFlowMonth} currency={merchant.currency} icon={Banknote} color={stats.cashFlowMonth >= 0 ? "text-indigo-600" : "text-rose-600"} bgColor={stats.cashFlowMonth >= 0 ? "bg-indigo-50" : "bg-rose-50"} description="Entrées - Sorties" />
-            <StatCard title="Dépenses Opérationnelles" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
-            <StatCard title="Bénéfice Net" value={stats.netProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
+            <StatCard dataAcomId="dashboard.stats.expenses_card" title="Dépenses Opérationnelles" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
+            <StatCard dataAcomId="dashboard.stats.net_profit_card" title="Bénéfice Net" value={stats.netProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
             <StatCard title="Volume des Ventes" value={stats.totalSalesCountMonth} icon={CreditCard} color="text-blue-600" bgColor="bg-blue-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Transactions réalisées ce mois" : "Transactions sur la période"} />
             <StatCard title="Panier Moyen" value={stats.averageOrderValueMonth} currency={merchant.currency} icon={ShoppingCart} color="text-teal-600" bgColor="bg-teal-50" description="Valeur moyenne par achat" />
             <StatCard title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={BarChart3} color="text-cyan-600" bgColor="bg-cyan-50" description="Marge brute globale sur la période" />
@@ -1157,6 +1160,7 @@ export const MerchantDashboard = ({
             {isSaasType(merchant.type, 'pressing') && (
               <>
                 <StatCard 
+                  dataAcomId="dashboard.stats.pressing_revenue_card"
                   title="Recettes Pressing" 
                   value={pressingDashboardStats?.totalTicketsAmount || 0} 
                   currency={merchant.currency} 
@@ -1167,6 +1171,7 @@ export const MerchantDashboard = ({
                   profitDetails={{ value: (pressingDashboardStats?.totalTicketsAmount || 0) - (pressingDashboardStats?.totalTicketsCost || 0) }}
                 />
                 <StatCard 
+                  dataAcomId="dashboard.stats.product_sales_card"
                   title="Ventes Produits" 
                   value={pressingDashboardStats?.totalProductsAmount || 0} 
                   currency={merchant.currency} 
@@ -1220,8 +1225,8 @@ export const MerchantDashboard = ({
                 />
               </>
             )}
-            <StatCard title="Dépenses" value={stats.expenses.total} currency={merchant.currency} icon={BarChart3} color="text-red-600" bgColor="bg-red-50" description="Total cumulé" />
-            <StatCard title="Bénéfice Net" value={stats.netProfit} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description="Total cumulé" />
+            <StatCard dataAcomId="dashboard.stats.expenses_card" title="Dépenses" value={stats.expenses.total} currency={merchant.currency} icon={BarChart3} color="text-red-600" bgColor="bg-red-50" description="Total cumulé" />
+            <StatCard dataAcomId="dashboard.stats.net_profit_card" title="Bénéfice Net" value={stats.netProfit} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description="Total cumulé" />
           </>
         )}
       </div>
@@ -1325,7 +1330,7 @@ export const MerchantDashboard = ({
       {/* Charts & Detailed Accounting */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Revenue Chart */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
+        <div data-acom-id="dashboard.charts.performance_card" className="lg:col-span-2 bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h3 className="text-xl font-bold text-gray-900">Performance Financière</h3>
@@ -1408,7 +1413,7 @@ export const MerchantDashboard = ({
 
         {/* Accounting & Activity */}
         <div className="space-y-8">
-          <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
+          <div data-acom-id="dashboard.accounting.summary_card" className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
             <h3 className="text-xl font-bold text-gray-900 mb-8">Résumé Comptable</h3>
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -1433,7 +1438,7 @@ export const MerchantDashboard = ({
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
+          <div data-acom-id="dashboard.activity.recent_feed" className="bg-white p-8 rounded-3xl border border-black/5 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">Activité Récente</h3>
               <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -1448,7 +1453,7 @@ export const MerchantDashboard = ({
       {merchant.type === 'pressing' ? (
         <div className="space-y-8">
           {/* 1. Récapitulatif Général de l'Activité (General Summary Card/Grid) */}
-          <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-8">
+          <div data-acom-id="dashboard.recap.general_card" className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h3 className="text-2xl font-black text-ink">📊 Récapitulatif Général</h3>
@@ -1466,7 +1471,7 @@ export const MerchantDashboard = ({
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Pressing Activity Column */}
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col justify-between">
+              <div data-acom-id="dashboard.recap.pressing_column" className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col justify-between">
                 <div>
                   <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block mb-1">🧺 Prestations Pressing</span>
                   <div className="flex items-baseline gap-1.5">
@@ -1492,7 +1497,7 @@ export const MerchantDashboard = ({
               </div>
 
               {/* Product Sales Column */}
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col justify-between">
+              <div data-acom-id="dashboard.recap.products_column" className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col justify-between">
                 <div>
                   <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest block mb-1">🛒 Vente de Produits</span>
                   <div className="flex items-baseline gap-1.5">
@@ -1518,7 +1523,7 @@ export const MerchantDashboard = ({
               </div>
 
               {/* Financial Summary Column */}
-              <div className="bg-primary/[0.02] border border-primary/10 rounded-2xl p-6 flex flex-col justify-between">
+              <div data-acom-id="dashboard.recap.total_column" className="bg-primary/[0.02] border border-primary/10 rounded-2xl p-6 flex flex-col justify-between">
                 <div>
                   <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest block mb-1">💰 Recettes Globales</span>
                   <div className="flex items-baseline gap-1.5">
@@ -1543,7 +1548,7 @@ export const MerchantDashboard = ({
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* 2. Tableau distinct : Informations Pressing (Dépôts / Tickets) */}
-            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-6">
+            <div data-acom-id="dashboard.pressing.tickets_table" className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-bold text-ink">🧺 Suivi des Prestations Pressing</h3>
@@ -1609,7 +1614,7 @@ export const MerchantDashboard = ({
             </div>
 
             {/* 3. Tableau distinct : Ventes de Produits (Boutique détergents) */}
-            <div className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-6">
+            <div data-acom-id="dashboard.products.sales_table" className="bg-white p-8 md:p-10 rounded-[2.5rem] border border-black/5 shadow-sm space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-bold text-ink">🛒 Vente de Produits Directe</h3>
@@ -2089,7 +2094,7 @@ const AccountingRow = ({ label, value, currency, icon: Icon, color }: any) => (
   </div>
 );
 
-const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, description, isLarge, profitDetails }: any) => {
+const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, description, isLarge, profitDetails, dataAcomId }: any) => {
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : String(value || '0');
   const textLength = formattedValue.length + (currency ? currency.length : 0);
   
@@ -2114,7 +2119,7 @@ const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, descript
   }
 
   return (
-    <div className={`bg-white p-6 sm:p-8 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col justify-between h-full ${isLarge ? 'min-h-[200px] sm:min-h-[260px]' : 'min-h-[220px]'}`}>
+    <div data-acom-id={dataAcomId} className={`bg-white p-6 sm:p-8 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col justify-between h-full ${isLarge ? 'min-h-[200px] sm:min-h-[260px]' : 'min-h-[220px]'}`}>
       <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform"></div>
       
       <div>

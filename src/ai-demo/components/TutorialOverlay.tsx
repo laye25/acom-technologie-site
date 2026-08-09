@@ -7,7 +7,7 @@ import { TutorialEngine } from '../Tutorial/TutorialEngine';
 import { ScreenRecorder } from '../Tutorial/ScreenRecorder';
 import { TargetHighlighter } from '../Tutorial/TargetHighlighter';
 import { ScreenRecordingStatus, TutorialStep } from '../types';
-import { Video, StopCircle, Play, ChevronRight, ChevronLeft, Volume2, X, Download, HelpCircle, CheckCircle, Info, Sparkles } from 'lucide-react';
+import { Video, StopCircle, Play, ChevronRight, ChevronLeft, Volume2, X, Download, HelpCircle, CheckCircle, Info, Sparkles, AlertTriangle } from 'lucide-react';
 
 export const TutorialOverlay: React.FC = () => {
   const [tutorialActive, setTutorialActive] = useState(false);
@@ -182,7 +182,11 @@ export const TutorialOverlay: React.FC = () => {
                 </span>
                 
                 {/* Step Category Badges */}
-                {currentStep.stepCategory === 'info' ? (
+                {currentStep.stepCategory === 'warning' ? (
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-400" /> ATTENTION
+                  </span>
+                ) : currentStep.stepCategory === 'info' ? (
                   <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1">
                     <Info className="w-3 h-3" /> INFORMATION
                   </span>
@@ -210,9 +214,9 @@ export const TutorialOverlay: React.FC = () => {
                   <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" /> ENREGISTREMENT
                   </span>
-                ) : currentStep.isOptional ? (
+                ) : currentStep.isOptional || currentStep.stepCategory === 'optional' ? (
                   <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                    <Info className="w-3 h-3" /> FACULTATIF
+                    <Info className="w-3 h-3" /> OPTIONNEL
                   </span>
                 ) : (
                   <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
@@ -245,7 +249,7 @@ export const TutorialOverlay: React.FC = () => {
                   Précédent
                 </button>
 
-                {currentStep.isOptional && (
+                {(currentStep.isOptional || currentStep.stepCategory === 'optional') && (
                   <button
                     onClick={handleSkipStep}
                     className="py-1.5 px-2 bg-amber-900/40 hover:bg-amber-800/60 text-amber-200 border border-amber-700/50 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1"

@@ -50,7 +50,10 @@ export const AcomAlertPopup: React.FC<AcomAlertPopupProps> = ({
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="relative max-w-sm w-full bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 pt-16 text-center space-y-6 mt-10 transition-all transform scale-100">
+      <div 
+        data-acom-id="pos.alert_notification_dialog"
+        className="relative max-w-sm w-full bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 pt-16 text-center space-y-6 mt-10 transition-all transform scale-100"
+      >
         
         {/* Floating Circle Overlay */}
         <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100/50">
@@ -90,6 +93,7 @@ export const AcomAlertPopup: React.FC<AcomAlertPopupProps> = ({
           )}
           <button
             type="button"
+            data-acom-id="alert-confirm-btn"
             onClick={() => {
               if (onConfirm) {
                 onConfirm();

@@ -9,6 +9,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { motion } from 'motion/react';
 import { AcomAlertPopup } from '../../../components/AcomAlertPopup';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
+import { EventBus } from '../../../ai-demo/BusinessEvents/EventBus';
 import { 
     Save, X, Loader2, Trash2, Printer, Search, 
     Filter, FileText, Check, DollarSign, Clock,
@@ -424,7 +425,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
       exit={{ opacity: 0, y: -20 }}
       className="space-y-6"
     >
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div data-acom-id="pressing.cash_closure.header" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-black text-ink">🔒 Clôture de Caisse & Rapport Journalier</h2>
           <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Supervision journalière & rapprochement financier</p>
@@ -434,13 +435,14 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Closure Form & Reconciliation Card */}
         <div className="lg:col-span-6 space-y-6">
-          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
+          <div data-acom-id="pressing.cash_closure.form_card" className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
             <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-black text-ink">🔑 Clôturer la caisse d'aujourd'hui</h3>
                 <p className="text-gray-400 text-xs mt-0.5">Vérifiez les calculs puis saisissez l'encours en espèces.</p>
               </div>
               <input
+                data-acom-id="pressing.cash_closure.date"
                 type="date"
                 value={closureDate}
                 onChange={e => setClosureDate(e.target.value)}
@@ -450,26 +452,26 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-100/40 text-center">
+                <div data-acom-id="pressing.cash_closure.press_value" className="p-4 bg-purple-50/60 rounded-2xl border border-purple-100/40 text-center">
                   <span className="block text-[8px] font-mono text-[#5c2197] uppercase tracking-wider">Recettes Pressing (+)</span>
                   <strong className="block text-base font-black text-[#481977] mt-1">{dailyPressingRevenue.toLocaleString()} F</strong>
                   <span className="text-[8px] text-[#5c2197] font-mono mt-0.5 block">
                     {dailyDepositsRevenue.toLocaleString()} F ({dailyPressingTickets.length} dép) + {dailyBalancesRevenue.toLocaleString()} F ({dailyBalancesCollected.length} soldes)
                   </span>
                 </div>
-                <div className="p-4 bg-cyan-50/60 rounded-2xl border border-cyan-100/40 text-center">
+                <div data-acom-id="pressing.cash_closure.product_sales" className="p-4 bg-cyan-50/60 rounded-2xl border border-cyan-100/40 text-center">
                   <span className="block text-[8px] font-mono text-cyan-400 uppercase tracking-wider">Ventes Produits (+)</span>
                   <strong className="block text-base font-black text-cyan-900 mt-1">{dailyDetergentRevenue.toLocaleString()} F</strong>
                   <span className="text-[8px] text-cyan-500 font-mono mt-0.5 block">{dailyDetergentSales.length} ventes de boutique</span>
                 </div>
-                <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100/45 text-center">
+                <div data-acom-id="pressing.cash_closure.expenses" className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100/45 text-center">
                   <span className="block text-[8px] font-mono text-rose-400 uppercase tracking-wider">Dépenses du Jour (-)</span>
                   <strong className="block text-base font-black text-rose-900 mt-1">{dailyExpensesTotal.toLocaleString()} F</strong>
                   <span className="text-[8px] text-rose-500 font-mono mt-0.5 block">{dailyExpenses.length} justificatifs saisis</span>
                 </div>
               </div>
 
-              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+              <div data-acom-id="pressing.cash_closure.expected_revenue" className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
                 <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest block">📊 Chiffre d'Affaires Théorique Attendu</span>
                 <strong className="text-2xl font-black text-ink mt-1 block">
                   {totalTheoreticalRevenue.toLocaleString()} <span className="text-sm font-medium">{merchant.currency || 'FCFA'}</span>
@@ -482,6 +484,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nom du Caissier / Opérateur *</label>
                   <input
+                    data-acom-id="pressing.cash_closure.cashier"
                     type="text"
                     required
                     placeholder="Ex: Kouamé Marc"
@@ -493,6 +496,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Espèces Réelles Comptées * ({merchant.currency || 'F'})</label>
                   <input
+                    data-acom-id="pressing.cash_closure.real_cash"
                     type="number"
                     required
                     value={actualCash || ''}
@@ -553,6 +557,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
               <div>
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Observations / Justifications</label>
                 <textarea
+                  data-acom-id="pressing.cash_closure.observations"
                   rows={2}
                   placeholder="Ex: Écart de caisse justifié par les dépenses de détergents ou petite monnaie manquante..."
                   value={closureNotes}
@@ -562,6 +567,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
               </div>
 
               <button
+                data-acom-id="pressing.cash_closure.validate"
                 type="button"
                 onClick={async () => {
                   if (!cashierName.trim()) {
@@ -607,6 +613,23 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                       return [newClosure, ...filtered];
                     });
 
+                    // Emit business event for tutorial & audit
+                    EventBus.emit({
+                      type: 'CASH_REGISTER_CLOSED',
+                      saas: 'pressing',
+                      merchantId: merchant.id,
+                      triggeredBy: 'user',
+                      payload: {
+                        closureId: newClosure.id,
+                        date: newClosure.date,
+                        cashierName: newClosure.cashierName,
+                        totalTheoreticalRevenue: newClosure.totalTheoreticalRevenue,
+                        actualCashCounted: newClosure.actualCashCounted,
+                        discrepancy: newClosure.discrepancy,
+                        timestamp: newClosure.timestamp
+                      }
+                    });
+
                     // Reset inputs
                     setActualCash(0);
                     setClosureNotes('');
@@ -646,7 +669,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
         </div>
 
         {/* Historical Closures List */}
-        <div className="lg:col-span-6 space-y-4">
+        <div data-acom-id="pressing.cash_closure.history" className="lg:col-span-6 space-y-4">
           <h3 className="text-base font-black text-ink flex items-center gap-2">
             📜 Historique des Clôtures Journalières
           </h3>

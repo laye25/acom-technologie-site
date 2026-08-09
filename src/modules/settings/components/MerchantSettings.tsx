@@ -5,6 +5,7 @@ import { dbService } from '../../../services/dbService';
 import { syncService } from '../../../services/syncService';
 import { Merchant } from '../../../types';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { EventBus } from '../../../ai-demo/BusinessEvents/EventBus';
 import { db } from '../../../db/db';
 import { SaaSManagerModal } from '../../../components/SaaSManagerModal';
 import { saasSubscriptionService, SAAS_CATALOG } from '../../../services/saasSubscriptionService';
@@ -122,6 +123,13 @@ const MerchantSettings = ({
       await dbService.merchants.save({ ...formData, updatedAt: new Date() } as any);
       onUpdate(formData);
       triggerAcomAlert('Succès', 'Réglages mis à jour', 'success', 'SYSTÈME');
+      EventBus.emit({
+        type: 'SETTINGS_UPDATED',
+        saas: (merchant.type as any) || 'pressing',
+        merchantId: merchant.id,
+        payload: formData,
+        triggeredBy: 'user'
+      });
     } catch (error) {
       triggerAcomAlert('Erreur', 'Erreur lors de la mise à jour', 'error', 'ALERTE');
     } finally {
@@ -137,7 +145,7 @@ const MerchantSettings = ({
       className="max-w-4xl mx-auto"
     >
       {/* Multi-SaaS & Subscriptions Manager Card */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 md:p-10 rounded-[3rem] text-white shadow-xl mb-12 border border-slate-700/50 relative overflow-hidden">
+      <div data-acom-id="settings.saas.card" className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 md:p-10 rounded-[3rem] text-white shadow-xl mb-12 border border-slate-700/50 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
           <Layers className="w-48 h-48 text-white" />
         </div>
@@ -157,6 +165,7 @@ const MerchantSettings = ({
             </div>
 
             <button
+              data-acom-id="settings.saas.manage_btn"
               type="button"
               onClick={() => setShowSaaSModal(true)}
               className="px-6 py-4 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
@@ -195,7 +204,7 @@ const MerchantSettings = ({
         />
       )}
 
-      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+      <div data-acom-id="settings.data.card" className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-2xl font-black text-ink">Gestion des Données Locales</h3>
@@ -207,7 +216,7 @@ const MerchantSettings = ({
         </div>
 
         <div className="space-y-6">
-          <div className="bg-emerald-50/30 rounded-[2rem] p-8 border border-emerald-100/50">
+          <div data-acom-id="settings.data.local_first_card" className="bg-emerald-50/30 rounded-[2rem] p-8 border border-emerald-100/50">
             <div className="flex flex-col sm:flex-row items-start gap-6">
               <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-emerald-100 shrink-0">
                 <HardDrive className="w-6 h-6 text-emerald-600" />
@@ -220,14 +229,14 @@ const MerchantSettings = ({
                 </p>
                 
                 {merchant.licenseType === 'local' ? (
-                  <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex items-start sm:items-center gap-3">
+                  <div data-acom-id="settings.data.sync_status" className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100 flex items-start sm:items-center gap-3">
                     <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
                     <p className="text-[10px] text-amber-800 font-bold uppercase tracking-wide min-w-0 flex-1 break-words">
                       Mode "Local Uniquement" activé. La synchronisation Cloud est désactivée.
                     </p>
                   </div>
                 ) : (
-                  <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-start sm:items-center gap-3">
+                  <div data-acom-id="settings.data.sync_status" className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-start sm:items-center gap-3">
                     <Database className="w-4 h-4 text-blue-600 shrink-0 mt-0.5 sm:mt-0" />
                     <p className="text-[10px] text-blue-800 font-bold uppercase tracking-wide min-w-0 flex-1 break-words">
                       Synchronisation Cloud activée. Vos données sont sauvegardées en temps réel.
@@ -236,7 +245,7 @@ const MerchantSettings = ({
                 )}
                 
                 <div className="mt-6 flex flex-wrap gap-4">
-                  <div className="bg-white/80 backdrop-blur px-5 py-3 rounded-2xl border border-emerald-100 flex items-center gap-3">
+                  <div data-acom-id="settings.data.security_status" className="bg-white/80 backdrop-blur px-5 py-3 rounded-2xl border border-emerald-100 flex items-center gap-3">
                     <CheckCircle className="w-4 h-4 text-emerald-500" />
                     <div>
                       <p className="text-[9px] font-black text-gray-400 uppercase">Statut</p>
@@ -253,9 +262,10 @@ const MerchantSettings = ({
               <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Exportation Critique</h5>
               <p className="text-xs text-gray-500 mb-4">Exportez vos données locales en format JSON pour une sauvegarde manuelle.</p>
               <button 
+                data-acom-id="settings.data.export_btn"
                 onClick={handleExportLocalData}
                 disabled={isExporting}
-                className="w-full py-4 bg-white border border-black/5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-primary/30 transition-all disabled:opacity-50"
+                className="w-full py-4 bg-white border border-black/5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-primary/30 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Exporter la Base Locale'}
               </button>
@@ -264,8 +274,9 @@ const MerchantSettings = ({
               <h5 className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-4">Sécurité Système</h5>
               <p className="text-xs text-rose-800/60 mb-4">Effacer le cache local peut résoudre certains problèmes de synchronisation.</p>
               <button 
+                data-acom-id="settings.data.clear_cache_btn"
                 onClick={handleClearCache}
-                className="w-full py-4 bg-white border border-rose-100 text-rose-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all"
+                className="w-full py-4 bg-white border border-rose-100 text-rose-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all cursor-pointer"
               >
                 Vider le Cache (Attention)
               </button>
@@ -274,7 +285,7 @@ const MerchantSettings = ({
         </div>
       </div>
 
-      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+      <div data-acom-id="settings.manager.card" className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-2xl font-black text-ink">Suivi Gérant (Temps Réel)</h3>
@@ -290,6 +301,7 @@ const MerchantSettings = ({
             <div>
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">WhatsApp Gérant (avec indicatif)</label>
               <input
+                data-acom-id="settings.manager.whatsapp_input"
                 type="text"
                 value={formData.managerNotifications?.whatsappPhone || ''}
                 onChange={e => setFormData({
@@ -303,6 +315,7 @@ const MerchantSettings = ({
             <div>
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">E-mail Gérant (Destinataire)</label>
               <input
+                data-acom-id="settings.manager.email_input"
                 type="email"
                 value={formData.managerNotifications?.email || ''}
                 onChange={e => setFormData({
@@ -316,7 +329,7 @@ const MerchantSettings = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <label className="flex items-center p-4 bg-white border border-gray-200 rounded-2xl cursor-pointer hover:border-indigo-300 transition-colors">
+            <label data-acom-id="settings.manager.notify_cash_closure_toggle" className="flex items-center p-4 bg-white border border-gray-200 rounded-2xl cursor-pointer hover:border-indigo-300 transition-colors">
               <input
                 type="checkbox"
                 checked={formData.managerNotifications?.notifyOnCashClosure !== false}
@@ -332,7 +345,7 @@ const MerchantSettings = ({
               </div>
             </label>
 
-            <label className="flex items-center p-4 bg-white border border-gray-200 rounded-2xl cursor-pointer hover:border-indigo-300 transition-colors">
+            <label data-acom-id="settings.manager.notify_pos_sale_toggle" className="flex items-center p-4 bg-white border border-gray-200 rounded-2xl cursor-pointer hover:border-indigo-300 transition-colors">
               <input
                 type="checkbox"
                 checked={formData.managerNotifications?.notifyOnPOSSale !== false}
@@ -350,9 +363,10 @@ const MerchantSettings = ({
           </div>
           
           <button
+            data-acom-id="settings.manager.save_alerts_btn"
             onClick={handleSave}
             disabled={saving}
-            className="w-full mt-4 flex items-center justify-center space-x-2 bg-indigo-600 text-white rounded-2xl py-4 font-bold shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+            className="w-full mt-4 flex items-center justify-center space-x-2 bg-indigo-600 text-white rounded-2xl py-4 font-bold shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
           >
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             <span>Sauvegarder les alertes</span>
@@ -360,7 +374,7 @@ const MerchantSettings = ({
         </div>
       </div>
 
-      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
+      <div data-acom-id="settings.desktop.card" className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl mb-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-2xl font-black text-ink">Version Bureau & Desktop</h3>
@@ -383,8 +397,9 @@ const MerchantSettings = ({
               </p>
               <div className="flex flex-wrap gap-4 pt-2">
                 <button
+                  data-acom-id="settings.desktop.download_btn"
                   onClick={() => setActiveTab('build')}
-                  className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95"
+                  className="flex items-center space-x-2 px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   <Download className="w-5 h-5" />
                   <span>Obtenir l'App Desktop</span>
@@ -399,7 +414,7 @@ const MerchantSettings = ({
         </div>
       </div>
 
-      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl">
+      <div data-acom-id="settings.business.card" className="bg-white p-6 md:p-10 rounded-[3rem] border border-black/5 shadow-xl">
         <div className="flex items-center justify-between mb-10">
           <div>
             <h3 className="text-2xl font-black text-ink">Réglages Business</h3>
@@ -411,7 +426,7 @@ const MerchantSettings = ({
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+          <div data-acom-id="settings.business.saas_type" className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
             <div className="flex items-center space-x-4 w-full min-w-0">
               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
                 <Store className="w-6 h-6 text-primary" />
@@ -427,7 +442,7 @@ const MerchantSettings = ({
             </div>
           </div>
 
-          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+          <div data-acom-id="settings.business.plan" className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
             <div className="flex items-center space-x-4 w-full min-w-0">
               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
                 <Zap className="w-6 h-6 text-primary" />
@@ -439,12 +454,12 @@ const MerchantSettings = ({
             </div>
             <button 
               onClick={() => setActiveTab('dashboard')}
-              className="text-[9px] font-black text-primary hover:bg-primary hover:text-white transition-all bg-primary/10 px-4 py-2 rounded-full uppercase tracking-widest shrink-0 self-start sm:self-auto"
+              className="text-[9px] font-black text-primary hover:bg-primary hover:text-white transition-all bg-primary/10 px-4 py-2 rounded-full uppercase tracking-widest shrink-0 self-start sm:self-auto cursor-pointer"
             >
               Améliorer
             </button>
           </div>
-          <div className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+          <div data-acom-id="settings.business.license_type_select" className="p-6 bg-gray-50/50 rounded-[2rem] border border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
             <div className="flex items-center space-x-4 w-full min-w-0">
               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-black/5 group-hover:scale-110 transition-transform">
                 {formData.licenseType === 'cloud' ? <Database className="w-6 h-6 text-blue-500" /> : <HardDrive className="w-6 h-6 text-emerald-500" />}
@@ -468,7 +483,7 @@ const MerchantSettings = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Nom de l'organisation</label>
-              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold text-lg" />
+              <input data-acom-id="settings.business.name_input" type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold text-lg" />
             </div>
 
             <div className="md:col-span-2">
@@ -502,7 +517,7 @@ const MerchantSettings = ({
                     className="hidden"
                     id="logo-upload"
                   />
-                  <label htmlFor="logo-upload" className="cursor-pointer inline-flex items-center px-6 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold shadow-sm uppercase tracking-widest hover:border-primary/50 transition-all text-gray-600">
+                  <label data-acom-id="settings.business.logo_upload_label" htmlFor="logo-upload" className="cursor-pointer inline-flex items-center px-6 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold shadow-sm uppercase tracking-widest hover:border-primary/50 transition-all text-gray-600">
                     <Upload className="w-4 h-4 mr-2" />
                     Changer le logo
                   </label>
@@ -513,23 +528,23 @@ const MerchantSettings = ({
 
             <div>
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Téléphone Professionnel</label>
-              <input type="tel" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-mono font-bold" />
+              <input data-acom-id="settings.business.phone_input" type="tel" value={formData.phone || ''} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-mono font-bold" />
             </div>
             <div>
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Email de Contact</label>
-              <input type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold" />
+              <input data-acom-id="settings.business.email_input" type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-bold" />
             </div>
 
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Adresse Physique</label>
               <div className="relative">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300" />
-                <input type="text" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full pl-12 pr-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-medium" />
+                <input data-acom-id="settings.business.address_input" type="text" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} className="w-full pl-12 pr-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 font-medium" />
               </div>
             </div>
             <div className="md:col-span-2">
               <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-3">Description / Slogan</label>
-              <textarea rows={4} value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 resize-none font-medium leading-relaxed" placeholder="Décrivez votre activité en quelques mots..." />
+              <textarea data-acom-id="settings.business.description_input" rows={4} value={formData.description || ''} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-5 py-4 rounded-2xl border border-gray-100 outline-none focus:ring-4 focus:ring-primary/10 bg-gray-50/30 resize-none font-medium leading-relaxed" placeholder="Décrivez votre activité en quelques mots..." />
             </div>
 
             {formData.type === 'scolaire' && (
@@ -561,9 +576,10 @@ const MerchantSettings = ({
           
           <div className="pt-6 border-t border-gray-100">
             <button 
+              data-acom-id="settings.business.save_btn"
               type="submit" 
               disabled={saving} 
-              className="w-full py-5 bg-ink text-white rounded-[1.5rem] font-black text-xs md:text-sm uppercase tracking-widest md:tracking-[0.2em] hover:bg-black transition-all flex items-center justify-center shadow-2xl shadow-black/20 active:scale-[0.98]"
+              className="w-full py-5 bg-ink text-white rounded-[1.5rem] font-black text-xs md:text-sm uppercase tracking-widest md:tracking-[0.2em] hover:bg-black transition-all flex items-center justify-center shadow-2xl shadow-black/20 active:scale-[0.98] cursor-pointer"
             >
               {saving ? <Loader2 className="w-6 h-6 animate-spin" /> : <><Save className="w-5 h-5 mr-3 shrink-0" /> <span>Enregistrer les modifications</span></>}
             </button>

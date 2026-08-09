@@ -17,6 +17,7 @@ import ScannerModal from '../../../components/ScannerModal';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { EventBus } from '../../../ai-demo/BusinessEvents/EventBus';
 
 
 const useHorizontalScroll = <T extends HTMLElement>() => {
@@ -465,6 +466,13 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       triggerCartError("ARTICLE EN RUPTURE, LA VENTE EST ANNULÉE.");
       return;
     }
+    EventBus.emit({
+      saas: 'stock',
+      merchantId: merchant.id,
+      type: 'POS_ITEM_ADDED',
+      payload: product,
+      triggeredBy: 'user'
+    });
     setCart(prev => {
       const existing = prev.find(item => item.productId === product.id);
       if (existing) {
@@ -721,6 +729,14 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       // 3. Set Receipt modal data and whatsappUrl
       setShowReceiptModal({ show: true, saleData: { ...saleData, id: saleId }, whatsappUrl: whatsappUrl });
 
+      EventBus.emit({
+        saas: 'stock',
+        merchantId: merchant.id,
+        type: 'POS_SALE_COMPLETED',
+        payload: { ...saleData, id: saleId },
+        triggeredBy: 'user'
+      });
+
       setCart([]);
       setCustomerName('');
       setCustomerPhone('');
@@ -832,21 +848,35 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           <div className="space-y-3">
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-              <input type="text" placeholder="Nom du client (optionnel)" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
+              <input 
+                type="text" 
+                data-acom-id="pos.customer_name"
+                placeholder="Nom du client (optionnel)" 
+                value={customerName} 
+                onChange={e => setCustomerName(e.target.value)} 
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" 
+              />
             </div>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-              <input type="tel" placeholder="Téléphone client" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" />
+              <input 
+                type="tel" 
+                data-acom-id="pos.customer_phone"
+                placeholder="Téléphone client" 
+                value={customerPhone} 
+                onChange={e => setCustomerPhone(e.target.value)} 
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary/10" 
+              />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+          <div data-acom-id="pos.payment_methods_zone" className="grid grid-cols-2 lg:grid-cols-3 gap-2">
             <PaymentMethodBtn active={paymentMethod === 'cash'} onClick={() => setPaymentMethod('cash')} label="ESPÈCES" />
             <PaymentMethodBtn active={paymentMethod === 'card'} onClick={() => setPaymentMethod('card')} label="CARTE" />
             <PaymentMethodBtn active={paymentMethod === 'mobile_money'} onClick={() => setPaymentMethod('mobile_money')} label="MOBILE" />
           </div>
 
-          <div className="pt-4 border-t border-black/5">
+          <div data-acom-id="pos.partial_payment_toggle" className="pt-4 border-t border-black/5">
             <label className="flex items-center gap-3 cursor-pointer group">
               <div 
                 onClick={() => setIsPartial(!isPartial)}
@@ -881,7 +911,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           <div className="pt-4 border-t border-black/5 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* WhatsApp follow-up */}
-              <div className="space-y-2">
+              <div data-acom-id="pos.whatsapp_manager_toggle" className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input 
                     type="checkbox"
@@ -910,7 +940,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               </div>
 
               {/* WhatsApp Client follow-up */}
-              <div className="space-y-2">
+              <div data-acom-id="pos.whatsapp_client_toggle" className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input 
                     type="checkbox"
@@ -939,7 +969,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
               </div>
 
               {/* Email follow-up */}
-              <div className="space-y-2">
+              <div data-acom-id="pos.messaging_zone" className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input 
                     type="checkbox"
@@ -969,7 +999,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-4 border-t border-dashed border-gray-100">
+          <div data-acom-id="pos.total_amount_zone" className="flex items-center justify-between pt-4 border-t border-dashed border-gray-100">
             <span className="text-gray-400 text-[10px] font-mono font-black uppercase tracking-widest">Total à payer</span>
             <div className="text-right">
               <span className="text-3xl font-black text-ink">{total.toLocaleString()}</span>
@@ -978,6 +1008,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           </div>
 
           <button 
+            data-acom-id="pos.submit_checkout_btn"
             onClick={async () => {
               await handleCheckout();
               if (isMobile) {
@@ -1008,6 +1039,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
             <input
               type="text"
               id="pos-search"
+              data-acom-id="pos.search_input"
               placeholder="Rechercher un produit ou scanner le code-barres (SKU)..."
               value={searchTerm}
               onChange={(e) => {
@@ -1059,6 +1091,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           </div>
           <button
             onClick={() => setShowBarcodeScanner(true)}
+            data-acom-id="pos.scanner_btn"
             className="h-auto px-5 bg-indigo-50 text-indigo-600 rounded-[1.5rem] border border-indigo-100 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all flex items-center justify-center shadow-sm whitespace-nowrap"
             title="Scanner un code-barres avec la caméra"
           >
@@ -1070,7 +1103,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
         {/* Filtres Intelligents */}
         <div className="space-y-4 bg-gray-50/50 p-4 rounded-3xl border border-black/5">
           {/* Ligne 1: Catégories (Filtre rapide) */}
-          <div className="space-y-2">
+          <div data-acom-id="pos.categories_zone" className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5" />
@@ -1291,7 +1324,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           {/* Ligne 2: Disponibilité & Tri */}
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between border-t border-black/5 pt-3">
             {/* Disponibilité Segmented Control */}
-            <div ref={stockFiltersRef} className="flex items-center gap-2 w-full overflow-x-auto pb-2 -mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div ref={stockFiltersRef} data-acom-id="pos.stock_filter_zone" className="flex items-center gap-2 w-full overflow-x-auto pb-2 -mb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
               <span className="text-[10px] shrink-0 font-black text-gray-400 uppercase tracking-widest mr-1">Filtrer Stock :</span>
               <div className="bg-white border border-black/5 rounded-2xl p-1 flex gap-1 shadow-sm shrink-0">
                 <button
@@ -1354,6 +1387,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Trier par :</span>
                 <div className="relative flex-1 md:flex-none">
                   <select
+                    data-acom-id="pos.sort_select"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as any)}
                     className="appearance-none bg-white border border-black/5 rounded-2xl pl-3 pr-8 py-1.5 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-primary/10 shadow-sm cursor-pointer w-full"
@@ -1399,9 +1433,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map((product) => (
+            {filteredProducts.map((product, idx) => (
               <button
                 key={product.id}
+                data-acom-id={idx === 0 ? "pos.product_card" : undefined}
                 onClick={() => addToCart(product)}
                 className="bg-white p-4 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all text-left group relative overflow-hidden flex flex-col justify-between"
               >
@@ -1441,7 +1476,10 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 </div>
                 
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg">
+                  <div 
+                    data-acom-id={idx === 0 ? "pos.add_to_cart_btn" : undefined}
+                    className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg"
+                  >
                     <Plus className="w-4 h-4" />
                   </div>
                 </div>
@@ -1452,7 +1490,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
       </div>
 
       <div className="hidden lg:block w-full lg:w-[400px]">
-        <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-xl sticky top-32">
+        <div data-acom-id="pos.cart_panel" className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-xl sticky top-32">
           {renderCartContent(false)}
         </div>
       </div>
@@ -1551,7 +1589,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                   {/* Left Column: Vente Réussie & Printers */}
                   <div className="space-y-4 md:space-y-6 flex flex-col justify-between">
-                    <div>
+                    <div data-acom-id="pos.sale_success_modal">
                       <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 mx-auto md:mx-0">
                         <CheckCircle className="w-8 h-8 text-emerald-500" />
                       </div>
@@ -1613,6 +1651,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
 
                     <div className="pt-2">
                       <button 
+                        data-acom-id="pos.new_client_btn"
                         onClick={() => setShowReceiptModal(null)}
                         className="w-full py-3 bg-gray-50 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-black/5 text-center"
                       >
@@ -1622,7 +1661,7 @@ const MerchantPOS = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, se
                   </div>
 
                   {/* Right Column: WhatsApp & Live Tracking Panel */}
-                  <div className="border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-6 flex flex-col justify-between">
+                  <div data-acom-id="pos.modal_tracking_details" className="border-t md:border-t-0 md:border-l border-gray-100 pt-6 md:pt-0 md:pl-6 flex flex-col justify-between">
                     <div className="space-y-4">
                       <div>
                         <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center mb-3">
