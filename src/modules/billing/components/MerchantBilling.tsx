@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, Search, FileText, Check, Download, ClipboardCheck, Clock, RefreshCw, Printer, Edit2 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -8,12 +8,13 @@ import { Merchant, MerchantSale, MerchantQuote } from '../../../types';
 import { billingService } from '../../../services/billingService';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { Receipt } from 'lucide-react';
-import { printDirectHTML, generateReceiptPDF, generateA4InvoicePDF, generateA4QuotePDF } from '../utils/pdfGenerator'; // Warning: cyclical import, will need to extract these
+import { printDirectHTML, generateReceiptPDF, generateA4InvoicePDF, generateA4QuotePDF } from '../utils/pdfGenerator';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import QuoteModal from './QuoteModal';
 import PaymentModal from './PaymentModal';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
   const [subTab, setSubTab] = useState<'invoices' | 'quotes' | 'pending'>('invoices');
@@ -35,6 +36,36 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
     db.quotes.where('merchantId').equals(merchant.id).reverse().sortBy('createdAt')
   , []) || [];
 
+  useEffect(() => {
+    TutorialEngine.setBillingContext({
+      subTab,
+      invoiceCount: sales.length,
+      pendingCount: sales.filter(s => s.balance && s.balance > 0).length,
+      quoteCount: quotes.length
+    });
+  }, [subTab, sales.length, quotes.length]);
+
+  const handleOpenPrintDoc = (type: 'sale' | 'quote', item: any) => {
+    setActivePrintDoc({ type, item });
+    TutorialEngine.onModalOpened('billing.print_modal');
+  };
+
+  const handleClosePrintDoc = () => {
+    setActivePrintDoc(null);
+    TutorialEngine.onModalClosed('billing.print_modal');
+  };
+
+  const handleOpenQuoteModal = (quote?: MerchantQuote | null) => {
+    setSelectedQuote(quote || null);
+    setIsQuoteModalOpen(true);
+    TutorialEngine.onModalOpened('billing.quote_modal');
+  };
+
+  const handleCloseQuoteModal = () => {
+    setIsQuoteModalOpen(false);
+    TutorialEngine.onModalClosed('billing.quote_modal');
+  };
+
   const handleConvertQuote = async (quote: MerchantQuote) => {
     try {
       await billingService.convertQuoteToInvoice(quote, merchant);
@@ -52,25 +83,28 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
     >
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div>
-          <h2 className="text-3xl font-black text-ink tracking-tight">Facturation & Devis</h2>
-          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Gestion des documents commerciaux</p>
+          <h2 data-acom-id="billing.title" className="text-3xl font-black text-ink tracking-tight">Facturation & Devis</h2>
+          <p data-acom-id="billing.subtitle" className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1">Gestion des documents commerciaux</p>
         </div>
-        <div className="flex bg-gray-100 p-1.5 rounded-2xl">
+        <div data-acom-id="billing.tabs_bar" className="flex bg-gray-100 dark:bg-slate-900 p-1.5 rounded-2xl border border-black/5 dark:border-slate-800">
           <button 
+            data-acom-id="billing.tab.invoices"
             onClick={() => setSubTab('invoices')}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'invoices' ? 'bg-white text-ink shadow-sm' : 'text-gray-400 hover:text-ink'}`}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'invoices' ? 'bg-white dark:bg-slate-800 text-ink dark:text-white shadow-sm' : 'text-gray-400 dark:text-slate-400 hover:text-ink dark:hover:text-white'}`}
           >
             Factures
           </button>
           <button 
+            data-acom-id="billing.tab.pending"
             onClick={() => setSubTab('pending')}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'pending' ? 'bg-white text-rose-500 shadow-sm' : 'text-gray-400 hover:text-rose-500'}`}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'pending' ? 'bg-white dark:bg-slate-800 text-rose-500 shadow-sm' : 'text-gray-400 dark:text-slate-400 hover:text-rose-500'}`}
           >
             Impayés
           </button>
           <button 
+            data-acom-id="billing.tab.quotes"
             onClick={() => setSubTab('quotes')}
-            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'quotes' ? 'bg-white text-ink shadow-sm' : 'text-gray-400 hover:text-ink'}`}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${subTab === 'quotes' ? 'bg-white dark:bg-slate-800 text-ink dark:text-white shadow-sm' : 'text-gray-400 dark:text-slate-400 hover:text-ink dark:hover:text-white'}`}
           >
             Devis
           </button>
@@ -80,67 +114,71 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
       {subTab === 'invoices' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-xl font-bold flex items-center gap-3">
+            <h3 data-acom-id="billing.invoices.header" className="text-xl font-bold flex items-center gap-3">
               <Receipt className="w-5 h-5 text-primary" />
               Historique des Factures
             </h3>
-            <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">{sales.length} Documents</span>
+            <span data-acom-id="billing.invoices.counter" className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">{sales.length} Documents</span>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-black/5 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table data-acom-id="billing.invoices.table" className="w-full text-left">
                 <thead>
-                  <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                    <th className="px-8 py-5">Référence & Date</th>
-                    <th className="px-8 py-5">Client</th>
-                    <th className="px-8 py-5">Mode</th>
-                    <th className="px-8 py-5 text-right">Montant TTC</th>
-                    <th className="px-8 py-5 text-right">Actions</th>
+                  <tr className="bg-gray-50/50 dark:bg-slate-900/50 text-[10px] font-mono font-black text-gray-400 dark:text-slate-400 uppercase tracking-[0.2em] border-b border-gray-100 dark:border-slate-800">
+                    <th data-acom-id="billing.invoices.col_ref" className="px-8 py-5">Référence & Date</th>
+                    <th data-acom-id="billing.invoices.col_client" className="px-8 py-5">Client</th>
+                    <th data-acom-id="billing.invoices.col_mode" className="px-8 py-5">Mode</th>
+                    <th data-acom-id="billing.invoices.col_amount" className="px-8 py-5 text-right">Montant TTC</th>
+                    <th data-acom-id="billing.invoices.col_actions" className="px-8 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                   {sales.length === 0 ? (
-                    <tr><td colSpan={5} className="py-20 text-center text-gray-400 text-sm">Aucune facture enregistrée</td></tr>
+                    <tr data-acom-id="billing.invoices.empty_state"><td colSpan={5} className="py-20 text-center text-gray-400 dark:text-slate-500 text-sm">Aucune facture enregistrée</td></tr>
                   ) : (
-                    sales.slice(0, invoiceLimit).map((sale) => (
-                      <tr key={sale.id} className="hover:bg-gray-50/50 transition-colors group">
+                    sales.slice(0, invoiceLimit).map((sale, idx) => (
+                      <tr 
+                        key={sale.id} 
+                        data-acom-id={idx === 0 ? "billing.invoices.first_row" : undefined}
+                        className="hover:bg-gray-50/50 dark:hover:bg-slate-800/40 transition-colors group"
+                      >
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-2">
-                            <p className="text-[11px] font-mono font-black text-ink">#INV-{sale.id.slice(0, 8).toUpperCase()}</p>
+                            <p className="text-[11px] font-mono font-black text-ink dark:text-white">#INV-{sale.id.slice(0, 8).toUpperCase()}</p>
                             {(sale as any).syncStatus && (
                               <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${
-                                (sale as any).syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                (sale as any).syncStatus === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                'bg-gray-50 text-gray-400 border-gray-100'
+                                (sale as any).syncStatus === 'synced' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/60' : 
+                                (sale as any).syncStatus === 'pending' ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-800/60' :
+                                'bg-gray-50 dark:bg-slate-800 text-gray-400 dark:text-slate-400 border-gray-100 dark:border-slate-700'
                               }`}>
                                 {(sale as any).syncStatus === 'synced' ? <Check className="w-2 h-2" /> : <RefreshCw className="w-2 h-2 animate-spin" />}
                                 <span className="text-[7px] font-black uppercase">{(sale as any).syncStatus}</span>
                               </div>
                             )}
                           </div>
-                          <p className="text-[9px] font-mono text-gray-400 mt-1 uppercase">
+                          <p className="text-[9px] font-mono text-gray-400 dark:text-slate-500 mt-1 uppercase">
                             {sale.createdAt?.seconds ? format(new Date(sale.createdAt.seconds * 1000), 'dd/MM/yyyy HH:mm') : format(new Date(sale.createdAt), 'dd/MM/yyyy HH:mm')}
                           </p>
                         </td>
                         <td className="px-8 py-6">
-                          <p className="font-black text-ink text-sm">{sale.customerName || 'Client POS'}</p>
+                          <p className="font-black text-ink dark:text-white text-sm">{sale.customerName || 'Client POS'}</p>
                         </td>
                         <td className="px-8 py-6">
                           <div className="flex flex-col gap-1">
                             <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border w-fit ${
-                              sale.paymentMethod === 'cash' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'
+                              sale.paymentMethod === 'cash' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/60' : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/60'
                             }`}>
                               {sale.paymentMethod}
                             </span>
                             {sale.balance !== undefined && sale.balance > 0 && (
-                              <span className="px-3 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-full text-[9px] font-black uppercase tracking-widest w-fit">
+                              <span className="px-3 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-800/60 rounded-full text-[9px] font-black uppercase tracking-widest w-fit">
                                 Reste: {sale.balance.toLocaleString()}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-8 py-6 text-right font-mono font-black text-ink">
+                        <td className="px-8 py-6 text-right font-mono font-black text-ink dark:text-white">
                           {sale.totalAmount.toLocaleString()} <span className="text-[9px] opacity-40">{merchant.currency}</span>
                         </td>
                         <td className="px-8 py-6 text-right">
@@ -157,8 +195,9 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                              
                              {/* Centralized Print Action Button */}
                              <button 
-                               onClick={() => setActivePrintDoc({ type: 'sale', item: sale })} 
-                               className="px-4 py-2 bg-gray-50 border border-black/5 hover:border-primary/20 hover:bg-primary/5 text-gray-700 hover:text-primary rounded-xl transition-all text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-sm"
+                               data-acom-id={idx === 0 ? "billing.invoices.first_row_btn_print" : undefined}
+                               onClick={() => handleOpenPrintDoc('sale', sale)} 
+                               className="px-4 py-2 bg-gray-50 dark:bg-slate-800 border border-black/5 dark:border-slate-700 hover:border-primary/20 hover:bg-primary/5 text-gray-700 dark:text-slate-200 hover:text-primary rounded-xl transition-all text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-sm"
                                title="Imprimer / Exporter le document (Reçus, Facture, Impayés)"
                              >
                                <Printer className="w-3.5 h-3.5 text-primary" />
@@ -189,28 +228,28 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
       {subTab === 'pending' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-xl font-bold flex items-center gap-3">
+            <h3 data-acom-id="billing.pending.header" className="text-xl font-bold flex items-center gap-3">
               <Clock className="w-5 h-5 text-amber-500" />
               Factures avec Impayés
             </h3>
-            <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">{sales.filter(s => s.balance && s.balance > 0).length} En attente</span>
+            <span data-acom-id="billing.pending.counter" className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">{sales.filter(s => s.balance && s.balance > 0).length} En attente</span>
           </div>
 
           <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table data-acom-id="billing.pending.table" className="w-full text-left">
                 <thead>
                   <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                    <th className="px-8 py-5">Référence</th>
-                    <th className="px-8 py-5">Client</th>
-                    <th className="px-8 py-5 text-right">Total</th>
-                    <th className="px-8 py-5 text-right text-rose-500">Reste à payer</th>
-                    <th className="px-8 py-5 text-right">Actions</th>
+                    <th data-acom-id="billing.pending.col_ref" className="px-8 py-5">Référence</th>
+                    <th data-acom-id="billing.pending.col_client" className="px-8 py-5">Client</th>
+                    <th data-acom-id="billing.pending.col_total" className="px-8 py-5 text-right">Total</th>
+                    <th data-acom-id="billing.pending.col_remaining" className="px-8 py-5 text-right text-rose-500">Reste à payer</th>
+                    <th data-acom-id="billing.pending.col_actions" className="px-8 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {sales.filter(s => s.balance !== undefined && s.balance > 0).length === 0 ? (
-                    <tr><td colSpan={5} className="py-20 text-center text-gray-400 text-sm italic uppercase tracking-widest font-black opacity-40">Toutes les créances sont recouvrées !</td></tr>
+                    <tr data-acom-id="billing.pending.empty_state"><td colSpan={5} className="py-20 text-center text-gray-400 text-sm italic uppercase tracking-widest font-black opacity-40">Toutes les créances sont recouvrées !</td></tr>
                   ) : (
                     sales.filter(s => s.balance !== undefined && s.balance > 0).slice(0, pendingLimit).map((sale) => (
                       <tr key={sale.id} className="hover:bg-rose-50/20 transition-colors group">
@@ -237,7 +276,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                              
                              {/* Centralized Print Action Button */}
                              <button 
-                               onClick={() => setActivePrintDoc({ type: 'sale', item: sale })} 
+                               onClick={() => handleOpenPrintDoc('sale', sale)} 
                                className="px-4 py-2 bg-gray-50 border border-black/5 hover:border-rose-100 hover:bg-rose-50/50 text-gray-700 hover:text-rose-600 rounded-xl transition-all text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-sm"
                                title="Imprimer / Exporter le document (Reçus, Facture, Impayés)"
                              >
@@ -269,14 +308,15 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
       {subTab === 'quotes' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h3 className="text-xl font-bold flex items-center gap-3">
+            <h3 data-acom-id="billing.quotes.header" className="text-xl font-bold flex items-center gap-3">
               <ClipboardCheck className="w-5 h-5 text-blue-500" />
               Gestion des Devis
             </h3>
             <div className="flex items-center gap-4">
-              <span className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">{quotes.length} Devis</span>
+              <span data-acom-id="billing.quotes.counter" className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">{quotes.length} Devis</span>
               <button 
-                onClick={() => { setSelectedQuote(null); setIsQuoteModalOpen(true); }}
+                data-acom-id="billing.quotes.btn_new"
+                onClick={() => handleOpenQuoteModal(null)}
                 className="px-6 py-3 bg-ink text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:shadow-xl transition-all"
               >
                 + Nouveau Devis
@@ -286,19 +326,19 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
 
           <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table data-acom-id="billing.quotes.table" className="w-full text-left">
                 <thead>
                   <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                    <th className="px-8 py-5">Référence & Date</th>
-                    <th className="px-8 py-5">Client</th>
-                    <th className="px-8 py-5">Statut</th>
-                    <th className="px-8 py-5 text-right">Montant Estimé</th>
-                    <th className="px-8 py-5 text-right">Actions</th>
+                    <th data-acom-id="billing.quotes.col_ref" className="px-8 py-5">Référence & Date</th>
+                    <th data-acom-id="billing.quotes.col_client" className="px-8 py-5">Client</th>
+                    <th data-acom-id="billing.quotes.col_status" className="px-8 py-5">Statut</th>
+                    <th data-acom-id="billing.quotes.col_amount" className="px-8 py-5 text-right">Montant Estimé</th>
+                    <th data-acom-id="billing.quotes.col_actions" className="px-8 py-5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {quotes.length === 0 ? (
-                    <tr><td colSpan={5} className="py-20 text-center text-gray-400 text-sm">Aucun devis enregistré</td></tr>
+                    <tr data-acom-id="billing.quotes.empty_state"><td colSpan={5} className="py-20 text-center text-gray-400 text-sm">Aucun devis enregistré</td></tr>
                   ) : (
                     quotes.slice(0, quoteLimit).map((quote) => (
                       <tr key={quote.id} className="hover:bg-gray-50/50 transition-colors group">
@@ -326,7 +366,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                           <div className="flex justify-end items-center gap-3">
                              {/* Centralized Print Action Button */}
                              <button 
-                               onClick={() => setActivePrintDoc({ type: 'quote', item: quote })} 
+                               onClick={() => handleOpenPrintDoc('quote', quote)} 
                                className="px-4 py-2 bg-gray-50 border border-black/5 hover:border-blue-100 hover:bg-blue-50/50 text-gray-700 hover:text-blue-600 rounded-xl transition-all text-[11px] font-black uppercase tracking-wider flex items-center gap-2 shadow-sm"
                                title="Imprimer / Exporter le devis"
                              >
@@ -336,7 +376,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
 
                              {quote.status === 'draft' && (
                                <button 
-                                 onClick={() => { setSelectedQuote(quote); setIsQuoteModalOpen(true); }} 
+                                 onClick={() => handleOpenQuoteModal(quote)} 
                                  className="p-2.5 bg-gray-50 hover:bg-amber-50 text-gray-400 hover:text-amber-500 rounded-xl transition-all border border-black/5"
                                  title="Modifier Devis"
                                >
@@ -377,7 +417,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
       {/* Quote Modal */}
       <QuoteModal 
         isOpen={isQuoteModalOpen} 
-        onClose={() => setIsQuoteModalOpen(false)} 
+        onClose={handleCloseQuoteModal} 
         merchant={merchant} 
         quote={selectedQuote}
       />
@@ -397,10 +437,11 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }}
-              onClick={() => setActivePrintDoc(null)} 
+              onClick={handleClosePrintDoc} 
               className="absolute inset-0 bg-ink/65 backdrop-blur-md" 
             />
             <motion.div 
+              data-acom-id="billing.print_modal.container"
               initial={{ scale: 0.9, opacity: 0, y: 15 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.9, opacity: 0, y: 15 }}
@@ -409,7 +450,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
               {/* Header */}
               <div className="bg-gray-50/80 px-8 py-6 border-b border-gray-100 flex justify-between items-center">
                 <div>
-                  <h3 className="text-xl font-bold text-ink flex items-center gap-2">
+                  <h3 data-acom-id="billing.print_modal.title" className="text-xl font-bold text-ink flex items-center gap-2">
                     <Printer className="w-5 h-5 text-primary" />
                     Centre d'Impression & d'Export
                   </h3>
@@ -421,7 +462,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                   </p>
                 </div>
                 <button 
-                  onClick={() => setActivePrintDoc(null)} 
+                  onClick={handleClosePrintDoc} 
                   className="p-2 hover:bg-gray-100 rounded-xl transition-all text-gray-400 hover:text-ink"
                 >
                   <X className="w-5 h-5" />
@@ -443,7 +484,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                 {activePrintDoc.type === 'sale' ? (
                   <>
                     {/* OPTION 1: Receipt standard (THERMIQUE) */}
-                    <div className="p-4 bg-white hover:bg-amber-50/10 border border-gray-100 hover:border-amber-200 rounded-2xl transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
+                    <div data-acom-id="billing.print_modal.option_receipt" className="p-4 bg-white hover:bg-amber-50/10 border border-gray-100 hover:border-amber-200 rounded-2xl transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
                       <div className="flex items-start gap-3">
                         <div className="p-3 bg-amber-50 text-amber-500 rounded-xl group-hover:scale-105 transition-transform">
                           <Receipt className="w-5 h-5" />
@@ -472,7 +513,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                     </div>
 
                     {/* OPTION 2: Facture A4 (OFFICIELLE) */}
-                    <div className="p-4 bg-white hover:bg-emerald-50/10 border border-gray-100 hover:border-emerald-200 rounded-2xl transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
+                    <div data-acom-id="billing.print_modal.option_invoice_a4" className="p-4 bg-white hover:bg-emerald-50/10 border border-gray-100 hover:border-emerald-200 rounded-2xl transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
                       <div className="flex items-start gap-3">
                         <div className="p-3 bg-emerald-50 text-emerald-500 rounded-xl group-hover:scale-105 transition-transform">
                           <FileText className="w-5 h-5" />
@@ -503,7 +544,7 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
                 ) : (
                   <>
                     {/* OPTION 4: Devis Proforma (Quotes) */}
-                    <div className="p-4 bg-white hover:bg-blue-50/10 border border-gray-100 hover:border-blue-200 rounded-2xl transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
+                    <div data-acom-id="billing.print_modal.option_quote_a4" className="p-4 bg-white hover:bg-blue-50/10 border border-gray-100 hover:border-blue-200 rounded-2xl transition-all flex flex-col sm:flex-row justify-between sm:items-center gap-4 group">
                       <div className="flex items-start gap-3">
                         <div className="p-3 bg-blue-50 text-blue-500 rounded-xl group-hover:scale-105 transition-transform">
                           <ClipboardCheck className="w-5 h-5" />
@@ -537,7 +578,8 @@ const MerchantBilling = ({ merchant }: { merchant: Merchant }) => {
               {/* Footer */}
               <div className="px-8 py-5 border-t border-gray-100 bg-gray-50 flex justify-end">
                 <button 
-                  onClick={() => setActivePrintDoc(null)}
+                  data-acom-id="billing.print_modal.close_btn"
+                  onClick={handleClosePrintDoc}
                   className="px-6 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl font-bold text-xs text-gray-600 uppercase tracking-widest transition-colors shadow-sm"
                 >
                   Fermer

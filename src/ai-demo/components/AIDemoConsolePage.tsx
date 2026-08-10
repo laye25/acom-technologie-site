@@ -8,18 +8,36 @@ import { ActionConfirmationModal } from './ActionConfirmationModal';
 import { TutorialOverlay } from './TutorialOverlay';
 import { ActionLogger } from '../AuditLog/ActionLogger';
 import { EventBus } from '../BusinessEvents/EventBus';
-import { TutorialEngine, PRESSING_GOLDEN_TUTORIAL, PRESSING_TARIFS_TUTORIAL, PRESSING_STOCK_SALES_TUTORIAL, PRESSING_CLOSURE_TUTORIAL, PRESSING_ACCOUNTING_TUTORIAL, PRESSING_FINANCIAL_REPORTS_TUTORIAL, PRESSING_SETTINGS_TUTORIAL, COMMERCE_POS_TUTORIAL } from '../Tutorial/TutorialEngine';
+import { 
+  TutorialEngine, 
+  PRESSING_GOLDEN_TUTORIAL, 
+  PRESSING_TARIFS_TUTORIAL, 
+  PRESSING_STOCK_SALES_TUTORIAL, 
+  PRESSING_CLOSURE_TUTORIAL, 
+  PRESSING_ACCOUNTING_TUTORIAL, 
+  PRESSING_FINANCIAL_REPORTS_TUTORIAL, 
+  PRESSING_SETTINGS_TUTORIAL, 
+  COMMERCE_POS_TUTORIAL,
+  COMMERCE_BILLING_INVOICES_TUTORIAL,
+  COMMERCE_BILLING_PENDING_TUTORIAL,
+  COMMERCE_BILLING_QUOTES_TUTORIAL,
+  COMMERCE_BILLING_QUOTE_MODAL_TUTORIAL,
+  COMMERCE_BILLING_PRINT_MODAL_TUTORIAL
+} from '../Tutorial/TutorialEngine';
 import { ScreenRecorder } from '../Tutorial/ScreenRecorder';
 import { ContextEngine } from '../Intelligence/ContextEngine';
 import { AcomActionLog, BusinessEvent } from '../types';
-import { Sparkles, Video, Play, Shield, Terminal, RefreshCw, Layers, CheckCircle2, AlertTriangle, ArrowRight, BookOpen, Clock, Lock, Receipt, BarChart3, Settings, ShoppingBag } from 'lucide-react';
+import { Sparkles, Video, Play, Shield, Terminal, RefreshCw, Layers, CheckCircle2, AlertTriangle, ArrowRight, BookOpen, Clock, Lock, Receipt, BarChart3, Settings, ShoppingBag, FileText, Printer, FileSpreadsheet } from 'lucide-react';
 
 export const AIDemoConsolePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'copilot' | 'tutorials' | 'logs' | 'capabilities'>('copilot');
   const [logs, setLogs] = useState<AcomActionLog[]>([]);
   const [events, setEvents] = useState<BusinessEvent[]>([]);
   const [selectedSaas, setSelectedSaas] = useState<'pressing' | 'stock'>('pressing');
-  const [selectedTutorialId, setSelectedTutorialId] = useState<'reception' | 'tarifs' | 'stock' | 'closure' | 'accounting' | 'reports' | 'settings' | 'commerce_pos'>('reception');
+  const [selectedTutorialId, setSelectedTutorialId] = useState<
+    'reception' | 'tarifs' | 'stock' | 'closure' | 'accounting' | 'reports' | 'settings' | 'commerce_pos' |
+    'billing_invoices' | 'billing_pending' | 'billing_quotes' | 'billing_quote_modal' | 'billing_print_modal'
+  >('billing_quote_modal');
 
   useEffect(() => {
     setLogs(ActionLogger.getLogs());
@@ -50,6 +68,16 @@ export const AIDemoConsolePage: React.FC = () => {
       ? PRESSING_SETTINGS_TUTORIAL
       : selectedTutorialId === 'commerce_pos'
       ? COMMERCE_POS_TUTORIAL
+      : selectedTutorialId === 'billing_invoices'
+      ? COMMERCE_BILLING_INVOICES_TUTORIAL
+      : selectedTutorialId === 'billing_pending'
+      ? COMMERCE_BILLING_PENDING_TUTORIAL
+      : selectedTutorialId === 'billing_quotes'
+      ? COMMERCE_BILLING_QUOTES_TUTORIAL
+      : selectedTutorialId === 'billing_quote_modal'
+      ? COMMERCE_BILLING_QUOTE_MODAL_TUTORIAL
+      : selectedTutorialId === 'billing_print_modal'
+      ? COMMERCE_BILLING_PRINT_MODAL_TUTORIAL
       : PRESSING_GOLDEN_TUTORIAL;
 
   const handleStartTutorial = () => {
@@ -310,7 +338,62 @@ export const AIDemoConsolePage: React.FC = () => {
                 }`}
               >
                 <ShoppingBag className="w-3.5 h-3.5" />
-                <span>8. Caisse POS Commerce ({COMMERCE_POS_TUTORIAL.steps.length} étapes)</span>
+                <span>8. Caisse POS ({COMMERCE_POS_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('billing_quote_modal')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'billing_quote_modal'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>9. Modale Nouveau Devis ({COMMERCE_BILLING_QUOTE_MODAL_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('billing_invoices')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'billing_invoices'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Receipt className="w-3.5 h-3.5" />
+                <span>10. Factures ({COMMERCE_BILLING_INVOICES_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('billing_pending')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'billing_pending'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>11. Impayés ({COMMERCE_BILLING_PENDING_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('billing_quotes')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'billing_quotes'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>12. Onglet Devis ({COMMERCE_BILLING_QUOTES_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('billing_print_modal')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'billing_print_modal'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>13. Modale Impression ({COMMERCE_BILLING_PRINT_MODAL_TUTORIAL.steps.length} étapes)</span>
               </button>
             </div>
 

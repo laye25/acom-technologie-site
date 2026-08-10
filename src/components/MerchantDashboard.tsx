@@ -1288,36 +1288,36 @@ export const MerchantDashboard = ({
             )}
           </div>
 
-          <div className="bg-ink p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+          <div className="bg-slate-900 dark:bg-slate-900/90 border border-slate-800 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:rotate-12 transition-transform duration-700">
               <PieChart className="w-48 h-48 text-white" />
             </div>
             <div className="relative h-full flex flex-col">
               <h3 className="text-xl font-bold text-white mb-2">Valorisation Globale</h3>
-              <p className="text-white/50 text-[11px] leading-relaxed mb-8 uppercase tracking-widest font-black">
+              <p className="text-slate-400 text-[11px] leading-relaxed mb-8 uppercase tracking-widest font-black">
                 Répartition financière de vos actifs
               </p>
               
               <div className="mt-auto space-y-6">
                 <div>
                   <div className="flex justify-between items-end mb-2">
-                    <span className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">Valeur Marchande</span>
+                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Valeur Marchande</span>
                     <span className="text-2xl font-black text-white">
                       {products.reduce((acc, p) => acc + (p.price * Number(p.stockQuantity || 0)), 0).toLocaleString()} <span className="text-xs font-mono opacity-50">{merchant.currency}</span>
                     </span>
                   </div>
-                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
                     <motion.div initial={{ width: 0 }} animate={{ width: '100%' }} className="h-full bg-primary" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <p className="text-[9px] text-white/30 uppercase font-black mb-1 tracking-widest">Rentabilité Est.</p>
+                  <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700/60">
+                    <p className="text-[9px] text-slate-400 uppercase font-black mb-1 tracking-widest">Rentabilité Est.</p>
                     <p className="text-lg font-black text-emerald-400">+24.5%</p>
                   </div>
-                  <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                    <p className="text-[9px] text-white/30 uppercase font-black mb-1 tracking-widest">Rotation Moy.</p>
+                  <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700/60">
+                    <p className="text-[9px] text-slate-400 uppercase font-black mb-1 tracking-widest">Rotation Moy.</p>
                     <p className="text-lg font-black text-blue-400">12 Jours</p>
                   </div>
                 </div>
@@ -2083,12 +2083,12 @@ export const MerchantDashboard = ({
 const AccountingRow = ({ label, value, currency, icon: Icon, color }: any) => (
   <div className="flex items-center justify-between group">
     <div className="flex items-center space-x-3">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gray-50 group-hover:bg-white transition-colors border border-transparent group-hover:border-gray-100`}>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gray-50 dark:bg-slate-800 group-hover:bg-white dark:group-hover:bg-slate-700 transition-colors border border-transparent group-hover:border-gray-100 dark:group-hover:border-slate-700`}>
         <Icon className={`w-4 h-4 ${color}`} />
       </div>
-      <span className="text-sm font-medium text-gray-500">{label}</span>
+      <span className="text-sm font-medium text-gray-500 dark:text-slate-400">{label}</span>
     </div>
-    <span className={`text-sm font-bold text-gray-900`}>
+    <span className={`text-sm font-bold text-gray-900 dark:text-slate-100`}>
       {value.toLocaleString()} {currency}
     </span>
   </div>
@@ -2119,35 +2119,35 @@ const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, descript
   }
 
   return (
-    <div data-acom-id={dataAcomId} className={`bg-white p-6 sm:p-8 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col justify-between h-full ${isLarge ? 'min-h-[200px] sm:min-h-[260px]' : 'min-h-[220px]'}`}>
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform"></div>
+    <div data-acom-id={dataAcomId} className={`bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[2rem] border border-black/5 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden flex flex-col justify-between h-full ${isLarge ? 'min-h-[200px] sm:min-h-[260px]' : 'min-h-[220px]'}`}>
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 dark:bg-slate-800/40 rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform"></div>
       
       <div>
-        <div className={`w-12 h-12 sm:w-14 sm:h-14 ${bgColor} rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform relative z-10 border border-black/5`}>
+        <div className={`w-12 h-12 sm:w-14 sm:h-14 ${bgColor} dark:bg-slate-800/80 rounded-xl sm:rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform relative z-10 border border-black/5 dark:border-slate-700`}>
           <Icon className={`w-6 h-6 sm:w-7 sm:h-7 ${color}`} />
         </div>
-        <p className="text-[10px] sm:text-xs font-black text-gray-400 mb-2 uppercase tracking-[0.2em] relative z-10 line-clamp-1">{title}</p>
+        <p className="text-[10px] sm:text-xs font-black text-gray-400 dark:text-slate-400 mb-2 uppercase tracking-[0.2em] relative z-10 line-clamp-1">{title}</p>
       </div>
 
       <div className="mt-auto relative z-10">
         <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 items-end">
-          <span className={`${fontSizeClass} font-black text-ink tracking-tighter block break-all leading-none`}>
+          <span className={`${fontSizeClass} font-black text-ink dark:text-white tracking-tighter block break-all leading-none`}>
             {formattedValue}
           </span>
           {currency && (
-            <span className={`${isLarge ? 'text-xs sm:text-sm md:text-base' : 'text-[10px] sm:text-xs'} font-black text-gray-400 uppercase tracking-widest break-keep`}>
+            <span className={`${isLarge ? 'text-xs sm:text-sm md:text-base' : 'text-[10px] sm:text-xs'} font-black text-gray-400 dark:text-slate-400 uppercase tracking-widest break-keep`}>
               {currency}
             </span>
           )}
         </div>
         {description && (
-          <p className="text-[9px] sm:text-[10px] text-gray-400 mt-3 font-mono font-bold uppercase tracking-widest relative z-10 line-clamp-2">
+          <p className="text-[9px] sm:text-[10px] text-gray-400 dark:text-slate-400 mt-3 font-mono font-bold uppercase tracking-widest relative z-10 line-clamp-2">
             {description}
           </p>
         )}
         {profitDetails && (
-          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-[10px] font-bold">
-            <span className="text-gray-500 uppercase tracking-widest">{profitDetails.label || 'Bénéfice Net'}</span>
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-bold">
+            <span className="text-gray-500 dark:text-slate-400 uppercase tracking-widest">{profitDetails.label || 'Bénéfice Net'}</span>
             <span className={`${profitDetails.value >= 0 ? 'text-primary' : 'text-rose-500'} font-mono`}>
               {profitDetails.value >= 0 ? '+' : ''}{profitDetails.value.toLocaleString()} {currency}
             </span>
@@ -2160,38 +2160,38 @@ const StatCard = ({ title, value, currency, icon: Icon, color, bgColor, descript
 
 // --- Inventory Manager ---
 // --- Inventory Sub-components ---
-export const StockStatCard = ({ label, value, suffix, icon: Icon, color, warning, danger }: any) => {
+export const StockStatCard = ({ label, value, suffix, icon: Icon, color, warning, danger, dataAcomId }: any) => {
   const colors: any = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    orange: 'bg-orange-50 text-orange-600 border-orange-100',
-    rose: 'bg-rose-50 text-rose-600 border-rose-100',
+    blue: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/50',
+    emerald: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50',
+    orange: 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-800/50',
+    rose: 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-800/50',
   };
 
   return (
-    <div className={`p-6 rounded-[2rem] border transition-all hover:shadow-lg bg-white ${warning ? 'ring-2 ring-orange-200' : danger ? 'ring-2 ring-rose-200 animate-pulse' : 'border-black/5'}`}>
+    <div data-acom-id={dataAcomId} className={`p-6 rounded-[2rem] border transition-all hover:shadow-lg bg-white dark:bg-slate-900 ${warning ? 'ring-2 ring-orange-200 dark:ring-orange-800 border-orange-300 dark:border-orange-700' : danger ? 'ring-2 ring-rose-200 dark:ring-rose-800 border-rose-300 dark:border-rose-700 animate-pulse' : 'border-black/5 dark:border-slate-800 shadow-sm'}`}>
       <div className="flex items-center justify-between mb-4">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${colors[color] || 'bg-gray-50'}`}>
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${colors[color] || 'bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-gray-100 dark:border-slate-700'}`}>
           <Icon className="w-6 h-6" />
         </div>
         {(warning || danger) && (
-          <div className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${warning ? 'bg-orange-100 text-orange-600' : 'bg-red-100 text-red-600'}`}>
+          <div className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${warning ? 'bg-orange-100 dark:bg-orange-950/70 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800' : 'bg-red-100 dark:bg-red-950/70 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'}`}>
             {warning ? 'Alerte' : 'Critique'}
           </div>
         )}
       </div>
       <div>
-        <h4 className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em]">{label}</h4>
+        <h4 className="text-[10px] font-mono font-black text-gray-400 dark:text-slate-400 uppercase tracking-[0.2em]">{label}</h4>
         <div className="flex items-baseline mt-1">
-          <span className="text-2xl font-black text-ink">{value}</span>
-          <span className="text-[9px] font-mono font-bold text-gray-400 ml-1.5 uppercase">{suffix}</span>
+          <span className="text-2xl font-black text-ink dark:text-white">{value}</span>
+          <span className="text-[9px] font-mono font-bold text-gray-400 dark:text-slate-400 ml-1.5 uppercase">{suffix}</span>
         </div>
       </div>
     </div>
   );
 };
 
-export const HealthIndicator = ({ label, value, color }: { label: string, value: string, color: string }) => {
+export const HealthIndicator = ({ label, value, color, dataAcomId }: { label: string, value: string, color: string, dataAcomId?: string }) => {
   const colors: any = {
     primary: 'bg-primary',
     blue: 'bg-blue-500',
@@ -2199,16 +2199,16 @@ export const HealthIndicator = ({ label, value, color }: { label: string, value:
   };
 
   return (
-    <div className="space-y-2">
+    <div data-acom-id={dataAcomId} className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] text-white/60 uppercase font-black tracking-widest">{label}</span>
-        <span className="text-[10px] text-white font-mono font-black">{value}%</span>
+        <span className="text-[10px] text-slate-300 dark:text-slate-300 uppercase font-black tracking-widest">{label}</span>
+        <span className="text-[10px] text-white dark:text-white font-mono font-black">{value}%</span>
       </div>
-      <div className="h-1.5 bg-white/10 rounded-full overflow-hidden border border-white/5">
+      <div className="h-2 bg-slate-800 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-700/80">
         <motion.div 
           initial={{ width: 0 }}
           animate={{ width: `${value}%` }}
-          className={`h-full ${colors[color] || 'bg-white'}`}
+          className={`h-full ${colors[color] || 'bg-violet-500'}`}
         />
       </div>
     </div>

@@ -4,12 +4,77 @@
 export class LanguageEngine {
   private static speechSynth: SpeechSynthesis | null = typeof window !== 'undefined' ? window.speechSynthesis : null;
   private static currentAudio: HTMLAudioElement | null = null;
+  private static currentUtterance: SpeechSynthesisUtterance | null = null;
   private static currentResolve: (() => void) | null = null;
+
+  private static isPausedState = false;
+  private static speechRate = 1.0;
+  private static speechSequenceId = 0;
+  private static activeSpeechId = 0;
+
+  /**
+   * Set speech speed rate (0.5 to 2.0)
+   */
+  public static setSpeechRate(rate: number): void {
+    this.speechRate = Math.max(0.5, Math.min(2.0, rate));
+  }
+
+  public static getSpeechRate(): number {
+    return this.speechRate;
+  }
+
+  /**
+   * Check if speech or audio playback is currently active
+   */
+  public static isSpeaking(): boolean {
+    return this.activeSpeechId !== 0 && !this.isPausedState;
+  }
+
+  /**
+   * Pause current speech audio or synthesis
+   */
+  public static pauseSpeech(): void {
+    this.isPausedState = true;
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.pause();
+      } catch {}
+    }
+    if (this.speechSynth) {
+      try {
+        this.speechSynth.pause();
+      } catch {}
+    }
+  }
+
+  /**
+   * Resume paused speech audio or synthesis
+   */
+  public static resumeSpeech(): void {
+    this.isPausedState = false;
+    if (this.currentAudio) {
+      try {
+        this.currentAudio.play();
+      } catch {}
+    }
+    if (this.speechSynth) {
+      try {
+        this.speechSynth.resume();
+      } catch {}
+    }
+  }
+
+  public static isSpeechPaused(): boolean {
+    return this.isPausedState;
+  }
 
   /**
    * Stop any current speech or audio playback immediately and resolve pending promises.
    */
   public static stopSpeech(): void {
+    this.isPausedState = false;
+    this.activeSpeechId = 0;
+
     if (this.currentResolve) {
       const resolve = this.currentResolve;
       this.currentResolve = null;
@@ -20,6 +85,7 @@ export class LanguageEngine {
       try {
         this.currentAudio.pause();
         this.currentAudio.currentTime = 0;
+        this.currentAudio.src = '';
       } catch {}
       this.currentAudio = null;
     }
@@ -29,6 +95,7 @@ export class LanguageEngine {
         this.speechSynth.cancel();
       } catch {}
     }
+    this.currentUtterance = null;
   }
 
   /**
@@ -42,6 +109,9 @@ export class LanguageEngine {
       return Promise.resolve();
     }
 
+    const currentToken = ++this.speechSequenceId;
+    this.activeSpeechId = currentToken;
+
     return new Promise<void>((resolve) => {
       this.currentResolve = resolve;
 
@@ -52,6 +122,9 @@ export class LanguageEngine {
         if (!resolved) {
           resolved = true;
           if (timeoutId) clearTimeout(timeoutId);
+          if (this.activeSpeechId === currentToken) {
+            this.activeSpeechId = 0;
+          }
           if (this.currentResolve === safeResolveRef) {
             this.currentResolve = null;
           }
@@ -60,10 +133,12 @@ export class LanguageEngine {
       };
       const safeResolveRef = safeResolve;
 
-      // Max safety timeout (3s to 8s max based on text length)
-      const maxMs = Math.min(8000, Math.max(3000, text.length * 80));
+      // Safety timeout scaled based on text length (12s to 60s) to never prematurely cut off narrations
+      const maxMs = Math.min(60000, Math.max(12000, text.length * 160));
       timeoutId = setTimeout(() => {
-        console.warn('[LanguageEngine] Speak safety timeout reached, forcing resolve');
+        if (this.activeSpeechId === currentToken) {
+          console.warn('[LanguageEngine] Speak safety timeout reached, forcing resolve');
+        }
         safeResolve();
       }, maxMs);
 
@@ -72,6 +147,7 @@ export class LanguageEngine {
         const url = `/api/tts?text=${encodeURIComponent(text)}&lang=${lang === 'wo' ? 'fr' : lang}`;
         const audio = new Audio(url);
         this.currentAudio = audio;
+        audio.playbackRate = this.speechRate;
 
         const onEnded = () => {
           if (this.currentAudio === audio) {
@@ -84,8 +160,12 @@ export class LanguageEngine {
           if (this.currentAudio === audio) {
             this.currentAudio = null;
           }
-          // Fallback to Web Speech API
-          this.speakWebSpeech(text, lang).then(safeResolve).catch(safeResolve);
+          if (this.activeSpeechId === currentToken) {
+            // Fallback to Web Speech API
+            this.speakWebSpeech(text, lang, currentToken).then(safeResolve).catch(safeResolve);
+          } else {
+            safeResolve();
+          }
         };
 
         audio.addEventListener('ended', onEnded, { once: true });
@@ -94,18 +174,26 @@ export class LanguageEngine {
         const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {
-            onError();
+            if (this.activeSpeechId === currentToken) {
+              onError();
+            } else {
+              safeResolve();
+            }
           });
         }
       } catch {
-        this.speakWebSpeech(text, lang).then(safeResolve).catch(safeResolve);
+        if (this.activeSpeechId === currentToken) {
+          this.speakWebSpeech(text, lang, currentToken).then(safeResolve).catch(safeResolve);
+        } else {
+          safeResolve();
+        }
       }
     });
   }
 
-  private static speakWebSpeech(text: string, lang: 'fr' | 'wo' = 'fr'): Promise<void> {
+  private static speakWebSpeech(text: string, lang: 'fr' | 'wo' = 'fr', token: number): Promise<void> {
     return new Promise<void>((resolve) => {
-      if (!this.speechSynth) {
+      if (this.activeSpeechId !== token || !this.speechSynth) {
         resolve();
         return;
       }
@@ -113,14 +201,16 @@ export class LanguageEngine {
       try {
         this.speechSynth.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = lang === 'wo' ? 'fr-FR' : 'fr-FR';
-        utterance.rate = 1.0;
+        utterance.lang = 'fr-FR';
+        utterance.rate = this.speechRate;
         utterance.pitch = 1.0;
+        this.currentUtterance = utterance;
 
         let resolved = false;
         const done = () => {
           if (!resolved) {
             resolved = true;
+            this.currentUtterance = null;
             resolve();
           }
         };
@@ -130,6 +220,7 @@ export class LanguageEngine {
 
         this.speechSynth.speak(utterance);
       } catch {
+        this.currentUtterance = null;
         resolve();
       }
     });

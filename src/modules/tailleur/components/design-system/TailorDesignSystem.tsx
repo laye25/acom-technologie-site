@@ -24,7 +24,7 @@ export const TailorCard: React.FC<TailorCardProps> = ({ children, className = ''
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
       onClick={onClick}
-      className={`bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between text-left space-y-4 ${className}`}
+      className={`bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-black/5 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex flex-col justify-between text-left space-y-4 ${className}`}
     >
       {children}
     </motion.div>
@@ -300,42 +300,42 @@ export const TailorFinancialCard: React.FC<TailorFinancialCardProps> = ({
   const isFullyPaid = rest === 0;
 
   return (
-    <div className={`bg-slate-50/70 rounded-2xl p-4 border border-slate-200/80 shadow-sm text-left space-y-3 ${className}`}>
-      <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-          <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+    <div className={`bg-slate-50/70 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm text-left space-y-3 ${className}`}>
+      <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
+        <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+          <Banknote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           <span>Bilan Financier Commande</span>
         </span>
         <TailorStatusBadge status={isFullyPaid ? 'paid' : 'unpaid'} size="sm" />
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 text-center">
+        <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700 text-center">
           <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider">Prix Convenu</span>
-          <span className="font-mono text-xs font-black text-slate-900 mt-0.5 block truncate">
+          <span className="font-mono text-xs font-black text-slate-900 dark:text-white mt-0.5 block truncate">
             {price.toLocaleString()} {currency}
           </span>
         </div>
 
-        <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100 text-center">
-          <span className="block text-[8px] font-black text-emerald-600 uppercase tracking-wider">Acompte Versé</span>
-          <span className="font-mono text-xs font-black text-emerald-700 mt-0.5 block truncate">
+        <div className="bg-emerald-50/50 dark:bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-800/60 text-center">
+          <span className="block text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Acompte Versé</span>
+          <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-300 mt-0.5 block truncate">
             {advance.toLocaleString()} {currency}
           </span>
         </div>
 
-        <div className={`p-2.5 rounded-xl border text-center ${rest > 0 ? 'bg-rose-50/50 border-rose-100' : 'bg-emerald-50/50 border-emerald-100'}`}>
-          <span className={`block text-[8px] font-black uppercase tracking-wider ${rest > 0 ? 'text-rose-500' : 'text-emerald-600'}`}>Reste à Payer</span>
-          <span className={`font-mono text-xs font-black mt-0.5 block truncate ${rest > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+        <div className={`p-2.5 rounded-xl border text-center ${rest > 0 ? 'bg-rose-50/50 dark:bg-rose-950/40 border-rose-100 dark:border-rose-800/60' : 'bg-emerald-50/50 dark:bg-emerald-950/40 border-emerald-100 dark:border-emerald-800/60'}`}>
+          <span className={`block text-[8px] font-black uppercase tracking-wider ${rest > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>Reste à Payer</span>
+          <span className={`font-mono text-xs font-black mt-0.5 block truncate ${rest > 0 ? 'text-rose-600 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
             {rest.toLocaleString()} {currency}
           </span>
         </div>
       </div>
 
       {linkedProfit !== undefined && marginPercent !== undefined && (
-        <div className="p-2.5 bg-violet-50/60 border border-violet-100 rounded-xl flex items-center justify-between text-xs font-black text-violet-700">
+        <div className="p-2.5 bg-violet-50/60 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-800/60 rounded-xl flex items-center justify-between text-xs font-black text-violet-700 dark:text-violet-300">
           <span className="flex items-center gap-1 text-[10px] uppercase font-mono">📊 Bénéfice Estimé :</span>
-          <span className="font-mono text-violet-800 font-extrabold text-xs">
+          <span className="font-mono text-violet-800 dark:text-violet-200 font-extrabold text-xs">
             +{linkedProfit.toLocaleString()} {currency} ({marginPercent.toFixed(0)}%)
           </span>
         </div>
@@ -376,20 +376,20 @@ export const TailorActionButton: React.FC<TailorActionButtonProps> = ({
       baseStyle += " bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-600/20";
       break;
     case 'encaisser':
-      baseStyle += " bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200";
+      baseStyle += " bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60";
       break;
     case 'pdf':
-      baseStyle += " bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200";
+      baseStyle += " bg-violet-50 dark:bg-violet-950/40 hover:bg-violet-100 dark:hover:bg-violet-900/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/60";
       break;
     case 'ticket':
-      baseStyle += " bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200";
+      baseStyle += " bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60";
       break;
     case 'danger':
-      baseStyle += " bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200";
+      baseStyle += " bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60";
       break;
     case 'secondary':
     default:
-      baseStyle += " bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80";
+      baseStyle += " bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700";
       break;
   }
 
@@ -439,7 +439,7 @@ export const TailorDeleteConfirmModal: React.FC<TailorDeleteConfirmModalProps> =
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-[2.5rem] p-6 sm:p-8 border border-slate-100 shadow-2xl max-w-md w-full text-left space-y-6"
+        className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 sm:p-8 border border-slate-100 dark:border-slate-800 shadow-2xl max-w-md w-full text-left space-y-6"
       >
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-2xl shrink-0 shadow-inner">

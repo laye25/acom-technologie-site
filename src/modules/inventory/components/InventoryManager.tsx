@@ -16,6 +16,8 @@ import { format } from 'date-fns';
 import { Package, Calculator, Check, RefreshCw, TrendingUp, ArrowDownRight, ArrowUpRight, Clock, ScanLine } from 'lucide-react';
 
 
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
+
 const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchant, setShowUpgradeModal?: (s: boolean) => void }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isRestocking, setIsRestocking] = useState(false);
@@ -67,11 +69,43 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
   const [filterMovementProduct, setFilterMovementProduct] = useState('all');
   const [filterMovementPeriod, setFilterMovementPeriod] = useState('all');
 
+  useEffect(() => {
+    if (isEditing) {
+      TutorialEngine.onModalOpened('stock.product_modal');
+    } else {
+      TutorialEngine.onModalClosed('stock.product_modal');
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (isAdjusting) {
+      TutorialEngine.onModalOpened('stock.adjustment_modal');
+    } else {
+      TutorialEngine.onModalClosed('stock.adjustment_modal');
+    }
+  }, [isAdjusting]);
+
   // 4. Products Quick Filter (All, Low stock, Out of stock)
   const [productFilterType, setProductFilterType] = useState<'all' | 'low' | 'out'>('all');
 
   // 5. Printable Physical Inventory Count Sheet
   const [isInventorySheetOpen, setIsInventorySheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (isInventorySheetOpen) {
+      TutorialEngine.onModalOpened('stock.inventory_sheet_modal');
+    } else {
+      TutorialEngine.onModalClosed('stock.inventory_sheet_modal');
+    }
+  }, [isInventorySheetOpen]);
+
+  useEffect(() => {
+    if (isGeneratingPO) {
+      TutorialEngine.onModalOpened('stock.reorder_modal');
+    } else {
+      TutorialEngine.onModalClosed('stock.reorder_modal');
+    }
+  }, [isGeneratingPO]);
 
   // Products loaded from Dexie via useLiveQuery
   useEffect(() => {
@@ -595,10 +629,14 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       items,
       totalCost
     });
+
+    // Advance Acom IA tutorial to Step 10
+    TutorialEngine.jumpToAcomId('stock.reorder_modal.generated_doc');
   };
 
   return (
     <motion.div 
+      data-acom-id="stock.page_header"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
@@ -607,6 +645,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       {/* Stock Quick Stats Container */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StockStatCard 
+          dataAcomId="stock.kpi.total_articles"
           label="Total Articles" 
           value={stats.totalItems.toString()} 
           suffix={`${stats.totalQuantity} UNITÉS`}
@@ -614,6 +653,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           color="blue"
         />
         <StockStatCard 
+          dataAcomId="stock.kpi.val_achat"
           label="Valo. Achat (CUMP)" 
           value={stats.totalPurchaseValue.toLocaleString()} 
           suffix={merchant.currency}
@@ -621,6 +661,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           color="indigo"
         />
         <StockStatCard 
+          dataAcomId="stock.kpi.val_vente"
           label="Valo. Vente" 
           value={stats.totalRetailValue.toLocaleString()} 
           suffix={merchant.currency}
@@ -628,6 +669,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           color="emerald"
         />
         <StockStatCard 
+          dataAcomId="stock.kpi.marge_theorique"
           label="Marge Théorique" 
           value={stats.theoreticalMargin.toLocaleString()} 
           suffix={`${Math.round(stats.theoreticalMarginPercent)}% MARGE`}
@@ -635,6 +677,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           color="emerald"
         />
         <StockStatCard 
+          dataAcomId="stock.kpi.points_alerte"
           label="Points d'alerte" 
           value={stats.lowStock.toString()} 
           suffix="ALERTES"
@@ -643,6 +686,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           warning={stats.lowStock > 0}
         />
         <StockStatCard 
+          dataAcomId="stock.kpi.articles_epuises"
           label="Articles épuisés" 
           value={stats.outOfStock.toString()} 
           suffix="RUPTURES"
@@ -656,9 +700,9 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
         {/* Main Product Table / List */}
         <div className="flex-1 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="relative w-full sm:w-96 flex gap-3">
+            <div data-acom-id="stock.search_input" className="relative w-full sm:w-96 flex gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-400" />
                 <input
                   type="text"
                   id="inventory-search"
@@ -675,12 +719,13 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                       }
                     }
                   }}
-                  className="w-full pl-12 pr-4 py-4 bg-white border border-black/5 rounded-[1.5rem] text-sm focus:ring-4 focus:ring-primary/10 shadow-sm outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-4 bg-white dark:bg-slate-800 border border-black/5 dark:border-slate-700 text-ink dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-400 rounded-[1.5rem] text-sm focus:ring-4 focus:ring-primary/10 shadow-sm outline-none transition-all"
                 />
               </div>
               <button
+                data-acom-id="stock.btn.scanner"
                 onClick={() => setShowBarcodeScanner(true)}
-                className="h-auto px-5 bg-indigo-50 text-indigo-600 rounded-[1.5rem] border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
+                className="h-auto px-5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 rounded-[1.5rem] border border-indigo-100 dark:border-indigo-800/60 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 transition-all flex items-center justify-center shadow-sm"
                 title="Scanner un code-barres"
               >
                 <ScanLine className="w-5 h-5" />
@@ -688,27 +733,30 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
             </div>
             <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
               <button
+                data-acom-id="stock.btn.new_product"
                 onClick={() => {
                   setCurrentProduct({ name: '', price: 0, stockQuantity: 0, category: 'Général', minStockLevel: 5 });
                   setIsEditing(true);
                 }}
-                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-ink text-white rounded-2xl font-black uppercase text-[9px] tracking-wider hover:bg-black transition-all shadow-md"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-primary dark:hover:bg-primary-hover border border-black/10 dark:border-primary/30 rounded-2xl font-black uppercase text-[9px] tracking-wider transition-all shadow-md"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Nouveau</span>
               </button>
               
               <button
+                data-acom-id="stock.btn.adjust_stock"
                 onClick={() => setIsAdjusting(true)}
-                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-2xl font-black uppercase text-[9px] tracking-wider hover:bg-indigo-100 transition-all shadow-sm"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/70 dark:text-indigo-300 dark:border-indigo-800/60 rounded-2xl font-black uppercase text-[9px] tracking-wider transition-all shadow-sm"
               >
                 <ClipboardList className="w-3.5 h-3.5" />
                 <span>Ajuster</span>
               </button>
 
               <button
+                data-acom-id="stock.btn.inventory_sheet"
                 onClick={() => setIsInventorySheetOpen(true)}
-                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-amber-50 border border-amber-100 text-amber-700 rounded-2xl font-black uppercase text-[9px] tracking-wider hover:bg-amber-100 transition-all shadow-sm"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:hover:bg-amber-900/70 dark:text-amber-300 dark:border-amber-800/60 rounded-2xl font-black uppercase text-[9px] tracking-wider transition-all shadow-sm"
                 title="Fiche d'inventaire physique"
               >
                 <FileText className="w-3.5 h-3.5" />
@@ -716,6 +764,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
               </button>
 
               <button
+                data-acom-id="stock.btn.purchase_order"
                 onClick={() => {
                   // Pre-fill selected products with all low/out of stock items
                   const deficientIds = products
@@ -729,7 +778,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                   setPoCustomQuantities(initialQuants);
                   setIsGeneratingPO(true);
                 }}
-                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-2xl font-black uppercase text-[9px] tracking-wider hover:bg-emerald-100 transition-all shadow-sm"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/70 dark:text-emerald-300 dark:border-emerald-800/60 rounded-2xl font-black uppercase text-[9px] tracking-wider transition-all shadow-sm"
                 title="Générer un Bon de Commande Fournisseur"
               >
                 <ShoppingCart className="w-3.5 h-3.5" />
@@ -737,8 +786,9 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
               </button>
 
               <button
+                data-acom-id="stock.btn.export_csv"
                 onClick={handleExportCSV}
-                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-gray-50 border border-black/5 text-gray-700 rounded-2xl font-black uppercase text-[9px] tracking-wider hover:bg-gray-100 transition-all shadow-sm"
+                className="flex-1 sm:flex-none flex items-center justify-center space-x-1.5 px-5 py-3.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-black/5 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 dark:border-slate-700 rounded-2xl font-black uppercase text-[9px] tracking-wider transition-all shadow-sm"
                 title="Exporter l'état du stock en format CSV"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -748,27 +798,36 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           </div>
 
           {/* Quick Filters for Stock Levels */}
-          <div className="flex items-center gap-2 bg-gray-50/50 p-1 rounded-2xl border border-gray-100 w-fit">
+          <div data-acom-id="stock.filters_zone" className="flex items-center gap-2 bg-gray-100/70 dark:bg-slate-900/90 p-1.5 rounded-2xl border border-gray-200/80 dark:border-slate-800 w-fit">
             <button 
+              data-acom-id="stock.filter.all"
               onClick={() => setProductFilterType('all')}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-                productFilterType === 'all' ? 'bg-white text-ink shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                productFilterType === 'all' 
+                  ? 'bg-white dark:bg-slate-800 text-ink dark:text-white shadow-sm border border-black/5 dark:border-slate-700' 
+                  : 'text-gray-500 dark:text-slate-400 hover:text-ink dark:hover:text-white hover:bg-white/50 dark:hover:bg-slate-800/50'
               }`}
             >
               Tout le Stock ({products.length})
             </button>
             <button 
+              data-acom-id="stock.filter.low"
               onClick={() => setProductFilterType('low')}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-                productFilterType === 'low' ? 'bg-amber-50 text-amber-700 shadow-sm border border-amber-100/30' : 'text-gray-400 hover:text-amber-600'
+                productFilterType === 'low' 
+                  ? 'bg-amber-100/90 dark:bg-amber-900/60 text-amber-900 dark:text-amber-300 shadow-sm border border-amber-300/60 dark:border-amber-700/60' 
+                  : 'text-amber-700/80 dark:text-amber-400/80 hover:text-amber-800 dark:hover:text-amber-300 hover:bg-amber-50/50 dark:hover:bg-amber-950/40'
               }`}
             >
               Stock Bas ({products.filter(p => Number(p.stockQuantity || 0) > 0 && Number(p.stockQuantity || 0) <= (Number(p.minStockLevel) || 5)).length})
             </button>
             <button 
+              data-acom-id="stock.filter.out"
               onClick={() => setProductFilterType('out')}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-                productFilterType === 'out' ? 'bg-rose-50 text-rose-700 shadow-sm border border-rose-100/30' : 'text-gray-400 hover:text-rose-600'
+                productFilterType === 'out' 
+                  ? 'bg-rose-100/90 dark:bg-rose-900/60 text-rose-900 dark:text-rose-300 shadow-sm border border-rose-300/60 dark:border-rose-700/60' 
+                  : 'text-rose-700/80 dark:text-rose-400/80 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-50/50 dark:hover:bg-rose-950/40'
               }`}
             >
               Épuisés ({products.filter(p => Number(p.stockQuantity || 0) <= 0).length})
@@ -778,22 +837,22 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           {loading ? (
             <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
           ) : (
-            <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm overflow-hidden">
+            <div data-acom-id="stock.products_table" className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-black/5 dark:border-slate-800 shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                      <th className="px-4 sm:px-8 py-3 md:py-5">Article</th>
-                      <th className="px-4 sm:px-8 py-3 md:py-5">Prix & Valeur</th>
-                      <th className="px-4 sm:px-8 py-3 md:py-5">État Stock</th>
+                    <tr className="bg-gray-50/70 dark:bg-slate-800/60 text-[10px] font-mono font-black text-gray-500 dark:text-slate-400 uppercase tracking-[0.2em] border-b border-gray-200 dark:border-slate-800">
+                      <th data-acom-id="stock.col.article" className="px-4 sm:px-8 py-3 md:py-5">Article</th>
+                      <th data-acom-id="stock.col.prix_valeur" className="px-4 sm:px-8 py-3 md:py-5">Prix & Valeur</th>
+                      <th data-acom-id="stock.col.etat_stock" className="px-4 sm:px-8 py-3 md:py-5">État Stock</th>
                       <th className="px-4 sm:px-8 py-3 md:py-5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                     {filteredProducts.length === 0 ? (
                       <tr>
                         <td colSpan={4} className="py-20 text-center">
-                          <div className="flex flex-col items-center opacity-30">
+                          <div className="flex flex-col items-center opacity-40 text-gray-400 dark:text-slate-500">
                             <Package className="w-12 h-12 mb-4" />
                             <p className="font-black uppercase tracking-widest text-xs">Aucun produit trouvé</p>
                           </div>
@@ -805,49 +864,49 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                         const isOut = Number(product.stockQuantity || 0) <= 0;
                         
                         return (
-                          <tr key={product.id} className="hover:bg-gray-50/20 transition-colors group">
+                          <tr key={product.id} className="hover:bg-gray-50/60 dark:hover:bg-slate-800/40 transition-colors group">
                             <td className="px-4 sm:px-8 py-4 md:py-6">
                               <div className="flex items-center space-x-3 md:space-x-5">
-                                <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-50 rounded-[1.25rem] flex items-center justify-center overflow-hidden border border-black/5 group-hover:scale-105 transition-transform shadow-inner shrink-0">
+                                <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-50 dark:bg-slate-800 rounded-[1.25rem] flex items-center justify-center overflow-hidden border border-black/5 dark:border-slate-700 group-hover:scale-105 transition-transform shadow-inner shrink-0">
                                   {product.image ? (
                                     <OptimizedImage src={product.image} alt={product.name} width={150} className="w-full h-full object-cover" />
                                   ) : (
-                                    <Package className="w-6 h-6 md:w-8 md:h-8 text-gray-200" />
+                                    <Package className="w-6 h-6 md:w-8 md:h-8 text-gray-300 dark:text-slate-600" />
                                   )}
                                 </div>
                                 <div className="flex flex-col min-w-0">
-                                  <span className="font-black text-ink text-sm leading-tight tracking-tight truncate">{product.name}</span>
+                                  <span className="font-black text-ink dark:text-white text-sm leading-tight tracking-tight truncate">{product.name}</span>
                                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                    <span className="text-[9px] font-mono font-black text-gray-400 uppercase tracking-[0.15em]">
+                                    <span className="text-[9px] font-mono font-black text-gray-400 dark:text-slate-400 uppercase tracking-[0.15em]">
                                       {product.sku || 'SANS SKU'}
                                     </span>
-                                    <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
-                                    <span className="text-[9px] font-mono font-black text-primary uppercase tracking-[0.15em]">
+                                    <span className="w-1 h-1 bg-gray-200 dark:bg-slate-700 rounded-full"></span>
+                                    <span className="text-[9px] font-mono font-black text-primary dark:text-violet-400 uppercase tracking-[0.15em]">
                                       {product.category}
                                     </span>
                                     {product.sizes && (
                                       <>
-                                        <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
-                                        <span className="text-[9px] font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                        <span className="w-1 h-1 bg-gray-200 dark:bg-slate-700 rounded-full"></span>
+                                        <span className="text-[9px] font-mono font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                           T: {product.sizes}
                                         </span>
                                       </>
                                     )}
                                     {product.colors && (
                                       <>
-                                        <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
-                                        <span className="text-[9px] font-mono font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                        <span className="w-1 h-1 bg-gray-200 dark:bg-slate-700 rounded-full"></span>
+                                        <span className="text-[9px] font-mono font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                           C: {product.colors}
                                         </span>
                                       </>
                                     )}
                                     {(product as any).syncStatus && (
                                       <>
-                                        <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
+                                        <span className="w-1 h-1 bg-gray-200 dark:bg-slate-700 rounded-full"></span>
                                         <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${
-                                          (product as any).syncStatus === 'synced' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                          (product as any).syncStatus === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                          'bg-gray-50 text-gray-400 border-gray-100'
+                                          (product as any).syncStatus === 'synced' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60' : 
+                                          (product as any).syncStatus === 'pending' ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/60' :
+                                          'bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border-gray-200 dark:border-slate-700'
                                         }`}>
                                           {(product as any).syncStatus === 'synced' ? <Check className="w-2.5 h-2.5" /> : <RefreshCw className="w-2.5 h-2.5 animate-spin" />}
                                           <span className="text-[8px] font-black uppercase tracking-wider">{(product as any).syncStatus}</span>
@@ -860,10 +919,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             </td>
                             <td className="px-4 sm:px-8 py-4 md:py-6">
                               <div className="flex flex-col">
-                                <span className="font-mono font-black text-ink text-sm">
-                                  {product.price.toLocaleString()} <span className="text-[9px] opacity-40">{merchant.currency}</span>
+                                <span className="font-mono font-black text-ink dark:text-white text-sm">
+                                  {product.price.toLocaleString()} <span className="text-[9px] opacity-50">{merchant.currency}</span>
                                 </span>
-                                <span className="text-[9px] font-mono font-bold text-gray-400 mt-1 uppercase tracking-wider">
+                                <span className="text-[9px] font-mono font-bold text-gray-400 dark:text-slate-400 mt-1 uppercase tracking-wider">
                                   VAL: {(product.price * Number(product.stockQuantity || 0)).toLocaleString()}
                                 </span>
                               </div>
@@ -871,13 +930,14 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             <td className="px-4 sm:px-8 py-4 md:py-6">
                               <div className="flex items-center space-x-4">
                                 <div className={`px-4 py-2 rounded-xl text-[10px] font-mono font-black border tracking-widest ${
-                                  isOut ? 'bg-rose-50 text-rose-600 border-rose-100 animate-pulse' :
-                                  isLow ? 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm' : 
-                                  'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100 transition-colors cursor-help'
+                                  isOut ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60 animate-pulse' :
+                                  isLow ? 'bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800/60 shadow-sm' : 
+                                  'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors cursor-help'
                                 }`}>
                                   {(product.stockQuantity || 0).toString().padStart(2, '0')} UNITÉS
                                 </div>
                                 <button 
+                                  data-acom-id="stock.btn.add_quick_qty"
                                   onClick={() => { 
                                     setCurrentProduct(product); 
                                     setRestockData({
@@ -889,7 +949,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                     });
                                     setIsRestocking(true); 
                                   }}
-                                  className="w-10 h-10 flex items-center justify-center bg-gray-50 border border-black/5 text-gray-500 rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
+                                  className="w-10 h-10 flex items-center justify-center bg-gray-50 dark:bg-slate-800 border border-black/5 dark:border-slate-700 text-gray-500 dark:text-slate-300 rounded-xl hover:bg-primary hover:text-white hover:border-primary transition-all shadow-sm"
                                   title="Réapprovisionner"
                                 >
                                   <Plus className="w-4 h-4" />
@@ -898,8 +958,8 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             </td>
                             <td className="px-4 sm:px-8 py-4 md:py-6 text-right">
                               <div className="flex items-center justify-end space-x-2">
-                                <button onClick={() => { setCurrentProduct(product); setIsEditing(true); }} className="p-3 bg-gray-50 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-xl transition-all border border-black/5 hover:border-primary/20 shadow-sm"><Edit2 className="w-4 h-4" /></button>
-                                <button onClick={() => setDeleteConfirm(product.id || null)} className="p-3 bg-gray-50 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all border border-black/5 hover:border-rose-200 shadow-sm"><Trash2 className="w-4 h-4" /></button>
+                                <button data-acom-id="stock.btn.edit_product" onClick={() => { setCurrentProduct(product); setIsEditing(true); }} className="p-3 bg-gray-50 dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:text-primary dark:hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl transition-all border border-black/5 dark:border-slate-700 shadow-sm"><Edit2 className="w-4 h-4" /></button>
+                                <button data-acom-id="stock.btn.delete_product" onClick={() => setDeleteConfirm(product.id || null)} className="p-3 bg-gray-50 dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-all border border-black/5 dark:border-slate-700 shadow-sm"><Trash2 className="w-4 h-4" /></button>
                               </div>
                             </td>
                           </tr>
@@ -909,10 +969,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                   </tbody>
                 </table>
                 {filteredProducts.length > productLimit && (
-                  <div className="p-4 flex justify-center border-t border-gray-100">
+                  <div className="p-4 flex justify-center border-t border-gray-100 dark:border-slate-800">
                     <button 
                       onClick={() => setProductLimit(prev => prev + 10)}
-                      className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                      className="px-6 py-2 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 font-bold text-[10px] rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest"
                     >
                       Voir plus
                     </button>
@@ -925,78 +985,79 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
 
         {/* Sidebar: Movement Summary or Chart */}
         <div className="w-full xl:w-[400px] space-y-6">
-          <div className="bg-ink p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
+          <div data-acom-id="stock.kpi.sante_stock" className="bg-slate-900 dark:bg-slate-900/90 border border-slate-800 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
               <TrendingUp className="w-32 h-32 text-white" />
             </div>
             <div className="relative">
               <h3 className="text-xl font-bold text-white mb-2">Santé du Stock</h3>
-              <p className="text-white/50 text-[11px] leading-relaxed mb-6 font-medium uppercase tracking-widest">
+              <p className="text-slate-400 text-[11px] leading-relaxed mb-6 font-medium uppercase tracking-widest">
                 Analyse de votre inventaire actuel
               </p>
               
               <div className="space-y-5">
-                <HealthIndicator label="Disponibilité" value={products.length > 0 ? (products.filter(p => Number(p.stockQuantity || 0) > 0).length / products.length * 100).toFixed(0) : '0'} color="primary" />
-                <HealthIndicator label="Rentabilité théorique" value={theoreticalProfit.toString()} color="blue" />
-                <HealthIndicator label="Rotation de stock" value={rotationStock.toString()} color="purple" />
+                <HealthIndicator dataAcomId="stock.health.disponibilite" label="Disponibilité" value={products.length > 0 ? (products.filter(p => Number(p.stockQuantity || 0) > 0).length / products.length * 100).toFixed(0) : '0'} color="primary" />
+                <HealthIndicator dataAcomId="stock.health.location_theorique" label="Rentabilité théorique" value={theoreticalProfit.toString()} color="blue" />
+                <HealthIndicator dataAcomId="stock.health.rotation" label="Rotation de stock" value={rotationStock.toString()} color="purple" />
               </div>
 
-              <div className="mt-8 pt-8 border-t border-white/10 grid grid-cols-2 gap-4">
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                  <p className="text-[10px] text-white/40 uppercase font-black mb-1">Articles Bas</p>
+              <div className="mt-8 pt-8 border-t border-slate-800 grid grid-cols-2 gap-4">
+                <div data-acom-id="stock.health.articles_bas" className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700/60">
+                  <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Articles Bas</p>
                   <p className="text-2xl font-black text-white">{stats.lowStock}</p>
                 </div>
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                  <p className="text-[10px] text-white/40 uppercase font-black mb-1">Ruptures</p>
+                <div data-acom-id="stock.health.ruptures" className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700/60">
+                  <p className="text-[10px] text-slate-400 uppercase font-black mb-1">Ruptures</p>
                   <p className="text-2xl font-black text-rose-400">{stats.outOfStock}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
-            <h4 className="text-sm font-black text-ink uppercase tracking-widest mb-6">Flux Récents</h4>
+          <div data-acom-id="stock.recent_flows" className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-black/5 dark:border-slate-800 shadow-sm">
+            <h4 className="text-sm font-black text-ink dark:text-white uppercase tracking-widest mb-6">Flux Récents</h4>
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
               {movements.slice(0, 8).map((m: any) => {
                 const product = products.find(p => p.id === m.productId);
                 return (
-                  <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 group hover:shadow-md transition-all gap-4">
+                  <div key={m.id} className="flex items-center justify-between p-4 bg-gray-50/70 dark:bg-slate-800/60 rounded-2xl border border-gray-100 dark:border-slate-700 group hover:shadow-md transition-all gap-4">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center border ${
-                        m.type === 'in' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                        m.type === 'sale' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-100 text-gray-400 border-gray-200'
+                        m.type === 'in' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/60' : 
+                        m.type === 'sale' ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-800/60' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-300 border-gray-200 dark:border-slate-600'
                       }`}>
                         {m.type === 'in' ? <ArrowDownRight className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-gray-900 truncate">{product?.name || 'Produit...'}</p>
-                        <p className="text-[9px] font-mono text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{product?.name || 'Produit...'}</p>
+                        <p className="text-[9px] font-mono text-gray-400 dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                           {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd MMM, HH:mm') : '-'}
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-xs font-black font-mono ${m.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      <p className={`text-xs font-black font-mono ${m.type === 'in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                         {m.type === 'in' ? '+' : '-'}{m.quantity}
                       </p>
-                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">UNITÉS</p>
+                      <p className="text-[9px] text-gray-400 dark:text-slate-400 font-bold uppercase tracking-widest">UNITÉS</p>
                     </div>
                   </div>
                 );
               })}
               {movements.length === 0 && (
-                <div className="py-12 text-center text-gray-300 font-bold uppercase text-[9px] tracking-[0.2em]">
+                <div className="py-12 text-center text-gray-400 dark:text-slate-500 font-bold uppercase text-[9px] tracking-[0.2em]">
                   Aucun mouvement enregistré
                 </div>
               )}
             </div>
             <button 
+              data-acom-id="stock.btn.view_all_history"
               onClick={() => {
                 // Focus the movements history if it was a separate tab, but here it's below
                 const el = document.getElementById('movements-section');
                 el?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="w-full mt-6 py-4 border border-gray-100 text-gray-400 hover:text-primary hover:border-primary/20 hover:bg-primary/5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+              className="w-full mt-6 py-4 border border-gray-200 dark:border-slate-700 text-gray-500 dark:text-slate-400 hover:text-primary dark:hover:text-primary hover:border-primary/20 dark:hover:border-primary/40 hover:bg-primary/5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
             >
               Voir tout l'historique
             </button>
@@ -1005,14 +1066,15 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       </div>
 
       {/* Full History Section with Advanced Filters */}
-      <div id="movements-section" className="pt-12 border-t border-gray-100">
+      <div id="movements-section" data-acom-id="stock.movements_journal" className="pt-12 border-t border-gray-100 dark:border-slate-800">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h3 className="text-2xl font-black text-ink tracking-tight">Journal des Mouvements</h3>
-            <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.15em] mt-1">Traçabilité complète & filtres avancés</p>
+            <h3 className="text-2xl font-black text-ink dark:text-white tracking-tight">Journal des Mouvements</h3>
+            <p className="text-[10px] font-mono font-black text-gray-400 dark:text-slate-400 uppercase tracking-[0.15em] mt-1">Traçabilité complète & filtres avancés</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button 
+              data-acom-id="stock.btn.export_journal_csv"
               onClick={() => {
                 const headers = ['Date', 'Produit', 'Type', 'Quantité', 'Raison', 'Opérateur'];
                 const rows = filteredMovements.map(m => {
@@ -1037,22 +1099,23 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                 link.click();
                 document.body.removeChild(link);
               }}
-              className="px-5 py-3 bg-white border border-black/5 rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-gray-50 transition-all flex items-center space-x-1.5 shadow-sm"
+              className="px-5 py-3 bg-white dark:bg-slate-800 border border-black/5 dark:border-slate-700 text-gray-700 dark:text-slate-200 rounded-xl text-[9px] font-black uppercase tracking-wider hover:bg-gray-50 dark:hover:bg-slate-700 transition-all flex items-center space-x-1.5 shadow-sm"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Exporter CSV Journal</span>
             </button>
           </div>
         </div>
 
         {/* Filters Panel */}
-        <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-gray-50/70 dark:bg-slate-900/90 p-6 rounded-3xl border border-gray-200/80 dark:border-slate-800 mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[9px] font-mono font-black text-gray-400 uppercase tracking-widest mb-2">Type de Flux</label>
+            <label className="block text-[10px] font-mono font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest mb-2">Type de Flux</label>
             <select
+              data-acom-id="stock.filter.movement_type"
               value={filterMovementType}
               onChange={e => setFilterMovementType(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-black/5 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-ink dark:text-white rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="all">Tous les types (Entrées & Sorties)</option>
               <option value="in">Entrées uniquement (Approvisionnements / Retours)</option>
@@ -1062,11 +1125,12 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           </div>
 
           <div>
-            <label className="block text-[9px] font-mono font-black text-gray-400 uppercase tracking-widest mb-2">Filtrer par Article</label>
+            <label className="block text-[10px] font-mono font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest mb-2">Filtrer par Article</label>
             <select
+              data-acom-id="stock.filter.movement_article"
               value={filterMovementProduct}
               onChange={e => setFilterMovementProduct(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-black/5 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-ink dark:text-white rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="all">Tous les produits</option>
               {products.map(p => (
@@ -1076,11 +1140,12 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           </div>
 
           <div>
-            <label className="block text-[9px] font-mono font-black text-gray-400 uppercase tracking-widest mb-2">Période Temporelle</label>
+            <label className="block text-[10px] font-mono font-black text-gray-700 dark:text-slate-200 uppercase tracking-widest mb-2">Période Temporelle</label>
             <select
+              data-acom-id="stock.filter.movement_period"
               value={filterMovementPeriod}
               onChange={e => setFilterMovementPeriod(e.target.value)}
-              className="w-full px-4 py-3 bg-white border border-black/5 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-ink dark:text-white rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="all">Toutes les dates</option>
               <option value="today">Aujourd'hui</option>
@@ -1090,64 +1155,64 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
           </div>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] border border-black/5 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-black/5 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                  <th className="px-8 py-5">Horodatage</th>
-                  <th className="px-8 py-5">Article Impacté</th>
-                  <th className="px-8 py-5">Flux & Quantité</th>
-                  <th className="px-8 py-5">Justification / Motif</th>
-                  <th className="px-8 py-5">Opérateur</th>
+                <tr className="bg-gray-50/70 dark:bg-slate-800/60 text-[10px] font-mono font-black text-gray-500 dark:text-slate-400 uppercase tracking-[0.2em] border-b border-gray-200 dark:border-slate-800">
+                  <th data-acom-id="stock.col.journal_timestamp" className="px-8 py-5">Horodatage</th>
+                  <th data-acom-id="stock.col.journal_article" className="px-8 py-5">Article Impacté</th>
+                  <th data-acom-id="stock.col.journal_flux" className="px-8 py-5">Flux & Quantité</th>
+                  <th data-acom-id="stock.col.journal_reason" className="px-8 py-5">Justification / Motif</th>
+                  <th data-acom-id="stock.col.journal_operator" className="px-8 py-5">Opérateur</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                 {filteredMovements.slice(0, movementLimit).map((m: any) => {
                   const product = products.find(p => p.id === m.productId);
                   const isPositive = m.type === 'in' || m.type === 'return';
                   return (
-                    <tr key={m.id} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={m.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="px-8 py-6">
-                        <span className="text-[11px] font-mono font-black text-ink uppercase">
+                        <span className="text-[11px] font-mono font-black text-ink dark:text-white uppercase">
                           {m.createdAt?.seconds ? format(new Date(m.createdAt.seconds * 1000), 'dd/MM/yyyy HH:mm') : 
                            m.createdAt ? format(new Date(m.createdAt), 'dd/MM/yyyy HH:mm') : '-'}
                         </span>
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
-                            <Package className="w-4 h-4 text-gray-400" />
+                          <div className="w-8 h-8 bg-gray-100 dark:bg-slate-800 rounded-lg flex items-center justify-center shrink-0 border border-black/5 dark:border-slate-700">
+                            <Package className="w-4 h-4 text-gray-500 dark:text-slate-400" />
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-xs font-black text-ink">{product?.name || 'Article supprimé'}</span>
-                            <span className="text-[9px] font-mono text-gray-400 font-bold">{product?.sku || 'SANS SKU'}</span>
+                            <span className="text-xs font-black text-ink dark:text-white">{product?.name || 'Article supprimé'}</span>
+                            <span className="text-[9px] font-mono text-gray-400 dark:text-slate-400 font-bold">{product?.sku || 'SANS SKU'}</span>
                           </div>
                         </div>
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-4">
                           <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                            m.type === 'in' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                            m.type === 'sale' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-                            'bg-rose-50 text-rose-600 border-rose-100'
+                            m.type === 'in' ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60' : 
+                            m.type === 'sale' ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/60' : 
+                            'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60'
                           }`}>
                             {m.type === 'in' ? 'ENTRÉE' : m.type === 'sale' ? 'VENTE' : m.type.toUpperCase()}
                           </span>
-                          <span className={`font-mono font-black text-sm ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          <span className={`font-mono font-black text-sm ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                             {isPositive ? '+' : '-'}{m.quantity}
                           </span>
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <span className="text-[11px] font-bold text-gray-400 italic">"{m.reason || 'Aucune note'}"</span>
+                        <span className="text-[11px] font-medium text-gray-600 dark:text-slate-300 italic">"{m.reason || 'Aucune note'}"</span>
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center text-[10px] font-black border border-indigo-100 uppercase">
+                          <div className="w-6 h-6 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center text-[10px] font-black border border-indigo-100 dark:border-indigo-800/60 uppercase">
                             {(m.performedBy || 'AD')[0]}
                           </div>
-                          <span className="text-xs font-bold text-ink">{m.performedBy || 'Administrateur'}</span>
+                          <span className="text-xs font-bold text-ink dark:text-white">{m.performedBy || 'Administrateur'}</span>
                         </div>
                       </td>
                     </tr>
@@ -1155,7 +1220,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                 })}
                 {filteredMovements.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-12 text-center text-gray-300 font-bold uppercase text-[9px] tracking-[0.2em]">
+                    <td colSpan={5} className="py-12 text-center text-gray-400 dark:text-slate-500 font-bold uppercase text-[9px] tracking-[0.2em]">
                       Aucun mouvement ne correspond aux filtres sélectionnés
                     </td>
                   </tr>
@@ -1163,10 +1228,10 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
               </tbody>
             </table>
             {filteredMovements.length > movementLimit && (
-              <div className="p-4 flex justify-center border-t border-gray-100">
+              <div className="p-4 flex justify-center border-t border-gray-100 dark:border-slate-800">
                 <button 
                   onClick={() => setMovementLimit(prev => prev + 10)}
-                  className="px-6 py-2 bg-gray-50 text-gray-600 font-bold text-[10px] rounded-xl hover:bg-gray-100 transition-colors uppercase tracking-widest"
+                  className="px-6 py-2 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 font-bold text-[10px] rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest"
                 >
                   Voir plus
                 </button>
@@ -1179,38 +1244,38 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       {/* Restock Modal */}
       <AnimatePresence>
         {isRestocking && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+              className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden"
             >
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50">
                 <div>
-                  <h3 className="text-xl font-bold text-ink">Réapprovisionner</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Mise à jour des stocks</p>
+                  <h3 className="text-xl font-bold text-ink dark:text-white">Réapprovisionner</h3>
+                  <p className="text-[10px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-widest mt-1">Mise à jour des stocks</p>
                 </div>
-                <button onClick={() => setIsRestocking(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
-                  <X className="w-5 h-5 text-gray-400" />
+                <button onClick={() => setIsRestocking(false)} className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-colors shadow-sm border border-black/5 dark:border-slate-700">
+                  <X className="w-5 h-5 text-gray-400 dark:text-slate-300" />
                 </button>
               </div>
 
               <div className="p-8 space-y-6">
-                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm border border-black/5">
+                <div className="p-4 bg-primary/5 dark:bg-primary/15 rounded-2xl border border-primary/10 dark:border-primary/25 flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-sm border border-black/5 dark:border-slate-700">
                     <Package className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest">Produit sélectionné</p>
-                    <p className="font-bold text-ink">{currentProduct?.name}</p>
+                    <p className="text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest">Produit sélectionné</p>
+                    <p className="font-bold text-ink dark:text-white">{currentProduct?.name}</p>
                   </div>
                 </div>
 
                 <form onSubmit={handleRestock} className="space-y-5">
                   <div className="grid grid-cols-1 gap-4">
                     <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Quantité à ajouter</label>
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Quantité à ajouter</label>
                       <input 
                         type="number" 
                         required 
@@ -1220,13 +1285,13 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                           const quantity = Number(e.target.value);
                           setRestockData(prev => ({ ...prev, quantity }));
                         }} 
-                        className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold text-base" 
+                        className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-base text-ink dark:text-white" 
                       />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix d'achat unitaire ({merchant.currency})</label>
+                        <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Prix d'achat unitaire ({merchant.currency})</label>
                         <input 
                           type="number" 
                           min="0" 
@@ -1236,12 +1301,12 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             const unitCostPrice = Number(e.target.value);
                             setRestockData(prev => ({ ...prev, unitCostPrice }));
                           }} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                          className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-ink dark:text-white" 
                         />
                       </div>
                       
                       <div>
-                        <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix de vente unitaire ({merchant.currency})</label>
+                        <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Prix de vente unitaire ({merchant.currency})</label>
                         <input 
                           type="number" 
                           min="0" 
@@ -1251,24 +1316,24 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             const unitSellingPrice = Number(e.target.value);
                             setRestockData(prev => ({ ...prev, unitSellingPrice }));
                           }} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                          className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-ink dark:text-white" 
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Résumé de l'approvisionnement */}
-                  <div className="p-4 bg-gray-50/80 rounded-2xl border border-gray-100 space-y-2">
+                  <div className="p-4 bg-gray-50/80 dark:bg-slate-800/80 rounded-2xl border border-gray-100 dark:border-slate-700 space-y-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="font-bold text-gray-500 uppercase tracking-wide">Coût Total Estimé :</span>
-                      <span className="font-mono font-black text-ink text-sm">
+                      <span className="font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide">Coût Total Estimé :</span>
+                      <span className="font-mono font-black text-ink dark:text-white text-sm">
                         {((restockData.quantity || 0) * (restockData.unitCostPrice || 0)).toLocaleString()} {merchant.currency}
                       </span>
                     </div>
                     {restockData.unitSellingPrice > restockData.unitCostPrice && (
-                      <div className="flex justify-between items-center text-[10px] pt-1.5 border-t border-dashed border-gray-200">
-                        <span className="text-emerald-600 font-bold uppercase tracking-wider">Marge unitaire estimée :</span>
-                        <span className="font-mono font-bold text-emerald-600">
+                      <div className="flex justify-between items-center text-[10px] pt-1.5 border-t border-dashed border-gray-200 dark:border-slate-700">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">Marge unitaire estimée :</span>
+                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                           {+(restockData.unitSellingPrice - restockData.unitCostPrice).toLocaleString()} {merchant.currency} ({Math.round(((restockData.unitSellingPrice - restockData.unitCostPrice) / restockData.unitSellingPrice) * 100)}%)
                         </span>
                       </div>
@@ -1276,12 +1341,12 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Motif / Note</label>
-                    <input type="text" value={restockData.reason} onChange={e => setRestockData({...restockData, reason: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-medium text-sm" placeholder="ex: Arrivage fournisseur..." />
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Motif / Note</label>
+                    <input type="text" value={restockData.reason} onChange={e => setRestockData({...restockData, reason: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-medium text-sm text-ink dark:text-white" placeholder="ex: Arrivage fournisseur..." />
                   </div>
                   
                   <div className="flex space-x-3 pt-4">
-                    <button type="button" onClick={() => setIsRestocking(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
+                    <button type="button" onClick={() => setIsRestocking(false)} className="flex-1 py-4 border border-gray-200 dark:border-slate-700 rounded-2xl font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Annuler</button>
                     <button type="submit" disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20">
                       {saving ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Confirmer l\'ajout'}
                     </button>
@@ -1323,52 +1388,52 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       {/* Product Modal */}
       <AnimatePresence>
         {isEditing && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2rem] shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div data-acom-id="stock.product_modal.header" data-acom-context="stock-new-product" className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50">
                 <div>
-                  <h3 className="text-xl font-bold text-ink">Détails du Produit</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Configuration technique de l'article</p>
+                  <h3 className="text-xl font-bold text-ink dark:text-white">Détails du Produit</h3>
+                  <p className="text-[10px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-widest mt-1">Configuration technique de l'article</p>
                 </div>
-                <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
-                  <X className="w-5 h-5 text-gray-400" />
+                <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-colors shadow-sm border border-black/5 dark:border-slate-700">
+                  <X className="w-5 h-5 text-gray-400 dark:text-slate-300" />
                 </button>
               </div>
 
               <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom du produit</label>
+                    <div data-acom-id="stock.product_modal.name">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Nom du produit</label>
                       <input 
                         type="text" 
                         required 
                         value={currentProduct?.name || ''} 
                         onChange={e => setCurrentProduct({...currentProduct!, name: e.target.value})} 
-                        className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" 
+                        className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-bold text-ink dark:text-white" 
                         placeholder="ex: Laptop Pro 15"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">SKU / Code interne</label>
+                    <div data-acom-id="stock.product_modal.sku">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">SKU / Code interne</label>
                       <div className="flex gap-2">
                         <input 
                           type="text" 
                           id="sku-input"
                           value={currentProduct?.sku || ''} 
                           onChange={e => setCurrentProduct({...currentProduct!, sku: e.target.value})} 
-                          className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono text-sm flex-1" 
+                          className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono text-sm flex-1 text-ink dark:text-white" 
                           placeholder="ex: LP-15-2024"
                         />
                         <button
                           type="button"
                           onClick={() => setShowSKUScanner(true)}
-                          className="px-4 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
+                          className="px-4 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
                           title="Scanner un code-barres"
                         >
                           <ScanLine className="w-5 h-5" />
@@ -1377,19 +1442,19 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     </div>
                   </div>
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Image (URL ou Fichier)</label>
+                    <div data-acom-id="stock.product_modal.image">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Image (URL ou Fichier)</label>
                       <div className="flex gap-3">
                         <div className="flex-1 space-y-2">
                           <input 
                             type="text" 
                             value={currentProduct?.image || ''} 
                             onChange={e => setCurrentProduct({...currentProduct!, image: e.target.value})} 
-                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-xs" 
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 text-xs text-ink dark:text-white" 
                             placeholder="https://..."
                           />
-                          <label className="block w-full text-center px-4 py-2 border border-dashed border-gray-300 rounded-xl cursor-pointer hover:bg-gray-50 transition-colors">
-                            <span className="text-xs font-bold text-gray-500">Ou uploader une image</span>
+                          <label className="block w-full text-center px-4 py-2 border border-dashed border-gray-300 dark:border-slate-700 rounded-xl cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
+                            <span className="text-xs font-bold text-gray-500 dark:text-slate-400">Ou uploader une image</span>
                             <input 
                               type="file"
                               accept="image/*"
@@ -1406,15 +1471,15 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                           </label>
                         </div>
                         {currentProduct?.image && (
-                          <div className="w-16 h-16 rounded-xl border border-black/5 overflow-hidden bg-gray-100 flex-shrink-0">
+                          <div className="w-16 h-16 rounded-xl border border-black/5 dark:border-slate-700 overflow-hidden bg-gray-100 dark:bg-slate-800 flex-shrink-0">
                             <OptimizedImage src={currentProduct.image} alt={currentProduct.name} width={100} className="w-full h-full object-cover" />
                           </div>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div data-acom-id="stock.product_modal.category" className="flex items-center gap-4">
                       <div className="flex-1">
-                        <label className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
+                        <label className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">
                           <span>Catégorie</span>
                           {showNewCatInput && (
                             <button type="button" onClick={() => { setShowNewCatInput(false); setCurrentProduct({...currentProduct!, category: ''}); }} className="text-primary hover:text-primary-hover capitalize tracking-normal text-[10px]">Annuler</button>
@@ -1425,7 +1490,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             type="text"
                             value={currentProduct?.category || ''} 
                             onChange={e => setCurrentProduct({...currentProduct!, category: e.target.value})} 
-                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-bold text-ink dark:text-white"
                             placeholder="Saisir la nouvelle catégorie..."
                             autoFocus
                           />
@@ -1440,7 +1505,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                 setCurrentProduct({...currentProduct!, category: e.target.value});
                               }
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold bg-white"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-bold bg-white text-ink dark:text-white"
                           >
                             <option value="" disabled>Sélectionner une catégorie</option>
                             {Array.from(new Set([
@@ -1455,7 +1520,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                         )}
                       </div>
                       <div className="flex-1">
-                        <label className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">
+                        <label className="flex justify-between items-center text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">
                           <span>Sous Catégorie</span>
                           {showNewSubCatInput && (
                             <button type="button" onClick={() => { setShowNewSubCatInput(false); setCurrentProduct({...currentProduct!, subCategory: ''}); }} className="text-primary hover:text-primary-hover capitalize tracking-normal text-[10px]">Annuler</button>
@@ -1466,7 +1531,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                             type="text" 
                             value={currentProduct?.subCategory || ''} 
                             onChange={e => setCurrentProduct({...currentProduct!, subCategory: e.target.value})} 
-                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-bold text-ink dark:text-white"
                             placeholder="Saisir la nouvelle sous catégorie..."
                             autoFocus
                           />
@@ -1481,7 +1546,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                 setCurrentProduct({...currentProduct!, subCategory: e.target.value});
                               }
                             }}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold bg-white"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-bold bg-white text-ink dark:text-white"
                           >
                             <option value="">(Aucune)</option>
                             {Array.from(new Set([
@@ -1498,80 +1563,80 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 border-t border-dashed border-gray-100">
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Coût intrant par unité (Prix d'achat)</label>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-4 border-t border-dashed border-gray-100 dark:border-slate-800">
+                  <div data-acom-id="stock.product_modal.cost_price">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Coût intrant par unité (Prix d'achat)</label>
                     <div className="relative">
                       <input 
                         type="text" 
                         value={currentProduct?.costPrice === 0 ? '' : currentProduct?.costPrice || ''} 
                         onChange={e => setCurrentProduct({...currentProduct!, costPrice: Number(e.target.value.replace(/\D/g, ''))})} 
-                        className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                        className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-ink dark:text-white" 
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 dark:text-slate-400">{merchant.currency}</span>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Prix de vente</label>
+                  <div data-acom-id="stock.product_modal.price">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Prix de vente</label>
                     <div className="relative">
                       <input 
                         type="text" 
                         required 
                         value={currentProduct?.price === 0 ? '' : currentProduct?.price || ''} 
                         onChange={e => setCurrentProduct({...currentProduct!, price: Number(e.target.value.replace(/\D/g, ''))})} 
-                        className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                        className="w-full pl-4 pr-12 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-ink dark:text-white" 
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">{merchant.currency}</span>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400 dark:text-slate-400">{merchant.currency}</span>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Stock actuel</label>
+                  <div data-acom-id="stock.product_modal.stock">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Stock actuel</label>
                     <input 
                       type="number" 
                       required 
                       value={currentProduct?.stockQuantity || ''} 
                       onChange={e => setCurrentProduct({...currentProduct!, stockQuantity: Number(e.target.value)})} 
-                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-ink dark:text-white" 
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Seuil d'alerte</label>
+                  <div data-acom-id="stock.product_modal.alert_level">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Seuil d'alerte</label>
                     <input 
                       type="number" 
                       required 
                       value={currentProduct?.minStockLevel || ''} 
                       onChange={e => setCurrentProduct({...currentProduct!, minStockLevel: Number(e.target.value)})} 
-                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-ink dark:text-white" 
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100">
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Tailles (Optionnel)</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-dashed border-gray-100 dark:border-slate-800">
+                  <div data-acom-id="stock.product_modal.sizes">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Tailles (Optionnel)</label>
                     <input 
                       type="text" 
                       value={currentProduct?.sizes || ''} 
                       onChange={e => setCurrentProduct({...currentProduct!, sizes: e.target.value})} 
-                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-sm" 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 text-sm text-ink dark:text-white" 
                       placeholder="ex: S, M, L, XL ou 38, 39, 40"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Couleur (Optionnel)</label>
+                  <div data-acom-id="stock.product_modal.color">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Couleur (Optionnel)</label>
                     <input 
                       type="text" 
                       value={currentProduct?.colors || ''} 
                       onChange={e => setCurrentProduct({...currentProduct!, colors: e.target.value})} 
-                      className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-sm" 
+                      className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 text-sm text-ink dark:text-white" 
                       placeholder="ex: Noir, Blanc, Bleu, Rouge"
                     />
                   </div>
                 </div>
               </form>
 
-              <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+              <div data-acom-id="stock.product_modal.actions" className="p-8 bg-gray-50/50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-800 flex space-x-4">
+                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 dark:border-slate-700 rounded-2xl font-bold text-gray-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 transition-colors">Annuler</button>
                 <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
                   {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le produit'}
                 </button>
@@ -1584,22 +1649,22 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deleteConfirm && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center"
+              className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center border border-gray-100 dark:border-slate-800"
             >
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-8 h-8 text-red-500" />
+              <div className="w-16 h-16 bg-red-50 dark:bg-rose-950/40 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100 dark:border-rose-800/40">
+                <AlertCircle className="w-8 h-8 text-red-500 dark:text-rose-400" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Supprimer le produit ?</h3>
-              <p className="text-sm text-gray-500 mb-6">Cette action est irréversible.</p>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Supprimer le produit ?</h3>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">Cette action est irréversible.</p>
               <div className="flex space-x-3">
                 <button 
                   onClick={() => setDeleteConfirm(null)}
-                  className="flex-1 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold hover:bg-gray-100 transition-all"
+                  className="flex-1 py-3 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 rounded-xl font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-all border border-gray-200 dark:border-slate-700"
                 >
                   Annuler
                 </button>
@@ -1619,31 +1684,31 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       {/* Manual Stock Adjustment Modal */}
       <AnimatePresence>
         {isAdjusting && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl overflow-hidden"
+              className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2rem] shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden"
             >
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div data-acom-id="stock.adjustment_modal.header" data-acom-context="stock-adjustment" className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50">
                 <div>
-                  <h3 className="text-xl font-bold text-ink">Ajustement Manuel du Stock</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Corriger manuellement les écarts de stock</p>
+                  <h3 className="text-xl font-bold text-ink dark:text-white">Ajustement Manuel du Stock</h3>
+                  <p className="text-[10px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-widest mt-1">Corriger manuellement les écarts de stock</p>
                 </div>
-                <button onClick={() => setIsAdjusting(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
-                  <X className="w-5 h-5 text-gray-400" />
+                <button onClick={() => setIsAdjusting(false)} className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-colors shadow-sm border border-black/5 dark:border-slate-700">
+                  <X className="w-5 h-5 text-gray-400 dark:text-slate-300" />
                 </button>
               </div>
 
               <form onSubmit={handleManualAdjustment} className="p-8 space-y-5">
-                <div>
-                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Sélectionner l'article</label>
+                <div data-acom-id="stock.adjustment_modal.product">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Sélectionner l'article</label>
                   <select
                     required
                     value={adjustmentData.productId}
                     onChange={e => setAdjustmentData({ ...adjustmentData, productId: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold bg-white text-sm"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-bold bg-white text-sm text-ink dark:text-white"
                   >
                     <option value="" disabled>Choisir un produit...</option>
                     {products.map(p => (
@@ -1653,14 +1718,14 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Type d'opération</label>
-                    <div className="flex bg-gray-100 p-1 rounded-xl">
+                  <div data-acom-id="stock.adjustment_modal.operation_type">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Type d'opération</label>
+                    <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-xl border border-gray-200/50 dark:border-slate-700/60">
                       <button
                         type="button"
                         onClick={() => setAdjustmentData({ ...adjustmentData, type: 'in' })}
                         className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                          adjustmentData.type === 'in' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 hover:text-ink'
+                          adjustmentData.type === 'in' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-ink dark:hover:text-white'
                         }`}
                       >
                         Entrée (+)
@@ -1669,7 +1734,7 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                         type="button"
                         onClick={() => setAdjustmentData({ ...adjustmentData, type: 'out' })}
                         className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                          adjustmentData.type === 'out' ? 'bg-rose-500 text-white shadow-sm' : 'text-gray-500 hover:text-ink'
+                          adjustmentData.type === 'out' ? 'bg-rose-500 text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-ink dark:hover:text-white'
                         }`}
                       >
                         Sortie (-)
@@ -1677,25 +1742,25 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Quantité</label>
+                  <div data-acom-id="stock.adjustment_modal.quantity">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Quantité</label>
                     <input
                       type="number"
                       required
                       min="1"
                       value={adjustmentData.quantity || ''}
                       onChange={e => setAdjustmentData({ ...adjustmentData, quantity: Math.max(1, Number(e.target.value)) })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold text-sm"
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-mono font-bold text-sm text-ink dark:text-white"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Motif prédéfini</label>
+                <div data-acom-id="stock.adjustment_modal.reason">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Motif prédéfini</label>
                   <select
                     value={adjustmentData.reason}
                     onChange={e => setAdjustmentData({ ...adjustmentData, reason: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold bg-white text-sm"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 font-bold bg-white text-sm text-ink dark:text-white"
                   >
                     <option value="Casse / Périmé">Casse / Périmé / Endommagé (Sortie)</option>
                     <option value="Vol / Perte constaté">Vol / Perte constaté (Sortie)</option>
@@ -1706,30 +1771,30 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Notes supplémentaires (Optionnel)</label>
+                <div data-acom-id="stock.adjustment_modal.notes">
+                  <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Notes supplémentaires (Optionnel)</label>
                   <input
                     type="text"
                     value={adjustmentData.customReason || ''}
                     onChange={e => setAdjustmentData({ ...adjustmentData, customReason: e.target.value })}
                     placeholder="Précisez les détails du mouvement..."
-                    className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-sm font-medium"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 text-sm font-medium text-ink dark:text-white"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom de l'opérateur</label>
+                  <div data-acom-id="stock.adjustment_modal.operator">
+                    <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Nom de l'opérateur</label>
                     <input
                       type="text"
                       required
                       value={adjustmentData.operator}
                       onChange={e => setAdjustmentData({ ...adjustmentData, operator: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-xs font-bold"
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 text-xs font-bold text-ink dark:text-white"
                     />
                   </div>
-                  <div className="flex items-end space-x-2">
-                    <button type="button" onClick={() => setIsAdjusting(false)} className="flex-1 py-3 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
+                  <div data-acom-id="stock.adjustment_modal.actions" className="flex items-end space-x-2">
+                    <button type="button" onClick={() => setIsAdjusting(false)} className="flex-1 py-3 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Annuler</button>
                     <button type="submit" disabled={saving} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-md">
                       {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Enregistrer'}
                     </button>
@@ -1744,39 +1809,40 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       {/* Supplier Purchase Order Modal */}
       <AnimatePresence>
         {isGeneratingPO && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div 
+              data-acom-id="stock.reorder_modal"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div data-acom-id="stock.reorder_modal.title" className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50">
                 <div>
-                  <h3 className="text-xl font-bold text-ink">Bon de Commande Fournisseur (Réassort)</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Générer un ordre de réapprovisionnement automatique</p>
+                  <h3 className="text-xl font-bold text-ink dark:text-white">Bon de Commande Fournisseur (Réassort)</h3>
+                  <p className="text-[10px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-widest mt-1">Générer un ordre de réapprovisionnement automatique</p>
                 </div>
-                <button onClick={() => { setIsGeneratingPO(false); setGeneratedPODoc(null); }} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
-                  <X className="w-5 h-5 text-gray-400" />
+                <button onClick={() => { setIsGeneratingPO(false); setGeneratedPODoc(null); }} className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-colors shadow-sm border border-black/5 dark:border-slate-700">
+                  <X className="w-5 h-5 text-gray-400 dark:text-slate-300" />
                 </button>
               </div>
 
               {!generatedPODoc ? (
                 <form onSubmit={handleGeneratePODocument} className="p-8 space-y-6 overflow-y-auto flex-1">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Fournisseur</label>
+                    <div data-acom-id="stock.reorder_modal.supplier">
+                      <label className="block text-[10px] font-mono font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest mb-2">Fournisseur</label>
                       <input
                         type="text"
                         required
                         value={poSupplier.name}
                         onChange={e => setPoSupplier({ ...poSupplier, name: e.target.value })}
                         placeholder="ex: SENEGAL TEXTILE SARL"
-                        className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 text-sm font-bold"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-100 dark:border-slate-700 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 dark:bg-slate-800 text-sm font-bold text-ink dark:text-white"
                       />
                     </div>
-                    <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-100 flex items-center gap-3 text-xs">
-                      <AlertCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div data-acom-id="stock.reorder_modal.alert_notice" className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 rounded-xl border border-emerald-100 dark:border-emerald-800 flex items-center gap-3 text-xs">
+                      <AlertCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span>
                         Les articles sélectionnés ci-dessous sont en alerte ou rupture de stock. Les quantités de commande par défaut visent à doubler le seuil d'alerte.
                       </span>
@@ -1784,17 +1850,18 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                   </div>
 
                   <div className="space-y-4">
-                    <h4 className="text-[11px] font-mono font-black text-ink uppercase tracking-widest">Articles à Commander</h4>
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 border border-gray-100 rounded-2xl p-4">
+                    <h4 data-acom-id="stock.reorder_modal.section_articles" className="text-[11px] font-mono font-black text-ink dark:text-white uppercase tracking-widest">Articles à Commander</h4>
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 border border-gray-100 dark:border-slate-800 rounded-2xl p-4">
                       {products.map(p => {
                         const isSelected = selectedPOProducts.includes(p.id as string);
                         
                         return (
-                          <div key={p.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all gap-4 ${
-                            isSelected ? 'bg-indigo-50/30 border-indigo-100' : 'bg-white border-gray-100'
+                          <div key={p.id} data-acom-id="stock.reorder_modal.article_row" className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border transition-all gap-4 ${
+                            isSelected ? 'bg-indigo-50/30 dark:bg-indigo-950/30 border-indigo-100 dark:border-indigo-800' : 'bg-white dark:bg-slate-800/60 border-gray-100 dark:border-slate-700'
                           }`}>
                             <div className="flex items-center gap-3">
                               <input
+                                data-acom-id="stock.reorder_modal.checkbox"
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={e => {
@@ -1807,21 +1874,22 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                                 className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                               />
                               <div>
-                                <p className="text-xs font-black text-ink">{p.name}</p>
-                                <p className="text-[9px] font-mono text-gray-400">Stock actuel: {p.stockQuantity || 0} / Seuil: {p.minStockLevel || 5}</p>
+                                <p className="text-xs font-black text-ink dark:text-white">{p.name}</p>
+                                <p className="text-[9px] font-mono text-gray-400 dark:text-slate-400">Stock actuel: {p.stockQuantity || 0} / Seuil: {p.minStockLevel || 5}</p>
                               </div>
                             </div>
 
                             {isSelected && (
                               <div className="flex items-center gap-2">
-                                <label className="text-[10px] font-mono text-gray-400 uppercase">Qté à Commander :</label>
+                                <label className="text-[10px] font-mono text-gray-400 dark:text-slate-400 uppercase">Qté à Commander :</label>
                                 <input
+                                  data-acom-id="stock.reorder_modal.quantity_input"
                                   type="number"
                                   min="1"
                                   required
                                   value={poCustomQuantities[p.id as string] || ''}
                                   onChange={e => setPoCustomQuantities({ ...poCustomQuantities, [p.id as string]: Math.max(1, Number(e.target.value)) })}
-                                  className="w-20 px-3 py-1.5 border border-indigo-100 rounded-lg text-xs font-mono font-bold text-center focus:ring-2 focus:ring-indigo-200"
+                                  className="w-20 px-3 py-1.5 border border-indigo-100 dark:border-indigo-800 bg-white dark:bg-slate-900 rounded-lg text-xs font-mono font-bold text-center text-ink dark:text-white focus:ring-2 focus:ring-indigo-200"
                                 />
                               </div>
                             )}
@@ -1831,57 +1899,57 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                    <button type="button" onClick={() => setIsGeneratingPO(false)} className="px-6 py-3 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">Annuler</button>
-                    <button type="submit" className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md">
+                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
+                    <button data-acom-id="stock.reorder_modal.cancel_btn" type="button" onClick={() => setIsGeneratingPO(false)} className="px-6 py-3 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">Annuler</button>
+                    <button data-acom-id="stock.reorder_modal.generate_btn" type="submit" className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md">
                       Générer le document PDF/Imprimable
                     </button>
                   </div>
                 </form>
               ) : (
-                <div className="p-8 flex-1 flex flex-col overflow-y-auto">
-                  <div className="border border-gray-200 p-8 rounded-2xl bg-gray-50/20 font-sans shadow-inner flex-1" id="po-print-area">
-                    <div className="flex justify-between items-start border-b border-gray-200 pb-6 mb-6">
+                <div data-acom-id="stock.reorder_modal.generated_doc" className="p-8 flex-1 flex flex-col overflow-y-auto">
+                  <div className="border border-gray-200 dark:border-slate-700 p-8 rounded-2xl bg-gray-50/20 dark:bg-slate-800/40 font-sans shadow-inner flex-1" id="po-print-area">
+                    <div className="flex justify-between items-start border-b border-gray-200 dark:border-slate-700 pb-6 mb-6">
                       <div>
-                        <h2 className="text-2xl font-black text-ink uppercase tracking-tight">{merchant.name}</h2>
-                        <p className="text-xs text-gray-500 mt-1">E-mail: {merchant.email || 'N/A'}</p>
-                        <p className="text-xs text-gray-500">Tél: {merchant.phone || 'N/A'}</p>
+                        <h2 className="text-2xl font-black text-ink dark:text-white uppercase tracking-tight">{merchant.name}</h2>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">E-mail: {merchant.email || 'N/A'}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">Tél: {merchant.phone || 'N/A'}</p>
                       </div>
                       <div className="text-right">
                         <span className="px-3 py-1 bg-ink text-white font-mono text-[9px] font-black uppercase rounded-full">BON DE COMMANDE</span>
-                        <p className="text-xs font-mono font-bold text-ink mt-3">{generatedPODoc.poNumber}</p>
-                        <p className="text-[10px] text-gray-400 mt-1">Généré le {generatedPODoc.date}</p>
+                        <p className="text-xs font-mono font-bold text-ink dark:text-white mt-3">{generatedPODoc.poNumber}</p>
+                        <p className="text-[10px] text-gray-400 dark:text-slate-400 mt-1">Généré le {generatedPODoc.date}</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="bg-white p-4 rounded-xl border border-gray-100">
-                        <p className="text-[9px] font-mono text-gray-400 uppercase font-black mb-1">Destinataire (Fournisseur) :</p>
-                        <p className="text-sm font-black text-indigo-700">{generatedPODoc.supplier}</p>
-                        <p className="text-xs text-gray-500 mt-1">Veuillez livrer à l'adresse de notre entrepôt.</p>
+                      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-100 dark:border-slate-800">
+                        <p className="text-[9px] font-mono text-gray-400 dark:text-slate-400 uppercase font-black mb-1">Destinataire (Fournisseur) :</p>
+                        <p className="text-sm font-black text-indigo-600 dark:text-indigo-400">{generatedPODoc.supplier}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Veuillez livrer à l'adresse de notre entrepôt.</p>
                       </div>
-                      <div className="bg-white p-4 rounded-xl border border-gray-100 text-right">
-                        <p className="text-[9px] font-mono text-gray-400 uppercase font-black mb-1">Détails de Livraison :</p>
-                        <p className="text-xs font-bold text-ink">Livraison Express Attendue</p>
-                        <p className="text-xs text-gray-500 mt-1">Sous 3 à 5 jours ouvrés</p>
+                      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-100 dark:border-slate-800 text-right">
+                        <p className="text-[9px] font-mono text-gray-400 dark:text-slate-400 uppercase font-black mb-1">Détails de Livraison :</p>
+                        <p className="text-xs font-bold text-ink dark:text-white">Livraison Express Attendue</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Sous 3 à 5 jours ouvrés</p>
                       </div>
                     </div>
 
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-gray-300 text-[10px] font-mono uppercase text-gray-400">
+                        <tr className="border-b border-gray-300 dark:border-slate-700 text-[10px] font-mono uppercase text-gray-400 dark:text-slate-400">
                           <th className="py-2">Description / SKU</th>
                           <th className="py-2 text-center">Quantité</th>
                           <th className="py-2 text-right">C.U. Estimé</th>
                           <th className="py-2 text-right">Total HT</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                         {generatedPODoc.items.map((item: any, idx: number) => (
-                          <tr key={idx} className="text-xs text-ink">
+                          <tr key={idx} className="text-xs text-ink dark:text-white">
                             <td className="py-3">
                               <p className="font-bold">{item.product?.name}</p>
-                              <p className="text-[9px] font-mono text-gray-400">{item.product?.sku || 'SANS SKU'}</p>
+                              <p className="text-[9px] font-mono text-gray-400 dark:text-slate-400">{item.product?.sku || 'SANS SKU'}</p>
                             </td>
                             <td className="py-3 text-center font-mono font-bold">{item.quantity}</td>
                             <td className="py-3 text-right font-mono">{item.unitCost.toLocaleString()} {merchant.currency}</td>
@@ -1891,19 +1959,19 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
                       </tbody>
                     </table>
 
-                    <div className="border-t border-gray-200 mt-6 pt-6 flex justify-between items-center">
-                      <div className="text-[10px] text-gray-400 max-w-sm">
+                    <div className="border-t border-gray-200 dark:border-slate-700 mt-6 pt-6 flex justify-between items-center">
+                      <div className="text-[10px] text-gray-400 dark:text-slate-400 max-w-sm">
                         * Ce document sert d'ordre officiel de commande. Le coût exact sera réajusté lors de la réception finale des factures d'achat.
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-gray-400 font-bold uppercase font-black">Montant Total Estimé HT</p>
-                        <p className="text-2xl font-black text-emerald-600">{generatedPODoc.totalCost.toLocaleString()} {merchant.currency}</p>
+                        <p className="text-xs text-gray-400 dark:text-slate-400 font-bold uppercase font-black">Montant Total Estimé HT</p>
+                        <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{generatedPODoc.totalCost.toLocaleString()} {merchant.currency}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-6 justify-end border-t border-gray-100 mt-4">
-                    <button onClick={() => setGeneratedPODoc(null)} className="px-5 py-3 border border-gray-200 text-xs font-bold rounded-xl text-gray-500 hover:bg-gray-50 transition-all">Retour</button>
+                  <div className="flex gap-3 pt-6 justify-end border-t border-gray-100 dark:border-slate-800 mt-4">
+                    <button onClick={() => setGeneratedPODoc(null)} className="px-5 py-3 border border-gray-200 dark:border-slate-700 text-xs font-bold rounded-xl text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all">Retour</button>
                     <button 
                       onClick={() => {
                         window.print();
@@ -1924,91 +1992,92 @@ const InventoryManager = ({ merchant, setShowUpgradeModal }: { merchant: Merchan
       {/* Physical Inventory Counting Sheet Modal */}
       <AnimatePresence>
         {isInventorySheetOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div className="px-8 py-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50" data-acom-id="stock.inventory_sheet_modal.header">
                 <div>
-                  <h3 className="text-xl font-bold text-ink">Fiche de Comptage d'Inventaire Physique</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Imprimer une fiche pour faire l'inventaire dans les rayons</p>
+                  <h3 className="text-xl font-bold text-ink dark:text-white">Fiche de Comptage d'Inventaire Physique</h3>
+                  <p className="text-[10px] font-mono text-gray-400 dark:text-slate-400 uppercase tracking-widest mt-1">Imprimer une fiche pour faire l'inventaire dans les rayons</p>
                 </div>
-                <button onClick={() => setIsInventorySheetOpen(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
-                  <X className="w-5 h-5 text-gray-400" />
+                <button onClick={() => setIsInventorySheetOpen(false)} className="p-2 hover:bg-white dark:hover:bg-slate-700 rounded-xl transition-colors shadow-sm border border-black/5 dark:border-slate-700" data-acom-id="stock.inventory_sheet_modal.close_icon">
+                  <X className="w-5 h-5 text-gray-400 dark:text-slate-300" />
                 </button>
               </div>
 
               <div className="p-8 overflow-y-auto flex-1 flex flex-col space-y-6">
-                <div className="p-4 bg-amber-50 text-amber-900 border border-amber-100 rounded-2xl flex items-center gap-3 text-xs">
-                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-100 dark:border-amber-800 rounded-2xl flex items-center gap-3 text-xs" data-acom-id="stock.inventory_sheet_modal.instruction">
+                  <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
                   <span>
                     Imprimez ce document pour vos équipes. Il comporte des colonnes vides pour le comptage physique manuel ainsi que les écarts constatés par rapport au système informatique.
                   </span>
                 </div>
 
-                <div className="border border-gray-200 p-8 rounded-2xl bg-white shadow-sm flex-1 print:p-0" id="print-sheet-area">
-                  <div className="flex justify-between items-start border-b border-gray-200 pb-6 mb-6">
+                <div className="border border-gray-200 dark:border-slate-700 p-8 rounded-2xl bg-white dark:bg-slate-900 shadow-sm flex-1 print:p-0" id="print-sheet-area">
+                  <div className="flex justify-between items-start border-b border-gray-200 dark:border-slate-700 pb-6 mb-6">
                     <div>
-                      <h2 className="text-2xl font-black text-ink uppercase tracking-tight">{merchant.name} - Inventaire</h2>
-                      <p className="text-xs text-gray-500 mt-1">Fiche de comptage physique pour contrôle des stocks</p>
+                      <h2 className="text-2xl font-black text-ink dark:text-white uppercase tracking-tight">{merchant.name} - Inventaire</h2>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Fiche de comptage physique pour contrôle des stocks</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-mono text-gray-400 uppercase">Date d'inventaire :</p>
-                      <p className="text-sm font-bold text-ink border-b border-gray-300 w-32 pb-1 inline-block mt-1"></p>
+                    <div className="text-right" data-acom-id="stock.inventory_sheet_modal.date">
+                      <p className="text-xs font-mono text-gray-400 dark:text-slate-400 uppercase">Date d'inventaire :</p>
+                      <p className="text-sm font-bold text-ink dark:text-white border-b border-gray-300 dark:border-slate-600 w-32 pb-1 inline-block mt-1"></p>
                     </div>
                   </div>
 
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse" data-acom-id="stock.inventory_sheet_modal.table">
                     <thead>
-                      <tr className="border-b border-gray-300 text-[9px] font-mono uppercase text-gray-400">
-                        <th className="py-3">SKU / Code-barres</th>
-                        <th className="py-3">Nom de l'article</th>
-                        <th className="py-3">Catégorie</th>
-                        <th className="py-3 text-center w-28">Stock Système</th>
-                        <th className="py-3 text-center w-32">Comptage Réel</th>
-                        <th className="py-3 text-center w-32">Écart (+/-)</th>
+                      <tr className="border-b border-gray-300 dark:border-slate-700 text-[9px] font-mono uppercase text-gray-400 dark:text-slate-400">
+                        <th className="py-3" data-acom-id="stock.inventory_sheet_modal.col_sku">SKU / Code-barres</th>
+                        <th className="py-3" data-acom-id="stock.inventory_sheet_modal.col_product">Nom de l'article</th>
+                        <th className="py-3" data-acom-id="stock.inventory_sheet_modal.col_category">Catégorie</th>
+                        <th className="py-3 text-center w-28" data-acom-id="stock.inventory_sheet_modal.col_system_stock">Stock Système</th>
+                        <th className="py-3 text-center w-32" data-acom-id="stock.inventory_sheet_modal.col_real_count">Comptage Réel</th>
+                        <th className="py-3 text-center w-32" data-acom-id="stock.inventory_sheet_modal.col_variance">Écart (+/-)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                       {products.map((p, idx) => (
-                        <tr key={idx} className="text-xs text-ink h-12">
-                          <td className="py-2 font-mono text-gray-400">{p.sku || 'SANS SKU'}</td>
+                        <tr key={idx} className="text-xs text-ink dark:text-white h-12">
+                          <td className="py-2 font-mono text-gray-400 dark:text-slate-400">{p.sku || 'SANS SKU'}</td>
                           <td className="py-2 font-bold">{p.name}</td>
-                          <td className="py-2 text-gray-500">{p.category || 'Général'}</td>
-                          <td className="py-2 text-center font-mono font-bold text-gray-400">{p.stockQuantity || 0}</td>
+                          <td className="py-2 text-gray-500 dark:text-slate-300">{p.category || 'Général'}</td>
+                          <td className="py-2 text-center font-mono font-bold text-gray-400 dark:text-slate-400">{p.stockQuantity || 0}</td>
                           <td className="py-2 text-center">
-                            <div className="w-20 h-6 border border-gray-300 rounded mx-auto"></div>
+                            <div className="w-20 h-6 border border-gray-300 dark:border-slate-600 rounded mx-auto"></div>
                           </td>
                           <td className="py-2 text-center">
-                            <div className="w-20 h-6 border border-gray-300 rounded mx-auto bg-gray-50/50"></div>
+                            <div className="w-20 h-6 border border-gray-300 dark:border-slate-600 rounded mx-auto bg-gray-50/50 dark:bg-slate-800/50"></div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  <div className="mt-12 pt-12 border-t border-dashed border-gray-200 grid grid-cols-2 gap-8 text-xs text-gray-400">
-                    <div>
+                  <div className="mt-12 pt-12 border-t border-dashed border-gray-200 dark:border-slate-700 grid grid-cols-2 gap-8 text-xs text-gray-400 dark:text-slate-400">
+                    <div data-acom-id="stock.inventory_sheet_modal.visa_operator">
                       <p className="font-bold mb-8">Visa de l'opérateur / inventorieur :</p>
-                      <p className="border-t border-gray-200 pt-2">Nom & Signature :</p>
+                      <p className="border-t border-gray-200 dark:border-slate-700 pt-2">Nom & Signature :</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right" data-acom-id="stock.inventory_sheet_modal.visa_management">
                       <p className="font-bold mb-8">Visa de la direction :</p>
-                      <p className="border-t border-gray-200 pt-2 inline-block w-48">Signature :</p>
+                      <p className="border-t border-gray-200 dark:border-slate-700 pt-2 inline-block w-48">Signature :</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-6 justify-end border-t border-gray-100">
-                  <button onClick={() => setIsInventorySheetOpen(false)} className="px-5 py-3 border border-gray-200 text-xs font-bold rounded-xl text-gray-500 hover:bg-gray-50 transition-all">Fermer</button>
+                <div className="flex gap-3 pt-6 justify-end border-t border-gray-100 dark:border-slate-800">
+                  <button onClick={() => setIsInventorySheetOpen(false)} className="px-5 py-3 border border-gray-200 dark:border-slate-700 text-xs font-bold rounded-xl text-gray-500 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-all" data-acom-id="stock.inventory_sheet_modal.close_btn">Fermer</button>
                   <button 
                     onClick={() => {
                       window.print();
                     }}
                     className="px-6 py-3 bg-ink text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-black transition-all flex items-center gap-1.5 shadow-md"
+                    data-acom-id="stock.inventory_sheet_modal.print_btn"
                   >
                     <FileText className="w-4 h-4" />
                     <span>Imprimer Fiche</span>

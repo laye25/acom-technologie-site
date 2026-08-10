@@ -12,7 +12,11 @@ import fs from "fs";
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
-  admin.initializeApp();
+  try {
+    admin.initializeApp();
+  } catch (e) {
+    console.warn("[Firebase Admin] Top-level initialization warning:", e);
+  }
 }
 
 let customDbId: string | undefined;
@@ -28,6 +32,13 @@ try {
 }
 
 function getFirestoreDb() {
+  if (!admin.apps.length) {
+    try {
+      admin.initializeApp();
+    } catch (e) {
+      console.warn("[Firebase Admin] Deferred initialization attempt:", e);
+    }
+  }
   if (customDbId) {
     return (admin.firestore as any)(customDbId);
   }

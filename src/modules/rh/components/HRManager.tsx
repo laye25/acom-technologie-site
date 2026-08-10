@@ -474,7 +474,7 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
       </div>
 
       {/* TABS NAVBAR */}
-      <div className="bg-gray-100 p-1 rounded-2xl flex flex-wrap gap-1 border border-black/5 print:hidden">
+      <div className="bg-gray-100 dark:bg-slate-900 p-1 rounded-2xl flex flex-wrap gap-1 border border-black/5 dark:border-slate-800 print:hidden">
         {[
           { id: 'employees', label: 'Collaborateurs', icon: Briefcase },
           { id: 'attendance', label: 'Pointage', icon: Clock },
@@ -489,8 +489,8 @@ const HRManager = ({ merchant }: { merchant: Merchant }) => {
               onClick={() => setActiveTab(tab.id as HRTab)}
               className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id 
-                  ? 'bg-white text-primary shadow-sm' 
-                  : 'text-gray-500 hover:bg-white/50 hover:text-ink'
+                  ? 'bg-white dark:bg-slate-800 text-primary dark:text-violet-400 shadow-sm' 
+                  : 'text-gray-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-ink dark:hover:text-white'
               }`}
             >
               <Icon className="w-4 h-4" />

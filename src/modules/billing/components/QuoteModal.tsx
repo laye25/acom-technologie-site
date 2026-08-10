@@ -6,6 +6,7 @@ import { db } from '../../../db/db';
 import { dbService } from '../../../services/dbService';
 import { Merchant, MerchantQuote, MerchantProduct, MerchantQuoteItem } from '../../../types';
 import { billingService } from '../../../services/billingService';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,6 +21,14 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
   const [notes, setNotes] = useState('');
   const [expiryDays, setExpiryDays] = useState(30);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      TutorialEngine.onModalOpened('billing.quote_modal');
+    } else {
+      TutorialEngine.onModalClosed('billing.quote_modal');
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (quote) {
@@ -143,59 +152,71 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
       <motion.div 
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
+        data-acom-id="billing.quote_modal.container"
         className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col"
       >
         <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-          <div>
+          <div data-acom-id="billing.quote_modal.title">
             <h3 className="text-2xl font-black text-ink">Nouveau Devis</h3>
             <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Créez une proposition commerciale</p>
           </div>
-          <button onClick={onClose} className="p-3 hover:bg-white rounded-2xl transition-all"><X className="w-6 h-6" /></button>
+          <button 
+            data-acom-id="billing.quote_modal.btn_close"
+            onClick={onClose} 
+            className="p-3 hover:bg-white rounded-2xl transition-all"
+            title="Fermer"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
 
         <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
+            <div data-acom-id="billing.quote_modal.section_client" className="space-y-4">
               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Informations Client</h4>
               <div className="space-y-4">
-                <div className="space-y-1.5">
+                <div data-acom-id="billing.quote_modal.field_name" className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Nom / Entreprise *</label>
                   <input 
                     type="text" 
                     value={customerName}
                     onChange={e => setCustomerName(e.target.value)}
                     required
+                    data-acom-id="billing.quote_modal.customer_name"
                     className="w-full px-5 py-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-primary/30 transition-all font-bold text-sm outline-none"
                     placeholder="Ex: Jean Dupont"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
+                  <div data-acom-id="billing.quote_modal.field_phone" className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Téléphone</label>
                     <input 
                       type="tel" 
                       value={customerPhone}
                       onChange={e => setCustomerPhone(e.target.value)}
+                      data-acom-id="billing.quote_modal.customer_phone"
                       className="w-full px-5 py-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-primary/30 transition-all font-bold text-sm outline-none"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div data-acom-id="billing.quote_modal.field_validity" className="space-y-1.5">
                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Validité (Jours)</label>
                      <input 
                        type="number" 
                        value={expiryDays}
                        onChange={e => setExpiryDays(parseInt(e.target.value))}
+                       data-acom-id="billing.quote_modal.expiry_days"
                        className="w-full px-5 py-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-primary/30 transition-all font-bold text-sm outline-none"
                      />
                   </div>
                 </div>
               </div>
             </div>
-            <div className="space-y-4">
+            <div data-acom-id="billing.quote_modal.field_address" className="space-y-4">
                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Détails Expédition (Optionnel)</h4>
                <textarea 
                   value={customerAddress}
                   onChange={e => setCustomerAddress(e.target.value)}
+                  data-acom-id="billing.quote_modal.customer_address"
                   className="w-full h-[120px] px-5 py-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:border-primary/30 transition-all font-bold text-sm outline-none resize-none"
                   placeholder="Adresse complète du client..."
                />
@@ -204,9 +225,10 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
 
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Articles du Devis</h4>
+              <h4 data-acom-id="billing.quote_modal.section_items" className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Articles du Devis</h4>
               <div className="flex gap-2">
                 <select 
+                  data-acom-id="billing.quote_modal.btn_add_product"
                   onChange={(e) => {
                     const p = products.find(prod => prod.id === e.target.value);
                     if (p) addItem(p);
@@ -220,6 +242,7 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
                   ))}
                 </select>
                 <button 
+                  data-acom-id="billing.quote_modal.btn_add_manual"
                   type="button"
                   onClick={() => addItem()}
                   className="px-4 py-2 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all"
@@ -301,7 +324,7 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
                  </div>
                ))}
                {items.length === 0 && (
-                 <div className="py-12 border-2 border-dashed border-gray-100 rounded-[2rem] flex flex-col items-center justify-center text-gray-400">
+                 <div data-acom-id="billing.quote_modal.empty_items_zone" className="py-12 border-2 border-dashed border-gray-100 rounded-[2rem] flex flex-col items-center justify-center text-gray-400">
                     <Package className="w-8 h-8 mb-2 opacity-20" />
                     <p className="text-[10px] font-black uppercase tracking-widest">Aucun article ajouté</p>
                  </div>
@@ -313,13 +336,14 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
             <div className="flex-1 w-full">
               <label className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 mb-3 block">Conditions de règlement & Notes</label>
               <textarea 
+                data-acom-id="billing.quote_modal.notes"
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 font-medium text-xs outline-none focus:border-primary/50 text-white placeholder-white/20 h-24 resize-none"
                 placeholder="Ex: Acompte de 50% à la commande, solde à la livraison..."
               />
             </div>
-            <div className="text-right shrink-0 min-w-[200px]">
+            <div data-acom-id="billing.quote_modal.total" className="text-right shrink-0 min-w-[200px]">
               <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Total Devis Estimé</p>
               <p className="text-5xl font-black">{total.toLocaleString()} <span className="text-lg opacity-40 font-mono">{merchant.currency}</span></p>
             </div>
@@ -328,6 +352,7 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
 
         <div className="p-8 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
           <button 
+            data-acom-id="billing.quote_modal.btn_cancel"
             type="button" 
             onClick={onClose}
             className="px-8 py-4 bg-white border border-black/5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all"
@@ -335,6 +360,7 @@ const QuoteModal = ({ isOpen, onClose, merchant, quote }: { isOpen: boolean, onC
             Annuler
           </button>
           <button 
+            data-acom-id="billing.quote_modal.btn_submit"
             onClick={handleSave}
             disabled={isSaving}
             className="px-10 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:shadow-2xl transition-all disabled:opacity-50 flex items-center gap-2"

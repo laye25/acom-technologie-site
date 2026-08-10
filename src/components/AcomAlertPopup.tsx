@@ -48,15 +48,21 @@ export const AcomAlertPopup: React.FC<AcomAlertPopupProps> = ({
     IconComponent = AlertCircle;
   }
 
+  const isCsvModal = (title && title.toLowerCase().includes('csv')) || (message && message.toLowerCase().includes('csv'));
+  const modalAcomId = isCsvModal ? 'stock.csv_success_modal' : 'pos.alert_notification_dialog';
+
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
       <div 
-        data-acom-id="pos.alert_notification_dialog"
+        data-acom-id={modalAcomId}
         className="relative max-w-sm w-full bg-white rounded-[2.5rem] border border-gray-100 shadow-2xl p-8 pt-16 text-center space-y-6 mt-10 transition-all transform scale-100"
       >
         
         {/* Floating Circle Overlay */}
-        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100/50">
+        <div 
+          data-acom-id="stock.csv_success_modal.icon"
+          className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-100/50"
+        >
           <div className={`w-20 h-20 ${colorBg} ${colorText} rounded-full flex items-center justify-center shadow-inner relative`}>
             {type === 'success' ? (
               <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -76,8 +82,18 @@ export const AcomAlertPopup: React.FC<AcomAlertPopupProps> = ({
           {subtitle && (
             <span className="text-[10px] tracking-widest font-black uppercase text-gray-400 block">{subtitle}</span>
           )}
-          <h4 className="text-lg font-black text-slate-800 leading-tight">{title}</h4>
-          <p className="text-xs text-gray-500 font-medium leading-relaxed px-1 whitespace-pre-line">{message}</p>
+          <h4 
+            data-acom-id="stock.csv_success_modal.title"
+            className="text-lg font-black text-slate-800 leading-tight"
+          >
+            {title}
+          </h4>
+          <p 
+            data-acom-id="stock.csv_success_modal.message"
+            className="text-xs text-gray-500 font-medium leading-relaxed px-1 whitespace-pre-line"
+          >
+            {message}
+          </p>
         </div>
 
         {/* Buttons */}
@@ -93,7 +109,7 @@ export const AcomAlertPopup: React.FC<AcomAlertPopupProps> = ({
           )}
           <button
             type="button"
-            data-acom-id="alert-confirm-btn"
+            data-acom-id={isCsvModal ? "stock.csv_success_modal.confirm_btn" : "alert-confirm-btn"}
             onClick={() => {
               if (onConfirm) {
                 onConfirm();

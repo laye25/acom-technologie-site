@@ -33,6 +33,8 @@ class SaaSPageRegistryService {
     this.registerAdditionalPressingPages();
     this.registerStockPage();
     this.registerCommercePOSPage();
+    this.registerSuppliersPage();
+    this.registerBillingPage();
   }
 
   public registerPage(page: SaaSPageDefinition): void {
@@ -1618,42 +1620,607 @@ class SaaSPageRegistryService {
   }
 
   private registerStockPage(): void {
-    this.registerPage({
-      pageId: 'stock_manager',
+    const stockDefinition: SaaSPageDefinition = {
+      pageId: 'inventory',
       saasId: 'stock',
-      name: 'Gestionnaire de Stock & Produits',
-      purpose: 'Suivi de l\'inventaire, création d\'articles et mouvements de stock',
+      name: 'Stock & Gestion des Produits — Management Commerce',
+      purpose: 'Suivi de l\'inventaire, valorisation du stock, ajustements manuels, fiches de comptage physique, réassorts et journal des mouvements',
       zones: [
         {
-          id: 'product_form',
-          name: 'Formulaire Création Produit',
-          description: 'Nouveau produit dans le catalogue',
+          id: 'stock_header_zone',
+          name: 'En-tête & Indicateurs Clés',
+          description: 'Présentation générale et 6 cartes d\'indicateurs clés de stock',
           elements: [
             {
-              acomId: 'stock.product.name',
-              semanticId: 'product.name',
-              label: 'Nom du produit',
+              acomId: 'stock.page_header',
+              semanticId: 'stock.header',
+              label: 'En-tête de la Page Stock',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.kpi.total_articles',
+              semanticId: 'stock.kpi.total',
+              label: 'Total Articles en Stock',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.kpi.val_achat',
+              semanticId: 'stock.kpi.purchase_val',
+              label: 'Valorisation Achat (CUMP)',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.kpi.val_vente',
+              semanticId: 'stock.kpi.sales_val',
+              label: 'Valorisation Vente',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.kpi.marge_theorique',
+              semanticId: 'stock.kpi.margin',
+              label: 'Marge Théorique (%)',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.kpi.points_alerte',
+              semanticId: 'stock.kpi.alerts',
+              label: 'Points d\'Alerte (Stock Bas)',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.kpi.articles_epuises',
+              semanticId: 'stock.kpi.out_of_stock',
+              label: 'Articles Épuisés (Ruptures)',
+              type: 'display',
+              supportedOperations: ['read']
+            }
+          ]
+        },
+        {
+          id: 'stock_actions_zone',
+          name: 'Actions & Recherche',
+          description: 'Barre de recherche, scanner et boutons d\'actions rapides',
+          elements: [
+            {
+              acomId: 'stock.search_input',
+              semanticId: 'stock.search',
+              label: 'Recherche & Scan SKU',
               type: 'input',
               supportedOperations: ['read', 'write']
             },
             {
-              acomId: 'stock.product.price',
-              semanticId: 'product.price',
-              label: 'Prix de vente FCFA',
+              acomId: 'stock.btn.scanner',
+              semanticId: 'stock.action.scanner',
+              label: 'Scanner Code-barres',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.btn.new_product',
+              semanticId: 'stock.action.new',
+              label: 'Nouveau Produit',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.btn.adjust_stock',
+              semanticId: 'stock.action.adjust',
+              label: 'Ajustement Manuel de Stock',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.btn.inventory_sheet',
+              semanticId: 'stock.action.count_sheet',
+              label: 'Fiche de Comptage Physique',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.btn.purchase_order',
+              semanticId: 'stock.action.reorder',
+              label: 'Réassort Bon de Commande Fournisseur',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.btn.export_csv',
+              semanticId: 'stock.action.export',
+              label: 'Exporter CSV Stock',
+              type: 'button',
+              supportedOperations: ['click']
+            }
+          ]
+        },
+        {
+          id: 'stock_catalog_zone',
+          name: 'Catalogue Articles & Filtres',
+          description: 'Filtres de niveau de stock et tableau principal des articles',
+          elements: [
+            {
+              acomId: 'stock.filters_zone',
+              semanticId: 'stock.filters',
+              label: 'Zone des Filtres de Stock',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.filter.all',
+              semanticId: 'stock.filter.all_btn',
+              label: 'Filtre Tout le Stock',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.filter.low',
+              semanticId: 'stock.filter.low_btn',
+              label: 'Filtre Stock Bas',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.filter.out',
+              semanticId: 'stock.filter.out_btn',
+              label: 'Filtre Articles Épuisés',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.products_table',
+              semanticId: 'stock.table',
+              label: 'Tableau des Produits',
+              type: 'table',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.col.article',
+              semanticId: 'stock.col.article_hdr',
+              label: 'Colonne Article',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.col.prix_valeur',
+              semanticId: 'stock.col.price_hdr',
+              label: 'Colonne Prix & Valeur',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.col.etat_stock',
+              semanticId: 'stock.col.status_hdr',
+              label: 'Colonne État du Stock',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.btn.add_quick_qty',
+              semanticId: 'stock.action.quick_add',
+              label: 'Réapprovisionnement Rapide (+)',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.btn.edit_product',
+              semanticId: 'stock.action.edit',
+              label: 'Modifier Produit',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.btn.delete_product',
+              semanticId: 'stock.action.delete',
+              label: 'Supprimer Produit',
+              type: 'button',
+              supportedOperations: ['click']
+            }
+          ]
+        },
+        {
+          id: 'stock_health_zone',
+          name: 'Santé du Stock & Flux Récents',
+          description: 'Aperçu analytique de la disponibilité, rentabilité et flux récents',
+          elements: [
+            {
+              acomId: 'stock.kpi.sante_stock',
+              semanticId: 'stock.health_card',
+              label: 'Carte Santé du Stock',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.health.disponibilite',
+              semanticId: 'stock.health.availability',
+              label: 'Taux de Disponibilité',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.health.location_theorique',
+              semanticId: 'stock.health.profitability',
+              label: 'Rentabilité Théorique',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.health.rotation',
+              semanticId: 'stock.health.rotation_rate',
+              label: 'Taux de Rotation',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.health.articles_bas',
+              semanticId: 'stock.health.low_count',
+              label: 'Nombre Articles Bas',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.health.ruptures',
+              semanticId: 'stock.health.out_count',
+              label: 'Nombre de Ruptures',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.recent_flows',
+              semanticId: 'stock.recent_movements_box',
+              label: 'Bloc Flux Récents',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.btn.view_all_history',
+              semanticId: 'stock.action.history_btn',
+              label: 'Bouton Voir tout l\'historique',
+              type: 'button',
+              supportedOperations: ['click']
+            }
+          ]
+        },
+        {
+          id: 'stock_journal_zone',
+          name: 'Journal des Mouvements',
+          description: 'Traçabilité complète des entrées, sorties, pertes et ventes avec filtres avancés',
+          elements: [
+            {
+              acomId: 'stock.movements_journal',
+              semanticId: 'stock.journal',
+              label: 'Journal des Mouvements de Stock',
+              type: 'table',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.btn.export_journal_csv',
+              semanticId: 'stock.journal.export_csv',
+              label: 'Exporter CSV Journal',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.filter.movement_type',
+              semanticId: 'stock.journal.filter_type',
+              label: 'Filtre Type de Flux',
+              type: 'select',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.filter.movement_article',
+              semanticId: 'stock.journal.filter_article',
+              label: 'Filtre Article Impacté',
+              type: 'select',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.filter.movement_period',
+              semanticId: 'stock.journal.filter_period',
+              label: 'Filtre Période Temporelle',
+              type: 'select',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.col.journal_timestamp',
+              semanticId: 'stock.journal.col_time',
+              label: 'Colonne Horodatage',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.col.journal_article',
+              semanticId: 'stock.journal.col_article',
+              label: 'Colonne Article Impacté',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.col.journal_flux',
+              semanticId: 'stock.journal.col_flux',
+              label: 'Colonne Flux & Quantité',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.col.journal_reason',
+              semanticId: 'stock.journal.col_reason',
+              label: 'Colonne Justification / Motif',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.col.journal_operator',
+              semanticId: 'stock.journal.col_operator',
+              label: 'Colonne Opérateur',
+              type: 'display',
+              supportedOperations: ['read']
+            }
+          ]
+        },
+        {
+          id: 'stock_adjustment_modal_zone',
+          name: 'Ajustement Manuel du Stock (Fenêtre)',
+          description: 'Champs et contrôles de la fenêtre de régularisation et correction manuelle du stock',
+          elements: [
+            {
+              acomId: 'stock.adjustment_modal.header',
+              semanticId: 'stock.adjustment.header',
+              label: 'En-tête Fenêtre Ajustement Manuel',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.adjustment_modal.product',
+              semanticId: 'stock.adjustment.product_select',
+              label: 'Sélectionner l\'article',
+              type: 'select',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.adjustment_modal.operation_type',
+              semanticId: 'stock.adjustment.type_toggle',
+              label: 'Type d\'opération (Entrée / Sortie)',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.adjustment_modal.quantity',
+              semanticId: 'stock.adjustment.qty_input',
+              label: 'Quantité',
               type: 'input',
               supportedOperations: ['read', 'write']
             },
             {
-              acomId: 'stock.product.quantity',
-              semanticId: 'product.quantity',
-              label: 'Quantité en stock',
+              acomId: 'stock.adjustment_modal.reason',
+              semanticId: 'stock.adjustment.reason_select',
+              label: 'Motif prédéfini',
+              type: 'select',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.adjustment_modal.notes',
+              semanticId: 'stock.adjustment.notes_input',
+              label: 'Notes supplémentaires',
               type: 'input',
               supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.adjustment_modal.operator',
+              semanticId: 'stock.adjustment.operator_input',
+              label: 'Nom de l\'opérateur',
+              type: 'input',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.adjustment_modal.actions',
+              semanticId: 'stock.adjustment.submit_btn',
+              label: 'Enregistrer l\'ajustement',
+              type: 'button',
+              supportedOperations: ['click']
+            }
+          ]
+        },
+        {
+          id: 'stock_inventory_sheet_modal_zone',
+          name: 'Fiche de Comptage d\'Inventaire Physique',
+          description: 'Éléments et contrôles de la fiche de comptage d\'inventaire physique pour relevé dans les rayons',
+          elements: [
+            {
+              acomId: 'stock.inventory_sheet_modal.header',
+              semanticId: 'stock.inventory_sheet.header',
+              label: 'Titre — Fiche de Comptage d\'Inventaire Physique',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.instruction',
+              semanticId: 'stock.inventory_sheet.instruction',
+              label: 'Message d\'instruction d\'inventaire',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.date',
+              semanticId: 'stock.inventory_sheet.date',
+              label: 'Date d\'inventaire',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.table',
+              semanticId: 'stock.inventory_sheet.table',
+              label: 'Tableau de comptage physique',
+              type: 'table',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.col_sku',
+              semanticId: 'stock.inventory_sheet.col_sku',
+              label: 'SKU / Code-barres',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.col_product',
+              semanticId: 'stock.inventory_sheet.col_product',
+              label: 'Nom de l\'article',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.col_category',
+              semanticId: 'stock.inventory_sheet.col_category',
+              label: 'Catégorie',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.col_system_stock',
+              semanticId: 'stock.inventory_sheet.col_system_stock',
+              label: 'Stock Système',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.col_real_count',
+              semanticId: 'stock.inventory_sheet.col_real_count',
+              label: 'Comptage Réel',
+              type: 'display',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.col_variance',
+              semanticId: 'stock.inventory_sheet.col_variance',
+              label: 'Écart (+/-)',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.visa_operator',
+              semanticId: 'stock.inventory_sheet.visa_operator',
+              label: 'Visa de l\'opérateur / inventorieur',
+              type: 'display',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.visa_management',
+              semanticId: 'stock.inventory_sheet.visa_management',
+              label: 'Visa de la direction',
+              type: 'display',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.close_btn',
+              semanticId: 'stock.inventory_sheet.close_btn',
+              label: 'Fermer la fiche',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.inventory_sheet_modal.print_btn',
+              semanticId: 'stock.inventory_sheet.print_btn',
+              label: 'Fiche imprimer',
+              type: 'button',
+              supportedOperations: ['click']
+            }
+          ]
+        },
+        {
+          id: 'stock_reorder_modal_zone',
+          name: 'Bon de Commande Fournisseur (Réassort)',
+          description: 'Fenêtre modale de réapprovisionnement automatique des articles en alerte ou rupture',
+          elements: [
+            {
+              acomId: 'stock.reorder_modal',
+              semanticId: 'stock.reorder_modal.container',
+              label: 'Fenêtre Réassort',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.reorder_modal.title',
+              semanticId: 'stock.reorder_modal.title',
+              label: 'Titre de la fenêtre Réassort',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.reorder_modal.supplier',
+              semanticId: 'stock.reorder_modal.supplier',
+              label: 'Fournisseur',
+              type: 'input',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.reorder_modal.alert_notice',
+              semanticId: 'stock.reorder_modal.alert_notice',
+              label: "Message d'alerte et seuil",
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.reorder_modal.section_articles',
+              semanticId: 'stock.reorder_modal.section_articles',
+              label: 'Articles à commander',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.reorder_modal.checkbox',
+              semanticId: 'stock.reorder_modal.checkbox',
+              label: "Case à cocher de l'article",
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.reorder_modal.article_row',
+              semanticId: 'stock.reorder_modal.article_row',
+              label: 'Informations de stock du produit',
+              type: 'display',
+              supportedOperations: ['read']
+            },
+            {
+              acomId: 'stock.reorder_modal.quantity_input',
+              semanticId: 'stock.reorder_modal.quantity_input',
+              label: 'Quantité à commander',
+              type: 'input',
+              supportedOperations: ['read', 'write']
+            },
+            {
+              acomId: 'stock.reorder_modal.cancel_btn',
+              semanticId: 'stock.reorder_modal.cancel_btn',
+              label: 'Bouton Annuler',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.reorder_modal.generate_btn',
+              semanticId: 'stock.reorder_modal.generate_btn',
+              label: 'Générer le document PDF/Imprimable',
+              type: 'button',
+              supportedOperations: ['click']
+            },
+            {
+              acomId: 'stock.reorder_modal.generated_doc',
+              semanticId: 'stock.reorder_modal.generated_doc',
+              label: 'Document de commande généré',
+              type: 'display',
+              supportedOperations: ['read']
             }
           ]
         }
       ]
-    });
+    };
+
+    this.registerPage(stockDefinition);
+    this.registerPage({ ...stockDefinition, pageId: 'stock' });
+    this.registerPage({ ...stockDefinition, pageId: 'stock_manager' });
+    this.registerPage({ ...stockDefinition, pageId: 'pressing_stock' });
   }
 
   private registerCommercePOSPage(): void {
@@ -1895,6 +2462,804 @@ class SaaSPageRegistryService {
     this.registerPage({ ...posDefinition, pageId: 'caisse_pos' });
     this.registerPage({ ...posDefinition, pageId: 'merchant_pos' });
     this.registerPage({ ...posDefinition, pageId: 'commerce_pos' });
+  }
+
+  private registerSuppliersPage(): void {
+    const suppliersDefinition: SaaSPageDefinition = {
+      pageId: 'suppliers',
+      saasId: 'commerce',
+      name: 'Fournisseurs & Partenaires Logistiques',
+      purpose: 'Centralisation, gestion des coordonnées, contacts et référencement des fournisseurs et partenaires logistiques',
+      zones: [
+        {
+          id: 'supplier_header_zone',
+          name: 'En-tête & Titre Partenaires Logistiques',
+          description: 'Présentation générale de la section Fournisseurs et nombre total de partenaires actifs',
+          elements: [
+            {
+              acomId: 'supplier.header',
+              semanticId: 'supplier.header_container',
+              label: 'En-tête Fournisseurs',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'En-tête de la page Partenaires logistiques'
+            },
+            {
+              acomId: 'supplier.title',
+              semanticId: 'supplier.page_title',
+              label: 'Titre Partenaires Logistiques',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Titre principal de la gestion des fournisseurs'
+            },
+            {
+              acomId: 'supplier.count',
+              semanticId: 'supplier.active_count',
+              label: 'Compteur Fournisseurs Actifs',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Affiche le nombre total de fournisseurs enregistrés'
+            },
+            {
+              acomId: 'supplier.new_supplier_btn',
+              semanticId: 'supplier.create_button',
+              label: 'Bouton + Nouveau Fournisseur',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Ouvre la fenêtre de création d\'un nouveau partenaire logistique'
+            }
+          ]
+        },
+        {
+          id: 'supplier_cards_zone',
+          name: 'Cartes & Données Fournisseurs',
+          description: 'Fiches détaillées des fournisseurs avec raison sociale, catégorie, interlocuteur, téléphone et email',
+          elements: [
+            {
+              acomId: 'supplier.card.first',
+              semanticId: 'supplier.first_card',
+              label: 'Fiche Fournisseur (Premier partenaire)',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Carte individuelle présentant le fournisseur actif, sa spécialité et ses coordonnées'
+            },
+            {
+              acomId: 'supplier.card.name',
+              semanticId: 'supplier.card_company_name',
+              label: 'Nom Entreprise Fournisseur',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Raison sociale du fournisseur sur sa fiche'
+            },
+            {
+              acomId: 'supplier.card.category',
+              semanticId: 'supplier.card_category_badge',
+              label: 'Catégorie Fournisseur',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Catégorie d\'activité ou famille de produits fournie'
+            },
+            {
+              acomId: 'supplier.card.details',
+              semanticId: 'supplier.card_contact_details',
+              label: 'Coordonnées & Contact Fournisseur',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Détails de l\'interlocuteur direct, téléphone professionnel et adresse e-mail'
+            }
+          ]
+        },
+        {
+          id: 'supplier_navbar_zone',
+          name: 'Barre de Navigation Principale',
+          description: 'Barre de navigation entre les modules avec l\'onglet Fournisseurs sélectionné',
+          elements: [
+            {
+              acomId: 'supplier.navbar',
+              semanticId: 'navigation.main_bar',
+              label: 'Barre de Navigation',
+              type: 'display',
+              supportedOperations: ['read', 'click'],
+              description: 'Barre de navigation transversale entre les modules de l\'application'
+            },
+            {
+              acomId: 'nav-suppliers',
+              semanticId: 'navigation.suppliers_tab',
+              label: 'Onglet Fournisseurs',
+              type: 'button',
+              supportedOperations: ['click', 'read'],
+              description: 'Bouton d\'accès au module Fournisseurs'
+            }
+          ]
+        },
+        {
+          id: 'supplier_modal_zone',
+          name: 'Fenêtre Nouveau Fournisseur',
+          description: 'Formulaire modal de création et saisie des informations du partenaire logistique',
+          elements: [
+            {
+              acomId: 'supplier.modal.container',
+              semanticId: 'supplier.modal_window',
+              label: 'Fenêtre Nouveau Fournisseur',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Cadre modal de création de fournisseur'
+            },
+            {
+              acomId: 'supplier.modal.title',
+              semanticId: 'supplier.modal_title',
+              label: 'Titre de la Fenêtre',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Titre "Nouveau fournisseur" et sous-titre "Gestion des partenaires logistiques"'
+            },
+            {
+              acomId: 'supplier.modal.close_btn',
+              semanticId: 'supplier.modal_close',
+              label: 'Bouton Fermer (X)',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Ferme la fenêtre de création sans enregistrer'
+            },
+            {
+              acomId: 'supplier.modal.name_input',
+              semanticId: 'supplier.company_name',
+              label: 'Nom de l\'entreprise',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Champ de saisie du nom officiel de l\'entreprise fournisseur'
+            },
+            {
+              acomId: 'supplier.modal.contact_input',
+              semanticId: 'supplier.contact_person',
+              label: 'Personne de contact',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Nom et prénom de l\'interlocuteur chez le fournisseur'
+            },
+            {
+              acomId: 'supplier.modal.phone_input',
+              semanticId: 'supplier.phone_number',
+              label: 'Téléphone',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Numéro de téléphone du fournisseur ou du contact'
+            },
+            {
+              acomId: 'supplier.modal.email_input',
+              semanticId: 'supplier.email_address',
+              label: 'Email',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Adresse e-mail de correspondance'
+            },
+            {
+              acomId: 'supplier.modal.category_input',
+              semanticId: 'supplier.category',
+              label: 'Catégorie',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Classification ou famille du fournisseur (ex: Général)'
+            },
+            {
+              acomId: 'supplier.modal.cancel_btn',
+              semanticId: 'supplier.cancel_button',
+              label: 'Bouton Annuler',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Annule la saisie et ferme la fenêtre'
+            },
+            {
+              acomId: 'supplier.modal.submit_btn',
+              semanticId: 'supplier.submit_button',
+              label: 'Bouton Enregistrer le fournisseur',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Valide la création et enregistre le nouveau fournisseur'
+            }
+          ]
+        }
+      ]
+    };
+
+    this.registerPage(suppliersDefinition);
+    this.registerPage({ ...suppliersDefinition, pageId: 'fournisseurs' });
+    this.registerPage({ ...suppliersDefinition, pageId: 'partenaires_logistiques' });
+    this.registerPage({ ...suppliersDefinition, pageId: 'merchant_suppliers' });
+  }
+
+  private registerBillingPage(): void {
+    const billingDefinition: SaaSPageDefinition = {
+      pageId: 'billing',
+      saasId: 'pressing',
+      name: 'Facturation & Devis',
+      purpose: 'Gestion centralisée des documents commerciaux : factures, factures impayées et devis proforma',
+      zones: [
+        {
+          id: 'billing_header_zone',
+          name: 'En-tête & Barre de Navigation',
+          description: 'Titre de la page, sous-titre de gestion des documents commerciaux et barre de navigation transversale',
+          elements: [
+            {
+              acomId: 'billing.header',
+              semanticId: 'billing.header_container',
+              label: 'En-tête Facturation',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Zone d\'en-tête du module Facturation & Devis'
+            },
+            {
+              acomId: 'billing.title',
+              semanticId: 'billing.page_title',
+              label: 'Titre Facturation & Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Titre officiel de la page centralisant la gestion des documents commerciaux'
+            },
+            {
+              acomId: 'billing.subtitle',
+              semanticId: 'billing.page_subtitle',
+              label: 'Sous-titre Gestion des documents commerciaux',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Sous-titre rappelant la vocation commerciale de la section'
+            },
+            {
+              acomId: 'billing.navbar',
+              semanticId: 'navigation.main_bar',
+              label: 'Barre de Navigation Principale',
+              type: 'display',
+              supportedOperations: ['read', 'click'],
+              description: 'Barre de navigation permettant de basculer entre les modules de l\'application'
+            },
+            {
+              acomId: 'billing.quota_alert',
+              semanticId: 'billing.system_alert',
+              label: 'Alerte Quota Firestore',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Alerte système signalant les limites de quota Firestore'
+            }
+          ]
+        },
+        {
+          id: 'billing_tabs_zone',
+          name: 'Sélecteur de Vues (Onglets)',
+          description: 'Boutons de navigation entre les trois vues : FACTURES, IMPAYÉS et DEVIS',
+          elements: [
+            {
+              acomId: 'billing.tabs_bar',
+              semanticId: 'billing.tabs_container',
+              label: 'Barre des Onglets',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Conteneur des trois onglets de navigation interne'
+            },
+            {
+              acomId: 'billing.tab.invoices',
+              semanticId: 'billing.tab_invoices',
+              label: 'Onglet FACTURES',
+              type: 'button',
+              supportedOperations: ['click', 'read'],
+              description: 'Accède à l\'historique des factures payées et enregistrées'
+            },
+            {
+              acomId: 'billing.tab.pending',
+              semanticId: 'billing.tab_pending',
+              label: 'Onglet IMPAYÉS',
+              type: 'button',
+              supportedOperations: ['click', 'read'],
+              description: 'Accède à la liste des factures avec reste à payer'
+            },
+            {
+              acomId: 'billing.tab.quotes',
+              semanticId: 'billing.tab_quotes',
+              label: 'Onglet DEVIS',
+              type: 'button',
+              supportedOperations: ['click', 'read'],
+              description: 'Accède à la gestion des propositions commerciales et devis'
+            }
+          ]
+        },
+        {
+          id: 'billing_invoices_zone',
+          name: 'Vue Historique des Factures',
+          description: 'Consultation des factures enregistrées, colonnes récapitulatives et centre d\'impression',
+          elements: [
+            {
+              acomId: 'billing.invoices.header',
+              semanticId: 'billing.invoices_header',
+              label: 'Titre Historique des Factures',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'En-tête de la section Historique des Factures'
+            },
+            {
+              acomId: 'billing.invoices.counter',
+              semanticId: 'billing.invoices_counter',
+              label: 'Compteur de Documents',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Nombre dynamique de factures enregistrées dans l\'historique'
+            },
+            {
+              acomId: 'billing.invoices.table',
+              semanticId: 'billing.invoices_table',
+              label: 'Tableau des Factures',
+              type: 'table',
+              supportedOperations: ['read'],
+              description: 'Grille listant l\'ensemble des factures émises'
+            },
+            {
+              acomId: 'billing.invoices.col_ref',
+              semanticId: 'billing.invoices_col_ref',
+              label: 'Colonne Référence & Date',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Identifiant unique de la facture et date d\'émission'
+            },
+            {
+              acomId: 'billing.invoices.col_client',
+              semanticId: 'billing.invoices_col_client',
+              label: 'Colonne Client',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Nom ou entreprise du client facturé'
+            },
+            {
+              acomId: 'billing.invoices.col_mode',
+              semanticId: 'billing.invoices_col_mode',
+              label: 'Colonne Mode de Règlement',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Moyen de paiement utilisé (Cash, Carte, Virement, etc.)'
+            },
+            {
+              acomId: 'billing.invoices.col_amount',
+              semanticId: 'billing.invoices_col_amount',
+              label: 'Colonne Montant TTC',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Montant toutes taxes comprises de la facture'
+            },
+            {
+              acomId: 'billing.invoices.col_actions',
+              semanticId: 'billing.invoices_col_actions',
+              label: 'Colonne Actions',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Boutons d\'impression, d\'export PDF et de visualisation'
+            },
+            {
+              acomId: 'billing.invoices.first_row',
+              semanticId: 'billing.invoices_first_row',
+              label: 'Ligne de Facture',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Détail d\'une facture enregistrée avec référence et date'
+            },
+            {
+              acomId: 'billing.invoices.first_row_btn_print',
+              semanticId: 'billing.invoices_btn_print',
+              label: 'Bouton Imprimer / Exporter',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Ouvre le centre d\'impression pour cette facture'
+            },
+            {
+              acomId: 'billing.invoices.last_entry_badge',
+              semanticId: 'billing.invoices_last_entry',
+              label: 'Badge Dernière Écriture',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Indicateur visuel de la dernière transaction enregistrée'
+            },
+            {
+              acomId: 'billing.invoices.empty_state',
+              semanticId: 'billing.invoices_empty',
+              label: 'État Vide Factures',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Message indiquant qu\'aucune facture n\'est enregistrée'
+            }
+          ]
+        },
+        {
+          id: 'billing_pending_zone',
+          name: 'Vue Factures avec Impayés',
+          description: 'Suivi des créances clients et factures en attente de solde',
+          elements: [
+            {
+              acomId: 'billing.pending.header',
+              semanticId: 'billing.pending_header',
+              label: 'Titre Factures avec Impayés',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'En-tête de la section des factures impayées'
+            },
+            {
+              acomId: 'billing.pending.counter',
+              semanticId: 'billing.pending_counter',
+              label: 'Compteur En Attente',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Nombre de factures nécessitant un règlement complémentaire'
+            },
+            {
+              acomId: 'billing.pending.table',
+              semanticId: 'billing.pending_table',
+              label: 'Tableau des Impayés',
+              type: 'table',
+              supportedOperations: ['read'],
+              description: 'Grille de suivi des créances et restes à payer'
+            },
+            {
+              acomId: 'billing.pending.col_ref',
+              semanticId: 'billing.pending_col_ref',
+              label: 'Colonne Référence',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Référence de la facture en impayé'
+            },
+            {
+              acomId: 'billing.pending.col_client',
+              semanticId: 'billing.pending_col_client',
+              label: 'Colonne Client',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Client redevable de l\'impayé'
+            },
+            {
+              acomId: 'billing.pending.col_total',
+              semanticId: 'billing.pending_col_total',
+              label: 'Colonne Total',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Montant total initial de la facture'
+            },
+            {
+              acomId: 'billing.pending.col_remaining',
+              semanticId: 'billing.pending_col_remaining',
+              label: 'Colonne Reste à Payer',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Solde restant dû par le client'
+            },
+            {
+              acomId: 'billing.pending.col_actions',
+              semanticId: 'billing.pending_col_actions',
+              label: 'Colonne Actions Impayés',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Actions de relance ou d\'impression'
+            },
+            {
+              acomId: 'billing.pending.empty_state',
+              semanticId: 'billing.pending_empty',
+              label: 'État Vide Impayés',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Message confirmant qu\'aucun impayé n\'est en attente'
+            }
+          ]
+        },
+        {
+          id: 'billing_quotes_zone',
+          name: 'Vue Gestion des Devis',
+          description: 'Création, suivi et consultation des devis commerciaux proforma',
+          elements: [
+            {
+              acomId: 'billing.quotes.header',
+              semanticId: 'billing.quotes_header',
+              label: 'Titre Gestion des Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'En-tête de la section des devis commerciaux'
+            },
+            {
+              acomId: 'billing.quotes.counter',
+              semanticId: 'billing.quotes_counter',
+              label: 'Compteur de Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Nombre de devis actuellement enregistrés dans la base'
+            },
+            {
+              acomId: 'billing.quotes.btn_new',
+              semanticId: 'billing.quotes_btn_create',
+              label: 'Bouton + Nouveau Devis',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Ouvre le formulaire modal de création d\'un devis proforma'
+            },
+            {
+              acomId: 'billing.quotes.table',
+              semanticId: 'billing.quotes_table',
+              label: 'Tableau des Devis',
+              type: 'table',
+              supportedOperations: ['read'],
+              description: 'Grille des propositions commerciales enregistrées'
+            },
+            {
+              acomId: 'billing.quotes.col_ref',
+              semanticId: 'billing.quotes_col_ref',
+              label: 'Colonne Référence & Date',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Numéro de devis et date d\'émission'
+            },
+            {
+              acomId: 'billing.quotes.col_client',
+              semanticId: 'billing.quotes_col_client',
+              label: 'Colonne Client',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Destinataire du devis'
+            },
+            {
+              acomId: 'billing.quotes.col_status',
+              semanticId: 'billing.quotes_col_status',
+              label: 'Colonne Statut',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'État du devis (Brouillon, Validé, Rejeté)'
+            },
+            {
+              acomId: 'billing.quotes.col_amount',
+              semanticId: 'billing.quotes_col_amount',
+              label: 'Colonne Montant Estimé',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Total chiffré de la proposition'
+            },
+            {
+              acomId: 'billing.quotes.col_actions',
+              semanticId: 'billing.quotes_col_actions',
+              label: 'Colonne Actions Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Actions d\'impression, conversion en vente ou modification'
+            },
+            {
+              acomId: 'billing.quotes.empty_state',
+              semanticId: 'billing.quotes_empty',
+              label: 'État Vide Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Message indiquant qu\'aucun devis n\'est enregistré'
+            }
+          ]
+        },
+        {
+          id: 'billing_quote_modal_zone',
+          name: 'Fenêtre Nouveau Devis (Formulaire)',
+          description: 'Saisie des coordonnées client, articles chiffrés, validité et conditions',
+          elements: [
+            {
+              acomId: 'billing.quote_modal.container',
+              semanticId: 'billing.quote_modal_window',
+              label: 'Fenêtre Nouveau Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Cadre modal de création de devis'
+            },
+            {
+              acomId: 'billing.quote_modal.title',
+              semanticId: 'billing.quote_modal_title',
+              label: 'Titre Nouveau Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Titre et sous-titre de proposition commerciale'
+            },
+            {
+              acomId: 'billing.quote_modal.section_client',
+              semanticId: 'billing.quote_modal_section_client',
+              label: 'Section Informations Client',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Bloc de saisie des coordonnées du client'
+            },
+            {
+              acomId: 'billing.quote_modal.btn_close',
+              semanticId: 'billing.quote_modal_close',
+              label: 'Bouton Fermer (X)',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Ferme la fenêtre sans enregistrer'
+            },
+            {
+              acomId: 'billing.quote_modal.field_name',
+              semanticId: 'billing.quote_customer_name',
+              label: 'Nom / Entreprise Client',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Champ obligatoire du nom ou raison sociale du client'
+            },
+            {
+              acomId: 'billing.quote_modal.customer_name',
+              semanticId: 'billing.quote_customer_name_input',
+              label: 'Saisie Nom Client',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Input du nom ou raison sociale du client'
+            },
+            {
+              acomId: 'billing.quote_modal.field_phone',
+              semanticId: 'billing.quote_customer_phone',
+              label: 'Téléphone Client',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Numéro de contact téléphonique'
+            },
+            {
+              acomId: 'billing.quote_modal.customer_phone',
+              semanticId: 'billing.quote_customer_phone_input',
+              label: 'Saisie Téléphone',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Input du numéro de téléphone'
+            },
+            {
+              acomId: 'billing.quote_modal.field_validity',
+              semanticId: 'billing.quote_expiry_days',
+              label: 'Validité de l\'offre (Jours)',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Durée en jours de validité commerciale de l\'offre'
+            },
+            {
+              acomId: 'billing.quote_modal.expiry_days',
+              semanticId: 'billing.quote_expiry_days_input',
+              label: 'Saisie Validité (Jours)',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Input de validité en jours'
+            },
+            {
+              acomId: 'billing.quote_modal.field_address',
+              semanticId: 'billing.quote_customer_address',
+              label: 'Détails Expédition & Adresse',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Adresse physique ou de livraison'
+            },
+            {
+              acomId: 'billing.quote_modal.customer_address',
+              semanticId: 'billing.quote_customer_address_input',
+              label: 'Saisie Détails Expédition',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Textarea des détails d\'expédition'
+            },
+            {
+              acomId: 'billing.quote_modal.section_items',
+              semanticId: 'billing.quote_articles_section',
+              label: 'Section Articles du Devis',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'En-tête de la grille d\'articles'
+            },
+            {
+              acomId: 'billing.quote_modal.btn_add_product',
+              semanticId: 'billing.quote_product_select',
+              label: 'Bouton + Ajouter un produit',
+              type: 'select',
+              supportedOperations: ['select'],
+              description: 'Ajoute rapidement un produit existant depuis le stock'
+            },
+            {
+              acomId: 'billing.quote_modal.btn_add_manual',
+              semanticId: 'billing.quote_btn_add_manual',
+              label: 'Bouton + Manuel',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Ajoute une ligne d\'article libre personnalisée'
+            },
+            {
+              acomId: 'billing.quote_modal.empty_items_zone',
+              semanticId: 'billing.quote_empty_items_zone',
+              label: 'Zone des Articles (État vide)',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Message et icône indiquant qu\'aucun article n\'a encore été ajouté'
+            },
+            {
+              acomId: 'billing.quote_modal.notes',
+              semanticId: 'billing.quote_notes',
+              label: 'Conditions de règlement & Notes',
+              type: 'input',
+              supportedOperations: ['write', 'read'],
+              description: 'Modalités d\'acompte, de paiement et mentions légales'
+            },
+            {
+              acomId: 'billing.quote_modal.total',
+              semanticId: 'billing.quote_total',
+              label: 'Total Devis Estimé',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Calcul automatique du montant total estimé du devis'
+            },
+            {
+              acomId: 'billing.quote_modal.btn_cancel',
+              semanticId: 'billing.quote_btn_cancel',
+              label: 'Bouton Annuler',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Annule la création du devis'
+            },
+            {
+              acomId: 'billing.quote_modal.btn_submit',
+              semanticId: 'billing.quote_btn_submit',
+              label: 'Bouton Enregistrer le Devis',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Sauvegarde définitive du devis dans la base'
+            }
+          ]
+        },
+        {
+          id: 'billing_print_modal_zone',
+          name: 'Centre d\'Impression & Export',
+          description: 'Choix du format d\'édition : ticket de caisse thermique, facture A4 ou devis A4',
+          elements: [
+            {
+              acomId: 'billing.print_modal.container',
+              semanticId: 'billing.print_modal_window',
+              label: 'Fenêtre Centre d\'Impression',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Cadre modal des options d\'impression et de téléchargement PDF'
+            },
+            {
+              acomId: 'billing.print_modal.title',
+              semanticId: 'billing.print_modal_title',
+              label: 'Titre Centre d\'Impression',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Titre de sélection du format de document'
+            },
+            {
+              acomId: 'billing.print_modal.option_receipt',
+              semanticId: 'billing.print_receipt_option',
+              label: 'Option Reçu de Caisse (Thermique 80mm)',
+              type: 'button',
+              supportedOperations: ['click', 'read'],
+              description: 'Impression ou téléchargement au format ticket de poche'
+            },
+            {
+              acomId: 'billing.print_modal.option_invoice_a4',
+              semanticId: 'billing.print_invoice_a4_option',
+              label: 'Option Facture Standard (Format A4)',
+              type: 'button',
+              supportedOperations: ['click', 'read'],
+              description: 'Facture officielle réglementaire avec en-tête d\'entreprise'
+            },
+            {
+              acomId: 'billing.print_modal.option_quote_a4',
+              semanticId: 'billing.print_quote_a4_option',
+              label: 'Option Devis Proforma (Format A4)',
+              type: 'button',
+              supportedOperations: ['click', 'read'],
+              description: 'Proposition budgétaire A4 avec validité d\'offre'
+            },
+            {
+              acomId: 'billing.print_modal.close_btn',
+              semanticId: 'billing.print_modal_close',
+              label: 'Bouton Fermer',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Ferme la fenêtre du centre d\'impression'
+            }
+          ]
+        }
+      ]
+    };
+
+    this.registerPage(billingDefinition);
+    this.registerPage({ ...billingDefinition, pageId: 'facturation' });
+    this.registerPage({ ...billingDefinition, pageId: 'devis' });
+    this.registerPage({ ...billingDefinition, pageId: 'factures' });
+    this.registerPage({ ...billingDefinition, pageId: 'impayes' });
   }
 }
 

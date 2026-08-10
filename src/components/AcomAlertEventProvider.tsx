@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AcomAlertPopup, AcomAlertPopupProps } from './AcomAlertPopup';
+import { TutorialEngine } from '../ai-demo/Tutorial/TutorialEngine';
 
 export const AcomAlertEventProvider: React.FC = () => {
   const [queue, setQueue] = useState<AcomAlertPopupProps[]>([]);
@@ -34,19 +35,39 @@ export const AcomAlertEventProvider: React.FC = () => {
       const nextAlert = queue[0];
       setQueue(prev => prev.slice(1));
       setCurrentPopup(nextAlert);
+
+      const isCsv = (nextAlert.title && nextAlert.title.toLowerCase().includes('csv')) || 
+                    (nextAlert.message && nextAlert.message.toLowerCase().includes('csv'));
+      if (isCsv) {
+        TutorialEngine.onModalOpened('stock.csv_success_modal');
+      }
     }
   }, [queue, currentPopup]);
 
   const handleClose = useCallback(() => {
+    if (currentPopup) {
+      const isCsv = (currentPopup.title && currentPopup.title.toLowerCase().includes('csv')) || 
+                    (currentPopup.message && currentPopup.message.toLowerCase().includes('csv'));
+      if (isCsv) {
+        TutorialEngine.onModalClosed('stock.csv_success_modal');
+      }
+    }
     setCurrentPopup(null);
-  }, []);
+  }, [currentPopup]);
 
   const handleConfirm = useCallback(() => {
-    if (currentPopup?.onConfirm) {
-      try {
-        currentPopup.onConfirm();
-      } catch (err) {
-        console.error("Error in alert onConfirm callback:", err);
+    if (currentPopup) {
+      const isCsv = (currentPopup.title && currentPopup.title.toLowerCase().includes('csv')) || 
+                    (currentPopup.message && currentPopup.message.toLowerCase().includes('csv'));
+      if (isCsv) {
+        TutorialEngine.onModalClosed('stock.csv_success_modal');
+      }
+      if (currentPopup.onConfirm) {
+        try {
+          currentPopup.onConfirm();
+        } catch (err) {
+          console.error("Error in alert onConfirm callback:", err);
+        }
       }
     }
     setCurrentPopup(null);

@@ -45,7 +45,7 @@ export class VerseauReasoner {
    * @returns VerseauReasoningResult structured reasoning trace and set of suggestions
    */
   static reason(
-    mode: 'tatami' | 'svg' | 'ia' | '44layers',
+    mode: 'tatami' | 'svg' | 'ia' | '44layers' | 'tatami1375' | 'tatami_1375' | string,
     fabricKey: string,
     fabricName: string,
     directive?: ExecutiveDirective
@@ -65,6 +65,14 @@ export class VerseauReasoner {
         "Forte superposition géométrique (jusqu'à 44 calques distincts)",
         "Combinaison d'éléments pleins (pétales) et d'éléments filaires (tiges)",
         "Forte densité de chevauchement locale"
+      );
+    } else if (mode === 'tatami1375' || mode === 'tatami_1375') {
+      family = 'Remplissage Phyllotactique (137.5° Golden Angle)';
+      confidence = 99;
+      analyzedFeatures.push(
+        "Trame phyllotactique apériodique à 137.5° (Angle d'or)",
+        "Élimination totale des alignements de piqûre et effet de moirage",
+        "Dispersion isotrope des forces de traction sur la trame"
       );
     } else if (mode === 'svg') {
       family = 'Courbes et tracés fins (Monogramme)';
@@ -344,6 +352,34 @@ export class VerseauReasoner {
           { parameter: 'travelPattern', value: 'Contour ➔ Centre', rationale: "Mise en œuvre du liage de maintien centré pour figer la matière.", confidence: 94 }
         );
       }
+    } else if (mode === 'tatami1375' || mode === 'tatami_1375') {
+      applicableLaws.push(
+        "LAW-1375 (Distribution angulaire d'or 137.5°)",
+        "LAW-045 (Dispersion apériodique des points de pénétration)"
+      );
+
+      hypotheses.push(
+        `HYP-1375: L'angle d'or irrationnel 137.5° élimine 100% des lignes de moirage sur ${fabricName}.`
+      );
+      conflicts.push(
+        "⚠️ CONFLIT: Densité de couverture maximale sans créer de lignes de faille structurelles."
+      );
+      decisions.push(
+        "DÉCISION: Orientation du remplissage Tatami sur le Golden Angle nominal de 137.5° avec déphasage 0.618."
+      );
+
+      douglas = 0.18;
+      ribbonWidth = 2.8;
+      angle = 137.5;
+      density = 0.38;
+      pullComp = 0.12;
+      travelPattern = 'Contour ➔ Centre';
+
+      suggestions.push(
+        { parameter: 'tatamiAngle', value: 137.5, rationale: "Angle d'or 137.5° irrationnel prévenant l'effet de moirage.", confidence: 99 },
+        { parameter: 'tatamiDensity', value: 0.38, rationale: "Densité optimale 0.38mm pour trame phyllotactique.", confidence: 98 },
+        { parameter: 'pullCompensation', value: 0.12, rationale: "Compensation de traction isotrope.", confidence: 95 }
+      );
     } else {
       applicableLaws.push(
         "LAW-032 (Anisotropie de traction directe)",

@@ -32,6 +32,7 @@ export class PhyllotaxisStudy {
 
             const originalMetrics: TatamiMetrics = {
                 ...origValidatorMetrics,
+                area: region.area || origValidatorMetrics.area,
                 gaps: Number((100 - origCoverage.coveragePercentage).toFixed(2))
             };
 
@@ -42,6 +43,7 @@ export class PhyllotaxisStudy {
 
             const correctedMetrics: TatamiMetrics = {
                 ...corrValidatorMetrics,
+                area: region.area || corrValidatorMetrics.area,
                 gaps: Number((100 - corrCoverage.coveragePercentage).toFixed(2))
             };
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Loader2, Edit2, Trash2, X, Mail, Phone, Truck, User } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -7,15 +7,37 @@ import { dbService } from '../../../services/dbService';
 import toast from 'react-hot-toast';
 import { Merchant, MerchantSupplier } from '../../../types';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentSupplier, setCurrentSupplier] = useState<Partial<MerchantSupplier> | null>(null);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (isEditing) {
+      TutorialEngine.onModalOpened('supplier.new_supplier_modal');
+    } else {
+      TutorialEngine.onModalClosed('supplier.new_supplier_modal');
+    }
+  }, [isEditing]);
+
   const suppliers = useLiveQuery(() => 
     db.suppliers.where('merchantId').equals(merchant.id).toArray()
   , [merchant.id]) || [];
+
+  // Synchronize supplier live data with TutorialEngine for dynamic vocal presentation
+  useEffect(() => {
+    const first = suppliers[0];
+    TutorialEngine.setSupplierContext({
+      supplierCount: suppliers.length,
+      firstSupplierName: first?.name || '',
+      firstSupplierCategory: first?.category || '',
+      firstSupplierContact: first?.contactName || '',
+      firstSupplierPhone: first?.phone || '',
+      firstSupplierEmail: first?.email || ''
+    });
+  }, [suppliers]);
 
   const loading = false;
 
@@ -29,6 +51,8 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
         merchantId: merchant.id
       });
       triggerAcomAlert('Succès', currentSupplier.id ? 'Fournisseur mis à jour' : 'Fournisseur ajouté', 'success', 'SYSTÈME');
+      toast.success(currentSupplier.id ? 'Fournisseur mis à jour avec succès' : 'Fournisseur enregistré avec succès');
+      TutorialEngine.onSupplierCreated(currentSupplier.name);
       setIsEditing(false);
       setCurrentSupplier(null);
     } catch (error) {
@@ -55,12 +79,13 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
       exit={{ opacity: 0, x: -20 }}
       className="space-y-6"
     >
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4" data-acom-id="supplier.header">
         <div>
-          <h2 className="text-3xl font-black text-ink tracking-tight">Partenaires Logistiques</h2>
-          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5">Fournisseurs actifs: {suppliers.length.toString().padStart(2, '0')}</p>
+          <h2 className="text-3xl font-black text-ink tracking-tight" data-acom-id="supplier.title">Partenaires Logistiques</h2>
+          <p className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] mt-1.5" data-acom-id="supplier.count">Fournisseurs actifs: {suppliers.length.toString().padStart(2, '0')}</p>
         </div>
         <button
+          data-acom-id="supplier.new_supplier_btn"
           onClick={() => {
             setCurrentSupplier({ name: '', contactName: '', email: '', phone: '', category: 'Général' });
             setIsEditing(true);
@@ -76,8 +101,12 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {suppliers.map((supplier) => (
-            <div key={supplier.id} className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+          {suppliers.map((supplier, idx) => (
+            <div 
+              key={supplier.id} 
+              data-acom-id={idx === 0 ? "supplier.card.first" : undefined}
+              className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden"
+            >
               <div className="flex justify-between items-start mb-6">
                 <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/10 group-hover:scale-110 transition-transform">
                   <Truck className="w-7 h-7 text-primary" />
@@ -88,10 +117,10 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
                 </div>
               </div>
               
-              <h3 className="text-xl font-black text-ink mb-1 leading-tight">{supplier.name}</h3>
-              <p className="text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mb-6">{supplier.category}</p>
+              <h3 className="text-xl font-black text-ink mb-1 leading-tight" data-acom-id={idx === 0 ? "supplier.card.name" : undefined}>{supplier.name}</h3>
+              <p className="text-[10px] text-gray-400 font-mono font-black uppercase tracking-[0.2em] mb-6" data-acom-id={idx === 0 ? "supplier.card.category" : undefined}>{supplier.category}</p>
               
-              <div className="space-y-4 pt-6 border-t border-dashed border-gray-100">
+              <div className="space-y-4 pt-6 border-t border-dashed border-gray-100" data-acom-id={idx === 0 ? "supplier.card.details" : undefined}>
                 <div className="flex items-center text-xs text-gray-600">
                   <div className="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center mr-4 border border-black/5">
                     <User className="w-3.5 h-3.5 opacity-40 text-primary" />
@@ -120,39 +149,40 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
         {isEditing && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <motion.div 
+              data-acom-id="supplier.modal.container"
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               className="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <div>
+                <div data-acom-id="supplier.modal.title">
                   <h3 className="text-xl font-bold text-ink">{currentSupplier?.id ? 'Modifier le fournisseur' : 'Nouveau fournisseur'}</h3>
                   <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des partenaires logistiques</p>
                 </div>
-                <button onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
+                <button data-acom-id="supplier.modal.close_btn" onClick={() => setIsEditing(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
                   <X className="w-5 h-5 text-gray-400" />
                 </button>
               </div>
 
               <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-2" data-acom-id="supplier.modal.name_input">
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Nom de l'entreprise</label>
                     <input type="text" required value={currentSupplier?.name || ''} onChange={e => setCurrentSupplier({...currentSupplier, name: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                   </div>
-                  <div>
+                  <div data-acom-id="supplier.modal.contact_input">
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Personne de contact</label>
                     <input type="text" value={currentSupplier?.contactName || ''} onChange={e => setCurrentSupplier({...currentSupplier, contactName: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                   </div>
-                  <div>
+                  <div data-acom-id="supplier.modal.phone_input">
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Téléphone</label>
                     <input type="tel" value={currentSupplier?.phone || ''} onChange={e => setCurrentSupplier({...currentSupplier, phone: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-mono font-bold" />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-2" data-acom-id="supplier.modal.email_input">
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Email</label>
                     <input type="email" value={currentSupplier?.email || ''} onChange={e => setCurrentSupplier({...currentSupplier, email: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30" />
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-2" data-acom-id="supplier.modal.category_input">
                     <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-2">Catégorie</label>
                     <input type="text" value={currentSupplier?.category || ''} onChange={e => setCurrentSupplier({...currentSupplier, category: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-gray-100 outline-none focus:ring-2 focus:ring-primary/20 bg-gray-50/30 font-bold" />
                   </div>
@@ -160,8 +190,8 @@ const SupplierManager = ({ merchant }: { merchant: Merchant }) => {
               </form>
 
               <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex space-x-4">
-                <button type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
-                <button onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
+                <button data-acom-id="supplier.modal.cancel_btn" type="button" onClick={() => setIsEditing(false)} className="flex-1 py-4 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-white transition-colors">Annuler</button>
+                <button data-acom-id="supplier.modal.submit_btn" onClick={handleSave} disabled={saving} className="flex-[2] py-4 bg-primary text-white rounded-2xl font-bold hover:bg-primary-hover transition-all shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center">
                   {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Enregistrer le fournisseur'}
                 </button>
               </div>

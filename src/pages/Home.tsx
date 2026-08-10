@@ -25,7 +25,7 @@ function SubCategorySection({ subCat, subServices }: { subCat: string, subServic
 
   return (
     <div className="space-y-6">
-      <h4 className="text-lg font-bold text-gray-700">{subCat}</h4>
+      <h4 className="text-lg font-bold text-slate-800 dark:text-slate-200">{subCat}</h4>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {visibleServices.map((service, index) => (
           <motion.div
@@ -43,7 +43,7 @@ function SubCategorySection({ subCat, subServices }: { subCat: string, subServic
       {subServices.length > 6 && (
         <button 
           onClick={() => setShowAll(!showAll)}
-          className="text-primary font-bold hover:underline"
+          className="text-primary dark:text-purple-400 font-bold hover:underline"
         >
           {showAll ? 'Voir moins' : 'Voir plus'}
         </button>
@@ -195,17 +195,17 @@ const Home = () => {
   };
 
   return (
-    <div className="bg-paper min-h-screen">
+    <div className="bg-paper text-slate-900 dark:text-slate-100 min-h-screen">
       <HeroBanner />
 
       {/* Dual Pillar Section - The "Two Worlds" Design */}
-      <section className="py-20 bg-white overflow-hidden">
+      <section className="py-20 bg-white dark:bg-[#0e1424] overflow-hidden border-y border-slate-100 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-display font-bold text-ink mb-6 tracking-tighter">
-              {settings?.expertiseSection?.titlePart1 || "Une Expertise,"} <span className="text-primary">{settings?.expertiseSection?.titlePart2 || "Deux Univers."}</span>
+            <h2 className="text-4xl md:text-6xl font-display font-bold text-slate-900 dark:text-white mb-6 tracking-tighter">
+              {settings?.expertiseSection?.titlePart1 || "Une Expertise,"} <span className="text-primary dark:text-purple-400">{settings?.expertiseSection?.titlePart2 || "Deux Univers."}</span>
             </h2>
-            <p className="text-gray-500 text-lg max-w-2xl mx-auto font-light">
+            <p className="text-slate-600 dark:text-slate-400 text-lg max-w-2xl mx-auto font-light">
               {settings?.expertiseSection?.subtitle || "Découvrez nos deux pôles d'excellence conçus pour répondre à l'intégralité de vos besoins digitaux et physiques."}
             </p>
           </div>
@@ -213,29 +213,29 @@ const Home = () => {
           <div className="grid md:grid-cols-2 gap-8">
             {/* Pillar 1 */}
             <motion.div
-              whileHover={{ y: -10, borderColor: `${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}66` }}
+              whileHover={{ y: -10, borderColor: `${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}88` }}
               animate={{
-                borderColor: activePillar === 'saas' ? (settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e') : '#f3f4f6',
-                boxShadow: activePillar === 'saas' ? `0 25px 50px -12px ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}40` : 'none'
+                borderColor: activePillar === 'saas' ? (settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e') : 'rgba(51,65,85,0.4)',
+                boxShadow: activePillar === 'saas' ? `0 25px 50px -12px ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}50` : 'none'
               }}
-              className="relative group cursor-pointer overflow-hidden rounded-[3rem] p-12 min-h-[500px] flex flex-col justify-end border-2 transition-all duration-500 bg-white"
+              className="relative group cursor-pointer overflow-hidden rounded-[3rem] p-8 md:p-12 min-h-[520px] flex flex-col justify-end border-2 transition-all duration-500 bg-[#0f172a] shadow-2xl"
               onClick={() => setActivePillar('saas')}
             >
               <div className="absolute inset-0 z-0">
                 <OptimizedImage 
                   src={settings?.expertiseSection?.universes?.[0]?.image || "https://picsum.photos/seed/saas-tech/1200/800"} 
                   alt="Acom SaaS"
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-75"
                 />
                 {/* Base Dark Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/80 to-ink/40" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/80 to-slate-950/40" />
                 
                 {/* Active Colored Overlay */}
                 <div 
                   className="absolute inset-0 transition-opacity duration-500"
                   style={{ 
                     opacity: activePillar === 'saas' ? 1 : 0, 
-                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}E6 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}F2 0%, rgba(15,23,42,0.92) 40%, rgba(15,23,42,0.45) 100%)` 
                   }} 
                 />
                 
@@ -244,17 +244,17 @@ const Home = () => {
                   className="absolute inset-0 transition-opacity duration-500 opacity-0 group-hover:opacity-100"
                   style={{ 
                     opacity: activePillar === 'saas' ? 0 : '',
-                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}B3 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e'}D9 0%, rgba(15,23,42,0.88) 40%, rgba(15,23,42,0.4) 100%)` 
                   }} 
                 />
               </div>
 
               <div className="relative z-10">
-                <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform border border-white/10">
-                  <Code className="w-8 h-8" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
+                <div className="w-16 h-16 bg-white/10 dark:bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform border border-white/20 shadow-lg">
+                  <Code className="w-8 h-8" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#c084fc' }} />
                 </div>
-                <h3 className="text-3xl font-display font-bold text-white mb-4">{settings?.expertiseSection?.universes?.[0]?.title || "Acom SaaS"}</h3>
-                <p className="text-white/70 mb-8 leading-relaxed">
+                <h3 className="text-3xl font-display font-bold text-white mb-4 tracking-tight drop-shadow-sm">{settings?.expertiseSection?.universes?.[0]?.title || "Acom SaaS"}</h3>
+                <p className="text-slate-200 text-sm md:text-base mb-8 leading-relaxed font-normal">
                   {settings?.expertiseSection?.universes?.[0]?.description || "Solutions logicielles métiers 100% cloud pour piloter votre activité. Une suite d'outils puissants adaptés à chaque secteur."}
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mb-10">
@@ -273,45 +273,45 @@ const Home = () => {
                       featuresList = [...featuresList, "Ateliers de couture"];
                     }
                     return featuresList.map((item, i) => (
-                      <li key={i} className="flex items-center text-xs font-medium text-white/80" id={`feature-saas-${i}`}>
-                        <CheckCircle2 className="w-3.5 h-3.5 mr-2 flex-shrink-0" id={`feature-saas-check-${i}`} style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
+                      <li key={i} className="flex items-center text-xs md:text-sm font-medium text-slate-100" id={`feature-saas-${i}`}>
+                        <CheckCircle2 className="w-4 h-4 mr-2 flex-shrink-0" id={`feature-saas-check-${i}`} style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#c084fc' }} />
                         {item}
                       </li>
                     ));
                   })()}
                 </ul>
-                <Link to={settings?.expertiseSection?.universes?.[0]?.linkUrl || "/solutions-saas"} className="inline-flex items-center font-bold text-white group-hover:gap-4 transition-all gap-2" onClick={(e) => e.stopPropagation()}>
-                  {settings?.expertiseSection?.universes?.[0]?.linkText || "Explorer les solutions SaaS"} <ArrowRight className="w-5 h-5" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#8e008e' }} />
+                <Link to={settings?.expertiseSection?.universes?.[0]?.linkUrl || "/solutions-saas"} className="inline-flex items-center font-bold text-white hover:text-white group-hover:gap-4 transition-all gap-2 text-sm md:text-base" onClick={(e) => e.stopPropagation()}>
+                  {settings?.expertiseSection?.universes?.[0]?.linkText || "Explorer les solutions SaaS"} <ArrowRight className="w-5 h-5" style={{ color: settings?.expertiseSection?.universes?.[0]?.baseColor || '#c084fc' }} />
                 </Link>
               </div>
             </motion.div>
 
             {/* Pillar 2 */}
             <motion.div
-              whileHover={{ y: -10, borderColor: `${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}66` }}
+              whileHover={{ y: -10, borderColor: `${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}88` }}
               animate={{
-                borderColor: activePillar === 'studio' ? (settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981') : '#f3f4f6',
-                boxShadow: activePillar === 'studio' ? `0 25px 50px -12px ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}40` : 'none'
+                borderColor: activePillar === 'studio' ? (settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981') : 'rgba(51,65,85,0.4)',
+                boxShadow: activePillar === 'studio' ? `0 25px 50px -12px ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}50` : 'none'
               }}
-              className="relative group cursor-pointer overflow-hidden rounded-[3rem] p-12 min-h-[500px] flex flex-col justify-end border-2 transition-all duration-500 bg-white"
+              className="relative group cursor-pointer overflow-hidden rounded-[3rem] p-8 md:p-12 min-h-[520px] flex flex-col justify-end border-2 transition-all duration-500 bg-[#0f172a] shadow-2xl"
               onClick={() => setActivePillar('studio')}
             >
               <div className="absolute inset-0 z-0">
                 <OptimizedImage 
                   src={settings?.expertiseSection?.universes?.[1]?.image || "https://picsum.photos/seed/studio-design/1200/800"} 
                   alt="Acom Studio"
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-75"
                 />
                 
                 {/* Base Dark Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/80 to-ink/40" />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/80 to-slate-950/40" />
                 
                 {/* Active Colored Overlay */}
                 <div 
                   className="absolute inset-0 transition-opacity duration-500"
                   style={{ 
                     opacity: activePillar === 'studio' ? 1 : 0, 
-                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}E6 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}F2 0%, rgba(15,23,42,0.92) 40%, rgba(15,23,42,0.45) 100%)` 
                   }} 
                 />
                 
@@ -320,17 +320,17 @@ const Home = () => {
                   className="absolute inset-0 transition-opacity duration-500 opacity-0 group-hover:opacity-100"
                   style={{ 
                     opacity: activePillar === 'studio' ? 0 : '',
-                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}B3 0%, rgba(15,23,42,0.9) 40%, rgba(15,23,42,0.4) 100%)` 
+                    background: `linear-gradient(to top, ${settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981'}D9 0%, rgba(15,23,42,0.88) 40%, rgba(15,23,42,0.4) 100%)` 
                   }} 
                 />
               </div>
 
               <div className="relative z-10">
-                <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform border border-white/10">
-                  <Palette className="w-8 h-8" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981' }} />
+                <div className="w-16 h-16 bg-white/10 dark:bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform border border-white/20 shadow-lg">
+                  <Palette className="w-8 h-8" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#34d399' }} />
                 </div>
-                <h3 className="text-3xl font-display font-bold text-white mb-4">{settings?.expertiseSection?.universes?.[1]?.title || "Acom Studio"}</h3>
-                <p className="text-white/70 mb-8 leading-relaxed">
+                <h3 className="text-3xl font-display font-bold text-white mb-4 tracking-tight drop-shadow-sm">{settings?.expertiseSection?.universes?.[1]?.title || "Acom Studio"}</h3>
+                <p className="text-slate-200 text-sm md:text-base mb-8 leading-relaxed font-normal">
                   {settings?.expertiseSection?.universes?.[1]?.description || "L'excellence du design et de l'impression. Personnalisez et commandez vos supports physiques avec une qualité irréprochable."}
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 mb-10">
@@ -340,14 +340,14 @@ const Home = () => {
                     'Papeterie & Bureautique',
                     'Signalétique'
                   ]).map((item, i) => (
-                    <li key={i} className="flex items-center text-xs font-medium text-white/80">
-                      <CheckCircle2 className="w-3.5 h-3.5 mr-2 flex-shrink-0" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981' }} />
+                    <li key={i} className="flex items-center text-xs md:text-sm font-medium text-slate-100">
+                      <CheckCircle2 className="w-4 h-4 mr-2 flex-shrink-0" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#34d399' }} />
                       {item}
                     </li>
                   ))}
                 </ul>
-                <Link to={settings?.expertiseSection?.universes?.[1]?.linkUrl || "/merchants"} className="inline-flex items-center font-bold text-white group-hover:gap-4 transition-all gap-2" onClick={(e) => e.stopPropagation()}>
-                  {settings?.expertiseSection?.universes?.[1]?.linkText || "Explorer Acom Studio"} <ArrowRight className="w-5 h-5" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#10b981' }} />
+                <Link to={settings?.expertiseSection?.universes?.[1]?.linkUrl || "/merchants"} className="inline-flex items-center font-bold text-white hover:text-white group-hover:gap-4 transition-all gap-2 text-sm md:text-base" onClick={(e) => e.stopPropagation()}>
+                  {settings?.expertiseSection?.universes?.[1]?.linkText || "Explorer Acom Studio"} <ArrowRight className="w-5 h-5" style={{ color: settings?.expertiseSection?.universes?.[1]?.baseColor || '#34d399' }} />
                 </Link>
               </div>
             </motion.div>
@@ -356,14 +356,14 @@ const Home = () => {
       </section>
 
       {/* Services Section - Dynamic Filtering */}
-      <section id="services" className="py-20 lg:py-32 bg-white overflow-hidden">
+      <section id="services" className="py-20 lg:py-32 bg-slate-50/50 dark:bg-[#0b0f19] overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
             <div className="max-w-xl">
-              <h2 className="text-4xl font-display font-bold text-ink mb-4 tracking-tight">
-                Services <span className="text-primary">Sur Mesure</span>
+              <h2 className="text-4xl font-display font-bold text-slate-900 dark:text-white mb-4 tracking-tight">
+                Services <span className="text-primary dark:text-purple-400">Sur Mesure</span>
               </h2>
-              <p className="text-gray-500">
+              <p className="text-slate-600 dark:text-slate-400">
                 {activePillar === 'saas' ? 'Solutions logicielles et plateformes digitales pour transformer votre entreprise.' : 
                  activePillar === 'studio' ? 'Design créatif et impression haute qualité pour votre communication.' :
                  'Explorez l\'intégralité de nos solutions digitales et physiques.'}
@@ -377,8 +377,8 @@ const Home = () => {
                   onClick={() => setActiveCategory(cat.id as any)}
                   className={`px-6 py-3 rounded-full text-sm font-bold transition-all ${
                     activeCategory === cat.id 
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                    ? 'bg-primary text-white shadow-lg shadow-primary/25' 
+                    : 'bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700 shadow-sm'
                   }`}
                 >
                   {t(cat.label)}
@@ -388,13 +388,13 @@ const Home = () => {
           </div>
 
           <div className="relative mb-12">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               placeholder="Rechercher un service (ex: Site web, Cartes de visite...)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-5 bg-gray-50 border border-gray-100 rounded-[2rem] text-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+              className="w-full pl-12 pr-4 py-5 bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-[2rem] text-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all shadow-sm"
             />
           </div>
 
@@ -403,7 +403,7 @@ const Home = () => {
               {loading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {Array(3).fill(0).map((_, i) => (
-                    <div key={i} className="h-[500px] bg-gray-50 animate-pulse rounded-[3rem]" />
+                    <div key={i} className="h-[500px] bg-slate-100 dark:bg-slate-800 animate-pulse rounded-[3rem]" />
                   ))}
                 </div>
               ) : (
@@ -411,7 +411,7 @@ const Home = () => {
                   {groupedServices.map((group) => (
                     <div key={group.category} className="space-y-12">
                       <div className="relative inline-block">
-                        <h3 className="text-2xl font-display font-bold text-ink uppercase tracking-wider">
+                        <h3 className="text-2xl font-display font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                           {group.category}
                         </h3>
                         <div className="absolute -bottom-2 left-0 w-full h-1 bg-primary rounded-full" />
@@ -431,13 +431,13 @@ const Home = () => {
 
           {!loading && filteredServices.length === 0 && (
             <div className="text-center py-32">
-              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Search className="w-10 h-10 text-gray-200" />
+              <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Search className="w-10 h-10 text-slate-400 dark:text-slate-500" />
               </div>
-              <p className="text-gray-400 text-lg">Aucun service trouvé pour cette recherche.</p>
+              <p className="text-slate-500 dark:text-slate-400 text-lg">Aucun service trouvé pour cette recherche.</p>
               <button 
                 onClick={() => { setActiveCategory('all'); setActivePillar('all'); setSearchQuery(''); }}
-                className="mt-4 text-primary font-bold hover:underline"
+                className="mt-4 text-primary dark:text-purple-400 font-bold hover:underline"
               >
                 Réinitialiser tous les filtres
               </button>
@@ -447,7 +447,7 @@ const Home = () => {
       </section>
 
       {/* Why Us Section - Hardware/Specialist (Recipe 3) */}
-      <section className="py-10 bg-white">
+      <section className="py-16 bg-white dark:bg-[#0e1424] border-y border-slate-100 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
@@ -456,7 +456,7 @@ const Home = () => {
               viewport={{ once: true }}
               className="relative"
             >
-              <div className="aspect-square rounded-[3rem] overflow-hidden shadow-2xl">
+              <div className="aspect-square rounded-[3rem] overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800">
                 <OptimizedImage
                   src={whyUs.image}
                   alt="Notre équipe"
@@ -475,17 +475,17 @@ const Home = () => {
                 className="flex items-center space-x-3 mb-3"
               >
                 <div className="w-12 h-px bg-primary" />
-                <span className="text-xs font-mono text-primary uppercase tracking-[0.4em] font-bold">Pourquoi Nous ?</span>
+                <span className="text-xs font-mono text-primary dark:text-purple-400 uppercase tracking-[0.4em] font-bold">Pourquoi Nous ?</span>
               </motion.div>
               <motion.h2
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="text-4xl md:text-5xl font-display font-bold text-ink mb-2 leading-tight tracking-tighter"
+                className="text-4xl md:text-5xl font-display font-bold text-slate-900 dark:text-white mb-4 leading-tight tracking-tighter"
               >
                 <Translate>{whyUs.title}</Translate>
               </motion.h2>
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {whyUs.points.map((item, i) => {
                   const Icon = iconMap[item.iconName] || CheckCircle2;
                   return (
@@ -497,12 +497,12 @@ const Home = () => {
                       viewport={{ once: true }}
                       className="flex items-start space-x-6"
                     >
-                      <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-primary/5 flex items-center justify-center">
-                        <Icon className="w-6 h-6 text-primary" />
+                      <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-primary/10 dark:bg-primary/20 border border-primary/20 flex items-center justify-center">
+                        <Icon className="w-6 h-6 text-primary dark:text-purple-400" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold text-ink mb-2">{item.title}</h3>
-                        <p className="text-gray-500 leading-relaxed">{item.description}</p>
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{item.title}</h3>
+                        <p className="text-slate-600 dark:text-slate-400 leading-relaxed">{item.description}</p>
                       </div>
                     </motion.div>
                   );
@@ -514,9 +514,9 @@ const Home = () => {
       </section>
 
       {/* Desktop App Section */}
-      <section className="py-20 bg-gray-50 overflow-hidden">
+      <section className="py-20 bg-slate-50 dark:bg-[#0b0f19] overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 md:px-12">
-          <div className="bg-white rounded-[3rem] p-8 md:p-16 border border-gray-100 shadow-xl relative overflow-hidden">
+          <div className="bg-white dark:bg-[#131c2e] rounded-[3rem] p-8 md:p-16 border border-slate-200/80 dark:border-slate-800 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             
             <div className="flex flex-col lg:flex-row items-center gap-16 relative z-10">
@@ -525,17 +525,17 @@ const Home = () => {
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-bold mb-6"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 dark:bg-primary/20 text-primary dark:text-purple-300 rounded-full text-sm font-bold mb-6 border border-primary/20"
                 >
                   <Monitor className="w-4 h-4" />
                   Application Native
                 </motion.div>
                 
-                <h2 className="text-4xl md:text-5xl font-display font-bold text-gray-900 mb-6 tracking-tight">
-                  Acom Gestion <span className="text-primary">Desktop</span>
+                <h2 className="text-4xl md:text-5xl font-display font-bold text-slate-900 dark:text-white mb-6 tracking-tight">
+                  Acom Gestion <span className="text-primary dark:text-purple-400">Desktop</span>
                 </h2>
                 
-                <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-xl">
+                <p className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed max-w-xl">
                   Découvrez une expérience de gestion fluide et ultra-rapide. Notre application native 
                   optimise vos flux de travail et s'intègre parfaitement avec vos périphériques (imprimantes de tickets, scanners).
                 </p>
@@ -547,11 +547,11 @@ const Home = () => {
                     "Démarrage Rapide",
                     "Sécurité Renforcée"
                   ].map((feature, i) => (
-                    <div key={i} className="flex items-center gap-3 text-gray-700">
-                      <div className="w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <div key={i} className="flex items-center gap-3 text-slate-800 dark:text-slate-200">
+                      <div className="w-6 h-6 bg-emerald-100 dark:bg-emerald-950/60 rounded-full flex items-center justify-center shrink-0 border border-emerald-200 dark:border-emerald-700/50">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                       </div>
-                      <span className="font-semibold">{feature}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{feature}</span>
                     </div>
                   ))}
                 </div>
@@ -563,9 +563,9 @@ const Home = () => {
                     href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop.Setup.1.0.0.exe"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-8 py-4 bg-ink text-white rounded-2xl font-bold shadow-2xl hover:bg-primary transition-colors gap-3"
+                    className="inline-flex items-center px-8 py-4 bg-slate-950 dark:bg-primary text-white hover:bg-primary dark:hover:bg-primary-hover rounded-2xl font-bold shadow-xl hover:shadow-primary/30 transition-all gap-3"
                   >
-                    <Download className="w-5 h-5" />
+                    <Download className="w-5 h-5 text-white" />
                     Télécharger Windows (.exe)
                   </motion.a>
 
@@ -575,20 +575,20 @@ const Home = () => {
                     href="https://ghp.ci/https://github.com/laye25/acom-technologie-site/releases/download/v1.0.0/Acom.Gestion.Desktop-1.0.0-arm64.dmg"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center px-8 py-4 bg-white border-2 border-gray-100 text-gray-900 rounded-2xl font-bold hover:bg-gray-50 transition-colors gap-3"
+                    className="inline-flex items-center px-8 py-4 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700/80 rounded-2xl font-bold transition-all gap-3 shadow-sm"
                   >
-                    <Download className="w-5 h-5 text-gray-500" />
+                    <Download className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                     Télécharger MacOS (.dmg)
                   </motion.a>
                 </div>
 
-                <div className="mt-6 inline-block p-4 bg-gray-50 rounded-2xl border border-gray-100 text-left">
-                  <p className="text-[10px] text-gray-400 font-mono break-all leading-tight mb-2">
-                    <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">WIN SHA-256:</span>
+                <div className="mt-6 inline-block p-4 bg-slate-100 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700 text-left">
+                  <p className="text-[10px] text-slate-600 dark:text-slate-400 font-mono break-all leading-tight mb-2">
+                    <span className="font-bold text-slate-800 dark:text-slate-300 mr-2 uppercase tracking-wider">WIN SHA-256:</span>
                     8c68a169f2f1c7def734ad91d4ebf0cbb3d45bb32ced315d11e722cac17c4fcd
                   </p>
-                  <p className="text-[10px] text-gray-400 font-mono break-all leading-tight">
-                    <span className="font-bold text-gray-500 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
+                  <p className="text-[10px] text-slate-600 dark:text-slate-400 font-mono break-all leading-tight">
+                    <span className="font-bold text-slate-800 dark:text-slate-300 mr-2 uppercase tracking-wider">MAC SHA-256:</span>
                     1656ba775088e613882e8b794b03d528b7e8f9a0b1c2d3e4f5a6b7c8d9e0
                   </p>
                 </div>
@@ -645,33 +645,33 @@ const Home = () => {
       </section>
 
       {/* CTA Section - Brutalist (Recipe 5) */}
-      <section className="py-10 px-6">
+      <section className="py-16 px-6 bg-slate-50 dark:bg-[#0b0f19]">
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="max-w-7xl mx-auto bg-ink rounded-[4rem] p-12 md:p-24 text-center relative overflow-hidden"
+          className="max-w-7xl mx-auto bg-slate-950 dark:bg-[#131c2e] rounded-[4rem] p-12 md:p-24 text-center relative overflow-hidden border border-slate-800 shadow-2xl"
         >
-          <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none" 
-               style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+          <div className="absolute top-0 left-0 w-full h-full opacity-15 pointer-events-none" 
+               style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1px)', backgroundSize: '36px 36px' }} />
           
-          <h2 className="text-4xl md:text-7xl font-display font-bold text-white mb-2 leading-[0.9] tracking-tighter">
+          <h2 className="text-4xl md:text-7xl font-display font-bold text-white mb-4 leading-[0.95] tracking-tighter">
             <Translate>{cta.title}</Translate> <br />
-            <span className="text-primary italic"><Translate>{cta.subtitle}</Translate></span>
+            <span className="text-primary dark:text-purple-400 italic"><Translate>{cta.subtitle}</Translate></span>
           </h2>
-          <p className="text-lg md:text-xl text-white/60 mb-4 max-w-2xl mx-auto font-light leading-relaxed">
+          <p className="text-lg md:text-xl text-slate-200 dark:text-slate-300 mb-8 max-w-2xl mx-auto font-light leading-relaxed">
             <Translate>{cta.description}</Translate>
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
             <Link
               to={cta.primaryButtonLink}
-              className="px-12 py-6 bg-primary text-white rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-2xl shadow-primary/40"
+              className="px-12 py-6 bg-primary hover:bg-primary-hover text-white rounded-full font-bold text-lg hover:scale-105 active:scale-95 transition-transform shadow-2xl shadow-primary/40"
             >
               <Translate>{cta.primaryButtonText}</Translate>
             </Link>
             <Link
               to={cta.secondaryButtonLink}
-              className="px-12 py-6 bg-white/5 backdrop-blur-md border border-white/10 text-white rounded-full font-bold text-lg hover:bg-white/10 transition-all"
+              className="px-12 py-6 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white rounded-full font-bold text-lg hover:scale-105 active:scale-95 transition-all"
             >
               <Translate>{cta.secondaryButtonText}</Translate>
             </Link>

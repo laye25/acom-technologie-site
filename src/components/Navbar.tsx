@@ -116,7 +116,7 @@ const Navbar = () => {
       <nav 
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
           scrolled 
-            ? 'bg-white/80 backdrop-blur-xl border-b border-black/5 py-3' 
+            ? 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-black/5 dark:border-slate-800 py-3' 
             : 'bg-transparent py-5'
         }`}
       >
@@ -148,11 +148,11 @@ const Navbar = () => {
                   <div className="absolute inset-0 bg-gradient-to-tr from-black/20 to-transparent" />
                 </div>
                 <div className="flex flex-col">
-                  <span className={`text-xl font-display font-bold tracking-tight leading-none transition-colors ${useWhiteText ? 'text-white' : 'text-ink'}`}>
+                  <span className={`text-xl font-display font-bold tracking-tight leading-none transition-colors ${useWhiteText ? 'text-white' : 'text-ink dark:text-white'}`}>
                     {brandName.split(' ')[0].toUpperCase()}
                   </span>
                   {brandName.split(' ').length > 1 && (
-                    <span className={`text-[10px] font-mono uppercase tracking-[0.2em] leading-none mt-1 transition-colors ${useWhiteText ? 'text-white/60' : 'text-gray-400'}`}>
+                    <span className={`text-[10px] font-mono uppercase tracking-[0.2em] leading-none mt-1 transition-colors ${useWhiteText ? 'text-white/60' : 'text-gray-400 dark:text-slate-400'}`}>
                       {brandName.split(' ').slice(1).join(' ')}
                     </span>
                   )}
@@ -169,7 +169,7 @@ const Navbar = () => {
                   key={link.name}
                   onClick={() => setIsDesignModalOpen(true)}
                   className={`relative px-4 py-2 text-sm font-medium transition-colors group ${
-                    useWhiteText ? 'text-white/90 hover:text-white' : 'text-gray-600 hover:text-primary'
+                    useWhiteText ? 'text-white/90 hover:text-white' : 'text-gray-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary'
                   }`}
                 >
                   {link.name}
@@ -180,8 +180,8 @@ const Navbar = () => {
                   to={link.path}
                   className={`relative px-4 py-2 text-sm font-medium transition-colors group ${
                     location.pathname === link.path 
-                      ? 'text-primary' 
-                      : useWhiteText ? 'text-white/90 hover:text-white' : 'text-gray-600 hover:text-primary'
+                      ? 'text-primary dark:text-primary' 
+                      : useWhiteText ? 'text-white/90 hover:text-white' : 'text-gray-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary'
                   }`}
                 >
                   {link.name}
@@ -203,7 +203,7 @@ const Navbar = () => {
             {user && <NotificationCenter />}
             {user ? (
               <div className={`flex items-center space-x-2 p-1 rounded-full border transition-all ${
-                useWhiteText ? 'bg-white/10 border-white/10' : 'bg-gray-50 border-black/5'
+                useWhiteText ? 'bg-white/10 border-white/10' : 'bg-gray-50 dark:bg-slate-800 border-black/5 dark:border-slate-700'
               }`}>
                 {authLinks.map((link) => (
                   <Link
@@ -211,26 +211,26 @@ const Navbar = () => {
                     to={link.path}
                     className={`p-2 rounded-full transition-all ${
                       location.pathname === link.path 
-                        ? 'bg-white text-primary shadow-sm' 
-                        : useWhiteText ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-primary hover:bg-white'
+                        ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' 
+                        : useWhiteText ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-gray-500 dark:text-slate-400 hover:text-primary dark:hover:text-white hover:bg-white dark:hover:bg-slate-700'
                     }`}
                     title={link.name}
                   >
                     <link.icon className="w-4 h-4" />
                   </Link>
                 ))}
-                <div className={`w-px h-4 mx-1 ${useWhiteText ? 'bg-white/20' : 'bg-gray-200'}`} />
+                <div className={`w-px h-4 mx-1 ${useWhiteText ? 'bg-white/20' : 'bg-gray-200 dark:bg-slate-700'}`} />
                 <Link to="/profile" className="flex items-center pr-2 group">
                   <OptimizedImage
                     src={profile?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.displayName || user?.email?.split('@')[0] || 'User')}&background=7c3aed&color=fff`}
                     alt="Profile"
                     width={100}
-                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm group-hover:scale-110 transition-transform"
+                    className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-700 shadow-sm group-hover:scale-110 transition-transform"
                   />
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className={`p-2 transition-colors ${useWhiteText ? 'text-white/40 hover:text-red-400' : 'text-gray-400 hover:text-red-500'}`}
+                  className={`p-2 transition-colors ${useWhiteText ? 'text-white/40 hover:text-red-400' : 'text-gray-400 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400'}`}
                   title="Déconnexion"
                 >
                   <LogOut className="w-4 h-4" />
@@ -259,7 +259,7 @@ const Navbar = () => {
             <button
               onClick={() => setIsOpen(!isOpen)}
               className={`p-2 rounded-xl transition-colors ${
-                useWhiteText ? 'text-white hover:bg-white/10' : 'text-gray-600 hover:bg-gray-100'
+                useWhiteText ? 'text-white hover:bg-white/10' : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
               }`}
             >
               {isOpen ? <X className="w-6 h-6" /> : (
@@ -279,7 +279,7 @@ const Navbar = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-full left-0 right-0 bg-white border-b border-black/5 shadow-2xl md:hidden"
+            className="absolute top-full left-0 right-0 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-slate-800 shadow-2xl md:hidden"
           >
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -291,7 +291,7 @@ const Navbar = () => {
                         setIsDesignModalOpen(true);
                         setIsOpen(false);
                       }}
-                      className="flex items-center justify-center px-4 py-3 rounded-2xl text-sm font-bold bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all"
+                      className="flex items-center justify-center px-4 py-3 rounded-2xl text-sm font-bold bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-all border border-gray-100 dark:border-slate-700"
                     >
                       {link.name}
                     </button>
@@ -300,10 +300,10 @@ const Navbar = () => {
                       key={link.path}
                       to={link.path}
                       onClick={() => setIsOpen(false)}
-                      className={`flex items-center justify-center px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
+                      className={`flex items-center justify-center px-4 py-3 rounded-2xl text-sm font-bold transition-all border border-transparent ${
                         location.pathname === link.path 
                           ? 'bg-primary text-white shadow-lg shadow-primary/20' 
-                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                          : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 dark:border-slate-700'
                       }`}
                     >
                       {link.name}
@@ -313,17 +313,17 @@ const Navbar = () => {
               </div>
               
               {user && (
-                <div className="pt-4 border-t border-gray-100 space-y-3">
-                  <div className="flex items-center space-x-3 mb-4 p-3 bg-gray-50 rounded-2xl">
+                <div className="pt-4 border-t border-gray-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center space-x-3 mb-4 p-3 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700">
                     <OptimizedImage
                       src={profile?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.displayName || user?.email?.split('@')[0] || 'User')}&background=7c3aed&color=fff`}
                       alt="Profile"
                       width={100}
-                      className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+                      className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-700 shadow-sm"
                     />
                     <div>
-                      <p className="text-sm font-bold text-gray-900">{profile?.displayName || 'Utilisateur'}</p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">{profile?.displayName || 'Utilisateur'}</p>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">{user.email}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -332,7 +332,7 @@ const Navbar = () => {
                         key={link.path}
                         to={link.path}
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center px-4 py-3 rounded-2xl text-sm font-bold bg-gray-50 text-gray-600 hover:bg-gray-100"
+                        className="flex items-center px-4 py-3 rounded-2xl text-sm font-bold bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-100 dark:border-slate-700"
                       >
                         <link.icon className="w-4 h-4 mr-2" />
                         {link.name}
@@ -341,7 +341,7 @@ const Navbar = () => {
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="flex w-full items-center justify-center px-4 py-3 rounded-2xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                    className="flex w-full items-center justify-center px-4 py-3 rounded-2xl text-sm font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-rose-950/40 hover:bg-red-100 dark:hover:bg-rose-900/50 transition-colors border border-red-100 dark:border-rose-800/40"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
                     Déconnexion

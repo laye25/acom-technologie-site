@@ -1200,7 +1200,7 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          <div className="space-y-4 mb-6 md:mb-8">
+          <div className="space-y-4 mb-6 md:mb-8" data-acom-id="supplier.navbar">
             {Object.entries(
               tabs.reduce((acc, tab) => {
                 const group = tab.group || 'Général';
@@ -1209,9 +1209,9 @@ const MerchantSaaS = () => {
                 return acc;
               }, {} as Record<string, any[]>)
             ).map(([groupName, groupTabs]) => (
-              <div key={groupName} className="bg-white p-3 rounded-2xl border border-black/5 shadow-sm">
+              <div key={groupName} className="bg-white dark:bg-slate-900/95 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-colors">
                 {groupName !== 'Général' && tabs[0].group && (
-                  <h4 className="text-[10px] font-black font-mono uppercase tracking-[0.2em] text-gray-400 mb-2 px-2">{groupName}</h4>
+                  <h4 className="text-[10px] font-black font-mono uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500 mb-2 px-2">{groupName}</h4>
                 )}
                 <div className="flex overflow-x-auto whitespace-nowrap snap-x snap-mandatory gap-2 pb-1 -mx-1 px-1">
                   {(groupTabs as any[]).map((tab: any) => (
@@ -1297,7 +1297,7 @@ const MerchantSaaS = () => {
         </Suspense>
 
         {/* SaaS Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500 font-medium">
+        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500 dark:text-slate-400 font-medium">
           <p>© {new Date().getFullYear()} Acom Technologie. Tous droits réservés.</p>
           <a 
             href="mailto:contact.abdoulayendiaye@gmail.com" 
@@ -1318,17 +1318,24 @@ const MerchantSaaS = () => {
 
 const TabButton = ({ active, onClick, icon: Icon, label, tabId }: any) => (
   <button
+    type="button"
     onClick={onClick}
     data-acom-id={`nav-${tabId}`}
     data-tutorial-id={tabId}
-    className={`flex items-center space-x-2.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+    className={`group flex items-center space-x-2.5 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap cursor-pointer select-none ${
       active 
-        ? 'bg-ink text-white shadow-xl shadow-ink/20 scale-105' 
-        : 'text-gray-400 hover:text-ink hover:bg-gray-50'
+        ? 'bg-slate-950 dark:bg-slate-950 text-white dark:text-white border border-slate-900 dark:border-slate-700 shadow-md shadow-slate-950/20 dark:shadow-inner scale-[1.02]' 
+        : 'bg-transparent hover:bg-slate-100/90 dark:hover:bg-slate-800/80 text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-100 border border-transparent'
     }`}
   >
-    <Icon className={`w-4 h-4 ${active ? 'text-primary' : ''}`} />
-    <span>{label}</span>
+    <Icon 
+      className={`w-4 h-4 shrink-0 transition-colors ${
+        active 
+          ? 'text-white dark:text-white' 
+          : 'text-violet-600 dark:text-slate-400 group-hover:text-slate-950 dark:group-hover:text-slate-100'
+      }`} 
+    />
+    <span className={active ? 'text-white dark:text-white font-black' : ''}>{label}</span>
   </button>
 );
 

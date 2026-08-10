@@ -7,7 +7,7 @@ import { TutorialEngine } from '../Tutorial/TutorialEngine';
 import { ScreenRecorder } from '../Tutorial/ScreenRecorder';
 import { TargetHighlighter } from '../Tutorial/TargetHighlighter';
 import { ScreenRecordingStatus, TutorialStep } from '../types';
-import { Video, StopCircle, Play, ChevronRight, ChevronLeft, Volume2, X, Download, HelpCircle, CheckCircle, Info, Sparkles, AlertTriangle } from 'lucide-react';
+import { Video, StopCircle, Play, Pause, ChevronRight, ChevronLeft, Volume2, VolumeX, X, Download, HelpCircle, CheckCircle, Info, Sparkles, AlertTriangle, ListFilter, MousePointer, Search, RotateCcw } from 'lucide-react';
 
 export const TutorialOverlay: React.FC = () => {
   const [tutorialActive, setTutorialActive] = useState(false);
@@ -16,6 +16,9 @@ export const TutorialOverlay: React.FC = () => {
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
   const [recordingStatus, setRecordingStatus] = useState<ScreenRecordingStatus>('idle');
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
+  const [isChooserOpen, setIsChooserOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [inspectMode, setInspectMode] = useState(false);
 
   useEffect(() => {
     const unsubTutorial = TutorialEngine.subscribe(() => {
@@ -23,6 +26,7 @@ export const TutorialOverlay: React.FC = () => {
       setCurrentStep(TutorialEngine.getCurrentStep());
       setWaitingForTab(TutorialEngine.isWaitingForTabSelection());
       setWaitingMessage(TutorialEngine.getWaitingMessage());
+      setIsChooserOpen(TutorialEngine.isFunctionChooserOpen());
     });
 
     const unsubRecorder = ScreenRecorder.subscribeStatus((status) => {
@@ -35,6 +39,37 @@ export const TutorialOverlay: React.FC = () => {
       unsubRecorder();
     };
   }, []);
+
+  // Handle direct click inspection on DOM elements with data-acom-id
+  useEffect(() => {
+    if (!inspectMode) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const acomElement = target.closest('[data-acom-id]');
+      if (acomElement) {
+        const acomId = acomElement.getAttribute('data-acom-id');
+        if (acomId) {
+          e.preventDefault();
+          e.stopPropagation();
+          TutorialEngine.jumpToAcomId(acomId);
+          setInspectMode(false);
+        }
+      }
+    };
+
+    window.addEventListener('click', handleClick, true);
+    return () => window.removeEventListener('click', handleClick, true);
+  }, [inspectMode]);
+
+  const scenario = TutorialEngine.getCurrentScenario();
+  const allSteps = scenario ? scenario.steps : [];
+
+  const filteredSteps = allSteps.filter(s =>
+    s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.targetAcomId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleStartRecording = async () => {
     await ScreenRecorder.startRecording();
@@ -231,10 +266,96 @@ export const TutorialOverlay: React.FC = () => {
               </p>
             </div>
 
-            {/* Speech Text */}
-            <div className="bg-indigo-900/40 border border-indigo-800/50 rounded-xl p-2.5 text-xs text-indigo-200 flex items-start gap-2">
-              <Volume2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-              <span className="italic">"{currentStep.speechFr}"</span>
+            {/* Speech Text & Vocal Controls */}
+            <div className="bg-indigo-900/40 border border-indigo-800/50 rounded-xl p-2.5 text-xs text-indigo-200 space-y-2">
+              <div className="flex items-start gap-2">
+                <Volume2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 animate-pulse" />
+                <span className="italic">"{currentStep.speechFr}"</span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-indigo-800/40 text-[11px] font-bold">
+                <button
+                  onClick={() => TutorialEngine.pauseNarration()}
+                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  title="Mettre la voix en pause"
+                >
+                  <Pause className="w-3 h-3 text-amber-300" />
+                  <span>Pause</span>
+                </button>
+                <button
+                  onClick={() => TutorialEngine.resumeNarration()}
+                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  title="Reprendre la lecture vocale"
+                >
+                  <Play className="w-3 h-3 text-emerald-300" />
+                  <span>Reprendre</span>
+                </button>
+                <button
+                  onClick={() => TutorialEngine.stopNarration()}
+                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  title="Arrêter la voix"
+                >
+                  <VolumeX className="w-3 h-3 text-rose-300" />
+                  <span>Stop</span>
+                </button>
+                <button
+                  onClick={() => TutorialEngine.repeatCurrentStep()}
+                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  title="Répéter l'explication vocale"
+                >
+                  <RotateCcw className="w-3 h-3 text-cyan-300" />
+                  <span>Répéter</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Actions: Choisir une fonction & Pointeur */}
+            <div className="flex items-center gap-2 pt-2 border-t border-indigo-800/60">
+              <button
+                onClick={() => TutorialEngine.openFunctionChooser()}
+                className="flex-1 py-1.5 px-2 bg-indigo-900/80 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/60 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <ListFilter className="w-3.5 h-3.5 text-indigo-400" />
+                Choisir une fonction
+              </button>
+              <button
+                onClick={() => setInspectMode(true)}
+                className="py-1.5 px-2.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-200 border border-cyan-700/60 rounded-xl text-[11px] font-bold transition flex items-center justify-center gap-1.5"
+                title="Cliquer directement sur un bouton de la page pour le comprendre"
+              >
+                <MousePointer className="w-3.5 h-3.5 text-cyan-400" />
+                Pointeur
+              </button>
+              <button
+                onClick={() => {
+                  if (scenario?.id === 'commerce_billing_quote_modal_tutorial') {
+                    TutorialEngine.startBillingQuoteModalTutorial(0);
+                  } else if (scenario?.id === 'commerce_billing_print_modal_tutorial') {
+                    TutorialEngine.startBillingPrintModalTutorial(0);
+                  } else if (scenario?.id === 'commerce_billing_invoices_tutorial') {
+                    TutorialEngine.startBillingTutorial('invoices', 0);
+                  } else if (scenario?.id === 'commerce_billing_pending_tutorial') {
+                    TutorialEngine.startBillingTutorial('pending', 0);
+                  } else if (scenario?.id === 'commerce_billing_quotes_tutorial') {
+                    TutorialEngine.startBillingTutorial('quotes', 0);
+                  } else if (scenario?.id === 'commerce_reorder_po_tutorial') {
+                    TutorialEngine.startReorderTutorial(0);
+                  } else if (scenario?.id === 'commerce_inventory_sheet_tutorial') {
+                    TutorialEngine.startInventorySheetTutorial(0);
+                  } else if (scenario?.id === 'commerce_stock_adjustment_tutorial') {
+                    TutorialEngine.startStockAdjustmentTutorial(0);
+                  } else if (scenario?.id === 'commerce_suppliers_tutorial') {
+                    TutorialEngine.startSuppliersTutorial(0);
+                  } else if (scenario?.id === 'commerce_new_supplier_modal_tutorial') {
+                    TutorialEngine.startNewSupplierModalTutorial(0);
+                  } else {
+                    TutorialEngine.startStockTutorial(0);
+                  }
+                }}
+                className="p-2 bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/50 rounded-xl transition"
+                title="Redémarrer la présentation complète"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             {/* Navigation Buttons */}
@@ -280,6 +401,85 @@ export const TutorialOverlay: React.FC = () => {
           </motion.div>
         )}
       </div>
+
+      {/* Inspect Mode Pointer Banner */}
+      {inspectMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-indigo-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-indigo-400 animate-pulse">
+          <MousePointer className="w-5 h-5 text-cyan-300 animate-spin" />
+          <span className="text-xs font-bold">Cliquez sur n'importe quel bouton ou zone de la page pour obtenir son explication</span>
+          <button onClick={() => setInspectMode(false)} className="ml-4 p-1 hover:bg-indigo-700 rounded-lg text-white">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Function Chooser Modal */}
+      {isChooserOpen && (
+        <div className="fixed inset-0 z-[9995] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-slate-100 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden font-sans">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <ListFilter className="w-5 h-5 text-indigo-400" />
+                  <span>Choisir une fonction — {scenario?.title || 'Gestion de Stock'}</span>
+                </h3>
+                <p className="text-xs text-slate-400">Cliquez sur n'importe quelle fonction pour être guidé directement dessus</p>
+              </div>
+              <button onClick={() => TutorialEngine.closeFunctionChooser()} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="p-4 border-b border-slate-800/80 bg-slate-950/50">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  placeholder="Rechercher une fonction (ex: Nouveau, Ajustement, Marge, CUMP, Journal)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Step List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {filteredSteps.map((s) => (
+                <button
+                  key={s.stepNumber}
+                  onClick={() => {
+                    TutorialEngine.jumpToStepIndex(s.stepNumber - 1);
+                  }}
+                  className={`w-full text-left p-3.5 rounded-2xl border transition flex items-start justify-between gap-3 ${
+                    currentStep?.stepNumber === s.stepNumber
+                      ? 'bg-indigo-900/50 border-indigo-500 text-white shadow-lg'
+                      : 'bg-slate-800/50 hover:bg-slate-800 border-slate-700/60 text-slate-200'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-mono font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                        Étape {s.stepNumber}
+                      </span>
+                      <span className="text-xs font-bold text-white">{s.title}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 line-clamp-2">{s.description}</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 shrink-0 mt-2" />
+                </button>
+              ))}
+              {filteredSteps.length === 0 && (
+                <div className="py-12 text-center text-slate-500 text-xs font-medium">
+                  Aucune fonction ne correspond à votre recherche.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

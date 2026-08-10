@@ -13,10 +13,15 @@ export interface CoverageCell {
 
 export interface CoverageMap {
     cells: CoverageCell[];
-    resolution: number; // Size of each cell in mm
+    resolution: number; // Size of each cell in units
     bounds: { minX: number; maxX: number; minY: number; maxY: number };
     coveragePercentage: number;
     underCoveredCount: number;
+}
+
+export interface StitchSegmentRef {
+    p1: EmbroideryPoint;
+    p2: EmbroideryPoint;
 }
 
 export class SpatialPointGrid {
@@ -39,32 +44,6 @@ export class SpatialPointGrid {
         }
     }
 
-    public getMinDistance(p: { x: number; y: number }, maxRadius: number = 3.0): number {
-        const cx = Math.floor(p.x / this.cellSize);
-        const cy = Math.floor(p.y / this.cellSize);
-        const rCells = Math.ceil(maxRadius / this.cellSize);
-
-        let minDist = maxRadius;
-
-        for (let dx = -rCells; dx <= rCells; dx++) {
-            for (let dy = -rCells; dy <= rCells; dy++) {
-                const key = `${cx + dx},${cy + dy}`;
-                const list = this.grid.get(key);
-                if (list) {
-                    for (let i = 0; i < list.length; i++) {
-                        const pt = list[i];
-                        const dist = Math.hypot(p.x - pt.x, p.y - pt.y);
-                        if (dist < minDist) {
-                            minDist = dist;
-                        }
-                    }
-                }
-            }
-        }
-
-        return minDist;
-    }
-
     public hasPointWithin(p: { x: number; y: number }, radius: number): boolean {
         const cx = Math.floor(p.x / this.cellSize);
         const cy = Math.floor(p.y / this.cellSize);
@@ -84,16 +63,81 @@ export class SpatialPointGrid {
                 }
             }
         }
-
         return false;
     }
 }
 
-export class CoverageAnalyzer {
-    private static readonly MAX_ALLOWED_GAP = 1.0; // 1mm max gap
+export class SpatialSegmentGrid {
+    private cellSize: number;
+    private grid: Map<string, StitchSegmentRef[]> = new Map();
 
+    constructor(cellSize: number, segments: EmbroideryPoint[][]) {
+        this.cellSize = Math.max(1.0, cellSize);
+        for (const seg of segments) {
+            if (!seg || seg.length < 2) continue;
+            for (let i = 0; i < seg.length - 1; i++) {
+                const p1 = seg[i];
+                const p2 = seg[i + 1];
+                if (!p1 || !p2 || isNaN(p1.x) || isNaN(p1.y) || isNaN(p2.x) || isNaN(p2.y)) continue;
+
+                // Index segment into all grid cells it touches
+                const minX = Math.min(p1.x, p2.x);
+                const maxX = Math.max(p1.x, p2.x);
+                const minY = Math.min(p1.y, p2.y);
+                const maxY = Math.max(p1.y, p2.y);
+
+                const cMinX = Math.floor(minX / this.cellSize);
+                const cMaxX = Math.floor(maxX / this.cellSize);
+                const cMinY = Math.floor(minY / this.cellSize);
+                const cMaxY = Math.floor(maxY / this.cellSize);
+
+                const segRef: StitchSegmentRef = { p1, p2 };
+
+                for (let cx = cMinX; cx <= cMaxX; cx++) {
+                    for (let cy = cMinY; cy <= cMaxY; cy++) {
+                        const key = `${cx},${cy}`;
+                        let list = this.grid.get(key);
+                        if (!list) {
+                            list = [];
+                            this.grid.set(key, list);
+                        }
+                        list.push(segRef);
+                    }
+                }
+            }
+        }
+    }
+
+    public getMinDistanceToSegment(p: { x: number; y: number }, maxRadius: number = 20.0): number {
+        const cx = Math.floor(p.x / this.cellSize);
+        const cy = Math.floor(p.y / this.cellSize);
+        const rCells = Math.ceil(maxRadius / this.cellSize);
+
+        let minDist = maxRadius;
+
+        for (let dx = -rCells; dx <= rCells; dx++) {
+            for (let dy = -rCells; dy <= rCells; dy++) {
+                const key = `${cx + dx},${cy + dy}`;
+                const list = this.grid.get(key);
+                if (list) {
+                    for (let i = 0; i < list.length; i++) {
+                        const seg = list[i];
+                        const dist = CoverageAnalyzer.distToSegment(p, seg.p1, seg.p2);
+                        if (dist < minDist) {
+                            minDist = dist;
+                        }
+                    }
+                }
+            }
+        }
+
+        return minDist;
+    }
+}
+
+export class CoverageAnalyzer {
     /**
-     * Builds a coverage map for a given tatami block in linear O(N) time.
+     * Builds a physically accurate coverage map for a given tatami block in O(N) time.
      */
     public static analyze(block: TatamiBlock, region: Region): CoverageMap {
         const bounds = this.getBounds(region);
@@ -104,31 +148,39 @@ export class CoverageAnalyzer {
             return { cells: [], resolution: 1, bounds, coveragePercentage: 100, underCoveredCount: 0 };
         }
 
-        // Adaptive resolution aiming for ~1,500-2,500 cells max
+        // Detect coordinate system (canvas pixels vs mm)
         const maxDim = Math.max(width, height);
-        const resolution = Math.max(0.8, Math.min(3.0, maxDim / 45));
+        const isCanvasScale = maxDim > 30;
+        const scaleFactor = isCanvasScale ? 7.5 : 1.0;
+
+        // Step spacing and maximum allowed gap threshold
+        const rawDensity = block.config.density || 0.4;
+        const effectiveDensity = rawDensity < 1.5 ? rawDensity * scaleFactor : rawDensity;
+        const maxAllowedGap = Math.max(1.2 * scaleFactor, effectiveDensity * 1.35);
+
+        // Adaptive resolution aiming for ~1,500 cells max
+        const resolution = Math.max(1.0 * scaleFactor, Math.min(5.0 * scaleFactor, maxDim / 40));
         const cells: CoverageCell[] = [];
 
-        // Flatten all points and index into Spatial Grid
-        const allPoints = block.points.flat();
-        const spatialGrid = new SpatialPointGrid(2.0, allPoints);
+        // Build spatial segment grid
+        const spatialGrid = new SpatialSegmentGrid(Math.max(4.0, effectiveDensity * 2.0), block.points);
 
-        // Downsample polygon for fast point-in-polygon and contour checks
+        // Downsample polygon for point-in-polygon checks
         const fullPoly = region.polygon;
-        const polyStep = fullPoly.length > 100 ? Math.ceil(fullPoly.length / 100) : 1;
+        const polyStep = fullPoly.length > 80 ? Math.ceil(fullPoly.length / 80) : 1;
         const sampledPoly = polyStep > 1 ? fullPoly.filter((_, idx) => idx % polyStep === 0) : fullPoly;
 
         let totalCellCount = 0;
         let underCoveredCount = 0;
-        const MAX_GRID_CELLS = 3000;
+        const MAX_GRID_CELLS = 2500;
 
         for (let y = bounds.minY; y <= bounds.maxY && totalCellCount < MAX_GRID_CELLS; y += resolution) {
             for (let x = bounds.minX; x <= bounds.maxX && totalCellCount < MAX_GRID_CELLS; x += resolution) {
                 if (this.isPointInPolygon({ x, y }, sampledPoly, bounds)) {
                     totalCellCount++;
-                    const distToStitch = spatialGrid.getMinDistance({ x, y }, 3.0);
+                    const distToStitch = spatialGrid.getMinDistanceToSegment({ x, y }, maxAllowedGap * 2.5);
                     const distToContour = this.getMinDistanceToContour({ x, y }, sampledPoly);
-                    const isUnderCovered = distToStitch > this.MAX_ALLOWED_GAP;
+                    const isUnderCovered = distToStitch > maxAllowedGap;
 
                     if (isUnderCovered) {
                         underCoveredCount++;
@@ -137,7 +189,7 @@ export class CoverageAnalyzer {
                     cells.push({
                         x,
                         y,
-                        density: block.config.density || 1.2,
+                        density: rawDensity,
                         distanceToNearestStitch: distToStitch,
                         distanceToContour: distToContour,
                         isUnderCovered
@@ -214,7 +266,7 @@ export class CoverageAnalyzer {
         return minDist;
     }
 
-    private static distToSegment(p: { x: number, y: number }, v: { x: number, y: number }, w: { x: number, y: number }): number {
+    public static distToSegment(p: { x: number, y: number }, v: { x: number, y: number }, w: { x: number, y: number }): number {
         const l2 = (v.x - w.x) ** 2 + (v.y - w.y) ** 2;
         if (l2 === 0) return Math.sqrt((p.x - v.x) ** 2 + (p.y - v.y) ** 2);
         let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;

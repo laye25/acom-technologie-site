@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 // @ts-ignore
 import ImageTracer from 'imagetracerjs';
 import type { GeometricSignature } from './GeometricSignatureEngine';
+import { Tatami1375Engine } from '@/src/core/tatami/Tatami1375Engine';
 
 export interface EmbroideryPoint {
   x: number;
@@ -12,7 +13,7 @@ export interface EmbroideryPoint {
 export interface EmbroideryLayer {
   id: string;
   name: string;
-  stitchType: 'running' | 'triple' | 'satin' | 'tatami' | 'zigzag' | 'manual';
+  stitchType: 'running' | 'triple' | 'satin' | 'tatami' | 'tatami1375' | 'zigzag' | 'manual';
   color: string;
   colorName: string;
   threadCode: string;
@@ -42,7 +43,7 @@ export interface EmbroideryObject {
   id: string;
   name: string;
   classification: 'contour' | 'remplissage' | 'texte' | 'feuille' | 'pétale' | 'centre' | 'tige' | 'décoration';
-  stitchType: 'satin' | 'tatami' | 'running' | 'triple' | 'zigzag' | 'manual';
+  stitchType: 'satin' | 'tatami' | 'tatami1375' | 'running' | 'triple' | 'zigzag' | 'manual';
   color: string;
   colorName: string;
   threadCode: string;
@@ -4088,24 +4089,25 @@ export class StitchEngine {
 
     let pullMultiplier = 1.0;
     let pushMultiplier = 1.0;
+    const safePullComp = typeof obj.pullComp === 'number' && !isNaN(obj.pullComp) ? obj.pullComp : 0.2;
 
     switch (fabric) {
       case 'silk':
-        pullMultiplier = 1.0 + (obj.pullComp * 1.35); // Fine silk pulls/shrinks easily, requires high pull compensation
-        pushMultiplier = 1.0 - (obj.pullComp * 0.75); // Perpendicular push expansion is pronounced
+        pullMultiplier = 1.0 + (safePullComp * 1.35); // Fine silk pulls/shrinks easily, requires high pull compensation
+        pushMultiplier = 1.0 - (safePullComp * 0.75); // Perpendicular push expansion is pronounced
         break;
       case 'denim':
-        pullMultiplier = 1.0 + (obj.pullComp * 0.85); // Heavy denim is highly stable, requires less compensation
-        pushMultiplier = 1.0 - (obj.pullComp * 0.35);
+        pullMultiplier = 1.0 + (safePullComp * 0.85); // Heavy denim is highly stable, requires less compensation
+        pushMultiplier = 1.0 - (safePullComp * 0.35);
         break;
       case 'leather':
-        pullMultiplier = 1.0 + (obj.pullComp * 0.45); // Rigidity prevents pull contraction, lower values avoid tear
-        pushMultiplier = 1.0 - (obj.pullComp * 0.15);
+        pullMultiplier = 1.0 + (safePullComp * 0.45); // Rigidity prevents pull contraction, lower values avoid tear
+        pushMultiplier = 1.0 - (safePullComp * 0.15);
         break;
       case 'cotton':
       default:
-        pullMultiplier = 1.0 + (obj.pullComp * 1.0);
-        pushMultiplier = 1.0 - (obj.pullComp * 0.5);
+        pullMultiplier = 1.0 + (safePullComp * 1.0);
+        pushMultiplier = 1.0 - (safePullComp * 0.5);
         break;
     }
 
@@ -4324,6 +4326,73 @@ export class StitchEngine {
           list.push({ points: seg, type: 'stitch' });
         }
       });
+    } else if (obj.stitchType === 'tatami1375' || obj.stitchType === ('tatami_1375' as any)) {
+      // Tatami 137.5° Golden Angle Filling Engine
+      const poly = (physicalPoints && physicalPoints.length > 2) ? physicalPoints : obj.points;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      poly.forEach(p => {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      });
+      let realArea = 0;
+      for (let i = 0; i < poly.length; i++) {
+        const j = (i + 1) % poly.length;
+        realArea += poly[i].x * poly[j].y - poly[j].x * poly[i].y;
+      }
+      realArea = Math.abs(realArea) / 2;
+
+      const holePolygons: { x: number; y: number }[][] = [];
+      if ((obj as any).holes && Array.isArray((obj as any).holes)) {
+        for (const h of (obj as any).holes) {
+          if (Array.isArray(h) && h.length >= 3) {
+            holePolygons.push(h.map((p: any) => ({
+              x: typeof p.x === 'number' ? p.x : (Array.isArray(p) ? p[0] : 0),
+              y: typeof p.y === 'number' ? p.y : (Array.isArray(p) ? p[1] : 0)
+            })));
+          }
+        }
+      }
+      if ((obj as any).holePolygons && Array.isArray((obj as any).holePolygons)) {
+        for (const h of (obj as any).holePolygons) {
+          if (Array.isArray(h) && h.length >= 3) {
+            holePolygons.push(h.map((p: any) => ({
+              x: typeof p.x === 'number' ? p.x : (Array.isArray(p) ? p[0] : 0),
+              y: typeof p.y === 'number' ? p.y : (Array.isArray(p) ? p[1] : 0)
+            })));
+          }
+        }
+      }
+
+      const region = {
+        id: obj.id || 'layer_region',
+        polygon: poly,
+        children: [],
+        holes: [],
+        holePolygons,
+        isHole: false,
+        isIsland: true,
+        color: obj.color || '#000000',
+        area: realArea,
+        orientation: 'CW' as any,
+        bbox: { minX, minY, maxX, maxY }
+      };
+
+      const nominalAngle = (obj.angle && obj.angle !== 45 && obj.angle !== 0) ? obj.angle : 137.5;
+
+      const res = Tatami1375Engine.planRegion(region, {
+        density: obj.density || 0.4,
+        stitchLength: 3.0,
+        nominalAngle: nominalAngle,
+        underlay: obj.underlay ? 'edge' : 'none'
+      });
+
+      for (const seg of res.block.points) {
+        if (seg.length > 0) {
+          list.push({ points: seg, type: 'stitch' });
+        }
+      }
     } else {
       if (cover.length > 0) {
         list.push({ points: cover, type: 'stitch' });

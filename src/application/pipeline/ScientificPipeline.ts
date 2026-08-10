@@ -3,7 +3,7 @@ import { db } from '../../db/db';
 import { ScientificEventBus } from '../ScientificEventBus';
 import { ScientificSnapshotService, SnapshotReason } from '../../modules/tailleur/services/ScientificSnapshotService';
 import { GeometryAutopsyService } from '../../modules/tailleur/services/GeometryAutopsyService';
-import { CompilerEngine, CompiledStitch } from '../../modules/tailleur/services/embroideryServices';
+import { CompilerEngine, CompiledStitch, StitchEngine } from '../../modules/tailleur/services/embroideryServices';
 import { VerseauExecutive } from '../../modules/tailleur/services/VerseauExecutive';
 import { VerseauReasoner } from '../../modules/tailleur/services/VerseauReasoner';
 import { VerseauCritic } from '../../modules/tailleur/services/VerseauCritic';
@@ -12,14 +12,76 @@ import { PerformanceProfiler } from '../../core/profiler/PerformanceProfiler';
 // Helper to wait/sleep for realistic pacing (optimized for high speed performance)
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, Math.min(ms, 2)));
 
-// Helper function to compile stitches
-function compileStitches(layers: any[]): CompiledStitch[] {
-  return [
-    { x: 0, y: 0, dx: 0, dy: 0, type: 'jump', colorIndex: 0 },
-    { x: 10, y: 10, dx: 10, dy: 10, type: 'stitch', colorIndex: 0 },
-    { x: 20, y: 10, dx: 10, dy: 0, type: 'stitch', colorIndex: 0 },
-    { x: 0, y: 0, dx: -20, dy: -10, type: 'end', colorIndex: 0 }
-  ];
+// Real full-fidelity stitch compilation helper
+function compileStitches(layers: any[], fabricKey: string = 'cotton'): CompiledStitch[] {
+  const list: CompiledStitch[] = [];
+  let cx = 0;
+  let cy = 0;
+  let colorIndex = 0;
+
+  const validLayers = (layers || []).filter(l => l && l.visible !== false && l.points && l.points.length > 0);
+  const uniqueColors = Array.from(new Set(validLayers.map(l => l.color || '#000000')));
+
+  const addStitch = (targetX: number, targetY: number, stType: 'stitch' | 'jump' | 'color_change' | 'stop' | 'end', cIdx: number) => {
+    if (isNaN(targetX) || isNaN(targetY) || !isFinite(targetX) || !isFinite(targetY)) return;
+    const rx = Math.round(targetX);
+    const ry = Math.round(targetY);
+    const fullDx = rx - cx;
+    const fullDy = ry - cy;
+
+    if (fullDx === 0 && fullDy === 0) {
+      list.push({ x: cx, y: cy, dx: 0, dy: 0, type: stType, colorIndex: cIdx });
+      return;
+    }
+
+    let stepGuard = 10000;
+    while ((cx !== rx || cy !== ry) && stepGuard-- > 0) {
+      const dXRemaining = rx - cx;
+      const dYRemaining = ry - cy;
+      const dx = Math.max(-121, Math.min(121, dXRemaining));
+      const dy = Math.max(-121, Math.min(121, dYRemaining));
+      if (dx === 0 && dy === 0) break;
+      cx += dx;
+      cy += dy;
+      const isFinal = (cx === rx && cy === ry);
+      list.push({ x: cx, y: cy, dx, dy, type: isFinal ? stType : 'jump', colorIndex: cIdx });
+    }
+    cx = rx;
+    cy = ry;
+  };
+
+  validLayers.forEach(layer => {
+    const cIdx = Math.max(0, uniqueColors.indexOf(layer.color || '#000000'));
+    const is1375 = layer.stitchType === 'tatami1375' || layer.stitchType === 'tatami_1375';
+    const effectiveAngle = is1375
+      ? (layer.angle && layer.angle !== 45 && layer.angle !== 0 ? layer.angle : 137.5)
+      : (layer.angle ?? 45);
+
+    const serviceObj = {
+      id: layer.id,
+      name: layer.name,
+      classification: layer.classification || 'contour',
+      stitchType: layer.stitchType,
+      color: layer.color,
+      density: layer.density ?? 0.4,
+      angle: effectiveAngle,
+      underlay: layer.underlay ?? false,
+      pullComp: layer.pullComp ?? 0.0,
+      points: layer.points,
+      segments: layer.subpaths || layer.segments
+    };
+
+    const segments = StitchEngine.compileToStitchPath(serviceObj as any, fabricKey);
+    segments.forEach(seg => {
+      seg.points.forEach((pt: any, sIdx: number) => {
+        const type = sIdx === 0 ? 'jump' : 'stitch';
+        addStitch(pt.x, pt.y, type, cIdx);
+      });
+    });
+  });
+
+  addStitch(cx, cy, 'end', colorIndex);
+  return list;
 }
 
 // RÈGLE N°3 : ScientificPipelineContext
@@ -589,7 +651,7 @@ export class DSTGenerationStep implements ScientificPipelineStep {
     ScientificEventBus.publish({ type: 'SIMULATION_STAGE', payload: { stage: 'compilation' } });
     await sleep(300);
 
-    const snapshotStitches = compileStitches(context.layers);
+    const snapshotStitches = compileStitches(context.layers, context.fabricKey);
     const buffer = CompilerEngine.compileToFormat(context.projectName, snapshotStitches, context.layers.length, context.format);
 
     ScientificEventBus.publish({
