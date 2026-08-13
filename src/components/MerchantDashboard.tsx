@@ -761,7 +761,7 @@ export const MerchantDashboard = ({
               </h4>
             </div>
           </div>
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 w-full lg:w-auto">
+          <div data-acom-id="dashboard.sync.actions_zone" className="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 w-full lg:w-auto">
             <button 
               data-acom-id="dashboard.sync.export_btn"
               onClick={async () => {
@@ -1089,8 +1089,8 @@ export const MerchantDashboard = ({
       <>
         {isSaasType(merchant.type, 'stock') && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-            <StatCard title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
-            <StatCard title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
+            <StatCard dataAcomId="dashboard.stats.total_stock_value" title="La Somme Totale du Stock" value={stats.totalStockValue} currency={merchant.currency} icon={Package} color="text-indigo-600" bgColor="bg-indigo-50" description="Valeur estimée à la vente" isLarge={true} />
+            <StatCard dataAcomId="dashboard.stats.total_stock_profit" title="Bénéfice Total du Stock" value={stats.totalStockProfit} currency={merchant.currency} icon={DollarSign} color="text-blue-600" bgColor="bg-blue-50" description="Bénéfice estimé sur le stock actuel" isLarge={true} />
           </div>
         )}
           
@@ -1116,14 +1116,14 @@ export const MerchantDashboard = ({
 
         {isSaasType(merchant.type, 'stock') ? (
           <>
-            <StatCard dataAcomId="dashboard.stats.pressing_revenue_card" title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
-            <StatCard title="Flux de Trésorerie" value={stats.cashFlowMonth} currency={merchant.currency} icon={Banknote} color={stats.cashFlowMonth >= 0 ? "text-indigo-600" : "text-rose-600"} bgColor={stats.cashFlowMonth >= 0 ? "bg-indigo-50" : "bg-rose-50"} description="Entrées - Sorties" />
+            <StatCard dataAcomId="dashboard.stats.revenue_card" title="Chiffre d'Affaires" value={stats.revenue.month} currency={merchant.currency} icon={TrendingUp} color="text-emerald-600" bgColor="bg-emerald-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
+            <StatCard dataAcomId="dashboard.stats.cashflow_card" title="Flux de Trésorerie" value={stats.cashFlowMonth} currency={merchant.currency} icon={Banknote} color={stats.cashFlowMonth >= 0 ? "text-indigo-600" : "text-rose-600"} bgColor={stats.cashFlowMonth >= 0 ? "bg-indigo-50" : "bg-rose-50"} description="Entrées - Sorties" />
             <StatCard dataAcomId="dashboard.stats.expenses_card" title="Dépenses Opérationnelles" value={stats.expenses.month} currency={merchant.currency} icon={TrendingDown} color="text-red-600" bgColor="bg-red-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
             <StatCard dataAcomId="dashboard.stats.net_profit_card" title="Bénéfice Net" value={stats.netProfitMonth} currency={merchant.currency} icon={DollarSign} color="text-purple-600" bgColor="bg-purple-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Ce mois-ci" : `Pour ${format(new Date(dashboardSelectedMonth + '-01'), 'MMMM yyyy', { locale: fr })}`} />
-            <StatCard title="Volume des Ventes" value={stats.totalSalesCountMonth} icon={CreditCard} color="text-blue-600" bgColor="bg-blue-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Transactions réalisées ce mois" : "Transactions sur la période"} />
-            <StatCard title="Panier Moyen" value={stats.averageOrderValueMonth} currency={merchant.currency} icon={ShoppingCart} color="text-teal-600" bgColor="bg-teal-50" description="Valeur moyenne par achat" />
-            <StatCard title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={BarChart3} color="text-cyan-600" bgColor="bg-cyan-50" description="Marge brute globale sur la période" />
-            <StatCard title="Alertes Stock" value={stats.lowStockCount} icon={AlertCircle} color={stats.lowStockCount > 0 ? "text-amber-600" : "text-emerald-600"} bgColor={stats.lowStockCount > 0 ? "bg-amber-50" : "bg-emerald-50"} description={`${stats.totalProducts} produits au total`} />
+            <StatCard dataAcomId="dashboard.stats.sales_volume_card" title="Volume des Ventes" value={stats.totalSalesCountMonth} icon={CreditCard} color="text-blue-600" bgColor="bg-blue-50" description={dashboardSelectedMonth === new Date().toISOString().slice(0, 7) ? "Transactions réalisées ce mois" : "Transactions sur la période"} />
+            <StatCard dataAcomId="dashboard.stats.average_basket_card" title="Panier Moyen" value={stats.averageOrderValueMonth} currency={merchant.currency} icon={ShoppingCart} color="text-teal-600" bgColor="bg-teal-50" description="Valeur moyenne par achat" />
+            <StatCard dataAcomId="dashboard.stats.sales_profit_card" title="Bénéfice de Vente" value={stats.grossProfitMonth} currency={merchant.currency} icon={BarChart3} color="text-cyan-600" bgColor="bg-cyan-50" description="Marge brute globale sur la période" />
+            <StatCard dataAcomId="dashboard.stats.stock_alerts_card" title="Alertes Stock" value={stats.lowStockCount} icon={AlertCircle} color={stats.lowStockCount > 0 ? "text-amber-600" : "text-emerald-600"} bgColor={stats.lowStockCount > 0 ? "bg-amber-50" : "bg-emerald-50"} description={`${stats.totalProducts} produits au total`} />
           </>
         ) : (
           <>
@@ -1186,6 +1186,7 @@ export const MerchantDashboard = ({
             {isSaasType(merchant.type, 'couture') && (
               <>
                 <StatCard 
+                  dataAcomId="dashboard.couture.orders_card"
                   title="Commandes Couture" 
                   value={tailleurDashboardStats?.totalOrdersAmount || 0} 
                   currency={merchant.currency} 
@@ -1195,6 +1196,7 @@ export const MerchantDashboard = ({
                   description={`${tailleurDashboardStats?.ordersCount || 0} fiches de mesures`} 
                 />
                 <StatCard 
+                  dataAcomId="dashboard.couture.advances_card"
                   title="Total Acomptes" 
                   value={tailleurDashboardStats?.totalAdvances || 0} 
                   currency={merchant.currency} 
@@ -1234,7 +1236,7 @@ export const MerchantDashboard = ({
       {/* Stock Health Summary (for Inventory based businesses) */}
       {(merchant.type === 'boutique' || merchant.type === 'chantier' || !merchant.type) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
+          <div data-acom-id="dashboard.stock.low_stock_table" className="bg-white p-8 rounded-[2.5rem] border border-black/5 shadow-sm">
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-xl font-bold text-ink">Alertes de Stock</h3>
@@ -1664,7 +1666,7 @@ export const MerchantDashboard = ({
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Recent Transactions */}
-          <div className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
+          <div data-acom-id="dashboard.recap.general_card" className="bg-white p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
             <div className="flex items-center justify-between mb-10">
               <div>
                 <h3 className="text-2xl font-black text-ink">Flux Financiers</h3>
@@ -1724,7 +1726,7 @@ export const MerchantDashboard = ({
           </div>
 
           {/* Dynamic Alerts / Quick View */}
-          <div className="bg-white p-6 sm:p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
+          <div data-acom-id={isSaasType(merchant.type, 'couture') ? "dashboard.couture.recent_orders_card" : "dashboard.stock.low_stock_table"} className="bg-white p-6 sm:p-10 rounded-[2.5rem] border border-black/5 shadow-sm">
             {merchant.type === 'scolaire' ? (
               <>
                 <div className="flex items-center justify-between mb-6">
@@ -1964,7 +1966,7 @@ export const MerchantDashboard = ({
                   )}
                 </div>
               </>
-            ) : merchant.type === 'tailleur' ? (
+            ) : isSaasType(merchant.type, 'couture') ? (
               <>
                 <div className="flex items-center justify-between mb-8">
                   <div>

@@ -452,7 +452,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 </div>
 
                 {/* Garment Selector Component */}
-                <div className="bg-white p-6 rounded-2xl text-slate-900 border border-slate-200">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800">
                   <GarmentSelector
                     merchantId={merchantId}
                     selectedGarmentId={selectedGarment.id}
@@ -515,7 +515,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 </div>
 
                 {/* Right Column: Dynamic Form Inputs + Realtime Validation (7 Cols) */}
-                <div className="lg:col-span-7 bg-white p-5 rounded-3xl border border-slate-200 shadow-xl overflow-y-auto h-full text-slate-900">
+                <div className="lg:col-span-7 bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-y-auto h-full text-slate-900 dark:text-slate-100">
                   <MeasurementForm
                     merchantId={merchantId}
                     clientId={clientInfo.id}

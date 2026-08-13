@@ -1,7 +1,8 @@
 // src/ai-demo/components/TutorialOverlay.tsx
 // Floating Screen Recording & Tutorial Control Hub
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TutorialEngine } from '../Tutorial/TutorialEngine';
 import { ScreenRecorder } from '../Tutorial/ScreenRecorder';
@@ -19,6 +20,86 @@ export const TutorialOverlay: React.FC = () => {
   const [isChooserOpen, setIsChooserOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [inspectMode, setInspectMode] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem('tutorielIA_position') || localStorage.getItem('tutorielIA');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return { x: parsed.x, y: parsed.y };
+        }
+        if (parsed && parsed.position && typeof parsed.position.x === 'number' && typeof parsed.position.y === 'number') {
+          return parsed.position;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    const defaultX = typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 360) : 100;
+    return { x: defaultX, y: 80 };
+  });
+
+  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number }>({
+    startX: 0,
+    startY: 0,
+    initialX: 0,
+    initialY: 0,
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('tutorielIA_position', JSON.stringify(position));
+      localStorage.setItem('tutorielIA', JSON.stringify({ position }));
+    } catch (e) {
+      // ignore
+    }
+  }, [position]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    e.preventDefault();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: position.x,
+      initialY: position.y,
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - dragRef.current.startX;
+      const dy = moveEvent.clientY - dragRef.current.startY;
+      
+      let newX = dragRef.current.initialX + dx;
+      let newY = dragRef.current.initialY + dy;
+
+      const panelWidth = 336;
+      const margin = 40;
+
+      const maxX = window.innerWidth - margin;
+      const maxY = window.innerHeight - margin;
+
+      newX = Math.max(-panelWidth + margin, Math.min(newX, maxX));
+      newY = Math.max(0, Math.min(newY, maxY));
+
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+  };
 
   useEffect(() => {
     const unsubTutorial = TutorialEngine.subscribe(() => {
@@ -98,7 +179,9 @@ export const TutorialOverlay: React.FC = () => {
     TutorialEngine.stopTutorial();
   };
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       {/* Target Spotlight Highlighter */}
       {tutorialActive && currentStep && (
@@ -107,14 +190,18 @@ export const TutorialOverlay: React.FC = () => {
         />
       )}
 
-      {/* Floating Toolbar in top-right corner */}
-      <div className="fixed top-20 right-6 z-[9990] flex flex-col gap-2 items-end">
+      {/* Floating Toolbar */}
+      <div 
+        id="acom-tutorial-manette-container"
+        className="fixed z-[99999999] flex flex-col gap-2 items-end w-84 select-none"
+        style={{ left: `${position.x}px`, top: `${position.y}px`, zIndex: 99999999 }}
+      >
         {/* Screen Recorder Badge */}
         {recordingStatus === 'recording' && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 animate-pulse"
+            className="bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 animate-pulse pointer-events-auto"
           >
             <span className="w-2 h-2 rounded-full bg-white" />
             ENREGISTREMENT ÉCRAN EN COURS
@@ -135,7 +222,7 @@ export const TutorialOverlay: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             href={recordedUrl}
             download={`Acom_Tutoriel_IA_${Date.now()}.webm`}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 transition"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 transition pointer-events-auto"
           >
             <Download className="w-3.5 h-3.5" />
             Télécharger la Vidéo Réelle
@@ -144,7 +231,7 @@ export const TutorialOverlay: React.FC = () => {
 
         {/* Permission Denied Notice */}
         {recordingStatus === 'permission_denied' && (
-          <div className="bg-amber-950/90 border border-amber-500/50 text-amber-200 text-xs p-2.5 rounded-xl max-w-xs shadow-xl backdrop-blur-md">
+          <div className="bg-amber-950/90 border border-amber-500/50 text-amber-200 text-xs p-2.5 rounded-xl max-w-xs shadow-xl backdrop-blur-md pointer-events-auto">
             ⚠️ Autorisation d'enregistrement d'écran refusée par le navigateur.
           </div>
         )}
@@ -155,9 +242,12 @@ export const TutorialOverlay: React.FC = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="bg-indigo-950/95 border-2 border-indigo-500/80 text-white p-4 rounded-2xl shadow-2xl backdrop-blur-xl w-84 space-y-3 font-sans"
+            className="bg-indigo-950/95 border-2 border-indigo-500/80 text-white p-4 rounded-2xl shadow-2xl backdrop-blur-xl w-84 space-y-3 font-sans pointer-events-auto"
           >
-            <div className="flex items-center justify-between border-b border-indigo-800/80 pb-2">
+            <div 
+              className="flex items-center justify-between border-b border-indigo-800/80 pb-2 cursor-grab active:cursor-grabbing select-none"
+              onPointerDown={handlePointerDown}
+            >
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-indigo-400 animate-spin" />
                 <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
@@ -192,9 +282,12 @@ export const TutorialOverlay: React.FC = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="bg-indigo-950/95 border border-indigo-500/40 text-white p-4 rounded-2xl shadow-2xl backdrop-blur-xl w-84 space-y-3"
+            className="bg-indigo-950/95 border border-indigo-500/40 text-white p-4 rounded-2xl shadow-2xl backdrop-blur-xl w-84 space-y-3 pointer-events-auto"
           >
-            <div className="flex items-center justify-between border-b border-indigo-800/60 pb-2">
+            <div 
+              className="flex items-center justify-between border-b border-indigo-800/60 pb-2 cursor-grab active:cursor-grabbing select-none"
+              onPointerDown={handlePointerDown}
+            >
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping" />
                 <span className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
@@ -272,38 +365,38 @@ export const TutorialOverlay: React.FC = () => {
                 <Volume2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5 animate-pulse" />
                 <span className="italic">"{currentStep.speechFr}"</span>
               </div>
-              <div className="flex items-center justify-between pt-2 border-t border-indigo-800/40 text-[11px] font-bold">
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-indigo-800/40 text-[11px] font-bold overflow-hidden box-border w-full max-w-full">
                 <button
                   onClick={() => TutorialEngine.pauseNarration()}
-                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  className="flex-1 min-w-[70px] px-2 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center justify-center gap-1 transition whitespace-nowrap overflow-hidden text-ellipsis"
                   title="Mettre la voix en pause"
                 >
-                  <Pause className="w-3 h-3 text-amber-300" />
-                  <span>Pause</span>
+                  <Pause className="w-3 h-3 text-amber-300 shrink-0" />
+                  <span className="truncate">Pause</span>
                 </button>
                 <button
                   onClick={() => TutorialEngine.resumeNarration()}
-                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  className="flex-1 min-w-[85px] px-2 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center justify-center gap-1 transition whitespace-nowrap overflow-hidden text-ellipsis"
                   title="Reprendre la lecture vocale"
                 >
-                  <Play className="w-3 h-3 text-emerald-300" />
-                  <span>Reprendre</span>
+                  <Play className="w-3 h-3 text-emerald-300 shrink-0" />
+                  <span className="truncate">Reprendre</span>
                 </button>
                 <button
                   onClick={() => TutorialEngine.stopNarration()}
-                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  className="flex-1 min-w-[65px] px-2 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center justify-center gap-1 transition whitespace-nowrap overflow-hidden text-ellipsis"
                   title="Arrêter la voix"
                 >
-                  <VolumeX className="w-3 h-3 text-rose-300" />
-                  <span>Stop</span>
+                  <VolumeX className="w-3 h-3 text-rose-300 shrink-0" />
+                  <span className="truncate">Stop</span>
                 </button>
                 <button
                   onClick={() => TutorialEngine.repeatCurrentStep()}
-                  className="px-2.5 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center gap-1 transition"
+                  className="flex-1 min-w-[80px] px-2 py-1 bg-indigo-800/80 hover:bg-indigo-700 text-indigo-100 rounded-lg flex items-center justify-center gap-1 transition whitespace-nowrap overflow-hidden text-ellipsis"
                   title="Répéter l'explication vocale"
                 >
-                  <RotateCcw className="w-3 h-3 text-cyan-300" />
-                  <span>Répéter</span>
+                  <RotateCcw className="w-3 h-3 text-cyan-300 shrink-0" />
+                  <span className="truncate">Répéter</span>
                 </button>
               </div>
             </div>
@@ -327,7 +420,9 @@ export const TutorialOverlay: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  if (scenario?.id === 'commerce_billing_quote_modal_tutorial') {
+                  if (scenario?.id === 'merchant_audit_log_tutorial') {
+                    TutorialEngine.startAuditLogTutorial(0);
+                  } else if (scenario?.id === 'commerce_billing_quote_modal_tutorial') {
                     TutorialEngine.startBillingQuoteModalTutorial(0);
                   } else if (scenario?.id === 'commerce_billing_print_modal_tutorial') {
                     TutorialEngine.startBillingPrintModalTutorial(0);
@@ -480,6 +575,7 @@ export const TutorialOverlay: React.FC = () => {
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 };

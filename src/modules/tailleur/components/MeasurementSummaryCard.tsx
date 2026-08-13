@@ -36,18 +36,18 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
   const hasAnyMeasurement = totalFilledCount > 0;
 
   return (
-    <div className={`bg-slate-50/70 rounded-2xl p-4 border border-slate-100 shadow-sm text-left transition-all ${className}`}>
+    <div className={`bg-slate-50/70 dark:bg-slate-900/60 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm text-left transition-all ${className}`}>
       {/* Header Context Banner with Garment Badge */}
-      <div className="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-200/60">
+      <div className="flex items-center justify-between gap-2 mb-3 pb-2.5 border-b border-slate-200/60 dark:border-slate-800">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 shrink-0">
+          <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-100 dark:border-emerald-800 shrink-0">
             <GarmentVectorIcon id={garment.id} name={garment.name} category={garment.category} className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <span className="text-[9px] font-mono font-bold text-emerald-700 uppercase tracking-widest block truncate">
+            <span className="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest block truncate">
               Profil : {garment.category}
             </span>
-            <p className="text-xs font-black text-slate-800 truncate flex items-center gap-1.5">
+            <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate flex items-center gap-1.5">
               <span>{garment.name}</span>
             </p>
           </div>
@@ -69,11 +69,11 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
       {/* Primary Measurements Grid (Mesures Principales) */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-            <Scissors className="w-3 h-3 text-emerald-600" />
+          <h4 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+            <Scissors className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
             <span>Mesures Principales ({primaryMeasurements.length})</span>
           </h4>
-          <span className="text-[9px] font-mono text-slate-400 font-semibold">
+          <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 font-semibold">
             {totalFilledCount} renseignée(s)
           </span>
         </div>
@@ -85,21 +85,21 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
                 key={m.key} 
                 className={`p-2 rounded-xl text-center border transition-all ${
                   m.isFilled 
-                    ? 'bg-white border-slate-200/80 shadow-xs' 
-                    : 'bg-slate-100/50 border-dashed border-slate-200 opacity-60'
+                    ? 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 shadow-xs' 
+                    : 'bg-slate-100/50 dark:bg-slate-900/40 border-dashed border-slate-200 dark:border-slate-800 opacity-60'
                 }`}
               >
-                <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider truncate" title={m.label}>
+                <span className="block text-[8px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-wider truncate" title={m.label}>
                   {m.shortLabel || m.label}
                 </span>
-                <span className={`font-mono text-xs font-black ${m.isFilled ? 'text-slate-900' : 'text-slate-400'}`}>
+                <span className={`font-mono text-xs font-black ${m.isFilled ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
                   {m.value !== '—' ? `${m.value} ${m.unit}` : '—'}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <div className="p-3 bg-white rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
+          <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-center text-xs text-slate-400">
             Aucune mesure principale disponible
           </div>
         )}
@@ -107,9 +107,9 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
 
       {/* Missing Mandatory Alert Warning if any */}
       {missingMandatoryMeasurements.length > 0 && (
-        <div className="mt-2.5 p-2 bg-amber-50/80 border border-amber-200/60 rounded-xl text-[10px] text-amber-800 flex items-center justify-between gap-2">
+        <div className="mt-2.5 p-2 bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/50 rounded-xl text-[10px] text-amber-800 dark:text-amber-300 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <span className="truncate">
               <strong>{missingMandatoryMeasurements.length} mesure(s) requise(s)</strong> manquante(s) pour {garment.name}
             </span>
@@ -124,19 +124,19 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-3 pt-3 border-t border-slate-200/60 space-y-2 overflow-hidden"
+            className="mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800 space-y-2 overflow-hidden"
           >
-            <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-              <Sliders className="w-3 h-3 text-teal-600" />
+            <h5 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Sliders className="w-3 h-3 text-teal-600 dark:text-teal-400" />
               <span>Mesures Complémentaires ({secondaryMeasurements.length})</span>
             </h5>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {secondaryMeasurements.map((m) => (
-                <div key={m.key} className="bg-white p-2 rounded-xl text-center border border-slate-200/80 shadow-xs">
+                <div key={m.key} className="bg-white dark:bg-slate-800 p-2 rounded-xl text-center border border-slate-200/80 dark:border-slate-700 shadow-xs">
                   <span className="block text-[8px] font-black text-slate-400 uppercase tracking-wider truncate" title={m.label}>
                     {m.shortLabel || m.label}
                   </span>
-                  <span className="font-mono text-xs font-black text-slate-900">
+                  <span className="font-mono text-xs font-black text-slate-900 dark:text-white">
                     {m.value} {m.unit}
                   </span>
                 </div>
@@ -147,12 +147,12 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
       </AnimatePresence>
 
       {/* Toggle Button for Expand or Modal */}
-      <div className="mt-3 pt-2 border-t border-slate-200/40 flex items-center justify-between gap-2">
+      <div className="mt-3 pt-2 border-t border-slate-200/40 dark:border-slate-800 flex items-center justify-between gap-2">
         {secondaryMeasurements.length > 0 ? (
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-[11px] font-bold text-slate-600 hover:text-slate-900 transition flex items-center gap-1 cursor-pointer"
+            className="text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition flex items-center gap-1 cursor-pointer"
           >
             {isExpanded ? (
               <>
@@ -175,7 +175,7 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
         <button
           type="button"
           onClick={() => setShowDetailModal(true)}
-          className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 transition flex items-center gap-1 cursor-pointer ml-auto"
+          className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition flex items-center gap-1 cursor-pointer ml-auto"
         >
           <Eye className="w-3.5 h-3.5" />
           <span>Voir toutes les mensurations</span>
@@ -189,7 +189,7 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col border border-slate-200 text-slate-900"
+            className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
           >
             {/* Modal Header */}
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
@@ -219,16 +219,16 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
             <div className="p-6 overflow-y-auto space-y-6">
               {/* Primary Section */}
               <div>
-                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800 mb-3 flex items-center gap-2 pb-1 border-b border-emerald-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-400 mb-3 flex items-center gap-2 pb-1 border-b border-emerald-100 dark:border-emerald-900/50">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   Mesures Principales Requis pour {garment.name}
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {primaryMeasurements.map((m) => (
-                    <div key={m.key} className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+                    <div key={m.key} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700">
                       <span className="block text-[10px] font-mono text-slate-400 uppercase font-bold">{m.code}</span>
-                      <span className="block text-xs font-bold text-slate-700 truncate">{m.label}</span>
-                      <span className="text-base font-mono font-black text-slate-900 mt-1 block">
+                      <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{m.label}</span>
+                      <span className="text-base font-mono font-black text-slate-900 dark:text-white mt-1 block">
                         {m.value} {m.value !== '—' ? m.unit : ''}
                       </span>
                     </div>
@@ -239,16 +239,16 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
               {/* Secondary Section */}
               {secondaryMeasurements.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-teal-800 mb-3 flex items-center gap-2 pb-1 border-b border-teal-100">
-                    <Sliders className="w-4 h-4 text-teal-600" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-teal-800 dark:text-teal-400 mb-3 flex items-center gap-2 pb-1 border-b border-teal-100 dark:border-teal-900/50">
+                    <Sliders className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                     Mesures Complémentaires Enregistrées ({secondaryMeasurements.length})
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {secondaryMeasurements.map((m) => (
-                      <div key={m.key} className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+                      <div key={m.key} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700">
                         <span className="block text-[10px] font-mono text-slate-400 uppercase font-bold">{m.code}</span>
-                        <span className="block text-xs font-bold text-slate-700 truncate">{m.label}</span>
-                        <span className="text-base font-mono font-black text-slate-900 mt-1 block">
+                        <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{m.label}</span>
+                        <span className="text-base font-mono font-black text-slate-900 dark:text-white mt-1 block">
                           {m.value} {m.unit}
                         </span>
                       </div>
@@ -260,15 +260,15 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
               {/* Missing Mandatory Section if any */}
               {missingMandatoryMeasurements.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-800 mb-3 flex items-center gap-2 pb-1 border-b border-amber-100">
-                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-400 mb-3 flex items-center gap-2 pb-1 border-b border-amber-100 dark:border-amber-900/50">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                     Mesures Manquantes pour {garment.name} ({missingMandatoryMeasurements.length})
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {missingMandatoryMeasurements.map((m) => (
-                      <div key={m.key} className="bg-amber-50/50 p-3 rounded-2xl border border-dashed border-amber-200 opacity-70">
-                        <span className="block text-[10px] font-mono text-amber-600 uppercase font-bold">{m.code}</span>
-                        <span className="block text-xs font-bold text-amber-900 truncate">{m.label}</span>
+                      <div key={m.key} className="bg-amber-50/50 dark:bg-amber-950/30 p-3 rounded-2xl border border-dashed border-amber-200 dark:border-amber-800 opacity-70">
+                        <span className="block text-[10px] font-mono text-amber-600 dark:text-amber-400 uppercase font-bold">{m.code}</span>
+                        <span className="block text-xs font-bold text-amber-900 dark:text-amber-200 truncate">{m.label}</span>
                         <span className="text-sm font-mono font-bold text-amber-500 mt-1 block">Non renseigné</span>
                       </div>
                     ))}
@@ -278,9 +278,9 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center shrink-0">
-              <span className="text-xs text-slate-500 font-medium">
-                Total des données enregistrées : <strong>{totalFilledCount} mesure(s)</strong>
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/90 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Total des données enregistrées : <strong className="text-slate-900 dark:text-white">{totalFilledCount} mesure(s)</strong>
               </span>
               {onOpenSmartAssistant && (
                 <button

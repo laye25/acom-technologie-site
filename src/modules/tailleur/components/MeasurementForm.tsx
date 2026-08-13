@@ -170,10 +170,10 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
             <button
               type="button"
               onClick={onChangeGarmentRequested}
-              className="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition hover:scale-105 cursor-pointer shrink-0"
+              className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition hover:scale-105 cursor-pointer shrink-0"
               title="Revenir à l'Étape 2 pour changer de modèle de vêtement"
             >
-              <RotateCcw className="w-4 h-4 text-emerald-600" />
+              <RotateCcw className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>🔄 Changer de vêtement</span>
             </button>
           )}
@@ -183,26 +183,26 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
           {/* Description & Style */}
           <div className="space-y-1">
-            <span className="text-[10px] font-mono font-bold text-emerald-800 uppercase tracking-widest block">
+            <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-widest block">
               Description & Modèle
             </span>
-            <p className="text-slate-700 font-medium leading-relaxed text-xs">
+            <p className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed text-xs">
               {selectedGarment.description || "Confection sur-mesure d'atelier haut de gamme."}
             </p>
           </div>
 
           {/* Profil & Recommandations de Couture */}
-          <div className="bg-white/90 p-3 rounded-xl border border-emerald-200/70 space-y-1.5 shadow-2xs">
+          <div className="bg-white/90 dark:bg-slate-800/90 p-3 rounded-xl border border-emerald-200/70 dark:border-emerald-800/60 space-y-1.5 shadow-2xs">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-mono font-bold text-emerald-800 uppercase tracking-widest flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 Profil de Mesures Chargé
               </span>
-              <span className="text-[10px] font-mono font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+              <span className="text-[10px] font-mono font-black text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-md">
                 {mandatoryDefinitions.length} requises / {optionalDefinitions.length} optionnelles
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700 font-medium pt-1 border-t border-slate-100">
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700 dark:text-slate-300 font-medium pt-1 border-t border-slate-100 dark:border-slate-700">
               <div>
                 <span className="text-slate-400 block text-[9px] uppercase font-bold">Marge de couture</span>
                 <span className="font-bold text-slate-900">1.5 - 2.0 cm</span>
@@ -297,12 +297,12 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                     onClick={() => handleFieldFocus(def.key)}
                     className={`p-3 rounded-2xl border transition-all ${
                       isActive
-                        ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/30 shadow-sm'
-                        : 'bg-white border-slate-200 hover:border-emerald-300'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-500/30 shadow-sm'
+                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-emerald-300'
                     }`}
                   >
                     <div className="flex justify-between items-center mb-1.5">
-                      <label className="text-xs font-extrabold text-slate-900 flex items-center gap-1">
+                      <label className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                         {def.label}
                       </label>
@@ -317,7 +317,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                         value={val}
                         onFocus={() => handleFieldFocus(def.key)}
                         onChange={(e) => handleChangeValue(def.key, e.target.value)}
-                        className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-emerald-500"
+                        className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-emerald-500"
                       />
                       <span className="absolute right-3 text-xs font-mono font-bold text-slate-400 pointer-events-none">
                         cm
@@ -331,9 +331,9 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
 
           {/* Section 2: Mesures Optionnelles pour ce vêtement */}
           {optionalDefinitions.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <h4 className="text-xs font-black uppercase text-sky-800 flex items-center gap-1.5 tracking-wider">
-                <Sparkles className="w-4 h-4 text-sky-600" />
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <h4 className="text-xs font-black uppercase text-sky-800 dark:text-sky-300 flex items-center gap-1.5 tracking-wider">
+                <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 Mesures Complémentaires / Optionnelles ({optionalDefinitions.length})
               </h4>
 
@@ -348,12 +348,12 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                       onClick={() => handleFieldFocus(def.key)}
                       className={`p-3 rounded-2xl border transition-all ${
                         isActive
-                          ? 'bg-sky-50 border-sky-500 ring-2 ring-sky-500/30 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-sky-300'
+                          ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-500 ring-2 ring-sky-500/30 shadow-sm'
+                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-sky-300'
                       }`}
                     >
                       <div className="flex justify-between items-center mb-1.5">
-                        <label className="text-xs font-bold text-slate-800">{def.label}</label>
+                        <label className="text-xs font-bold text-slate-800 dark:text-slate-200">{def.label}</label>
                         <span className="font-mono text-[10px] text-slate-400 font-bold">{def.code}</span>
                       </div>
 
@@ -365,7 +365,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                           value={val}
                           onFocus={() => handleFieldFocus(def.key)}
                           onChange={(e) => handleChangeValue(def.key, e.target.value)}
-                          className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-sky-500"
+                          className="w-full pl-3 pr-9 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold text-slate-900 dark:text-white outline-none focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-sky-500"
                         />
                         <span className="absolute right-3 text-xs font-mono font-bold text-slate-400 pointer-events-none">
                           cm

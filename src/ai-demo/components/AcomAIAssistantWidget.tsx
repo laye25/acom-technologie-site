@@ -10,7 +10,7 @@ import { LanguageEngine } from '../Assistant/LanguageEngine';
 import { ConversationContext, ChatMessage } from '../Assistant/ConversationContext';
 import { VoiceSessionManager, VoiceSessionInfo } from '../Assistant/VoiceSessionManager';
 import { VoiceOrbIndicator } from './VoiceOrbIndicator';
-import { TutorialEngine } from '../Tutorial/TutorialEngine';
+import { TutorialEngine, COMMERCE_OVERVIEW_TUTORIAL } from '../Tutorial/TutorialEngine';
 import { Mic, MicOff, Send, Sparkles, Volume2, Globe, Shield, RefreshCw, X, MessageSquare, Radio } from 'lucide-react';
 
 interface WidgetProps {
@@ -658,6 +658,48 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
         }
       }
 
+      // Contextual Tutorial Trigger: Page Aperçu / Dashboard
+      if (
+        lowerText.includes('présentation aperçu') || 
+        lowerText.includes('presentation apercu') || 
+        lowerText.includes('présentation de la page aperçu') || 
+        lowerText.includes('presentation de la page apercu') || 
+        lowerText.includes('présentation complète de la page aperçu') || 
+        lowerText.includes('tutoriel aperçu') || 
+        lowerText.includes('tutoriel apercu') || 
+        lowerText.includes('présentation atelier de couture') || 
+        lowerText.includes('presentation atelier de couture') || 
+        lowerText.includes('présentation atelier couture') || 
+        lowerText.includes('presentation atelier couture') || 
+        lowerText.includes('présentation ateliers de couture') || 
+        lowerText.includes('presentation ateliers de couture') || 
+        lowerText.includes('présentation couture') || 
+        lowerText.includes('presentation couture') || 
+        lowerText.includes('tutoriel couture') || 
+        lowerText.includes('tutoriel atelier') || 
+        lowerText.includes('présentation management commerce') || 
+        lowerText.includes('presentation management commerce') || 
+        lowerText.includes('présente-moi toute la page aperçu') || 
+        lowerText.includes('presente-moi toute la page apercu') ||
+        lowerText.includes('découverte aperçu') ||
+        lowerText.includes('decouverte apercu') ||
+        lowerText.includes('visite guidée') ||
+        lowerText.includes('visite guidee') ||
+        (lowerText.includes('présentation') && lowerText.includes('aperçu')) ||
+        (lowerText.includes('tutoriel') && lowerText.includes('aperçu'))
+      ) {
+        const saas = context.activeSaaS || 'boutique';
+        const scenario = TutorialEngine.getOverviewScenarioForSaas(saas);
+        TutorialEngine.startTutorial(scenario);
+        const count = scenario.steps.length;
+        const msgFr = `Démarrage de la présentation complète et interactive de la page Aperçu (${count} étapes) : ${scenario.title}.`;
+        const msgWo = `Tambali présentation complète bu xët u Aperçu bi (${count} étapes).`;
+        ConversationContext.addAssistantMessage(msgFr, msgWo, 'tutorial.overview.start', 'success');
+        LanguageEngine.speak(language === 'wo' ? msgWo : msgFr, language);
+        setIsProcessing(false);
+        return;
+      }
+
       if (lowerText.includes('stock') || lowerText.includes('inventaire') || context.currentPage === 'inventory') {
         if (lowerText.includes('choisir une fonction') || lowerText.includes('choisir fonction') || lowerText.includes('liste des fonctions')) {
           TutorialEngine.startStockTutorial(0);
@@ -712,6 +754,29 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
           const msgFr = "Orientation vers la fonction : Journal des Mouvements (Étape 34).";
           const msgWo = "Dem nañu ci Journal des Mouvements.";
           ConversationContext.addAssistantMessage(msgFr, msgWo, 'tutorial.jumpToFunction', 'success');
+          setIsProcessing(false);
+          return;
+        }
+      }
+
+      if (lowerText.includes('audit') || context.currentPage === 'audit' || context.currentPage === 'journal_audit' || context.currentPage === 'merchant_audit') {
+        if (lowerText.includes('choisir une fonction') || lowerText.includes('choisir fonction') || lowerText.includes('liste des fonctions') || lowerText.includes('choisir un élément')) {
+          TutorialEngine.startAuditLogTutorial(0);
+          TutorialEngine.openFunctionChooser();
+          const msgFr = "Menu des fonctions du Journal d'Audit ouvert. Choisissez l'élément à découvrir.";
+          const msgWo = "Menu u Journal d'Audit ubbeu na. Tannal li nga bëgg xam.";
+          ConversationContext.addAssistantMessage(msgFr, msgWo, 'tutorial.chooseFunction', 'success');
+          LanguageEngine.speak(language === 'wo' ? msgWo : msgFr, language);
+          setIsProcessing(false);
+          return;
+        }
+
+        if (lowerText.includes('présentation') || lowerText.includes('presentation') || lowerText.includes('explique') || lowerText.includes('présente') || lowerText.includes('tutoriel') || lowerText.includes('audit')) {
+          TutorialEngine.startAuditLogTutorial(0);
+          const msgFr = "Démarrage du tutoriel interactif du Journal d'Audit.";
+          const msgWo = "Tambali présentation bu Journal d'Audit.";
+          ConversationContext.addAssistantMessage(msgFr, msgWo, 'tutorial.startAudit', 'success');
+          LanguageEngine.speak(language === 'wo' ? msgWo : msgFr, language);
           setIsProcessing(false);
           return;
         }
@@ -889,6 +954,7 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
   const currentContext = ContextEngine.getContext();
   const activePage = currentContext.currentPage || '';
   const isStockPage = activePage === 'inventory' || currentContext.activeSaaS === 'stock';
+  const isAuditPage = activePage === 'audit' || activePage === 'journal_audit' || activePage === 'merchant_audit' || activePage === 'audit_log';
   const isBillingPage = activePage === 'billing' || activePage === 'facturation';
   const currentScenario = TutorialEngine.getCurrentScenario();
   const isReorderModal = currentScenario?.id === 'commerce_reorder_po_tutorial' || TutorialEngine.getActiveModal() === 'stock.reorder_modal' || TutorialEngine.getActiveModal() === 'stock_reorder_modal';
@@ -948,6 +1014,13 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
     { label: '📝 Notes', promptFr: 'Explique-moi les notes supplémentaires', promptWo: 'Wane ma Notes' },
     { label: '👤 Opérateur', promptFr: 'Explique-moi le nom de l\'opérateur', promptWo: 'Wane ma Opérateur' },
     { label: '✅ Validation', promptFr: 'Explique-moi la validation de l\'ajustement', promptWo: 'Wane ma Validation' }
+  ] : isAuditPage ? [
+    { label: '🎓 Présentation complète', promptFr: 'Présentation complète du Journal d\'Audit', promptWo: 'Présentation complète u Journal d\'Audit' },
+    { label: '📋 Choisir une fonction', promptFr: 'Choisir une fonction du Journal d\'Audit', promptWo: 'Tannal benn fonction u Journal d\'Audit' },
+    { label: '⏱️ Temps Réel', promptFr: 'Explique-moi l\'indicateur Temps Réel', promptWo: 'Wane ma Temps Réel' },
+    { label: '📊 Tableau d\'Audit', promptFr: 'Explique-moi le Tableau d\'Audit', promptWo: 'Wane ma Tableau d\'Audit' },
+    { label: '📅 Horodatage', promptFr: 'Explique-moi l\'Horodatage', promptWo: 'Wane ma Horodatage' },
+    { label: '📦 Type de Flux & Delta', promptFr: 'Explique-moi le Type de Flux et Delta Stock', promptWo: 'Wane ma Type de Flux ak Delta' }
   ] : isStockPage ? [
     { label: '🎓 Présentation complète', promptFr: 'Présentation complète du Stock', promptWo: 'Présentation complète u Stock bi' },
     { label: '📋 Choisir une fonction', promptFr: 'Choisir une fonction du Stock', promptWo: 'Tannal benn fonction u Stock' },
@@ -956,9 +1029,10 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
     { label: '📄 Fiche Comptage', promptFr: 'Explique-moi la fiche de comptage', promptWo: 'Wane ma Fiche de Comptage' },
     { label: '📜 Journal Mouvements', promptFr: 'Explique-moi le journal des mouvements', promptWo: 'Wane ma Journal Mouvements' }
   ] : [
+    { label: '🎓 Présentation Aperçu (50 étapes)', promptFr: 'Présentation complète de la page Aperçu', promptWo: 'Présentation complète u Aperçu bi' },
+    { label: '📊 Flux Financiers', promptFr: 'Explique-moi la section Flux Financiers', promptWo: 'Wane ma wàllu Flux Financiers' },
+    { label: '⚠️ Articles en Rupture', promptFr: 'Explique-moi la section Articles en Rupture', promptWo: 'Wane ma wàllu Articles en Rupture' },
     { label: '📥 Nouveau Dépôt Client', promptFr: 'Ajoute un dépôt pour le client Ibou avec un acompte de 2 000 FCFA', promptWo: 'Bindal dépôt bu client Ibou acompte 2 000 FCFA' },
-    { label: '🔍 Rechercher Client', promptFr: 'Recherche le client Ibou', promptWo: 'Wut client Ibou' },
-    { label: '💰 Enregistrer Versement', promptFr: 'Enregistre un versement de 12 000 FCFA', promptWo: 'Bindal fey bu 12 000 FCFA' },
     { label: '📊 Clôturer la Caisse', promptFr: 'Clôture la caisse avec 15 000 FCFA comptés', promptWo: 'Tëjal caisse bi ak 15 000 FCFA' }
   ];
 
@@ -1184,6 +1258,7 @@ export const AcomAIAssistantWidget: React.FC<WidgetProps> = ({ embedded = false,
           </motion.div>
         ) : (
           <motion.button
+            data-acom-id="dashboard.assistant_floating_btn"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}

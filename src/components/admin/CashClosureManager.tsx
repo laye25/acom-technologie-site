@@ -373,12 +373,13 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
 
   return (
     <motion.div 
+      data-acom-id="pressing.cash_closure.container"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       className="space-y-6"
     >
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div data-acom-id="pressing.cash_closure.header" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-black text-slate-900">🔒 Clôture de Caisse & Rapport Journalier</h2>
           <p className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mt-1">Supervision journalière & rapprochement financier</p>
@@ -387,13 +388,14 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-6 space-y-6">
-          <form onSubmit={handleCreateClosure} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
+          <form onSubmit={handleCreateClosure} data-acom-id="pressing.cash_closure.form_card" className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-6">
             <div className="border-b border-gray-100 pb-4 flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-black text-slate-900">🔑 Clôturer la caisse d'aujourd'hui</h3>
                 <p className="text-gray-400 text-xs mt-0.5">Vérifiez les calculs puis saisissez l'encours en espèces.</p>
               </div>
               <input
+                data-acom-id="pressing.cash_closure.date"
                 type="date"
                 value={closureDate}
                 onChange={e => setClosureDate(e.target.value)}
@@ -403,19 +405,19 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-center">
+                <div data-acom-id="pressing.cash_closure.press_value" className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-center">
                   <span className="block text-[8px] font-mono text-emerald-500 uppercase tracking-wider">Recettes Ventes (+)</span>
                   <strong className="block text-base font-black text-emerald-900 mt-1">{dailySalesRevenue.toLocaleString()} F</strong>
                   <span className="text-[8px] text-emerald-600 font-mono mt-0.5 block">{dailySales.length} ventes du jour</span>
                 </div>
-                <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100 text-center">
+                <div data-acom-id="pressing.cash_closure.expenses" className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100 text-center">
                   <span className="block text-[8px] font-mono text-rose-500 uppercase tracking-wider">Dépenses du Jour (-)</span>
                   <strong className="block text-base font-black text-rose-900 mt-1">{dailyExpensesTotal.toLocaleString()} F</strong>
                   <span className="text-[8px] text-rose-600 font-mono mt-0.5 block">{dailyExpenses.length} justificatifs saisis</span>
                 </div>
               </div>
 
-              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+              <div data-acom-id="pressing.cash_closure.expected_revenue" className="p-5 bg-slate-50 rounded-2xl border border-slate-100 text-center">
                 <span className="text-[9px] font-mono font-black text-slate-500 uppercase tracking-widest block">📊 Chiffre d'Affaires Théorique Attendu</span>
                 <strong className="text-2xl font-black text-slate-900 mt-1 block">
                   {totalTheoreticalRevenue.toLocaleString()} <span className="text-sm font-medium">{merchant.currency || 'FCFA'}</span>
@@ -427,6 +429,7 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1.5">Nom du Caissier / Opérateur *</label>
                   <input
+                    data-acom-id="pressing.cash_closure.cashier"
                     type="text"
                     required
                     placeholder="Ex: Kouamé Marc"
@@ -438,6 +441,7 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
                 <div>
                   <label className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1.5">Espèces Comptées ({merchant.currency || 'F'})</label>
                   <input
+                    data-acom-id="pressing.cash_closure.real_cash"
                     type="text"
                     required
                     value={actualCash}
@@ -479,25 +483,38 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
                 </div>
               )}
 
-              {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
-                <div className="p-4 bg-orange-50 rounded-2xl border border-orange-200">
-                  <h4 className="text-sm font-bold text-orange-800 mb-2">🚨 Alertes de Stock</h4>
-                  {outOfStockItems.length > 0 && (
-                    <div className="text-xs text-orange-900 mb-1">
-                      <span className="font-bold text-red-600">❌ Épuisés :</span> {outOfStockItems.map(p => p.name).join(', ')}
-                    </div>
-                  )}
-                  {lowStockItems.length > 0 && (
-                    <div className="text-xs text-orange-900">
-                      <span className="font-bold text-orange-600">⚠️ Point de rupture :</span> {lowStockItems.map(p => `${p.name} (${p.stockQuantity || 0})`).join(', ')}
-                    </div>
-                  )}
-                </div>
-              )}
+              <div data-acom-id="pressing.cash_closure.stock_alerts" className={`p-4 rounded-2xl border transition-all ${
+                (lowStockItems.length > 0 || outOfStockItems.length > 0) 
+                  ? 'bg-orange-50 border-orange-200' 
+                  : 'bg-emerald-50/60 border-emerald-100'
+              }`}>
+                <h4 className={`text-sm font-bold mb-1 flex items-center justify-between ${
+                  (lowStockItems.length > 0 || outOfStockItems.length > 0) ? 'text-orange-800' : 'text-emerald-800'
+                }`}>
+                  <span>🚨 Alertes de Stock</span>
+                  <span className="text-[10px] font-mono font-normal">
+                    {(lowStockItems.length > 0 || outOfStockItems.length > 0) ? `${outOfStockItems.length + lowStockItems.length} alerte(s)` : 'Stock OK'}
+                  </span>
+                </h4>
+                {outOfStockItems.length > 0 && (
+                  <div className="text-xs text-orange-900 mb-1">
+                    <span className="font-bold text-red-600">❌ Épuisés :</span> {outOfStockItems.map(p => p.name).join(', ')}
+                  </div>
+                )}
+                {lowStockItems.length > 0 && (
+                  <div className="text-xs text-orange-900">
+                    <span className="font-bold text-orange-600">⚠️ Point de rupture :</span> {lowStockItems.map(p => `${p.name} (${p.stockQuantity || 0})`).join(', ')}
+                  </div>
+                )}
+                {lowStockItems.length === 0 && outOfStockItems.length === 0 && (
+                  <p className="text-xs text-emerald-700 font-medium">Aucune rupture ni alerte critique de stock détectée pour cette journée.</p>
+                )}
+              </div>
 
               <div>
                 <label className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-1.5">Observations / Justifications</label>
                 <textarea
+                  data-acom-id="pressing.cash_closure.observations"
                   rows={2}
                   placeholder="Ex: Écart de caisse justifié par la monnaie..."
                   value={closureNotes}
@@ -508,6 +525,7 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
 
               <div className="pt-4">
                 <button
+                  data-acom-id="pressing.cash_closure.validate"
                   type="submit"
                   className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition shadow-lg shadow-slate-900/20"
                 >
@@ -519,12 +537,12 @@ export const CashClosureManager: React.FC<{ merchant: Merchant }> = ({ merchant 
           </form>
         </div>
 
-        <div className="lg:col-span-6 space-y-4">
+        <div data-acom-id="pressing.cash_closure.history" className="lg:col-span-6 space-y-4">
           <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-4 block border-b border-gray-100 pb-2">Historique des Clôtures</h3>
           
           <div className="space-y-3">
             {closures.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+              <div data-acom-id="pressing.cash_closure.history_empty" className="p-8 text-center text-gray-400 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
                 <Lock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-xs font-medium">Aucune clôture enregistrée pour cette caisse.</p>
               </div>

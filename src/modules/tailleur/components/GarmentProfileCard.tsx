@@ -58,7 +58,7 @@ export const GarmentProfileCard: React.FC<GarmentProfileCardProps> = ({
   };
 
   return (
-    <div className={`bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-left ${className}`}>
+    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm overflow-hidden text-left ${className}`}>
       {/* Header Banner: Modèle & Vêtement à Confectionner */}
       <div className="p-3.5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2">

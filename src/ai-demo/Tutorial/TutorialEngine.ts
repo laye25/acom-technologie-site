@@ -734,145 +734,166 @@ export const PRESSING_GOLDEN_TUTORIAL: TutorialScenario = {
 export const PRESSING_CLOSURE_TUTORIAL: TutorialScenario = {
   id: 'pressing_tutorial_closure',
   title: 'Clôture de Caisse & Rapport Journalier',
-  description: 'Supervision journalière, rapprochement financier et clôture définitive de caisse avec notification automatique.',
+  description: 'Supervision journalière, rapprochement financier, comptage d\'espèces, justification et validation définitive de caisse.',
   saasModule: 'pressing',
-  estimatedDurationSec: 180,
+  estimatedDurationSec: 210,
   steps: [
     {
       stepNumber: 1,
-      title: '1. Clôture de Caisse & Rapport Journalier',
-      description: 'Supervision journalière & rapprochement financier. Nous allons effectuer la clôture de caisse de la journée. Vérifiez les informations affichées avant de valider définitivement la caisse.',
-      targetAcomId: 'pressing.cash_closure.header',
+      title: '1. Onglet « Clôture de Caisse »',
+      description: 'Vous êtes dans le module Clôture de Caisse. Cette section permet de vérifier les mouvements de la journée et de procéder à la clôture de la caisse.',
+      targetAcomId: 'nav-pressing_closure',
       actionToPerform: 'observe',
-      speechFr: 'Nous allons effectuer la clôture de caisse de la journée. Vérifiez les informations affichées avant de valider définitivement la caisse.',
-      speechWolof: 'Dalal ak jamm ci clôture de caisse bi. Saytul xibaar yi laata ngay verrouillé caisse bi.',
+      speechFr: 'Vous êtes dans le module Clôture de Caisse. Cette section permet de vérifier les mouvements de la journée et de procéder à la clôture de la caisse.',
+      speechWolof: 'Nekk nga ci module Clôture de Caisse. Wàll wii da lay may nga seet yëngu-yëngu bis bi ak clôturer caisse bi.',
       stepCategory: 'info'
     },
     {
       stepNumber: 2,
-      title: '2. Date de Clôture',
-      description: 'Vérifiez la date de la clôture. Elle doit correspondre à la journée que vous souhaitez clôturer.',
-      targetAcomId: 'pressing.cash_closure.date',
+      title: '2. Titre de la Page',
+      description: 'Cette page permet d\'effectuer la clôture quotidienne de la caisse et de consulter l\'historique des clôtures précédentes.',
+      targetAcomId: 'pressing.cash_closure.header',
       actionToPerform: 'observe',
-      speechFr: 'Vérifiez la date de la clôture. Elle doit correspondre à la journée que vous souhaitez clôturer.',
-      speechWolof: 'Séétal date bi mu méngook biss bi nga bëgg clôturer.',
-      stepCategory: 'control'
+      speechFr: 'Cette page permet d\'effectuer la clôture quotidienne de la caisse et de consulter l\'historique des clôtures précédentes.',
+      speechWolof: 'Xët wii dafa lay may nga def clôture quotidienne bu caisse bi ak seet historique bu clôtures yu passe.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 3,
-      title: '3. Recettes Pressing (+)',
-      description: 'Cette zone présente les recettes générées par l\'activité pressing pour la journée. Vérifiez le montant affiché.',
-      targetAcomId: 'pressing.cash_closure.press_value',
+      title: '3. Clôturer la caisse d\'aujourd\'hui',
+      description: 'Cette zone est dédiée à la clôture de la caisse du jour. Avant de valider, vérifiez les montants et les informations affichées.',
+      targetAcomId: 'pressing.cash_closure.form_card',
       actionToPerform: 'observe',
-      speechFr: 'Cette zone présente les recettes générées par l\'activité pressing pour la journée. Vérifiez le montant affiché.',
-      speechWolof: 'Fi mooy xaalis bi activité pressing bi indi ci biss bi. Xoolal montant bi.',
-      stepCategory: 'control'
+      speechFr: 'Cette zone est dédiée à la clôture de la caisse du jour. Avant de valider, vérifiez les montants et les informations affichées.',
+      speechWolof: 'Zone wii dafa jagleel clôture caisse bu tey bi. Bala nga koy valider, seetal montant yi ak xibaar yi feeñ.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 4,
-      title: '4. Ventes Produits (+)',
-      description: 'Cette zone présente les ventes de produits réalisées pendant la journée. Vérifiez le montant et le nombre de ventes affichés.',
-      targetAcomId: 'pressing.cash_closure.product_sales',
+      title: '4. Date de Clôture',
+      description: 'La date permet d\'identifier la journée de caisse concernée par cette clôture. Vérifiez qu\'elle correspond bien à la journée que vous souhaitez clôturer.',
+      targetAcomId: 'pressing.cash_closure.date',
       actionToPerform: 'observe',
-      speechFr: 'Cette zone présente les ventes de produits réalisées pendant la journée. Vérifiez le montant et le nombre de ventes affichés.',
-      speechWolof: 'Fi mooy jaay détergent ak produit yi ci boutique bi. Saytul montant bi.',
+      speechFr: 'La date permet d\'identifier la journée de caisse concernée par cette clôture. Vérifiez qu\'elle correspond bien à la journée que vous souhaitez clôturer.',
+      speechWolof: 'Date bi da lay may nga xam bisu caisse bi ñuy clôturer. Seetal baxam méngook bis bi nga bëgg a clôturer.',
       stepCategory: 'control'
     },
     {
       stepNumber: 5,
-      title: '5. Dépenses du Jour (-)',
-      description: 'Vérifiez les dépenses enregistrées pour la journée ainsi que les justificatifs associés.',
-      targetAcomId: 'pressing.cash_closure.expenses',
+      title: '5. Recettes Versées',
+      description: 'Cette zone présente le montant des recettes versées pour la journée. Utilisez cette information pour contrôler les recettes avant la clôture.',
+      targetAcomId: 'pressing.cash_closure.press_value',
       actionToPerform: 'observe',
-      speechFr: 'Vérifiez les dépenses enregistrées pour la journée ainsi que les justificatifs associés.',
-      speechWolof: 'Xoolal dépense yi ngeen bind tay ak justificatif yi.',
+      speechFr: 'Cette zone présente le montant des recettes versées pour la journée. Utilisez cette information pour contrôler les recettes avant la clôture.',
+      speechWolof: 'Zone wii da lay wone montant recettes yi duggu ci bis bi. Jëfandikol xibaar wii ngir contrôler recettes yi bala clôture bi.',
       stepCategory: 'control'
     },
     {
       stepNumber: 6,
-      title: '6. Chiffre d\'Affaires Théorique Attendu',
-      description: 'Vérifiez le chiffre d\'affaires théorique attendu avant de compter les espèces présentes dans la caisse.',
-      targetAcomId: 'pressing.cash_closure.expected_revenue',
+      title: '6. Dépenses du Jour',
+      description: 'Cette zone présente le montant des dépenses enregistrées pour la journée. Vérifiez que les dépenses correspondent bien aux opérations effectuées.',
+      targetAcomId: 'pressing.cash_closure.expenses',
       actionToPerform: 'observe',
-      speechFr: 'Vérifiez le chiffre d\'affaires théorique attendu avant de compter les espèces présentes dans la caisse.',
-      speechWolof: 'Saytul chiffre d\'affaires théorique bi attendu laata ngay compté xaliss bi.',
+      speechFr: 'Cette zone présente le montant des dépenses enregistrées pour la journée. Vérifiez que les dépenses correspondent bien aux opérations effectuées.',
+      speechWolof: 'Zone wii da lay wone montant dépenses yi nga denc ci bis bi. Seetal baxam dépenses yi méngook opérations yi am.',
       stepCategory: 'control'
     },
     {
       stepNumber: 7,
-      title: '7. Nom du Caissier / Opérateur',
-      description: 'Renseignez le nom du caissier ou de l\'opérateur responsable de cette caisse.',
-      targetAcomId: 'pressing.cash_closure.cashier',
-      actionToPerform: 'type',
-      inputValue: 'Kouamé Marc',
-      speechFr: 'Renseignez le nom du caissier ou de l\'opérateur responsable de cette caisse.',
-      speechWolof: 'Bindal touru caissier bi wala opérateur bi responsable ci caisse bi.',
-      stepCategory: 'required'
+      title: '7. Écart / Différence',
+      description: 'L\'écart permet de comparer les montants attendus avec les montants réellement constatés. Un écart doit être vérifié avant de clôturer définitivement la caisse.',
+      targetAcomId: 'pressing.cash_closure.expected_revenue',
+      actionToPerform: 'observe',
+      speechFr: 'L\'écart permet de comparer les montants attendus avec les montants réellement constatés. Un écart doit être vérifié avant de clôturer définitivement la caisse.',
+      speechWolof: 'Écart bi da lay may nga compare montant yi ñu foogoon ak montant yi nekk ci caisse bi. War nga seet écart bi bala nga clôturer caisse bi.',
+      stepCategory: 'control'
     },
     {
       stepNumber: 8,
-      title: '8. Espèces Réelles Comptées (+ FCFA)',
-      description: 'Comptez physiquement les espèces présentes dans la caisse, puis saisissez le montant réel compté en francs CFA.',
-      targetAcomId: 'pressing.cash_closure.real_cash',
+      title: '8. Nom du Caissier / Opérateur',
+      description: 'Indiquez ici le nom du caissier ou de l\'opérateur responsable de la caisse.',
+      targetAcomId: 'pressing.cash_closure.cashier',
       actionToPerform: 'type',
-      inputValue: '10500',
-      speechFr: 'Comptez physiquement les espèces présentes dans la caisse, puis saisissez le montant réel compté en francs CFA.',
-      speechWolof: 'Waññal xaliss bi nekk ci caisse bi, nga bind montant réel bi fi.',
+      inputValue: 'Kouamé Marc',
+      speechFr: 'Indiquez ici le nom du caissier ou de l\'opérateur responsable de la caisse.',
+      speechWolof: 'Bindal fi turu caissier bi wala opérateur bi yor caisse bi.',
       stepCategory: 'required'
     },
     {
       stepNumber: 9,
-      title: '9. Observations / Justificatifs',
-      description: 'Ajoutez ici une observation ou un justificatif si vous devez expliquer un écart ou une dépense particulière.',
+      title: '9. Espèces Comptées (FCFA)',
+      description: 'Renseignez ici le montant des espèces réellement comptées dans la caisse. Cette valeur permet de comparer l\'argent physique avec les montants enregistrés dans le système.',
+      targetAcomId: 'pressing.cash_closure.real_cash',
+      actionToPerform: 'type',
+      inputValue: '10500',
+      speechFr: 'Renseignez ici le montant des espèces réellement comptées dans la caisse. Cette valeur permet de comparer l\'argent physique avec les montants enregistrés dans le système.',
+      speechWolof: 'Bindal fi xalis wu dëggu wu nekk ci caisse bi. Valeur wii da lay may nga compare xalis bi ak xibaar yi nekk ci système bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 10,
+      title: '10. Alertes de Stock',
+      description: 'Cette zone affiche les éventuelles alertes liées au stock. Consultez-les avant la clôture afin de prendre en compte les anomalies ou points de rupture signalés par le système.',
+      targetAcomId: 'pressing.cash_closure.stock_alerts',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone affiche les éventuelles alertes liées au stock. Consultez-les avant la clôture afin de prendre en compte les anomalies ou points de rupture signalés par le système.',
+      speechWolof: 'Zone wii da lay wone alertes yu am ci stock bi. Seetal leen bala clôture bi ngir xam anomalies wala manque de stock.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 11,
+      title: '11. Observations / Justifications',
+      description: 'Cette zone permet d\'ajouter une observation ou une justification concernant la clôture, notamment lorsqu\'un écart ou une situation particulière doit être expliqué.',
       targetAcomId: 'pressing.cash_closure.observations',
       actionToPerform: 'type',
       inputValue: 'Écart de caisse justifié par la petite monnaie',
-      speechFr: 'Ajoutez ici une observation ou un justificatif si vous devez expliquer un écart ou une dépense particulière.',
-      speechWolof: 'Yokkal observation wala explication bu fekké am na écart wala dépense.',
+      speechFr: 'Cette zone permet d\'ajouter une observation ou une justification concernant la clôture, notamment lorsqu\'un écart ou une situation particulière doit être expliqué.',
+      speechWolof: 'Zone wii da lay may nga yokk observation wala justification ci clôture bi, rawatina soom écart wala situation particulière.',
       isOptional: true,
       stepCategory: 'optional'
     },
     {
-      stepNumber: 10,
-      title: '10. Contrôle Final & Rapprochement',
-      description: 'Vérifiez la date, le caissier, le montant théorique, les espèces réellement comptées et les éventuelles observations avant de verrouiller la caisse.',
-      targetAcomId: 'pressing.cash_closure.form_card',
-      actionToPerform: 'observe',
-      speechFr: 'Vérifiez la date, le caissier, le montant théorique, les espèces réellement comptées et les éventuelles observations avant de verrouiller la caisse.',
-      speechWolof: 'Saytul date bi, caissier bi, montant attendu bi ak xaliss réel bi laata ngay tëj caisse bi.',
-      stepCategory: 'control'
-    },
-    {
-      stepNumber: 11,
-      title: '11. Valider & Verrouiller la Caisse',
-      description: 'Lorsque toutes les informations sont correctes, cliquez sur Valider et verrouiller la caisse pour clôturer définitivement la journée.',
+      stepNumber: 12,
+      title: '12. Valider la Clôture du Jour',
+      description: 'Après avoir vérifié les informations, renseigné les champs nécessaires et contrôlé les éventuels écarts, utilisez ce bouton pour valider la clôture du jour.',
       targetAcomId: 'pressing.cash_closure.validate',
       actionToPerform: 'click',
-      speechFr: 'Lorsque toutes les informations sont correctes, cliquez sur Valider et verrouiller la caisse pour clôturer définitivement la journée.',
-      speechWolof: 'Soo paré, bëssal ci Valider & Verrouiller la Caisse ngir tëj caisse bi.',
+      speechFr: 'Après avoir vérifié les informations, renseigné les champs nécessaires et contrôlé les éventuels écarts, utilisez ce bouton pour valider la clôture du jour.',
+      speechWolof: 'Soo seetee xibaar yi pare, bind champ yi ak contrôler écart yi, jëfandikol bouton bi ngir valider clôture bu bis bi.',
       expectedEvent: 'CASH_REGISTER_CLOSED',
       stepCategory: 'final'
     },
     {
-      stepNumber: 12,
-      title: '12. Clôture Validée — E-mail & WhatsApp',
-      description: 'La clôture de caisse a été validée et le rapport transmis par e-mail au Gérant. Cliquez sur D\'accord pour terminer le tutoriel.',
-      targetAcomId: 'alert-confirm-btn',
-      actionToPerform: 'click',
-      speechFr: 'La clôture de caisse est validée. Cliquez sur D\'accord pour terminer le tutoriel.',
-      speechWolof: 'Clôture de caisse bi validé na. Bëssal ci D\'ACCORD ci alerte bi.',
-      stepCategory: 'control'
-    },
-    {
       stepNumber: 13,
-      title: '13. Historique des Clôtures Journalières',
-      description: 'L\'historique permet de retrouver les clôtures journalières précédemment enregistrées.',
+      title: '13. Historique des Clôtures',
+      description: 'Cette zone permet de consulter les clôtures enregistrées précédemment. Elle sert à retrouver l\'historique des journées déjà clôturées.',
       targetAcomId: 'pressing.cash_closure.history',
       actionToPerform: 'observe',
-      speechFr: 'L\'historique permet de retrouver les clôtures journalières précédemment enregistrées.',
-      speechWolof: 'Ci historique bi mën nga fi giss yeneen clôture journalière yi passée.',
+      speechFr: 'Cette zone permet de consulter les clôtures enregistrées précédemment. Elle sert à retrouver l\'historique des journées déjà clôturées.',
+      speechWolof: 'Zone wii da lay may nga seet clôtures yi passed. Dafa lay may nga feccat historique bis yi ñu clôturer pare.',
       isOptional: true,
       stepCategory: 'info'
+    },
+    {
+      stepNumber: 14,
+      title: '14. État de l\'Historique',
+      description: 'Pour le moment, aucune clôture n\'est enregistrée pour cette caisse. L\'historique se remplira au fur et à mesure des clôtures validées.',
+      targetAcomId: 'pressing.cash_closure.history_empty',
+      actionToPerform: 'observe',
+      speechFr: 'Pour le moment, aucune clôture n\'est enregistrée pour cette caisse. L\'historique se remplira au fur et à mesure des clôtures validées.',
+      speechWolof: 'Léegi, amul benn clôture bu nekk ci caisse bi. Historique bi dina fess fu mu yàgg yàgg ci clôtures yi ñuy valider.',
+      isOptional: true,
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 15,
+      title: '15. Conclusion',
+      description: 'Vous avez maintenant parcouru les principales fonctions de la clôture de caisse : contrôle de la journée, recettes, dépenses, écarts, espèces comptées, observations et validation. Vous pouvez également consulter l\'historique des clôtures enregistrées.',
+      targetAcomId: 'pressing.cash_closure.container',
+      actionToPerform: 'observe',
+      speechFr: 'Vous avez maintenant parcouru les principales fonctions de la clôture de caisse : contrôle de la journée, recettes, dépenses, écarts, espèces comptées, observations et validation. Vous pouvez également consulter l\'historique des clôtures enregistrées.',
+      speechWolof: 'Léegi nga xam fonctions bu clôture de caisse: contrôle bis bi, recettes, dépenses, écarts, espèces comptées, observations ak validation. Mën nga seet tamit historique clôtures yi.',
+      stepCategory: 'final'
     }
   ]
 };
@@ -883,155 +904,245 @@ export const PRESSING_CLOSURE_TUTORIAL: TutorialScenario = {
 export const PRESSING_ACCOUNTING_TUTORIAL: TutorialScenario = {
   id: 'pressing_tutorial_accounting',
   title: 'Comptabilité / Nouvelle Dépense',
-  description: 'Enregistrement d\'une nouvelle dépense manuelle, notification au gérant et intégration dans les données comptables et le flux de trésorerie de l\'atelier.',
+  description: 'Présentation complète de la page Comptabilité et du formulaire Nouvelle dépense manuelle.',
   saasModule: 'pressing',
-  estimatedDurationSec: 180,
+  estimatedDurationSec: 240,
   steps: [
     {
       stepNumber: 1,
-      title: '1. Comptabilité & Nouvelle Dépense',
-      description: 'Nous allons enregistrer une nouvelle dépense. Cliquez sur le bouton Nouvelle dépense pour ouvrir le formulaire.',
-      targetAcomId: 'accounting.btn.new_expense',
-      actionToPerform: 'click',
-      speechFr: 'Nous allons enregistrer une nouvelle dépense. Cliquez sur le bouton Nouvelle dépense pour ouvrir le formulaire.',
-      speechWolof: 'Ñu ngi waaj a bind dépense bu bees. Bëssal ci bouton Nouvelle dépense ngir ubbi formulaire bi.',
-      stepCategory: 'required'
+      title: '1. Titre « Comptabilité »',
+      description: 'Bienvenue dans la section Comptabilité. Cette page permet de suivre les flux financiers et les dépenses générales de l’atelier.',
+      targetAcomId: 'accounting.title',
+      actionToPerform: 'observe',
+      speechFr: 'Bienvenue dans la section Comptabilité. Cette page permet de suivre les flux financiers et les dépenses générales de l’atelier.',
+      speechWolof: 'Dalal ak jamm ci wàllu Comptabilité. Xët wii dafa laay may nga top xaliss bi ak dépenses générales yu atelier bi.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 2,
-      title: '2. Description / Intitulé',
-      description: 'Saisissez la description ou l\'intitulé de la dépense. Par exemple : facture Senelec, loyer de l\'atelier ou transport coursier.',
-      targetAcomId: 'accounting.expense.title',
-      actionToPerform: 'type',
-      inputValue: 'Facture Senelec Janvier',
-      speechFr: 'Saisissez la description ou l\'intitulé de la dépense. Par exemple : facture Senelec, loyer de l\'atelier ou transport coursier.',
-      speechWolof: 'Bindal description bi wala turu dépense bi. Misaal : facture Senelec, loyer atelier bi wala transport.',
-      stepCategory: 'required'
+      title: '2. Description de la Page',
+      description: 'Cette section est dédiée au suivi des flux financiers et à la gestion des dépenses générales de l’atelier.',
+      targetAcomId: 'accounting.subtitle',
+      actionToPerform: 'observe',
+      speechFr: 'Cette section est dédiée au suivi des flux financiers et à la gestion des dépenses générales de l’atelier.',
+      speechWolof: 'Wàll wii dafa jagleel top flux financiers ak saytu dépenses générales yu atelier bi.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 3,
-      title: '3. Montant (FCFA)',
-      description: 'Saisissez le montant de la dépense en francs CFA.',
-      targetAcomId: 'accounting.expense.amount',
-      actionToPerform: 'type',
-      inputValue: '42500',
-      speechFr: 'Saisissez le montant de la dépense en francs CFA.',
-      speechWolof: 'Bindal montant dépense bi ci francs CFA.',
-      stepCategory: 'required'
+      title: '3. Bouton « Nouvelle dépense »',
+      description: 'Pour enregistrer une nouvelle dépense, utilisez le bouton Nouvelle dépense. Il permet d’ouvrir le formulaire de saisie d’une dépense.',
+      targetAcomId: 'accounting.btn.new_expense',
+      actionToPerform: 'observe',
+      speechFr: 'Pour enregistrer une nouvelle dépense, utilisez le bouton Nouvelle dépense. Il permet d’ouvrir le formulaire de saisie d’une dépense.',
+      speechWolof: 'Ngir bind dépense bu bees, jëfandikol bouton Nouvelle dépense. Dafa lay ubbi formulaire ngir nga bind ko.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 4,
-      title: '4. Date de Dépense',
-      description: 'Vérifiez ou sélectionnez la date à laquelle la dépense a été effectuée.',
-      targetAcomId: 'accounting.expense.date',
+      title: '4. Charges Totales',
+      description: 'La carte Charges totales permet de visualiser le montant total des charges enregistrées.',
+      targetAcomId: 'accounting.kpi.charges_totales',
       actionToPerform: 'observe',
-      speechFr: 'Vérifiez ou sélectionnez la date à laquelle la dépense a été effectuée.',
-      speechWolof: 'Saytul wala nga tànn date bi dépense bi amé.',
-      stepCategory: 'required'
+      speechFr: 'La carte Charges totales permet de visualiser le montant total des charges enregistrées.',
+      speechWolof: 'Carte Charges totales dafa lay wone montant total bu charges yépp yi nga bind.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 5,
-      title: '5. Catégorie Comptable',
-      description: 'Sélectionnez la catégorie comptable correspondant à la dépense.',
-      targetAcomId: 'accounting.expense.category_grid',
+      title: '5. Dépenses Générales',
+      description: 'Cette carte présente le montant des dépenses générales enregistrées dans le système.',
+      targetAcomId: 'accounting.kpi.depenses_generales',
       actionToPerform: 'observe',
-      speechFr: 'Sélectionnez la catégorie comptable correspondant à la dépense.',
-      speechWolof: 'Tànnal catégorie comptable bi méngook dépense bi.',
-      stepCategory: 'required'
+      speechFr: 'Cette carte présente le montant des dépenses générales enregistrées dans le système.',
+      speechWolof: 'Carte wii dafa lay wone montant dépenses générales yi nekk ci système bi.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 6,
-      title: '6. Mode de Paiement',
-      description: 'Sélectionnez le mode de paiement utilisé pour cette dépense.',
-      targetAcomId: 'accounting.expense.payment_methods',
+      title: '6. Filtres',
+      description: 'Ces boutons permettent de filtrer les informations affichées afin de consulter soit l’ensemble du flux de trésorerie, soit uniquement les dépenses générales.',
+      targetAcomId: 'accounting.filters_row',
       actionToPerform: 'observe',
-      speechFr: 'Sélectionnez le mode de paiement utilisé pour cette dépense.',
-      speechWolof: 'Tànnal ni nga fayé dépense bi (espèces, mobile money, carte, virement wala chèque).',
-      stepCategory: 'required'
+      speechFr: 'Ces boutons permettent de filtrer les informations affichées afin de consulter soit l’ensemble du flux de trésorerie, soit uniquement les dépenses générales.',
+      speechWolof: 'Boutons yi dañu lay may nga filtre xibaar yi ngir seet lepp ci trésorerie bi wala dépenses générales rekk.',
+      stepCategory: 'info'
     },
     {
       stepNumber: 7,
-      title: '7. Référence / Justificatif (Optionnel)',
-      description: 'Si vous disposez d\'une référence ou d\'un justificatif, vous pouvez l\'indiquer ici.',
+      title: '7. Tableau Comptable',
+      description: 'Le tableau présente les dépenses enregistrées. Chaque ligne peut regrouper la désignation, la catégorie, la date d’émission et le montant de la dépense.',
+      targetAcomId: 'accounting.outflows_table',
+      actionToPerform: 'observe',
+      speechFr: 'Le tableau présente les dépenses enregistrées. Chaque ligne peut regrouper la désignation, la catégorie, la date d’émission et le montant de la dépense.',
+      speechWolof: 'Tableau bi dafa lay wone dépenses yi. Bii rëdd nekk dafa am désignation, catégorie, date d’émission ak montant.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 8,
+      title: '8. État Vide',
+      description: 'Lorsqu’aucune dépense ne correspond au filtre sélectionné, le tableau affiche qu’aucune charge n’est enregistrée pour ce filtre.',
+      targetAcomId: 'accounting.empty_state',
+      actionToPerform: 'observe',
+      speechFr: 'Lorsqu’aucune dépense ne correspond au filtre sélectionné, le tableau affiche qu’aucune charge n’est enregistrée pour ce filtre.',
+      speechWolof: 'Su feccante amul benn dépense bu méngook filtre bi, tableau bi da lay wone ni amul benn charge.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 9,
+      title: '9. Ouverture du Formulaire',
+      description: 'Nous allons maintenant voir comment enregistrer une nouvelle dépense. Cliquez sur Nouvelle dépense pour ouvrir le formulaire.',
+      targetAcomId: 'accounting.btn.new_expense',
+      actionToPerform: 'click',
+      speechFr: 'Nous allons maintenant voir comment enregistrer une nouvelle dépense. Cliquez sur Nouvelle dépense pour ouvrir le formulaire.',
+      speechWolof: 'Léegi ñu seet nan lañuy binde dépense bu bees. Bëssal ci Nouvelle dépense ngir ubbi formulaire bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 10,
+      title: '10. Titre du Modal',
+      description: 'Voici le formulaire Nouvelle dépense manuelle. Il permet d’enregistrer une dépense directement dans la comptabilité de l’application.',
+      targetAcomId: 'accounting.expense.form_title',
+      actionToPerform: 'observe',
+      speechFr: 'Voici le formulaire Nouvelle dépense manuelle. Il permet d’enregistrer une dépense directement dans la comptabilité de l’application.',
+      speechWolof: 'Fi mooy formulaire Nouvelle dépense manuelle. Dafa lay may nga bind dépense direct ci comptabilité application bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 11,
+      title: '11. Sous-titre',
+      description: 'Ce formulaire est destiné au suivi et à la justification des dépenses enregistrées dans la comptabilité.',
+      targetAcomId: 'accounting.expense.form_subtitle',
+      actionToPerform: 'observe',
+      speechFr: 'Ce formulaire est destiné au suivi et à la justification des dépenses enregistrées dans la comptabilité.',
+      speechWolof: 'Formulaire wii dafa jagleel top ak justification dépenses yi nga denc ci comptabilité bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 12,
+      title: '12. Désignation / Intitulé',
+      description: 'Commencez par renseigner la désignation ou l’intitulé de la dépense. Vous pouvez indiquer par exemple le nom d’une facture, d’un fournisseur ou d’un service.',
+      targetAcomId: 'accounting.expense.title',
+      actionToPerform: 'type',
+      inputValue: 'Facture Senelec Janvier',
+      speechFr: 'Commencez par renseigner la désignation ou l’intitulé de la dépense. Vous pouvez indiquer par exemple le nom d’une facture, d’un fournisseur ou d’un service.',
+      speechWolof: 'Tambalil ci bind désignation bi wala turu dépense bi. Misaal: turu facture, fournisseur wala service.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 13,
+      title: '13. Montant',
+      description: 'Indiquez ensuite le montant de la dépense en francs CFA.',
+      targetAcomId: 'accounting.expense.amount',
+      actionToPerform: 'type',
+      inputValue: '42500',
+      speechFr: 'Indiquez ensuite le montant de la dépense en francs CFA.',
+      speechWolof: 'Tekkal fi montant dépense bi ci francs CFA.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 14,
+      title: '14. Date de Dépense',
+      description: 'Sélectionnez maintenant la date à laquelle la dépense a été effectuée.',
+      targetAcomId: 'accounting.expense.date',
+      actionToPerform: 'observe',
+      speechFr: 'Sélectionnez maintenant la date à laquelle la dépense a été effectuée.',
+      speechWolof: 'Tànnal léegi date bi dépense bi amé.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 15,
+      title: '15. Catégorie Comptable',
+      description: 'La catégorie comptable permet de classer correctement la dépense. Sélectionnez la catégorie correspondant à la nature de votre dépense.',
+      targetAcomId: 'accounting.expense.category_grid',
+      actionToPerform: 'observe',
+      speechFr: 'La catégorie comptable permet de classer correctement la dépense. Sélectionnez la catégorie correspondant à la nature de votre dépense.',
+      speechWolof: 'Catégorie comptable bi dafa lay may nga seddale dépense bi ci yoon. Tànnal catégorie bi méngook dépense bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 16,
+      title: '16. Catégories Disponibles',
+      description: 'Plusieurs catégories sont disponibles, notamment Loyer, Électricité, Eau, Internet et Télécommunications, Transport et Livraison, Entretien et Réparations, Machines et Équipements, Fournitures administratives, Marketing et Communication, Taxes et Frais administratifs, Prestations externes et Autres dépenses.',
+      targetAcomId: 'accounting.expense.category_grid',
+      actionToPerform: 'observe',
+      speechFr: 'Plusieurs catégories sont disponibles, notamment Loyer, Électricité, Eau, Internet et Télécommunications, Transport et Livraison, Entretien et Réparations, Machines et Équipements, Fournitures administratives, Marketing et Communication, Taxes et Frais administratifs, Prestations externes et Autres dépenses.',
+      speechWolof: 'Am na ay catégories yu bari: Loyer, Électricité, Eau, Internet, Transport, Entretien, Machines, Fournitures, Marketing, Taxes, Prestations externes ak Autres dépenses.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 17,
+      title: '17. Mode de Paiement',
+      description: 'Cette section permet d’indiquer comment la dépense a été réglée. Sélectionnez le mode de paiement correspondant à l’opération.',
+      targetAcomId: 'accounting.expense.payment_methods',
+      actionToPerform: 'observe',
+      speechFr: 'Cette section permet d’indiquer comment la dépense a été réglée. Sélectionnez le mode de paiement correspondant à l’opération.',
+      speechWolof: 'Wàll wii da lay wone ni nga fayé dépense bi. Tànnal mode de paiement bi méngook opération bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 18,
+      title: '18. Options de Paiement',
+      description: 'Plusieurs modes de paiement sont disponibles : espèces, Mobile Money, carte bancaire, virement bancaire ou chèque bancaire. Choisissez celui qui correspond au règlement effectué.',
+      targetAcomId: 'accounting.expense.payment_methods',
+      actionToPerform: 'observe',
+      speechFr: 'Plusieurs modes de paiement sont disponibles : espèces, Mobile Money, carte bancaire, virement bancaire ou chèque bancaire. Choisissez celui qui correspond au règlement effectué.',
+      speechWolof: 'Am na espèces, Mobile Money, carte bancaire, virement bancaire wala chèque. Tànnal bi nga jëfandikoo.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 19,
+      title: '19. Référence / Justificatif',
+      description: 'Ce champ est facultatif. Il permet d’ajouter une référence ou une information permettant d’identifier le justificatif associé à la dépense.',
       targetAcomId: 'accounting.expense.reference',
       actionToPerform: 'type',
       inputValue: 'REC-2026-08',
       isOptional: true,
-      speechFr: 'Si vous disposez d\'une référence ou d\'un justificatif, vous pouvez l\'indiquer ici.',
-      speechWolof: 'Soo amé numéro référence wala reçu, mën nga ko bind fi.',
+      speechFr: 'Ce champ est facultatif. Il permet d’ajouter une référence ou une information permettant d’identifier le justificatif associé à la dépense.',
+      speechWolof: 'Champ bi du obligatoire. Dafa lay may nga yokk référence wala numéro reçu bu méngook dépense bi.',
       stepCategory: 'optional'
     },
     {
-      stepNumber: 8,
-      title: '8. Description / Justification (Optionnel)',
-      description: 'Ajoutez ici, si nécessaire, des détails permettant d\'expliquer ou de justifier la dépense.',
+      stepNumber: 20,
+      title: '20. Description / Justification',
+      description: 'Vous pouvez utiliser cette zone pour ajouter des détails, des commentaires ou une justification concernant la dépense.',
       targetAcomId: 'accounting.expense.description',
       actionToPerform: 'type',
       inputValue: 'Règlement consommation compteur atelier',
       isOptional: true,
-      speechFr: 'Ajoutez ici, si nécessaire, des détails permettant d\'expliquer ou de justifier la dépense.',
-      speechWolof: 'Yokkal fi ay leral wala explication ngir justifier dépense bi.',
+      speechFr: 'Vous pouvez utiliser cette zone pour ajouter des détails, des commentaires ou une justification concernant la dépense.',
+      speechWolof: 'Mën nga jëfandikoo zone wii ngir yokk ay leral, commentaires wala justification ci dépense bi.',
       stepCategory: 'optional'
     },
     {
-      stepNumber: 9,
-      title: '9. Contrôle Final & Vérification',
-      description: 'Vérifiez les informations saisies avant d\'enregistrer la dépense et de notifier le gérant.',
-      targetAcomId: 'accounting.expense.form_card',
+      stepNumber: 21,
+      title: '21. Bouton Annuler',
+      description: 'Le bouton Annuler permet de fermer le formulaire sans enregistrer la dépense.',
+      targetAcomId: 'accounting.expense.cancel_btn',
       actionToPerform: 'observe',
-      speechFr: 'Vérifiez les informations saisies avant d\'enregistrer la dépense et de notifier le gérant.',
-      speechWolof: 'Saytul lepp loo bind laata ngay valider dépense bi ak yëgle gérant bi.',
-      stepCategory: 'control'
-    },
-    {
-      stepNumber: 10,
-      title: '10. Enregistrer la Dépense & Notifier',
-      description: 'Cliquez sur Enregistrer la dépense et Notifier pour enregistrer cette dépense et transmettre l\'information au gérant.',
-      targetAcomId: 'accounting.expense.submit_btn',
-      actionToPerform: 'click',
-      speechFr: 'Cliquez sur Enregistrer la dépense et Notifier pour enregistrer cette dépense et transmettre l\'information au gérant.',
-      speechWolof: 'Bëssal ci Enregistrer la dépense & Notifier ngir denc dépense bi te yëgle ko gérant bi.',
-      expectedEvent: 'EXPENSE_CREATED',
-      stepCategory: 'final'
-    },
-    {
-      stepNumber: 11,
-      title: '11. Dépense Enregistrée — Suivi Gérant',
-      description: 'La dépense a été enregistrée et le suivi du gérant a été déclenché. Cliquez sur D\'accord pour continuer.',
-      targetAcomId: 'alert-confirm-btn',
-      actionToPerform: 'click',
-      speechFr: 'La dépense a été enregistrée et le suivi du gérant a été déclenché. Cliquez sur D\'accord pour continuer.',
-      speechWolof: 'Dépense bi denc nañu ko te yëgle nañu gérant bi. Bëssal ci D\'accord ngir wéy.',
-      stepCategory: 'control'
-    },
-    {
-      stepNumber: 12,
-      title: '12. Charges Totales & Dépenses Générales',
-      description: 'La dépense enregistrée est maintenant intégrée aux données comptables de l\'atelier.',
-      targetAcomId: 'accounting.kpi.charges_totales',
-      actionToPerform: 'observe',
-      speechFr: 'La dépense enregistrée est maintenant intégrée aux données comptables de l\'atelier.',
-      speechWolof: 'Dépense bi nga bind duggu na léegi ci comptabilité ak bilan atelier bi.',
-      stepCategory: 'control'
-    },
-    {
-      stepNumber: 13,
-      title: '13. Flux de Trésorerie & Filtres',
-      description: 'Vous pouvez consulter toutes les opérations de trésorerie ou filtrer uniquement les dépenses générales.',
-      targetAcomId: 'accounting.filters_row',
-      actionToPerform: 'observe',
-      speechFr: 'Vous pouvez consulter toutes les opérations de trésorerie ou filtrer uniquement les dépenses générales.',
-      speechWolof: 'Mën nga seet lepp lu ëpp ci trésorerie bi wala nga filtre dépenses générales rekk.',
+      speechFr: 'Le bouton Annuler permet de fermer le formulaire sans enregistrer la dépense.',
+      speechWolof: 'Bouton Annuler dafa lay may nga ubbi te tëj formulaire bi té do denc dépense bi.',
       stepCategory: 'info'
     },
     {
-      stepNumber: 14,
-      title: '14. Tableau des Dépenses & Ligne Enregistrée',
-      description: 'Vérifiez que la dépense apparaît bien dans le tableau avec sa description, sa catégorie, sa date et son montant.',
-      targetAcomId: 'accounting.outflows_table',
+      stepNumber: 22,
+      title: '22. Enregistrer la dépense',
+      description: 'Lorsque toutes les informations nécessaires sont renseignées, utilisez ce bouton pour enregistrer la dépense et déclencher l’action de notification prévue par l’application.',
+      targetAcomId: 'accounting.expense.submit_btn',
+      actionToPerform: 'click',
+      expectedEvent: 'EXPENSE_CREATED',
+      speechFr: 'Lorsque toutes les informations nécessaires sont renseignées, utilisez ce bouton pour enregistrer la dépense et déclencher l’action de notification prévue par l’application.',
+      speechWolof: 'Soo paree ci bind xibaar yépp, jëfandikol bouton bi ngir denc dépense bi ak yëgle gérant bi.',
+      stepCategory: 'final'
+    },
+    {
+      stepNumber: 23,
+      title: '23. Conclusion du Formulaire',
+      description: 'Vous avez maintenant parcouru les principales étapes de création d’une dépense manuelle : désignation, montant, date, catégorie comptable, mode de paiement, référence et justification. Une fois les informations renseignées, vous pouvez enregistrer la dépense.',
+      targetAcomId: 'accounting.expense.form_card',
       actionToPerform: 'observe',
-      speechFr: 'Vérifiez que la dépense apparaît bien dans le tableau avec sa description, sa catégorie, sa date et son montant.',
-      speechWolof: 'Saytul ni dépense bi fésé ci tableau bi ak turam, catégorie bi, date bi ak montant bi.',
+      speechFr: 'Vous avez maintenant parcouru les principales étapes de création d’une dépense manuelle : désignation, montant, date, catégorie comptable, mode de paiement, référence et justification. Une fois les informations renseignées, vous pouvez enregistrer la dépense.',
+      speechWolof: 'Léegi nga xam yoon bi yépp ngir bind dépense manuelle: désignation, montant, date, catégorie, mode de paiement, référence ak justification. Soo paree mën nga denc dépense bi.',
       stepCategory: 'control'
     }
   ]
@@ -1469,6 +1580,986 @@ export const PRESSING_SETTINGS_TUTORIAL: TutorialScenario = {
       speechWolof: 'Soo noppee ci soppi yëpp, cuubal ci bouton bi ngir denc réglages yu yees yi.',
       stepCategory: 'final',
       expectedEvent: 'SETTINGS_UPDATED'
+    }
+  ]
+};
+
+export const COMMERCE_OVERVIEW_TUTORIAL: TutorialScenario = {
+  id: 'commerce_overview_tutorial',
+  title: 'Tutoriel Complet — Page « Aperçu & Tableau de Bord Général »',
+  description: 'Présentation guidée interactive complète de la page Aperçu de haut en bas (50 étapes).',
+  saasModule: 'commerce',
+  estimatedDurationSec: 420,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Logo et Identité Acom',
+      description: 'Présentation de l\'identité Acom et accueil sur la page Aperçu du module Management Commerce.',
+      targetAcomId: 'header.logo_and_title',
+      actionToPerform: 'observe',
+      speechFr: 'Bienvenue dans Acom. Vous êtes sur la page Aperçu du module Management Commerce. Cette page constitue votre tableau de bord général et votre premier point d\'accès aux principales fonctions du logiciel.',
+      speechWolof: 'Dalal ak jàmm ci Acom. Yàggi nekk ci xët u Aperçu ci wàllu Management Commerce. Xët wii mooy sa kaye liggéey bu yaatu ngir xam ni jumtukaay yi di doxee.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Nom du Logiciel / Module',
+      description: 'Le module Management Commerce centralise le stock, les ventes, les flux financiers et les alertes.',
+      targetAcomId: 'header.module_name',
+      actionToPerform: 'observe',
+      speechFr: 'Cette interface est dédiée au Management Commerce. Elle centralise les informations nécessaires au suivi de votre activité, notamment le stock, les ventes, les flux financiers et les alertes.',
+      speechWolof: 'Xët wii ñeeltina Management Commerce. Dafa dajale xibaar yëpp yu am solo ngir saytu sa stock, sa jaay-jaay, xaalis bi di duggu ak di génne, ak artu yi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 3,
+      title: '3. Plan Premium',
+      description: 'Indication de la formule de votre compte.',
+      targetAcomId: 'header.plan_badge',
+      actionToPerform: 'observe',
+      speechFr: 'Ce badge indique la formule actuellement utilisée pour votre compte.',
+      speechWolof: 'Badge bi dafay wone formule bi nga am ci sa compte.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 4,
+      title: '4. Mode d\'Affichage',
+      description: 'Inversion du thème entre le mode sombre et le mode clair.',
+      targetAcomId: 'header.theme_toggle',
+      actionToPerform: 'observe',
+      speechFr: 'Ce contrôle permet de choisir le mode d\'affichage de l\'application, entre le mode sombre et le mode clair.',
+      speechWolof: 'Jumtukaay bi dafay tax nga mën a soppi melokaanu xët bi, ndax nga bëgg ko mu lëndëm wala mu leer.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 5,
+      title: '5. Notifications',
+      description: 'Accès aux notifications et messages système de votre compte.',
+      targetAcomId: 'header.notifications',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone permet d\'accéder aux notifications disponibles pour votre compte.',
+      speechWolof: 'Wàll wii dafay tax nga mën a xool yéeneer yi ak notification yi nga am ci sa compte.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 6,
+      title: '6. Profil Utilisateur',
+      description: 'Profil utilisateur et rôle au sein du système.',
+      targetAcomId: 'header.user_profile',
+      actionToPerform: 'observe',
+      speechFr: 'Ici, vous retrouvez votre profil utilisateur ainsi que votre rôle dans l\'application.',
+      speechWolof: 'Fi nga koy gise sa profil nit ak sa taxawaay ci application bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 7,
+      title: '7. Licence Locale Active',
+      description: 'Statut de validité de votre licence d\'utilisation locale.',
+      targetAcomId: 'header.licence_status',
+      actionToPerform: 'observe',
+      speechFr: 'Cette information indique l\'état de votre licence locale. Ici, la licence est indiquée comme active.',
+      speechWolof: 'Xibaar wii dafay wone ne sa licence locale mu ngi dox bu baax.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 8,
+      title: '8. Nombre de Magasins Actifs',
+      description: 'Nombre d\'unités opérationnelles associées à cet environnement.',
+      targetAcomId: 'header.stores_count',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone indique le nombre d\'unités ou de magasins actuellement actifs dans votre environnement.',
+      speechWolof: 'Wàll wii dafay wone limu boutique wala bérab yu dox ci sa mbootay.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 9,
+      title: '9. Sélecteur de SaaS Actif',
+      description: 'Changement dynamique du logiciel métier SaaS.',
+      targetAcomId: 'header.active_saas',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone indique le module SaaS actuellement actif. Ici, le module utilisé est Management Commerce.',
+      speechWolof: 'Wàll wii dafay wone module SaaS bi nga nekk léegi. Fi, mooy Management Commerce.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 10,
+      title: '10. Date d\'Écriture Disque',
+      description: 'Date de dernière écriture locale des transactions sur le disque dur.',
+      targetAcomId: 'header.disk_write',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone présente l\'information d\'écriture ou de synchronisation du disque telle qu\'elle est affichée par l\'application.',
+      speechWolof: 'Wàll wii dafay wone xibaaru bind ci disque bi ak dates yi application bi di bind.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 11,
+      title: '11. Barre des Accès Rapides',
+      description: 'Accès rapide vers les modules transversaux et utilitaires de la plateforme.',
+      targetAcomId: 'dashboard.quick_access.bar',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone regroupe plusieurs accès rapides vers des fonctions complémentaires du logiciel.',
+      speechWolof: 'Wàll wii dafa dajale yoon yu gaaw yëpp ngir dem ci yeneen jumtukaay.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 12,
+      title: '12. Bouton Acom IA Démo',
+      description: 'Accès au simulateur interactif pour tester les parcours guidés.',
+      targetAcomId: 'dashboard.quick_access.ai_demo_btn',
+      actionToPerform: 'observe',
+      speechFr: 'Acom IA Démo permet d\'accéder à l\'assistant interactif qui accompagne l\'utilisateur dans la découverte et l\'utilisation du logiciel.',
+      speechWolof: 'Acom IA Démo dafay tax nga mën a duggu ci assistant bi di la gunge ci njàngu logiciel bi.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 13,
+      title: '13. Bouton AcomZone',
+      description: 'Espace de marché et d\'intégration de l\'écosystème Acom.',
+      targetAcomId: 'dashboard.quick_access.acomzone_btn',
+      actionToPerform: 'observe',
+      speechFr: 'AcomZone donne accès à la marketplace et aux services proposés dans cet environnement.',
+      speechWolof: 'AcomZone dafay ubbil yoon ci marketplace bi ak service yi nekk ci mbootay bi.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 14,
+      title: '14. Application Desktop Native',
+      description: 'Mode d\'installation bureau pour une rapidité optimale sans navigateur.',
+      targetAcomId: 'dashboard.quick_access.desktop_btn',
+      actionToPerform: 'observe',
+      speechFr: 'App Desktop permet d\'accéder à l\'application locale.',
+      speechWolof: 'App Desktop dafay tax nga mën a yebbu application bi ci sa ordinatær local.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 15,
+      title: '15. Documentation Technique',
+      description: 'Consultez les guides utilisateurs et manuels d\'exploitation.',
+      targetAcomId: 'dashboard.quick_access.docs_btn',
+      actionToPerform: 'observe',
+      speechFr: 'La documentation regroupe les guides et les tutoriels destinés à accompagner l\'utilisateur.',
+      speechWolof: 'Documentation bi dafa dajale téerey njàngale ak téerey xam-xam ngir dimbali nit bi.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 16,
+      title: '16. Déconnexion de Session',
+      description: 'Permet de clôturer la session courante en toute sécurité.',
+      targetAcomId: 'dashboard.quick_access.logout_btn',
+      actionToPerform: 'observe',
+      speechFr: 'Ce bouton permet de quitter la session actuellement ouverte.',
+      speechWolof: 'Bouton bi dafay tax nga mën a génne ci sa session ci kaaraange.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 17,
+      title: '17. Navigation Principale',
+      description: 'Barre d\'onglets principale donnant accès aux sous-modules fonctionnels.',
+      targetAcomId: 'merchant.navbar',
+      actionToPerform: 'observe',
+      speechFr: 'Cette barre constitue la navigation principale du logiciel. Elle permet d\'accéder aux différents domaines fonctionnels de votre environnement.',
+      speechWolof: 'Bandeau wii mooy yoonu navigation bu gëna am solo. Dfay tax nga mën a dem ci wàll yëpp.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 18,
+      title: '18. Onglet Aperçu (Actif)',
+      description: 'Page d\'accueil synthétique offrant la vue globale d\'activité.',
+      targetAcomId: 'nav-apercu',
+      actionToPerform: 'observe',
+      speechFr: 'Vous êtes actuellement dans l\'onglet Aperçu. C\'est ici que vous retrouvez la vision générale de votre activité.',
+      speechWolof: 'Yàggi nekk ci onglet Aperçu. Fi nga koy gise méttaayu sa liggéey ci am mbooloo.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 19,
+      title: '19. Onglet Caisse POS',
+      description: 'Module d\'encaissement tactile et de vente directe au comptoir.',
+      targetAcomId: 'nav-caisse',
+      actionToPerform: 'observe',
+      speechFr: 'L\'onglet Caisse POS est dédié aux opérations de caisse et de vente au point de vente.',
+      speechWolof: 'Onglet Caisse POS mooy bérab bi ñu jagleel jaay-jaay yi ak lekku xaalis bi ci comptoir bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 20,
+      title: '20. Onglet Stock',
+      description: 'Gestion des articles, inventaires, catégories et seuils de réapprovisionnement.',
+      targetAcomId: 'nav-stock',
+      actionToPerform: 'observe',
+      speechFr: 'L\'onglet Stock permet de suivre et de gérer les articles et les niveaux de stock.',
+      speechWolof: 'Onglet Stock dafay tax nga mën a saytu lepp lu am ci produit yi ak limu stock bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 21,
+      title: '21. Onglet Fournisseurs',
+      description: 'Gestion de l\'annuaire des fournisseurs et des commandes d\'achat.',
+      targetAcomId: 'nav-fournisseurs',
+      actionToPerform: 'observe',
+      speechFr: 'L\'onglet Fournisseurs permet de gérer les partenaires et les informations liées aux approvisionnements.',
+      speechWolof: 'Onglet Fournisseurs dafay saytu partenariat yi ak lepp lu jëm ci jëndu marchandises.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 22,
+      title: '22. Onglet Facture / Devis',
+      description: 'Édition, suivi et impression des factures proforma, devis et traites.',
+      targetAcomId: 'nav-facturation',
+      actionToPerform: 'observe',
+      speechFr: 'Cette section permet de gérer les documents commerciaux, notamment les factures et les devis.',
+      speechWolof: 'Wàll wii dafay saytu kayitu commerçant yi, rawatina factures yi ak devis yi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 23,
+      title: '23. Onglet Audit & Traçabilité',
+      description: 'Consultation de l\'historique d\'événements et des journaux d\'opérations.',
+      targetAcomId: 'nav-audit',
+      actionToPerform: 'observe',
+      speechFr: 'L\'Audit permet de consulter la traçabilité des opérations enregistrées dans le système.',
+      speechWolof: 'Audit bi dafay wone séedde ak yoonu jëf yëpp yi ñu bind ci masin bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 24,
+      title: '24. Onglet Comptabilité',
+      description: 'Saisie des dépenses, gestion des charges et journaux de caisse.',
+      targetAcomId: 'nav-compta',
+      actionToPerform: 'observe',
+      speechFr: 'La section Compta regroupe les informations liées aux flux financiers et aux dépenses générales.',
+      speechWolof: 'Wàllu Compta dafa dajale xibaar yi jëm ci xaalis ak dépense yëpp.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 25,
+      title: '25. Onglet Clôture de Caisse',
+      description: 'Formulaire de fin de journée, rapport journalier et justification d\'écarts.',
+      targetAcomId: 'nav-pressing_closure',
+      actionToPerform: 'observe',
+      speechFr: 'Cette section permet de gérer la clôture de caisse et le suivi des opérations correspondantes.',
+      speechWolof: 'Wàll wii dafay saytu tëju caisse bi ak séeddeu xaalis bu bés bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 26,
+      title: '26. Onglet Rapports Financiers',
+      description: 'Bilans statistiques, bilans de période et exports de résultats.',
+      targetAcomId: 'nav-reports',
+      actionToPerform: 'observe',
+      speechFr: 'La section Rapports permet d\'accéder aux informations et synthèses disponibles sous forme de rapports.',
+      speechWolof: 'Wàllu Rapports dafay ubbil yoon ci mboolooxu xibaar yi ci kayitu bilan.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 27,
+      title: '27. Onglet Réglages & Paramètres',
+      description: 'Configuration du profil de l\'entreprise, imprimantes et paramètres généraux.',
+      targetAcomId: 'nav-settings',
+      actionToPerform: 'observe',
+      speechFr: 'Les Réglages permettent d\'accéder aux paramètres de l\'application.',
+      speechWolof: 'Réglages yi dafay tax nga mën a soppi paramètre yëpp yu application bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 28,
+      title: '28. Briefing Matinal Intelligent',
+      description: 'Recommandations quotidiennes générées pour orienter les actions du jour.',
+      targetAcomId: 'dashboard.briefing.card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone constitue le briefing de la journée. Elle peut présenter un message ou une information destinée à vous accompagner au début de votre activité.',
+      speechWolof: 'Wàll wii mooy briefing u bés bi. Dfay wone xibaar ak digal ngir tambali bés bi ci ndam.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 29,
+      title: '29. Moteur de Synchronisation',
+      description: 'Statut du moteur de données garantissant un fonctionnement continu hors connexion.',
+      targetAcomId: 'dashboard.sync.card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone permet de connaître l\'état du moteur de synchronisation des données.',
+      speechWolof: 'Wàll wii dafay wone méttaayu moteur de synchronisation bi ci diggante local ak cloud.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 30,
+      title: '30. Commandes de Synchronisation',
+      description: 'Commandes manuelles pour forcer la synchronisation, exporter ou restaurer la base locale.',
+      targetAcomId: 'dashboard.sync.actions_zone',
+      actionToPerform: 'observe',
+      speechFr: 'Ces commandes permettent d\'effectuer les différentes opérations de gestion de la synchronisation.',
+      speechWolof: 'Commande yii dafay tax nga mën a denc, délloosi wala forcer synchronisation bi.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 31,
+      title: '31. Valeur Totale du Stock',
+      description: 'Évaluation marchande globale des articles détenus en réserve et en rayon.',
+      targetAcomId: 'dashboard.stats.total_stock_value',
+      actionToPerform: 'observe',
+      speechFr: 'Cette carte présente la valeur totale du stock selon les données actuellement affichées.',
+      speechWolof: 'Kàrt wii dafay wone njortu njagum stock bi yëpp léegi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 32,
+      title: '32. Bénéfice Potentiel du Stock',
+      description: 'Estimation de la marge brute réalisable sur la totalité du stock disponible.',
+      targetAcomId: 'dashboard.stats.total_stock_profit',
+      actionToPerform: 'observe',
+      speechFr: 'Cette carte présente le bénéfice total associé au stock selon les données affichées.',
+      speechWolof: 'Kàrt wii dafay wone bénéfice bi nga mën a gaañe ci stock bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 33,
+      title: '33. Période d\'Analyse des Ventes',
+      description: 'Choix de la fenêtre temporelle de calcul pour l\'ensemble des cartes de performance.',
+      targetAcomId: 'dashboard.stats.period_select',
+      actionToPerform: 'observe',
+      speechFr: 'Ce sélecteur permet de choisir la période utilisée pour les statistiques de vente présentées dans le tableau de bord.',
+      speechWolof: 'Sélecteur bi dafay tax nga mën a tann weer wi nga bëgg xool stat yi.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 34,
+      title: '34. Chiffre d\'Affaires Réalisé',
+      description: 'Montant cumulé des encaissements enregistrés sur la période sélectionnée.',
+      targetAcomId: 'dashboard.stats.revenue_card',
+      actionToPerform: 'observe',
+      speechFr: 'Le chiffre d\'affaires présente le montant des ventes réalisé pour la période sélectionnée.',
+      speechWolof: 'Chiffre d\'affaires bi dafay wone limu xaalis bi nga gaañe ci jaay-jaay yi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 35,
+      title: '35. Flux de Trésorerie',
+      description: 'Bilan net entre les entrées de caisse et les sorties de la période.',
+      targetAcomId: 'dashboard.stats.cashflow_card',
+      actionToPerform: 'observe',
+      speechFr: 'Le flux de trésorerie permet de suivre les entrées et les sorties financières enregistrées sur la période.',
+      speechWolof: 'Flux de trésorerie bi dafay wone xaalis bi dugge ak bi génne ci waxtu wi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 36,
+      title: '36. Dépenses Cumulées',
+      description: 'Somme des décaissements et charges opérationnelles comptabilisées.',
+      targetAcomId: 'dashboard.stats.expenses_card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette carte présente les dépenses enregistrées pour la période sélectionnée.',
+      speechWolof: 'Kàrt wii dafay wone dépense yëpp yi nga bind ci weer wi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 37,
+      title: '37. Bénéfice Net Consolidé',
+      description: 'Résultat net d\'exploitation égal au chiffre d\'affaires moins les charges.',
+      targetAcomId: 'dashboard.stats.net_profit_card',
+      actionToPerform: 'observe',
+      speechFr: 'Le bénéfice net présente le résultat net calculé à partir des données disponibles pour la période.',
+      speechWolof: 'Bénéfice net bi mooy li nga ci gaañe dëgg-dëgg mu waññiku dépense yi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 38,
+      title: '38. Volume des Transactions',
+      description: 'Nombre de tickets de caisse ou ventes validées durant la période.',
+      targetAcomId: 'dashboard.stats.sales_volume_card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette carte présente le volume des ventes enregistré sur la période sélectionnée.',
+      speechWolof: 'Kàrt wii dafay wone limu transaction yi nga def ci weer wi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 39,
+      title: '39. Panier Moyen Client',
+      description: 'Dépense moyenne effectuée par client sur chaque transaction.',
+      targetAcomId: 'dashboard.stats.average_basket_card',
+      actionToPerform: 'observe',
+      speechFr: 'Le panier moyen indique la valeur moyenne d\'une transaction selon les données disponibles.',
+      speechWolof: 'Panier moyen bi dafay wone cér bi client bu nekk di fay ci am vente.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 40,
+      title: '40. Marge Brute de Vente',
+      description: 'Bénéfice direct réalisé sur la revente des marchandises.',
+      targetAcomId: 'dashboard.stats.sales_profit_card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette carte présente le bénéfice associé aux ventes sur la période sélectionnée.',
+      speechWolof: 'Kàrt wii dafay wone marge brute bi nga am ci jaay-jaay yi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 41,
+      title: '41. Alertes de Stock Faible',
+      description: 'Compteur d\'articles ayant atteint ou franchi le seuil d\'alerte.',
+      targetAcomId: 'dashboard.stats.stock_alerts_card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette carte permet d\'identifier rapidement les éventuelles alertes liées au stock.',
+      speechWolof: 'Kàrt wii dafay tax nga mën a ràññee gaaw alertes yi nekk ci stock bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 42,
+      title: '42. Graphique de Performance Financière',
+      description: 'Courbes comparatives quotidiennes des ventes et des charges d\'exploitation.',
+      targetAcomId: 'dashboard.charts.performance_card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone présente l\'évolution de la performance financière sur la période affichée. Elle permet de visualiser les tendances des données disponibles.',
+      speechWolof: 'Graphique bi dafay wone ni xaalis bi di soppikoo bés bu nekk ci ay jaay ak ay dépense.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 43,
+      title: '43. Synthèse Comptable',
+      description: 'Tableau récapitulatif des agrégats financiers et ratios de gestion.',
+      targetAcomId: 'dashboard.accounting.summary_card',
+      actionToPerform: 'observe',
+      speechFr: 'Le résumé comptable rassemble les principaux indicateurs financiers dans une présentation synthétique.',
+      speechWolof: 'Résumé comptable bi dafa dajale revenus yi, dépenses yi ak marge nette bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 44,
+      title: '44. Journal des Activités Récentes',
+      description: 'Fil d\'actualité des dernières opérations saisies dans le système.',
+      targetAcomId: 'dashboard.activity.recent_feed',
+      actionToPerform: 'observe',
+      speechFr: 'Cette section présente les dernières activités enregistrées dans l\'application. Elle permet de suivre rapidement les opérations récentes.',
+      speechWolof: 'Wàll wii dafay wone jëf yu mujj yi ñu def ci application bi ci waxtu wu nekk.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 45,
+      title: '45. Bilan des Flux Financiers',
+      description: 'Consolidation récapitulative des mouvements de fonds du commerce.',
+      targetAcomId: 'dashboard.recap.general_card',
+      actionToPerform: 'observe',
+      speechFr: 'Cette section permet de consulter les derniers mouvements financiers enregistrés dans l\'application.',
+      speechWolof: 'Wàll wii dafay tax nga mën a xool bilan des mouvements financiers yi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 46,
+      title: '46. Surveillance des Articles en Rupture',
+      description: 'Liste détaillée des références nécessitant un réapprovisionnement urgent.',
+      targetAcomId: 'dashboard.stock.low_stock_table',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone permet de surveiller les articles qui sont en rupture de stock ou qui nécessitent une attention particulière.',
+      speechWolof: 'Wàll wii dafay saytu produit yi mën a jeex wala yi am manque ci stock bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 47,
+      title: '47. Widget Floating Assistant Acom IA',
+      description: 'Bouton d\'appel permanent de l\'assistant intelligent disponible 24/7 en Français et Wolof.',
+      targetAcomId: 'dashboard.assistant_floating_btn',
+      actionToPerform: 'observe',
+      speechFr: 'L\'assistant Acom IA reste accessible depuis l\'interface afin de vous accompagner lorsque vous avez besoin d\'aide ou d\'informations.',
+      speechWolof: 'Assistant Acom IA bi mu ngi nekk ci wàllu sufe ngir dimbali la waxtu wu nekk.',
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 48,
+      title: '48. Centre de Notification & Système',
+      description: 'Rappels système, alertes de licence et notifications utilisateur.',
+      targetAcomId: 'header.notifications',
+      actionToPerform: 'observe',
+      speechFr: 'Cette zone regroupe les indications système et les informations relatives à votre environnement de travail.',
+      speechWolof: 'Fi nga koy gise xibaaru système bi ak xibaar yu yees yi nekk ci sa mbootay.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 49,
+      title: '49. Pied de Page Général',
+      description: 'Informations de copyright, liens de support technique et mentions légales.',
+      targetAcomId: 'dashboard.footer',
+      actionToPerform: 'observe',
+      speechFr: 'Nous arrivons à la fin de la page. Le pied de page contient les informations générales et les accès complémentaires du logiciel.',
+      speechWolof: 'Yegsi nañu ci sufe xët bi. Pied de page bi dafa am xibaar yi gëna yaatu ak support technique bi.',
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 50,
+      title: '50. Synthèse & Conclusion du Premier Contact',
+      description: 'Bravo ! Vous maîtrisez désormais l\'ensemble de l\'organisation générale du tableau de bord Aperçu.',
+      targetAcomId: 'header.logo_and_title',
+      actionToPerform: 'observe',
+      speechFr: 'Vous venez de parcourir l\'ensemble de la page Aperçu de Management Commerce. Vous avez découvert l\'organisation générale d\'Acom, les informations de votre environnement, les accès rapides, la navigation principale, le briefing, la synchronisation, les indicateurs de stock et de vente, les statistiques financières, les activités récentes, les flux financiers et les alertes de stock. Cette page constitue votre point de départ pour naviguer dans le reste du logiciel. Vous savez maintenant où retrouver les principales informations et les différents modules de gestion.',
+      speechWolof: 'Jéxal nañu njàngale xët u Aperçu bi ci Management Commerce. Xam nga léegi ni Acom tege, yoonu navigation bi, briefing bi, synchronisation bi, stat yi, dépense yi ak alertes yi yëpp. Xët wii mooy sa tambalikaay ngir dox ci lepp lu am ci logiciel bi.',
+      stepCategory: 'final'
+    }
+  ]
+};
+
+export const COUTURE_OVERVIEW_TUTORIAL: TutorialScenario = {
+  id: 'couture_tutorial_dashboard',
+  title: 'Présentation Complète — Ateliers de Couture & Confection',
+  description: 'Tutoriel guidé interactif pour analyser l\'environnement de travail, les fiches mesures, les acomptes, les commandes en atelier et la santé financière.',
+  saasModule: 'tailleur',
+  estimatedDurationSec: 420,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Identité « Acom Creative Studio » / Logo et Titre',
+      description: 'Logo et identité générale de votre atelier de création textile et de confection sur mesure.',
+      targetAcomId: 'header.logo_and_title',
+      actionToPerform: 'observe',
+      speechFr: "Bienvenue dans Acom Creative Studio pour les Ateliers de Couture. Cette zone présente le logo et l'identité de votre atelier de création textile et de confection sur mesure.",
+      speechWolof: "Dalal jàmm ci Acom Creative Studio ngir Ateliers de Couture. Fi mooy wone logo ak tàmbli yu sa atelier de couture ak ñaw sur mesure.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Nom du Logiciel / SaaS Actif « Ateliers de Couture »',
+      description: 'Environnement métier dédié au pilotage des prises de mesures et des commandes de confection.',
+      targetAcomId: 'header.module_name',
+      actionToPerform: 'observe',
+      speechFr: "Vous êtes actuellement connecté au logiciel Ateliers de Couture, conçu pour piloter les prises de mesures, le suivi des commandes clients, la gestion des coupons de tissus et l'activité de vos artisans.",
+      speechWolof: "Yaa ngi léegi ci logiciel Ateliers de Couture, ngir saytu natt yi, commande yu ñaw yi, kuponu sër yi ak liggéeyu tayër yi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 3,
+      title: '3. Formule / Plan de l\'Atelier',
+      description: 'Formule d\'abonnement active déterminant les fonctionnalités et capacités de votre atelier.',
+      targetAcomId: 'header.plan_badge',
+      actionToPerform: 'observe',
+      speechFr: "Ce badge indique votre formule d'abonnement active, déterminant vos capacités d'enregistrement de fiches mesures, de gestion des stocks tissus et d'accès aux modules avancés.",
+      speechWolof: "Badge bi dafay wone formule bi nga abonné, muy tax nga xam li nga mën a def ci commande mesures ak stock sër.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 4,
+      title: '4. Mode d\'Affichage (Thème Clair / Sombre)',
+      description: 'Bascule entre le mode clair et le mode sombre pour un confort visuel optimal en atelier.',
+      targetAcomId: 'header.theme_toggle',
+      actionToPerform: 'observe',
+      speechFr: "Ce bouton permet d'alterner entre le mode clair et le mode sombre pour un confort visuel optimal lors de vos sessions de travail en atelier.",
+      speechWolof: "Bouton bi dafay tax nga soppi leer gi ak lëndëm gi ngir gëna yombal sa xool ci atelier bi.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 5,
+      title: '5. Notifications Atelier',
+      description: 'Alertes en temps réel sur les échéances d\'essayage, livraisons prêtes et réapprovisionnements.',
+      targetAcomId: 'header.notifications',
+      actionToPerform: 'observe',
+      speechFr: "La cloche de notifications vous informe en direct des échéances d'essayage, des commandes prêtes pour livraison et des alertes sur vos coupons de tissus.",
+      speechWolof: "Kloche bi dafay yëgle waxtu essayage yi, commande yu paré ngir livraison ak artu yu sër yi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 6,
+      title: '6. Profil Gestionnaire Atelier',
+      description: 'Informations du compte utilisateur connecté et accès aux paramètres de sécurité.',
+      targetAcomId: 'header.user_profile',
+      actionToPerform: 'observe',
+      speechFr: "Cette section affiche l'identité du maître tailleur ou gestionnaire connecté, avec un accès direct aux paramètres de compte et de sécurité.",
+      speechWolof: "Fi dafay wone kiy géré atelier bi, ak yoon wu gaaw ngir dem ci compte bi ak kaaraange gi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 7,
+      title: '7. Licence Locale Active',
+      description: 'Garantie de fonctionnement autonome et continu de l\'atelier même hors connexion Internet.',
+      targetAcomId: 'header.licence_status',
+      actionToPerform: 'observe',
+      speechFr: "Votre licence locale garantit un fonctionnement continu et autonome de votre atelier, même en cas de coupure totale d'Internet.",
+      speechWolof: "Licence locale bi dafay wone ni sa atelier mën na liggéey ci anam bu mat sax soo amul connexion Internet.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 8,
+      title: '8. Ateliers Actifs',
+      description: 'Nombre d\'ateliers, points de prise de mesures ou boutiques rattachés.',
+      targetAcomId: 'header.stores_count',
+      actionToPerform: 'observe',
+      speechFr: "Cet indicateur affiche le nombre d'ateliers, de points de prise de mesures ou de boutiques de prêt-à-porter rattachés à votre compte.",
+      speechWolof: "Fi dafay wone limu atelier, bérabu natt wala boutique yu prêt-à-porter yi nga yor.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 9,
+      title: '9. Sélecteur de SaaS Actif',
+      description: 'Bascule instantanée vers les autres logiciels de la suite Acom.',
+      targetAcomId: 'header.active_saas',
+      actionToPerform: 'observe',
+      speechFr: "Le sélecteur de SaaS vous permet de basculer instantanément vers les autres univers de la suite Acom selon vos activités complémentaires.",
+      speechWolof: "Sélecteur bi dafay tax nga mën a wacc ci yeneen logiciel Acom soo amee yeneen liggéey.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 10,
+      title: '10. Date d\'Écriture Disque Sécurisée',
+      description: 'Horodatage de la dernière écriture sécurisée dans la base de données locale.',
+      targetAcomId: 'header.disk_write',
+      actionToPerform: 'observe',
+      speechFr: "Cette métrique confirme l'écriture immédiate et sécurisée de chaque fiche de mesure et commande couture dans la base de données locale de votre ordinateur.",
+      speechWolof: "Fi dafay wone ni lepp lu nga bind ci natt ak commande dafay dencu dërët ci masin bi ci anam bu kaaraange.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 11,
+      title: '11. Bandeau Accès Rapides',
+      description: 'Raccourcis transversaux vers les outils clés de la plateforme.',
+      targetAcomId: 'dashboard.quick_access.bar',
+      actionToPerform: 'observe',
+      speechFr: "Le bandeau d'accès rapides rassemble les raccourcis essentiels vers les outils transversaux de votre atelier.",
+      speechWolof: "Bandeau bi dafa dajale yoon yu gaaw yëpp ngir dugg ci jumtukaay yu am solo yi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 12,
+      title: '12. Bouton Acom IA Démo',
+      description: 'Lancement du simulateur interactif et de la formation guidée en atelier.',
+      targetAcomId: 'dashboard.quick_access.ai_demo_btn',
+      actionToPerform: 'observe',
+      speechFr: "Le bouton Acom IA Démo lance votre assistant et simulateur de formation pour maîtriser l'ensemble des fonctionnalités couture en situation réelle.",
+      speechWolof: "Bouton Acom IA Démo dafay ubbil la ndimbalu formation bi ngir jàng ni ñuy doxale atelier couture bi.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 13,
+      title: '13. Bouton AcomZone',
+      description: 'Partage de modèles, synchronisation collaborative multisite et interconnexion.',
+      targetAcomId: 'dashboard.quick_access.acomzone_btn',
+      actionToPerform: 'observe',
+      speechFr: "AcomZone facilite le partage de modèles de tenues, de fiches techniques et la synchronisation multisite entre vos différents ateliers de confection.",
+      speechWolof: "AcomZone dafay tax nga mën a séddoo model yu bees yi ak a lëkkaloo ak yeneen atelier.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 14,
+      title: '14. Application Desktop Native',
+      description: 'Téléchargement de la version installable hors ligne pour ordinateur.',
+      targetAcomId: 'dashboard.quick_access.desktop_btn',
+      actionToPerform: 'observe',
+      speechFr: "Téléchargez et utilisez la version Bureau pour une rapidité maximale à la prise de mesures et un fonctionnement 100 % hors ligne garanti.",
+      speechWolof: "Jëlël version Bureau bi ngir liggéey bu gëna gaaw te mën a dox ci kow masin bi te du laaj connexion.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 15,
+      title: '15. Documentation Technique & Guides',
+      description: 'Manuels d\'utilisation, barèmes de coupe et guides pratiques pour tailleurs.',
+      targetAcomId: 'dashboard.quick_access.docs_btn',
+      actionToPerform: 'observe',
+      speechFr: "Consultez les guides pratiques, barèmes de mesures et manuels d'utilisation pour exploiter au mieux votre logiciel couture.",
+      speechWolof: "Xoolal téerey njàngale yi ak dosiye yi ngir gëna xam ni ñuy doxale logiciel bi.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 16,
+      title: '16. Déconnexion de Session',
+      description: 'Clôture sécurisée de la session de travail active.',
+      targetAcomId: 'dashboard.quick_access.logout_btn',
+      actionToPerform: 'observe',
+      speechFr: "Ce bouton clôture votre session de travail en sécurisant l'intégrité de toutes les mesures et encaissements enregistrés.",
+      speechWolof: "Bouton bi dafay tëj sa session ci kaaraange te denc lepp loo bindoon.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 17,
+      title: '17. Navigation Principale Couture',
+      description: 'Barre de navigation transversale organisant l\'ensemble des modules de l\'atelier.',
+      targetAcomId: 'merchant.navbar',
+      actionToPerform: 'observe',
+      speechFr: "La barre de navigation principale structure l'ensemble des modules opérationnels de votre atelier de couture et de confection.",
+      speechWolof: "Barre de navigation bi mooy wone yoon yëpp yu am ci atelier couture bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 18,
+      title: '18. Onglet Aperçu (Actif)',
+      description: 'Tableau de bord central consolidant les indicateurs clés et l\'activité en temps réel.',
+      targetAcomId: 'nav-dashboard',
+      actionToPerform: 'observe',
+      speechFr: "L'onglet Aperçu est le tableau de bord central. Il offre une vue globale en temps réel sur la santé financière, les commandes en cours et la synchronisation de l'atelier.",
+      speechWolof: "Onglet Aperçu mooy tableau de bord bi. Dafay wone ci saas bi méttaayu xaalis bi, commande yi ñuy ñaw ak synchronisation bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 19,
+      title: '19. Onglet Clients Couture',
+      description: 'Répertoire des clients, carnet d\'adresses et préférences de coupe.',
+      targetAcomId: 'nav-tailleur_clients',
+      actionToPerform: 'observe',
+      speechFr: "Le module Clients Couture gère le répertoire de vos clients, leur historique de modèles commandés et leurs préférences de styles.",
+      speechWolof: "Module Clients Couture dafay denc turu client yi, model yi ñu bëgg ak yére yi ñu mas a ñawlo.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 20,
+      title: '20. Onglet Commandes Mesures',
+      description: 'Saisie des mensurations corporelles, attribution des fiches et étapes de confection.',
+      targetAcomId: 'nav-tailleur_orders',
+      actionToPerform: 'observe',
+      speechFr: "Le module Commandes Mesures est le cœur de votre atelier. Il permet de saisir les mensurations complètes (épaules, poitrine, tour de taille, longueur) et de suivre les étapes : coupe, couture, essayage et livraison.",
+      speechWolof: "Module Commandes Mesures mooy xolu atelier bi. Fi ngay binde natt yëpp (mbagg, dënn, ndigg, gudday) ak saytu ni ñaw bi di jëme kanam ba keroog ñuy livrer.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 21,
+      title: '21. Onglet Tissus & Wax',
+      description: 'Inventaire des coupons de tissus, métrages de wax, bazins, soies et approvisionnements.',
+      targetAcomId: 'nav-tailleur_tissus',
+      actionToPerform: 'observe',
+      speechFr: "Le module Tissus & Wax suit vos métrages de tissus, coupons de wax, bazins, soies et fournitures apportées par les clients ou issues de votre stock.",
+      speechWolof: "Module Tissus & Wax dafay saytu metr yu sër yi, kuponu wax, bazin, soye ak sër yi client yi indi.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 22,
+      title: '22. Onglet Boutique Prêt-à-Porter',
+      description: 'Catalogue et vente directe des créations finies et tenues exposées en showroom.',
+      targetAcomId: 'nav-tailleur_boutique',
+      actionToPerform: 'observe',
+      speechFr: "La Boutique Prêt-à-Porter permet de vendre directement les créations, tenues confectionnées d'avance et accessoires exposés dans votre showroom.",
+      speechWolof: "Boutique Prêt-à-Porter dafay tax nga mën a jaay yére yi nga ñaw ba noppi ak accessoire yi nekk ci sa showroom.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 23,
+      title: '23. Onglet Inspirations & Moodboards',
+      description: 'Galerie visuelle de modèles, catalogues de tendances et albums pour conseiller vos clients.',
+      targetAcomId: 'nav-tailleur_gallery',
+      actionToPerform: 'observe',
+      speechFr: "Le catalogue d'inspirations regroupe vos catalogues de modèles, moodboards visuels et albums de créations pour conseiller vos clients lors du choix de leurs tenues.",
+      speechWolof: "Wàllu Inspirations dafa dajale photo model yu rafet yi ak galeri créations ngir wone ko client yi bu ñuy tànn model.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 24,
+      title: '24. Onglet Artisans & Équipe',
+      description: 'Gestion de l\'équipe de confection, attribution des coupes et suivi de productivité.',
+      targetAcomId: 'nav-tailleur_artisans',
+      actionToPerform: 'observe',
+      speechFr: "Le module Artisans & Équipe attribue les fiches de confection à vos coupeurs et couturiers, et suit la productivité de chaque membre de l'atelier.",
+      speechWolof: "Module Artisans & Équipe dafay jox liggéey bi coupeur yi ak tailleur yi tey saytu liggéey bu nekk.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 25,
+      title: '25. Onglet Mercerie & Coût de Revient',
+      description: 'Calcul précis du prix de revient : fils, doublures, boutons, fermetures et temps passé.',
+      targetAcomId: 'nav-tailleur_mercerie',
+      actionToPerform: 'observe',
+      speechFr: "Ce module calcule le coût de revient précis de chaque modèle en intégrant les fils, fermetures, boutons, doublures et temps de main d'œuvre pour fixer des tarifs rentables.",
+      speechWolof: "Module bi dafay natt njagum ñaw bi ci wénji, bouton, doublure ak waxtu liggéey ngir am bénéfice bu baax.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 26,
+      title: '26. Onglet Clôture de Caisse',
+      description: 'Arrêté quotidien de caisse, réconciliation des acomptes et solde des tenues livrées.',
+      targetAcomId: 'nav-tailleur_closure',
+      actionToPerform: 'observe',
+      speechFr: "La Clôture de Caisse permet d'arrêter les comptes de la journée, de contrôler les acomptes encaissés, les soldes reçus à la livraison et les décaissements.",
+      speechWolof: "Clôture de Caisse dafay tëj caisse u bés bi, saytu acompte yi dugge, reliquat yi ñu fay bu ñuy jël yére ak dépense yi.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 27,
+      title: '27. Onglet Comptabilité Atelier',
+      description: 'Consolidation financière des recettes de confection, ventes de prêt-à-porter et dépenses.',
+      targetAcomId: 'nav-accounting',
+      actionToPerform: 'observe',
+      speechFr: "Le module Compta consolide le chiffre d'affaires couture, les recettes de prêt-à-porter, les charges d'atelier et calcule votre rentabilité nette.",
+      speechWolof: "Module Compta dafay dajale xaalis bi dugge ci ñaw ak jaay, dépense yu atelier bi te wone sa bénéfice net.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 28,
+      title: '28. Onglet Rapports & Statistiques',
+      description: 'Analyses des modèles les plus demandés, des périodes d\'affluence et des bénéfices.',
+      targetAcomId: 'nav-reports',
+      actionToPerform: 'observe',
+      speechFr: "Les Rapports fournissent des graphiques détaillés sur les modèles les plus demandés, la saisonnalité des commandes et les performances financières.",
+      speechWolof: "Rapports yi dafay joxe graphique yu lér ci model yi gëna dox, waxtu fête yi ak li atelier bi di gaañe.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 29,
+      title: '29. Onglet Réglages & Paramètres',
+      description: 'Configuration générale de l\'atelier, barèmes de mesures, devises et reçus.',
+      targetAcomId: 'nav-settings',
+      actionToPerform: 'observe',
+      speechFr: "Les Réglages configurent votre atelier : barèmes de mesures par défaut, devises, modèles d'impression de reçus de prise de mesures et préférences de notifications.",
+      speechWolof: "Réglages yi dafay tax nga régler barème natt yi, xaalis bi nga ciy liggéeyee, ak ni reçu natt bi di génnee.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 30,
+      title: '30. Briefing Matinal Intelligent',
+      description: 'Recommandations quotidiennes pour orienter les actions prioritaires de confection.',
+      targetAcomId: 'dashboard.briefing.card',
+      actionToPerform: 'observe',
+      speechFr: "Cette zone présente le briefing matinal intelligent généré pour votre atelier : rappels des essayages prévus aujourd'hui, livraisons urgentes et alertes prioritaires.",
+      speechWolof: "Wàll wii mooy briefing u suba bi. Dafay wone essayage yu bés bi, yére yi war a livré te leegi ak li gëna am solo.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 31,
+      title: '31. Moteur de Synchronisation',
+      description: 'Statut du moteur de données assurant un fonctionnement continu hors ligne et cloud.',
+      targetAcomId: 'dashboard.sync.card',
+      actionToPerform: 'observe',
+      speechFr: "Le moteur de synchronisation assure la conservation locale de vos fiches clients et mesures, et synchronise automatiquement les données dès qu'une connexion est établie.",
+      speechWolof: "Moteur de synchronisation bi dafay denc natt yi ci masin bi te di ko yóbbu ci cloud bi bu amee connexion.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 32,
+      title: '32. Commandes de Synchronisation',
+      description: 'Actions de synchronisation manuelle, sauvegarde locale et restauration de données.',
+      targetAcomId: 'dashboard.sync.actions_zone',
+      actionToPerform: 'observe',
+      speechFr: "Ces boutons permettent de forcer la synchronisation manuelle, d'exporter une sauvegarde complète de votre atelier ou de restaurer vos données.",
+      speechWolof: "Bouton yii dafay tax nga mën a forcer synchronisation bi, denc sauvegarde bu sa atelier wala délloosi données yi.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 33,
+      title: '33. Indicateur Commandes Couture',
+      description: 'Montant total et volume des fiches de mesures et commandes en confection.',
+      targetAcomId: 'dashboard.couture.orders_card',
+      actionToPerform: 'observe',
+      speechFr: "Cette carte présente le volume d'affaires total et le nombre de fiches de mesures et commandes en cours de confection dans l'atelier.",
+      speechWolof: "Kàrt wii dafay wone limu commande mesures yi ak fiches yi ñuy ñaw léegi ci atelier bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 34,
+      title: '34. Indicateur Total Acomptes',
+      description: 'Montant des acomptes perçus à la commande et nombre de pièces livrées.',
+      targetAcomId: 'dashboard.couture.advances_card',
+      actionToPerform: 'observe',
+      speechFr: "Cette carte affiche le montant total des acomptes perçus lors de la prise de commande ainsi que le nombre de tenues déjà livrées et soldées.",
+      speechWolof: "Kàrt wii dafay wone xaalis bi ñu jël ci acompte ak limu commande yi paré te livrer nañu leen.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 35,
+      title: '35. Période d\'Analyse des Ventes',
+      description: 'Sélecteur de fenêtre temporelle de calcul pour les cartes statistiques.',
+      targetAcomId: 'dashboard.stats.period_select',
+      actionToPerform: 'observe',
+      speechFr: "Ce sélecteur ajuste la période d'analyse des statistiques de l'atelier : aujourd'hui, cette semaine, ce mois ou vue annuelle.",
+      speechWolof: "Fi ngay tànne jamono bi nga bëgg xool stat yi : tey, ayibiyé, weer wi wala at mi.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 36,
+      title: '36. Dépenses d\'Atelier',
+      description: 'Cumul des charges d\'exploitation, mercerie, tissus et entretien.',
+      targetAcomId: 'dashboard.stats.expenses_card',
+      actionToPerform: 'observe',
+      speechFr: "Cette carte totalise les dépenses de l'atelier sur la période : achats de mercerie, coupons de tissus, maintenance des machines à coudre et charges.",
+      speechWolof: "Kàrt wii dafay dajale dépense yëpp yu atelier bi : jënd wénji, sër, entretien masin yi ak leneen.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 37,
+      title: '37. Bénéfice Net Consolidé',
+      description: 'Résultat net d\'exploitation après déduction des coûts d\'atelier.',
+      targetAcomId: 'dashboard.stats.net_profit_card',
+      actionToPerform: 'observe',
+      speechFr: "Le bénéfice net calcule le résultat net réel de l'atelier après déduction de toutes les dépenses et charges de confection.",
+      speechWolof: "Bénéfice net bi mooy li nga gaañe dëgg-dëgg bu ñu waññee dépense yi yëpp ci li dugge ci ñaw bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 38,
+      title: '38. Graphique de Performance Financière',
+      description: 'Évolution quotidienne comparée des encaissements et des charges.',
+      targetAcomId: 'dashboard.charts.performance_card',
+      actionToPerform: 'observe',
+      speechFr: "Ce graphique illustre l'évolution temporelle de vos encaissements couture et de vos charges d'atelier pour visualiser vos tendances d'activité.",
+      speechWolof: "Graphique bi dafay wone ni xaalis bi di soppikoo bés bu nekk ci acompte, reliquat ak dépense.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 39,
+      title: '39. Synthèse Comptable Atelier',
+      description: 'Synthèse des agrégats financiers et ratios de rentabilité textile.',
+      targetAcomId: 'dashboard.accounting.summary_card',
+      actionToPerform: 'observe',
+      speechFr: "Le résumé comptable synthétise vos recettes de confection, marges de prêt-à-porter et soldes restant à encaisser à la livraison.",
+      speechWolof: "Résumé comptable bi dafa dajale li dugge ci ñaw, li des ci fay ak marge nette bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 40,
+      title: '40. Journal des Activités Récentes',
+      description: 'Fil d\'actualité des dernières fiches créées, essayages et livraisons.',
+      targetAcomId: 'dashboard.activity.recent_feed',
+      actionToPerform: 'observe',
+      speechFr: "Ce fil d'actualité retrace les dernières actions enregistrées : nouvelles fiches de mesures créées, acomptes versés, tenues passées à l'essayage ou livrées.",
+      speechWolof: "Fil d'activité bi dafay wone jëf yu mujj yi : commande yu bees, acompte yu ñu fay, yére yi ñu essayee wala livré.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 41,
+      title: '41. Bilan des Flux Financiers',
+      description: 'Consolidation récapitulative des mouvements de trésorerie de l\'atelier.',
+      targetAcomId: 'dashboard.recap.general_card',
+      actionToPerform: 'observe',
+      speechFr: "Cette section récapitule les flux monétaires consolidés entre encaissements d'acomptes, règlements finaux et sorties de fonds de l'atelier.",
+      speechWolof: "Wàll wii dafay tax nga mën a xool bilan bu mat ci xaalis bi dugge ak bi génne ci atelier bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 42,
+      title: '42. Dernières Commandes Couture en Atelier',
+      description: 'Tableau des commandes récentes : client, modèle, montant et statut d\'avancement.',
+      targetAcomId: 'dashboard.couture.recent_orders_card',
+      actionToPerform: 'observe',
+      speechFr: "Ce tableau liste les fiches de commande les plus récentes avec le nom du client, le modèle choisi, le montant et l'état d'avancement : prise de mesures, coupe, confection, essayage ou prêt.",
+      speechWolof: "Tableau bi dafay wone commande yu mujj yi : turu client bi, model bi mu bëgg, njag li ak fan la ñaw bi tollu ba keroog mu paré.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 43,
+      title: '43. Widget Flottant Assistant Acom IA',
+      description: 'Assistant intelligent disponible 24/7 en Français et Wolof pour guider vos opérations.',
+      targetAcomId: 'dashboard.assistant_floating_btn',
+      actionToPerform: 'observe',
+      speechFr: "L'assistant Acom IA reste à votre disposition 24h sur 24 pour répondre à vos questions, générer des fiches de mesure vocales et vous guider dans vos tâches.",
+      speechWolof: "Assistant Acom IA bi mu ngi nekk ci wàllu sufe ngir dimbali la waxtu wu nekk ci wax wala ci bind.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 44,
+      title: '44. Centre de Notification & Système',
+      description: 'Alertes système, rappels de rendez-vous d\'essayage et notifications.',
+      targetAcomId: 'header.notifications',
+      actionToPerform: 'observe',
+      speechFr: "Cette zone regroupe les alertes relatives à la synchronisation, les rappels d'essayages clients et les informations d'intégrité de l'application.",
+      speechWolof: "Fi nga koy gise xibaaru système bi ak rappels essayage yi am solo ci sa atelier.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 45,
+      title: '45. Pied de Page Général',
+      description: 'Mentions légales, numéro de version et support technique.',
+      targetAcomId: 'dashboard.footer',
+      actionToPerform: 'observe',
+      speechFr: "Le pied de page contient les mentions légales, la version du logiciel et les liens d'accès direct au support technique Acom.",
+      speechWolof: "Pied de page bi dafa am xibaar yi gëna yaatu ak support technique bi ngir dimbali la.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 46,
+      title: '46. Synthèse & Conclusion du Premier Contact Couture',
+      description: 'Félicitations ! Vous maîtrisez l\'organisation générale du tableau de bord Ateliers de Couture.',
+      targetAcomId: 'header.logo_and_title',
+      actionToPerform: 'observe',
+      speechFr: "Félicitations ! Vous venez de parcourir l'ensemble de la page Aperçu du SaaS Ateliers de Couture. Vous maîtrisez désormais l'identité de votre atelier, la barre de navigation, le suivi des fiches mesures, les indicateurs d'acomptes, la santé financière et la synchronisation. Cette page constitue votre tour de contrôle pour piloter sereinement la confection sur mesure et la satisfaction de vos clients.",
+      speechWolof: "Jéxal nañu njàngale xët u Aperçu bi ci Ateliers de Couture ! Xam nga léegi ni atelier bi tege, yoonu navigation bi, saytu natt yi ak commande yi, xaalis bi, stat yi ak synchronisation bi. Xët wii mooy sa tour de contrôle ngir sa atelier de couture gëna jëm kanam ci ndam.",
+      stepCategory: 'final'
     }
   ]
 };
@@ -3639,6 +4730,126 @@ export const COMMERCE_BILLING_PRINT_MODAL_TUTORIAL: TutorialScenario = {
   ]
 };
 
+export const MERCHANT_AUDIT_LOG_TUTORIAL: TutorialScenario = {
+  id: 'merchant_audit_log_tutorial',
+  title: 'Tutoriel Journal d\'Audit',
+  description: 'Présentation guidée et traçabilité complète des flux de stock et opérations d\'audit.',
+  saasModule: 'commerce',
+  estimatedDurationSec: 120,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Présentation de la Page',
+      description: 'Bienvenue dans le Journal d’Audit. Cette page permet de suivre la traçabilité des flux de stock et de consulter les opérations enregistrées dans le système.',
+      targetAcomId: 'audit.title',
+      actionToPerform: 'observe',
+      speechFr: 'Bienvenue dans le Journal d’Audit. Cette page permet de suivre la traçabilité des flux de stock et de consulter les opérations enregistrées dans le système.',
+      speechWolof: 'Dalal ak jamm ci Journal d’Audit. Xët wii dafa lay may nga top topatoo mbootu stock ak opérations yi nekk ci système bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Indicateur Temps Réel',
+      description: 'L’indicateur Temps réel permet de savoir que les informations affichées sont suivies en temps réel. Il permet de garder une vision actualisée des mouvements enregistrés.',
+      targetAcomId: 'audit.realtime',
+      actionToPerform: 'observe',
+      speechFr: 'L’indicateur Temps réel permet de savoir que les informations affichées sont suivies en temps réel. Il permet de garder une vision actualisée des mouvements enregistrés.',
+      speechWolof: 'Indicateur Temps réel dafa lay wone ni xibaar yi dañu leen di topetoo leegi leegi ci temps réel.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 3,
+      title: '3. Tableau d’Audit',
+      description: 'Voici le journal des opérations. Les informations sont organisées dans un tableau afin de faciliter la lecture et le suivi des mouvements de stock.',
+      targetAcomId: 'audit.table',
+      actionToPerform: 'observe',
+      speechFr: 'Voici le journal des opérations. Les informations sont organisées dans un tableau afin de faciliter la lecture et le suivi des mouvements de stock.',
+      speechWolof: 'Bii mooy journal des opérations. Tableau bi da lay may nga mën a jàng ak top yëngu-yëngu stock bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 4,
+      title: '4. Horodatage',
+      description: 'La colonne Horodatage indique la date et l’heure auxquelles chaque opération a été enregistrée. Elle permet de suivre précisément la chronologie des mouvements.',
+      targetAcomId: 'audit.col.timestamp',
+      actionToPerform: 'observe',
+      speechFr: 'La colonne Horodatage indique la date et l’heure auxquelles chaque opération a été enregistrée. Elle permet de suivre précisément la chronologie des mouvements.',
+      speechWolof: 'Colonne Horodatage da lay wone date ak heure bi opération nekk amé.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 5,
+      title: '5. Produit',
+      description: 'La colonne Produit permet d’identifier l’article concerné par le mouvement enregistré.',
+      targetAcomId: 'audit.col.product',
+      actionToPerform: 'observe',
+      speechFr: 'La colonne Produit permet d’identifier l’article concerné par le mouvement enregistré.',
+      speechWolof: 'Colonne Produit da lay may nga xam marse am mouvement.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 6,
+      title: '6. Type de Flux',
+      description: 'La colonne Type de flux permet d’identifier la nature du mouvement enregistré, par exemple une entrée ou une sortie de stock.',
+      targetAcomId: 'audit.col.type',
+      actionToPerform: 'observe',
+      speechFr: 'La colonne Type de flux permet d’identifier la nature du mouvement enregistré, par exemple une entrée ou une sortie de stock.',
+      speechWolof: 'Colonne Type de flux da lay wone baxam entrée wala sortie de stock la.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 7,
+      title: '7. Quantité',
+      description: 'La colonne Quantité indique le volume d’articles concerné par le mouvement.',
+      targetAcomId: 'audit.col.quantity',
+      actionToPerform: 'observe',
+      speechFr: 'La colonne Quantité indique le volume d’articles concerné par le mouvement.',
+      speechWolof: 'Colonne Quantité da lay wone limu produits yi yëngu.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 8,
+      title: '8. Delta Stock',
+      description: 'Le Delta Stock permet de visualiser l’impact du mouvement sur la quantité disponible en stock.',
+      targetAcomId: 'audit.col.delta',
+      actionToPerform: 'observe',
+      speechFr: 'Le Delta Stock permet de visualiser l’impact du mouvement sur la quantité disponible en stock.',
+      speechWolof: 'Delta Stock da lay wone soppi-soppi bi am ci limu stock bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 9,
+      title: '9. Motif / Raison',
+      description: 'Cette colonne permet de consulter la justification ou la raison associée à l’opération lorsqu’elle est renseignée.',
+      targetAcomId: 'audit.col.reason',
+      actionToPerform: 'observe',
+      speechFr: 'Cette colonne permet de consulter la justification ou la raison associée à l’opération lorsqu’elle est renseignée.',
+      speechWolof: 'Colonne wii da lay may nga seet sebabu opération bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 10,
+      title: '10. Navigation',
+      description: 'Vous êtes actuellement dans la section Audit. Les autres sections permettent d’accéder aux différentes fonctions de gestion de l’application.',
+      targetAcomId: 'merchant.navbar',
+      actionToPerform: 'observe',
+      speechFr: 'Vous êtes actuellement dans la section Audit. Les autres sections permettent d’accéder aux différentes fonctions de gestion de l’application.',
+      speechWolof: 'Nekk nga ci wàllu Audit. Yeneen wàll yi dañ lay may nga dem ci fonctionnnalités application bi.',
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 11,
+      title: '11. Conclusion',
+      description: 'Vous savez maintenant utiliser le Journal d’Audit pour suivre les mouvements de stock, identifier les produits concernés, consulter les quantités et comprendre l’impact de chaque opération.',
+      targetAcomId: 'audit.container',
+      actionToPerform: 'observe',
+      speechFr: 'Vous savez maintenant utiliser le Journal d’Audit pour suivre les mouvements de stock, identifier les produits concernés, consulter les quantités et comprendre l’impact de chaque opération.',
+      speechWolof: 'Léegi xam nga nan lañuy jëfandikoo Journal d’Audit ngir topatoo yëngu-yëngu stock bi.',
+      stepCategory: 'required'
+    }
+  ]
+};
+
 export interface NarrationQueueItem {
   id: string;
   text: string;
@@ -4024,9 +5235,42 @@ class TutorialEngineService {
     return this.waitingMessage;
   }
 
-  public getScenarioForPage(pageId: string): TutorialScenario | undefined {
-    if (pageId === 'dashboard' || pageId === 'apercu' || pageId === 'pressing_dashboard') {
+  public getOverviewScenarioForSaas(saasModule?: string): TutorialScenario {
+    const rawSaas = saasModule || ContextEngine.getContext().activeSaaS || 'boutique';
+    const s = String(rawSaas).toLowerCase();
+    if (s === 'tailleur' || s === 'couture' || s === 'atelier' || s === 'broderie') {
+      return COUTURE_OVERVIEW_TUTORIAL;
+    }
+    if (s === 'pressing' || s === 'pressing_pro' || s === 'lave-linge') {
       return PRESSING_DASHBOARD_TUTORIAL;
+    }
+    return COMMERCE_OVERVIEW_TUTORIAL;
+  }
+
+  public getScenarioForPage(pageId: string, saasModule?: string): TutorialScenario | undefined {
+    const activeSaas = saasModule || ContextEngine.getContext().activeSaaS || 'boutique';
+    const saas = String(activeSaas).toLowerCase();
+
+    // Universal Overview / Dashboard resolution based on active SaaS
+    if (
+      pageId === 'dashboard' || 
+      pageId === 'apercu' || 
+      pageId === 'overview' || 
+      pageId === 'commerce_overview' || 
+      pageId === 'tailleur_dashboard' || 
+      pageId === 'couture_dashboard' || 
+      pageId === 'pressing_dashboard'
+    ) {
+      if (pageId === 'tailleur_dashboard' || pageId === 'couture_dashboard') {
+        return COUTURE_OVERVIEW_TUTORIAL;
+      }
+      if (pageId === 'pressing_dashboard') {
+        return PRESSING_DASHBOARD_TUTORIAL;
+      }
+      if (pageId === 'commerce_overview') {
+        return COMMERCE_OVERVIEW_TUTORIAL;
+      }
+      return this.getOverviewScenarioForSaas(saas);
     }
     if (pageId === 'pressing_receipt') {
       return PRESSING_GOLDEN_TUTORIAL;
@@ -4037,7 +5281,7 @@ class TutorialEngineService {
     if (pageId === 'pressing_stock') {
       return PRESSING_STOCK_SALES_TUTORIAL;
     }
-    if (pageId === 'pressing_closure') {
+    if (pageId === 'pressing_closure' || pageId === 'cash_closure' || pageId === 'cloture' || pageId === 'closure' || pageId === 'tailleur_closure' || pageId === 'cash_closure_manager') {
       return PRESSING_CLOSURE_TUTORIAL;
     }
     if (pageId === 'accounting' || pageId === 'pressing_compta' || pageId === 'pressing_accounting' || pageId === 'comptabilite') {
@@ -4090,6 +5334,9 @@ class TutorialEngineService {
         return COMMERCE_BILLING_QUOTES_TUTORIAL;
       }
       return COMMERCE_BILLING_INVOICES_TUTORIAL;
+    }
+    if (pageId === 'audit' || pageId === 'journal_audit' || pageId === 'merchant_audit' || pageId === 'audit_log') {
+      return MERCHANT_AUDIT_LOG_TUTORIAL;
     }
     return undefined;
   }
@@ -4501,6 +5748,59 @@ class TutorialEngineService {
 
   public startBillingPrintModalTutorial(initialStepIndex = 0): void {
     this.startTutorial(COMMERCE_BILLING_PRINT_MODAL_TUTORIAL, initialStepIndex);
+  }
+
+  public startAuditLogTutorial(initialStepIndex = 0): void {
+    this.startTutorial(MERCHANT_AUDIT_LOG_TUTORIAL, initialStepIndex);
+  }
+
+  public startCoutureOverviewTutorial(initialStepIndex = 0): void {
+    this.startTutorial(COUTURE_OVERVIEW_TUTORIAL, initialStepIndex);
+  }
+
+  public startContextualOverviewTutorial(saasModule?: string, initialStepIndex = 0): void {
+    const scenario = this.getOverviewScenarioForSaas(saasModule);
+    this.startTutorial(scenario, initialStepIndex);
+  }
+
+  public onSaasChanged(newSaas: string, newPage: string = 'dashboard'): void {
+    const wasActive = this.isActive;
+
+    // 1. Abort any active speech and clear the voice queue immediately
+    LanguageEngine.stopSpeech();
+    this.tutorialVoiceLock = false;
+    this.activeTutorialStep = null;
+    this.tutorialVoiceQueue = [];
+    this.activeNarrationToken++;
+
+    // 2. Clear previous scenario state
+    this.isActive = false;
+    this.currentStepIndex = -1;
+    this.currentScenario = null;
+    this.isAutoPresenting = false;
+    this.isWaitingForTab = false;
+    this.waitingMessage = null;
+
+    if (this.unsubscribeEventBus) {
+      this.unsubscribeEventBus();
+      this.unsubscribeEventBus = null;
+    }
+
+    // 3. Update ContextEngine with the new active SaaS and page
+    ContextEngine.updateContext({
+      activeSaaS: newSaas as any,
+      currentPage: newPage
+    });
+
+    this.notify();
+
+    // 4. If a tutorial was running, restart at step 1 in the new SaaS context
+    if (wasActive) {
+      const newScenario = this.getScenarioForPage(newPage, newSaas);
+      if (newScenario) {
+        this.startTutorial(newScenario, 0);
+      }
+    }
   }
 
   public stopTutorial(): void {

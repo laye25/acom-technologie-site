@@ -22,7 +22,9 @@ import {
   COMMERCE_BILLING_PENDING_TUTORIAL,
   COMMERCE_BILLING_QUOTES_TUTORIAL,
   COMMERCE_BILLING_QUOTE_MODAL_TUTORIAL,
-  COMMERCE_BILLING_PRINT_MODAL_TUTORIAL
+  COMMERCE_BILLING_PRINT_MODAL_TUTORIAL,
+  COMMERCE_OVERVIEW_TUTORIAL,
+  COUTURE_OVERVIEW_TUTORIAL
 } from '../Tutorial/TutorialEngine';
 import { ScreenRecorder } from '../Tutorial/ScreenRecorder';
 import { ContextEngine } from '../Intelligence/ContextEngine';
@@ -35,9 +37,9 @@ export const AIDemoConsolePage: React.FC = () => {
   const [events, setEvents] = useState<BusinessEvent[]>([]);
   const [selectedSaas, setSelectedSaas] = useState<'pressing' | 'stock'>('pressing');
   const [selectedTutorialId, setSelectedTutorialId] = useState<
-    'reception' | 'tarifs' | 'stock' | 'closure' | 'accounting' | 'reports' | 'settings' | 'commerce_pos' |
+    'overview' | 'overview_couture' | 'reception' | 'tarifs' | 'stock' | 'closure' | 'accounting' | 'reports' | 'settings' | 'commerce_pos' |
     'billing_invoices' | 'billing_pending' | 'billing_quotes' | 'billing_quote_modal' | 'billing_print_modal'
-  >('billing_quote_modal');
+  >('overview');
 
   useEffect(() => {
     setLogs(ActionLogger.getLogs());
@@ -54,7 +56,11 @@ export const AIDemoConsolePage: React.FC = () => {
   }, []);
 
   const currentScenario = 
-    selectedTutorialId === 'tarifs' 
+    selectedTutorialId === 'overview'
+      ? COMMERCE_OVERVIEW_TUTORIAL
+      : selectedTutorialId === 'overview_couture'
+      ? COUTURE_OVERVIEW_TUTORIAL
+      : selectedTutorialId === 'tarifs' 
       ? PRESSING_TARIFS_TUTORIAL 
       : selectedTutorialId === 'stock'
       ? PRESSING_STOCK_SALES_TUTORIAL
@@ -78,7 +84,7 @@ export const AIDemoConsolePage: React.FC = () => {
       ? COMMERCE_BILLING_QUOTE_MODAL_TUTORIAL
       : selectedTutorialId === 'billing_print_modal'
       ? COMMERCE_BILLING_PRINT_MODAL_TUTORIAL
-      : PRESSING_GOLDEN_TUTORIAL;
+      : COMMERCE_OVERVIEW_TUTORIAL;
 
   const handleStartTutorial = () => {
     TutorialEngine.startTutorial(currentScenario);
@@ -120,13 +126,27 @@ export const AIDemoConsolePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={handleStartGoldenTutorial}
-              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center gap-2"
+              onClick={() => TutorialEngine.startTutorial(COUTURE_OVERVIEW_TUTORIAL)}
+              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center gap-2 cursor-pointer"
             >
               <Play className="w-4 h-4 fill-current" />
-              Lancer Tutoriel Pressing
+              Présentation Aperçu (Couture)
+            </button>
+            <button
+              onClick={() => TutorialEngine.startTutorial(COMMERCE_OVERVIEW_TUTORIAL)}
+              className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center gap-2 cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              Présentation Aperçu (Commerce)
+            </button>
+            <button
+              onClick={handleStartGoldenTutorial}
+              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center gap-2 cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              Tutoriel Pressing
             </button>
             <button
               onClick={handleStartScreenRecord}
@@ -252,6 +272,28 @@ export const AIDemoConsolePage: React.FC = () => {
 
             {/* Scenario Picker Pills */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setSelectedTutorialId('overview_couture')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'overview_couture'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+                <span>0A. Aperçu Couture ({COUTURE_OVERVIEW_TUTORIAL.steps.length} étapes)</span>
+              </button>
+              <button
+                onClick={() => setSelectedTutorialId('overview')}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  selectedTutorialId === 'overview'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>0B. Aperçu Commerce ({COMMERCE_OVERVIEW_TUTORIAL.steps.length} étapes)</span>
+              </button>
               <button
                 onClick={() => setSelectedTutorialId('reception')}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${

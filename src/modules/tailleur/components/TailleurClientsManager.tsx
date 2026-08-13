@@ -404,7 +404,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 text-left">
         <div>
-          <h2 className="text-2xl font-black text-ink">Fichier Clients Couture</h2>
+          <h2 data-acom-id="clients.title" className="text-2xl font-black text-ink">Fichier Clients Couture</h2>
           <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Clients actifs : {filteredClients.length.toString().padStart(3, '0')}</p>
         </div>
         
@@ -435,6 +435,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
           </button>
 
           <button 
+            data-acom-id="clients.add_btn"
             onClick={() => {
               setCurrentClient(null);
               setIsSmartAssistantOpen(true);
@@ -447,7 +448,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
         </div>
       </div>
 
-      <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-left">
+      <div data-acom-id="clients.search" className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-left">
         <Search className="w-5 h-5 text-gray-400 shrink-0 ml-1" />
         <input 
           type="text" 
@@ -475,7 +476,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
           <p className="text-xs text-gray-400">Ajoutez des clients pour stocker leurs mesures de couture métriques.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+        <div data-acom-id="clients.list" className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
           {filteredClients.map((client) => (
             <TailorCard key={client.id}>
               <div>

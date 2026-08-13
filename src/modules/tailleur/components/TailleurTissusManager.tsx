@@ -767,62 +767,62 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       {/* Stats Board */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Varieties */}
-        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-violet-50 text-violet-600">
+        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-violet-50 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400">
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <span className="block text-[10px] text-slate-400 font-black tracking-wider uppercase">VARIÉTÉS</span>
-            <span className="text-sm sm:text-base font-black text-slate-800">{stats.totalTypes} modèles</span>
+            <span className="block text-[10px] text-slate-400 dark:text-slate-400 font-black tracking-wider uppercase">VARIÉTÉS</span>
+            <span className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100">{stats.totalTypes} modèles</span>
           </div>
         </div>
 
         {/* Total Stock */}
-        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
+        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
             <Package className="w-5 h-5" />
           </div>
           <div>
-            <span className="block text-[10px] text-slate-400 font-black tracking-wider uppercase">STOCK GLOBAL</span>
-            <span className="text-sm sm:text-base font-black text-slate-800">{stats.totalMeters} m</span>
+            <span className="block text-[10px] text-slate-400 dark:text-slate-400 font-black tracking-wider uppercase">STOCK GLOBAL</span>
+            <span className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100">{stats.totalMeters} m</span>
           </div>
         </div>
 
         {/* Total Cost Value */}
-        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600">
+        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
             <TrendingUp className="w-5 h-5" />
           </div>
           <div>
-            <span className="block text-[10px] text-slate-400 font-black tracking-wider uppercase">VALEUR D'ACHAT (COÛT)</span>
-            <span className="text-sm sm:text-base font-black text-slate-800 font-mono">{stats.totalCost.toLocaleString()} {currency}</span>
+            <span className="block text-[10px] text-slate-400 dark:text-slate-400 font-black tracking-wider uppercase">VALEUR D'ACHAT (COÛT)</span>
+            <span className="text-sm sm:text-base font-black text-slate-800 dark:text-slate-100 font-mono">{stats.totalCost.toLocaleString()} {currency}</span>
           </div>
         </div>
 
         {/* Profit Estimé */}
-        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600">
+        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
             <CheckCircle className="w-5 h-5" />
           </div>
           <div>
-            <span className="block text-[10px] text-slate-400 font-black tracking-wider uppercase">PROFIT ESTIMÉ</span>
-            <span className="text-sm sm:text-base font-black text-emerald-600 font-mono">+{stats.expectedProfit.toLocaleString()} {currency}</span>
+            <span className="block text-[10px] text-slate-400 dark:text-slate-400 font-black tracking-wider uppercase">PROFIT ESTIMÉ</span>
+            <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400 font-mono">+{stats.expectedProfit.toLocaleString()} {currency}</span>
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm space-y-3">
+      <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-3">
         <div className="flex flex-col lg:flex-row gap-3">
           {/* Search bar */}
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               placeholder="Rechercher par nom, couleur (bleu, bordeaux...), motif (brodé...), réf, fournisseur..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-medium rounded-xl transition-all outline-none"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-violet-500/25 text-sm font-medium rounded-xl transition-all outline-none placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
 
@@ -832,11 +832,11 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             <select
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
-              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-violet-500/25"
             >
-              <option value="All">Toutes catégories</option>
+              <option value="All" className="bg-white dark:bg-slate-900">Toutes catégories</option>
               {dynamicCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+                <option key={cat} value={cat} className="bg-white dark:bg-slate-900">{cat}</option>
               ))}
             </select>
 
@@ -844,11 +844,11 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             <select
               value={selectedColorFamily}
               onChange={e => setSelectedColorFamily(e.target.value)}
-              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-violet-500/25"
             >
-              <option value="all">Toutes les couleurs</option>
+              <option value="all" className="bg-white dark:bg-slate-900">Toutes les couleurs</option>
               {FABRIC_COLOR_FAMILIES.map(fam => (
-                <option key={fam.id} value={fam.id}>{fam.name}</option>
+                <option key={fam.id} value={fam.id} className="bg-white dark:bg-slate-900">{fam.name}</option>
               ))}
             </select>
 
@@ -856,11 +856,11 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             <select
               value={selectedPattern}
               onChange={e => setSelectedPattern(e.target.value)}
-              className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-violet-500/25"
             >
-              <option value="all">Tous les motifs</option>
+              <option value="all" className="bg-white dark:bg-slate-900">Tous les motifs</option>
               {FABRIC_PATTERNS.map(pat => (
-                <option key={pat.id} value={pat.name}>{pat.icon ? `${pat.icon} ` : ''}{pat.name}</option>
+                <option key={pat.id} value={pat.name} className="bg-white dark:bg-slate-900">{pat.icon ? `${pat.icon} ` : ''}{pat.name}</option>
               ))}
             </select>
 
@@ -937,7 +937,10 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             return (
               <div
                 key={tissu.id}
-                className={`rounded-2xl border ${isCrit ? 'border-amber-300 bg-amber-50/60' : isOut ? 'border-red-200 bg-red-50/60' : 'border-slate-200 bg-white'} overflow-hidden shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 flex flex-col group hover:scale-[1.01]`}
+                className={`rounded-2xl border ${
+                  isCrit ? 'border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20' : 
+                  'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+                } overflow-hidden shadow-sm hover:shadow-md hover:border-violet-200 dark:hover:border-violet-700 transition-all duration-200 flex flex-col group hover:scale-[1.01]`}
               >
                   {/* Fabric Banner Pattern Accent */}
                   <div className={`h-28 relative overflow-hidden ${matchedTheme.bg} flex items-end p-3.5 z-0`}>
@@ -990,7 +993,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     <div className="space-y-2.5">
                       {/* Name */}
                       <div>
-                        <h3 className="text-sm font-black text-slate-900 line-clamp-2 leading-snug group-hover:text-violet-700 transition-colors">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors">
                           {tissu.name}
                         </h3>
                       </div>
@@ -998,9 +1001,9 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                       {/* Color & Pattern Badge Row */}
                       <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                         {/* Main Color Pill with Hex Circle */}
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-2xs">
                           <span 
-                            className="w-3.5 h-3.5 rounded-full border border-black/20 shadow-inner flex-shrink-0" 
+                            className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-white/20 shadow-inner flex-shrink-0" 
                             style={{ backgroundColor: displayHex }}
                           />
                           <span className="truncate max-w-[130px]">
@@ -1010,58 +1013,58 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
 
                         {/* Secondary Color if exists */}
                         {tissu.secondaryColor && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-50 text-slate-600 border border-slate-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                             + {tissu.secondaryColor}
                           </span>
                         )}
 
                         {/* Pattern Pill */}
                         {tissu.pattern && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-100">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-800">
                             🎨 {tissu.pattern}
                           </span>
                         )}
                       </div>
 
                       {/* Price breakdown */}
-                      <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
+                      <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700">
                         <div>
-                          <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">COÛT ACHAT</span>
-                          <span className="font-mono font-black text-slate-800">{(tissu.costPricePerMeter ?? 0).toLocaleString()} {currency}/m</span>
+                          <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">COÛT ACHAT</span>
+                          <span className="font-mono font-black text-slate-800 dark:text-slate-100">{(tissu.costPricePerMeter ?? 0).toLocaleString()} {currency}/m</span>
                         </div>
                         <div>
-                          <span className="block text-[9px] text-slate-500 font-bold uppercase tracking-wider">PRIX VENTE</span>
-                          <span className="font-mono font-black text-violet-700">{(tissu.pricePerMeter ?? tissu.price ?? 0).toLocaleString()} {currency}/m</span>
+                          <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">PRIX VENTE</span>
+                          <span className="font-mono font-black text-violet-700 dark:text-violet-400">{(tissu.pricePerMeter ?? tissu.price ?? 0).toLocaleString()} {currency}/m</span>
                         </div>
                       </div>
 
                       {tissu.supplier && (
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <ShoppingCart className="w-3 h-3 text-slate-500" />
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <ShoppingCart className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                           Fournisseur : {tissu.supplier}
                         </p>
                       )}
 
                       {tissu.notes && (
-                        <p className="text-xs text-slate-600 font-medium line-clamp-2 italic leading-relaxed pt-1 border-t border-slate-100">
+                        <p className="text-xs text-slate-600 dark:text-slate-300 font-medium line-clamp-2 italic leading-relaxed pt-1 border-t border-slate-100 dark:border-slate-800">
                           &ldquo;{tissu.notes}&rdquo;
                         </p>
                       )}
                     </div>
 
                     {/* Stock indicator and controls */}
-                    <div className="pt-3 border-t border-slate-100 space-y-3">
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
                           Métrage disponible :
                         </span>
-                        <span className={`text-xs font-black ${isOut ? 'text-red-600' : isCrit ? 'text-amber-600' : 'text-slate-800'}`}>
+                        <span className={`text-xs font-black ${isOut ? 'text-red-600 dark:text-red-400' : isCrit ? 'text-amber-600 dark:text-amber-400' : 'text-slate-800 dark:text-slate-100'}`}>
                           {quantity} m
                         </span>
                       </div>
 
                       {/* Progress Bar */}
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${
                             isOut ? 'bg-red-500' : isCrit ? 'bg-amber-500' : 'bg-emerald-500'
@@ -1079,14 +1082,14 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                               setIsNewCategory(false);
                               setIsFormOpen(true);
                             }}
-                            className="p-2 hover:bg-slate-100 text-slate-600 rounded-xl transition-all"
+                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl transition-all"
                             title="Modifier"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(tissu.id)}
-                            className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-xl transition-all"
+                            className="p-2 hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all"
                             title="Supprimer"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1099,7 +1102,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                             setIsNewCategory(false);
                             setIsFormOpen(true);
                           }}
-                          className="px-3 py-1.5 bg-slate-900 hover:bg-violet-700 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1"
+                          className="px-3 py-1.5 bg-slate-900 dark:bg-slate-800 hover:bg-violet-700 dark:hover:bg-violet-600 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1 border border-transparent dark:border-slate-700"
                         >
                           Ajuster stock
                           <ArrowRight className="w-3.5 h-3.5" />

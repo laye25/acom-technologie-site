@@ -99,6 +99,22 @@ export function isSaasType(rawType: string | undefined, targetCategory: string):
 }
 
 /**
+ * Returns a clean, standardized display label for any raw SaaS type.
+ */
+export function getSaasDisplayName(rawType?: string): string {
+  if (isSaasType(rawType, 'couture')) return 'Ateliers de Couture';
+  if (isSaasType(rawType, 'broderie')) return 'Acom Creative Studio';
+  if (isSaasType(rawType, 'pressing')) return 'Management Pressing';
+  if (isSaasType(rawType, 'medical')) return 'Clinique & Médical';
+  if (isSaasType(rawType, 'school')) return 'Management Scolaire';
+  if (isSaasType(rawType, 'transport')) return 'Management Flotte';
+  if (isSaasType(rawType, 'rh')) return 'Management RH';
+  if (isSaasType(rawType, 'btp') || isSaasType(rawType, 'chantier')) return 'Management BTP / Chantier';
+  if (isSaasType(rawType, 'entreprise')) return 'Management Entreprise';
+  return 'Management Commerce';
+}
+
+/**
  * Returns the exact route for a given SaaS and optional Merchant ID.
  */
 export function getSaasClientRoute(rawType?: string, merchantId?: string): string {

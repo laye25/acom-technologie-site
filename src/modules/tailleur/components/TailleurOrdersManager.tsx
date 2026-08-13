@@ -1234,38 +1234,38 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     const linkedCostSheet = costSheets.find(cs => cs.orderId === order.id);
     
     const themeClasses = 
-      themeColor === 'rose' ? 'hover:border-rose-300 shadow-rose-50/25' :
-      themeColor === 'amber' ? 'hover:border-amber-300 shadow-amber-50/25' :
-      themeColor === 'emerald' ? 'hover:border-emerald-300 shadow-emerald-50/25' :
-      'hover:border-violet-300 shadow-violet-50/25';
+      themeColor === 'rose' ? 'hover:border-rose-300 dark:hover:border-rose-700 shadow-rose-50/25' :
+      themeColor === 'amber' ? 'hover:border-amber-300 dark:hover:border-amber-700 shadow-amber-50/25' :
+      themeColor === 'emerald' ? 'hover:border-emerald-300 dark:hover:border-emerald-700 shadow-emerald-50/25' :
+      'hover:border-violet-300 dark:hover:border-violet-700 shadow-violet-50/25';
 
     return (
       <div 
         key={order.id} 
-        className={`bg-white p-4 rounded-2xl border ${
-          order.isUrgent ? 'border-red-200 bg-red-50/5' : 'border-slate-100'
+        className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border ${
+          order.isUrgent ? 'border-red-200 dark:border-red-900 bg-red-50/5 dark:bg-red-950/20' : 'border-slate-100 dark:border-slate-800'
         } shadow-sm ${themeClasses} hover:shadow-md transition-all flex flex-col justify-between text-left`}
       >
         <div>
           <div className="flex justify-between items-center gap-1">
-            <span className="text-[8px] font-mono font-black text-gray-400 uppercase flex items-center gap-1">
+            <span className="text-[8px] font-mono font-black text-gray-400 dark:text-slate-400 uppercase flex items-center gap-1">
               {order.isUrgent && <span className="animate-pulse">🚨</span>}
               CMD-{order.id?.slice(0, 5).toUpperCase()}
             </span>
             <select
               value={order.status}
               onChange={(e) => handleStatusChange(order.id, e.target.value)}
-              className={`text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-wider cursor-pointer border outline-none ${
-                order.status === 'livre' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                order.status === 'pret' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                'bg-amber-50 text-amber-600 border-amber-100'
+              className={`text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-wider cursor-pointer border outline-none bg-white dark:bg-slate-800 ${
+                order.status === 'livre' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800' :
+                order.status === 'pret' ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-300 border-blue-100 dark:border-blue-800' :
+                'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-300 border-amber-100 dark:border-amber-800'
               }`}
             >
-              <option value="mesures">🧵 Mesures</option>
-              <option value="coupe">✂️ Couture</option>
-              <option value="retouche">✏️ Retouche</option>
-              <option value="pret">👗 Prêt / Essai</option>
-              <option value="livre">🤝 Livré</option>
+              <option value="mesures" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">🧵 Mesures</option>
+              <option value="coupe" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">✂️ Couture</option>
+              <option value="retouche" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">✏️ Retouche</option>
+              <option value="pret" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">👗 Prêt / Essai</option>
+              <option value="livre" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">🤝 Livré</option>
             </select>
           </div>
 
@@ -1274,13 +1274,13 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               <img 
                 src={order.inspirationImage} 
                 alt="Style Inspiration" 
-                className="w-11 h-11 rounded-lg object-cover border border-slate-200 shadow-sm shrink-0"
+                className="w-11 h-11 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shadow-sm shrink-0"
                 referrerPolicy="no-referrer"
               />
             )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 min-w-0">
-                <h4 className="font-extrabold text-ink text-xs leading-tight truncate">{order.clientName}</h4>
+                <h4 className="font-extrabold text-ink dark:text-white text-xs leading-tight truncate">{order.clientName}</h4>
                 {order.isUrgent && (
                   <span className="bg-red-500 text-white text-[7px] font-black px-1 rounded-sm shrink-0">
                     URGENT
@@ -1292,19 +1292,19 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   </span>
                 )}
               </div>
-              <p className="text-[9px] text-violet-600 font-bold leading-normal truncate">{order.model}</p>
+              <p className="text-[9px] text-violet-600 dark:text-violet-400 font-bold leading-normal truncate">{order.model}</p>
             </div>
           </div>
           
-          <div className="mt-2 pt-2 border-t border-slate-50 space-y-1">
-            <div className="flex justify-between text-[9px] font-bold text-gray-500">
+          <div className="mt-2 pt-2 border-t border-slate-50 dark:border-slate-800 space-y-1">
+            <div className="flex justify-between text-[9px] font-bold text-gray-500 dark:text-slate-400">
               <span>Reste :</span>
-              <span className="font-mono text-rose-500">{rest.toLocaleString()} {merchant.currency}</span>
+              <span className="font-mono text-rose-500 dark:text-rose-400">{rest.toLocaleString()} {merchant.currency}</span>
             </div>
             {order.deliveryDate && (
-              <div className="flex justify-between text-[8px] font-semibold text-slate-400">
+              <div className="flex justify-between text-[8px] font-semibold text-slate-400 dark:text-slate-500">
                 <span>Échéance :</span>
-                <span className={order.isUrgent || (new Date(order.deliveryDate) < now && order.status !== 'livre') ? 'text-red-500 font-bold animate-pulse' : ''}>
+                <span className={order.isUrgent || (new Date(order.deliveryDate) < now && order.status !== 'livre') ? 'text-red-500 dark:text-red-400 font-bold animate-pulse' : 'text-slate-700 dark:text-slate-300'}>
                   {format(new Date(order.deliveryDate), 'dd/MM/yyyy')}
                 </span>
               </div>
@@ -1312,7 +1312,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
 
           {linkedCostSheet && (
-            <div className="mt-2 p-1.5 bg-violet-50/50 border border-violet-100 rounded-lg flex items-center justify-between text-[8px] font-black text-violet-700">
+            <div className="mt-2 p-1.5 bg-violet-50/50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-800/60 rounded-lg flex items-center justify-between text-[8px] font-black text-violet-700 dark:text-violet-300">
               <span>Rentabilité :</span>
               <span className="font-mono font-extrabold">+{linkedCostSheet.profit.toLocaleString()} {merchant.currency}</span>
             </div>
@@ -1446,22 +1446,22 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-          <div className="bg-slate-100 p-1 rounded-xl flex border border-slate-200">
+          <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex border border-slate-200 dark:border-slate-700">
             <button
               onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'list' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:text-slate-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               Fiches Liste
             </button>
             <button
               onClick={() => setViewMode('timeline')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'timeline' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:text-slate-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'timeline' ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               Planning
             </button>
             <button
               onClick={() => setViewMode('campaigns')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'campaigns' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:text-slate-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'campaigns' ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               Fidélisation 🌟
             </button>
@@ -1470,7 +1470,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           <button
             onClick={() => triggerSync(true)}
             disabled={isSyncing}
-            className="flex items-center justify-center space-x-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+            className="flex items-center justify-center space-x-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Sinc...' : 'Sync 🔄'}</span>
@@ -1478,7 +1478,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
           <button
             onClick={exportOrdersToCSV}
-            className="flex items-center justify-center space-x-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+            className="flex items-center justify-center space-x-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Excel 📊</span>
@@ -1486,7 +1486,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
           <button
             onClick={exportOrdersToPDF}
-            className="flex items-center justify-center space-x-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+            className="flex items-center justify-center space-x-2 px-3 py-2 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/60 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>PDF 🖨️</span>
@@ -1502,15 +1502,15 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm justify-between text-left">
+      <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm justify-between text-left">
         <div className="flex items-center gap-3 flex-1 w-full">
-          <Search className="w-5 h-5 text-gray-400 shrink-0" />
+          <Search className="w-5 h-5 text-gray-400 dark:text-slate-500 shrink-0" />
           <input 
             type="text" 
             placeholder="Rechercher par client ou modèle..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-sm text-slate-700 bg-transparent outline-none font-medium placeholder-gray-400"
+            className="w-full text-sm text-slate-700 dark:text-slate-100 bg-transparent outline-none font-medium placeholder-gray-400 dark:placeholder-slate-500"
           />
         </div>
 
@@ -1526,7 +1526,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
             <button
               key={tab.id}
               onClick={() => setFilterStatus(tab.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${filterStatus === tab.id ? 'bg-violet-600 text-white shadow-sm' : 'bg-slate-100 hover:bg-slate-100 text-gray-600'}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${filterStatus === tab.id ? 'bg-violet-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300'}`}
             >
               {tab.label}
             </button>
@@ -2506,21 +2506,21 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   />
 
                   {/* Delivery, Fabric & Workflow Status Row */}
-                  <div className="mt-3.5 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="mt-3.5 bg-slate-50/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-violet-50 text-violet-600 rounded-xl border border-violet-100 shrink-0">
+                      <div className="p-1.5 bg-violet-50 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400 rounded-xl border border-violet-100 dark:border-violet-800 shrink-0">
                         <Calendar className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <span className="block text-[8px] font-mono font-bold text-slate-400 uppercase">Livraison</span>
-                        <span className="font-extrabold text-xs text-slate-800">
+                        <span className="block text-[8px] font-mono font-bold text-slate-400 dark:text-slate-400 uppercase">Livraison</span>
+                        <span className="font-extrabold text-xs text-slate-800 dark:text-slate-100">
                           {order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : 'Indéterminée'}
                         </span>
                       </div>
                     </div>
 
                     {order.tissuUsed && (
-                      <span className="bg-white px-2.5 py-1 rounded-xl text-xs font-extrabold border border-slate-200/80 text-slate-700 shadow-2xs truncate max-w-[150px]">
+                      <span className="bg-white dark:bg-slate-800 px-2.5 py-1 rounded-xl text-xs font-extrabold border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs truncate max-w-[150px]">
                         🧵 {order.tissuUsed}
                       </span>
                     )}
@@ -2528,18 +2528,18 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     <select
                       value={order.status}
                       onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-wider bg-white shadow-2xs cursor-pointer outline-none focus:ring-2 focus:ring-violet-500 ${
-                        order.status === 'livre' ? 'text-emerald-700 border-emerald-200 bg-emerald-50' :
-                        order.status === 'pret' ? 'text-teal-700 border-teal-200 bg-teal-50' :
-                        order.status === 'coupe' ? 'text-violet-700 border-violet-200 bg-violet-50' :
-                        'text-amber-700 border-amber-200 bg-amber-50'
+                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black border uppercase tracking-wider bg-white dark:bg-slate-800 shadow-2xs cursor-pointer outline-none focus:ring-2 focus:ring-violet-500 ${
+                        order.status === 'livre' ? 'text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/50' :
+                        order.status === 'pret' ? 'text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/50' :
+                        order.status === 'coupe' ? 'text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/50' :
+                        'text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50'
                       }`}
                     >
-                      <option value="mesures">🧵 Mesures</option>
-                      <option value="coupe">✂️ Couture</option>
-                      <option value="retouche">✏️ Retouche</option>
-                      <option value="pret">👗 Prêt / Essai</option>
-                      <option value="livre">🤝 Livré</option>
+                      <option value="mesures" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">🧵 Mesures</option>
+                      <option value="coupe" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">✂️ Couture</option>
+                      <option value="retouche" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">✏️ Retouche</option>
+                      <option value="pret" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">👗 Prêt / Essai</option>
+                      <option value="livre" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">🤝 Livré</option>
                     </select>
                   </div>
 

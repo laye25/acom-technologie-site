@@ -735,72 +735,72 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
       id="tailleur-mercerie-cost-container"
     >
       {/* Top Header & KPI Summary Bar */}
-      <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xs flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-gray-100 dark:border-slate-800 shadow-xs flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-3 py-1 rounded-full uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-950/50 px-3 py-1 rounded-full uppercase tracking-wider border border-violet-100 dark:border-violet-800">
               Atelier Couture • Fournitures & Revient
             </span>
             {alertItemsCount > 0 && (
-              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100 flex items-center gap-1">
+              <span className="text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 px-2.5 py-0.5 rounded-full border border-rose-100 dark:border-rose-800 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> {alertItemsCount} Ravitaillements requis
               </span>
             )}
           </div>
-          <h2 className="text-xl font-black text-gray-900 mt-2 flex items-center gap-2">
-            <Box className="w-6 h-6 text-violet-600" /> Mercerie Intelligent & Fiches de Coût
+          <h2 className="text-xl font-black text-gray-900 dark:text-white mt-2 flex items-center gap-2">
+            <Box className="w-6 h-6 text-violet-600 dark:text-violet-400" /> Mercerie Intelligent & Fiches de Coût
           </h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
             Bibliothèque complète de fournitures avec identification par couleur, taille, matière et catégories administrables.
           </p>
         </div>
 
         {/* Global KPIs */}
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
-          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 min-w-[130px]">
-            <p className="text-[9px] text-gray-400 font-bold uppercase">Articles en Stock</p>
-            <p className="text-lg font-bold text-gray-900 mt-0.5">{mercerie.length} réf.</p>
+          <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border border-slate-100 dark:border-slate-700 min-w-[130px]">
+            <p className="text-[9px] text-gray-400 dark:text-slate-400 font-bold uppercase">Articles en Stock</p>
+            <p className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{mercerie.length} réf.</p>
           </div>
-          <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 min-w-[150px]">
-            <p className="text-[9px] text-gray-400 font-bold uppercase">Valeur du Stock</p>
-            <p className="text-lg font-bold text-violet-700 mt-0.5">{totalStockValue.toLocaleString('fr-FR')} {currency}</p>
+          <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border border-slate-100 dark:border-slate-700 min-w-[150px]">
+            <p className="text-[9px] text-gray-400 dark:text-slate-400 font-bold uppercase">Valeur du Stock</p>
+            <p className="text-lg font-bold text-violet-700 dark:text-violet-400 mt-0.5">{totalStockValue.toLocaleString('fr-FR')} {currency}</p>
           </div>
         </div>
       </div>
 
       {/* Main Sub-tabs Header Bar */}
-      <div className="flex items-center gap-1.5 p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200/60 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1.5 p-1.5 bg-gray-100/80 dark:bg-slate-800/80 rounded-2xl border border-gray-200/60 dark:border-slate-700 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setSubTab('mercerie')}
           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
-            subTab === 'mercerie' ? 'bg-white text-violet-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+            subTab === 'mercerie' ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300 shadow-xs' : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
           }`}
         >
-          <Box className="w-4 h-4 text-violet-600" /> Stock Mercerie ({mercerie.length})
+          <Box className="w-4 h-4 text-violet-600 dark:text-violet-400" /> Stock Mercerie ({mercerie.length})
         </button>
 
         <button
           onClick={() => setSubTab('categories')}
           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
-            subTab === 'categories' ? 'bg-white text-violet-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+            subTab === 'categories' ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300 shadow-xs' : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
           }`}
         >
-          <FolderPlus className="w-4 h-4 text-violet-600" /> Catégories ({categories.length})
+          <FolderPlus className="w-4 h-4 text-violet-600 dark:text-violet-400" /> Catégories ({categories.length})
         </button>
 
         <button
           onClick={() => setSubTab('costs')}
           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
-            subTab === 'costs' ? 'bg-white text-violet-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+            subTab === 'costs' ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300 shadow-xs' : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
           }`}
         >
-          <Calculator className="w-4 h-4 text-violet-600" /> Fiches de Coût ({costSheets.length})
+          <Calculator className="w-4 h-4 text-violet-600 dark:text-violet-400" /> Fiches de Coût ({costSheets.length})
         </button>
 
         <button
           onClick={() => { resetCostSheetForm(); setSubTab('new_cost'); }}
           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
-            subTab === 'new_cost' ? 'bg-violet-600 text-white shadow-xs' : 'text-gray-600 hover:text-gray-900'
+            subTab === 'new_cost' ? 'bg-violet-600 text-white shadow-xs' : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
           }`}
         >
           <Plus className="w-4 h-4" /> Calculer un Coût
@@ -809,10 +809,10 @@ export const TailleurMercerieCostManager = ({ merchant }: TailleurMercerieCostMa
         <button
           onClick={() => setSubTab('analytics')}
           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
-            subTab === 'analytics' ? 'bg-white text-violet-700 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+            subTab === 'analytics' ? 'bg-white dark:bg-slate-900 text-violet-700 dark:text-violet-300 shadow-xs' : 'text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
           }`}
         >
-          <TrendingUp className="w-4 h-4 text-violet-600" /> Rentabilité & Marges
+          <TrendingUp className="w-4 h-4 text-violet-600 dark:text-violet-400" /> Rentabilité & Marges
         </button>
       </div>
 

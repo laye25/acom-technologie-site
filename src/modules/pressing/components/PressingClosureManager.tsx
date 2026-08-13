@@ -420,6 +420,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
 
   return (
     <motion.div 
+      data-acom-id="pressing.cash_closure.container"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -538,21 +539,33 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
                 </div>
               )}
 
-              {(lowStockItems.length > 0 || outOfStockItems.length > 0) && (
-                <div className="p-4 bg-orange-50 rounded-2xl border border-orange-200">
-                  <h4 className="text-sm font-bold text-orange-800 mb-2">🚨 Alertes de Stock</h4>
-                  {outOfStockItems.length > 0 && (
-                    <div className="text-xs text-orange-900 mb-1">
-                      <span className="font-bold text-red-600">❌ Épuisés :</span> {outOfStockItems.map(p => p.name).join(', ')}
-                    </div>
-                  )}
-                  {lowStockItems.length > 0 && (
-                    <div className="text-xs text-orange-900">
-                      <span className="font-bold text-orange-600">⚠️ Point de rupture :</span> {lowStockItems.map(p => `${p.name} (${p.stock || 0})`).join(', ')}
-                    </div>
-                  )}
-                </div>
-              )}
+              <div data-acom-id="pressing.cash_closure.stock_alerts" className={`p-4 rounded-2xl border transition-all ${
+                (lowStockItems.length > 0 || outOfStockItems.length > 0) 
+                  ? 'bg-orange-50 border-orange-200' 
+                  : 'bg-emerald-50/60 border-emerald-100'
+              }`}>
+                <h4 className={`text-sm font-bold mb-1 flex items-center justify-between ${
+                  (lowStockItems.length > 0 || outOfStockItems.length > 0) ? 'text-orange-800' : 'text-emerald-800'
+                }`}>
+                  <span>🚨 Alertes de Stock</span>
+                  <span className="text-[10px] font-mono font-normal">
+                    {(lowStockItems.length > 0 || outOfStockItems.length > 0) ? `${outOfStockItems.length + lowStockItems.length} alerte(s)` : 'Stock OK'}
+                  </span>
+                </h4>
+                {outOfStockItems.length > 0 && (
+                  <div className="text-xs text-orange-900 mb-1">
+                    <span className="font-bold text-red-600">❌ Épuisés :</span> {outOfStockItems.map(p => p.name).join(', ')}
+                  </div>
+                )}
+                {lowStockItems.length > 0 && (
+                  <div className="text-xs text-orange-900">
+                    <span className="font-bold text-orange-600">⚠️ Point de rupture :</span> {lowStockItems.map(p => `${p.name} (${p.stock || 0})`).join(', ')}
+                  </div>
+                )}
+                {lowStockItems.length === 0 && outOfStockItems.length === 0 && (
+                  <p className="text-xs text-emerald-700 font-medium">Aucune rupture ni alerte critique de stock détectée pour cette journée.</p>
+                )}
+              </div>
 
               <div>
                 <label className="block text-[10px] font-mono font-bold text-gray-400 uppercase tracking-widest mb-1.5">Observations / Justifications</label>
@@ -675,7 +688,7 @@ export const PressingClosureManager = ({ merchant }: { merchant: Merchant }) => 
           </h3>
 
           {closures.length === 0 ? (
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 text-center text-gray-400 space-y-2 shadow-sm">
+            <div data-acom-id="pressing.cash_closure.history_empty" className="bg-white p-8 rounded-3xl border border-gray-100 text-center text-gray-400 space-y-2 shadow-sm">
               <p className="text-xs font-bold font-mono">Aucun rapport de clôture archivé pour le moment.</p>
               <p className="text-[10px]">Utilisez le formulaire de gauche pour effectuer votre premier rapprochement.</p>
             </div>

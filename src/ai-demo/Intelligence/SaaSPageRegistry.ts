@@ -754,7 +754,7 @@ class SaaSPageRegistryService {
       ]
     });
 
-    this.registerPage({
+    const closureDefinition: SaaSPageDefinition = {
       pageId: 'pressing_closure',
       saasId: 'pressing',
       name: 'Clôture de Caisse & Rapport Journalier',
@@ -885,7 +885,12 @@ class SaaSPageRegistryService {
           ]
         }
       ]
-    });
+    };
+
+    this.registerPage(closureDefinition);
+    this.registerPage({ ...closureDefinition, pageId: 'cash_closure', saasId: 'commerce' });
+    this.registerPage({ ...closureDefinition, pageId: 'cloture' });
+    this.registerPage({ ...closureDefinition, pageId: 'tailleur_closure', saasId: 'tailleur' });
 
     // 5. Comptabilité & Dépenses
     const accountingDefinition: SaaSPageDefinition = {
@@ -899,6 +904,22 @@ class SaaSPageRegistryService {
           name: 'Entête & Action Nouvelle Dépense',
           description: 'Ouverture du formulaire de saisie de dépense manuelle',
           elements: [
+            {
+              acomId: 'accounting.title',
+              semanticId: 'accounting.main_title',
+              label: 'Titre « Comptabilité »',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Titre principal de la page Comptabilité'
+            },
+            {
+              acomId: 'accounting.subtitle',
+              semanticId: 'accounting.main_subtitle',
+              label: 'Sous-titre Comptabilité',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Description de la page Comptabilité'
+            },
             {
               acomId: 'accounting.btn.new_expense',
               semanticId: 'accounting.new_expense_btn',
@@ -921,6 +942,22 @@ class SaaSPageRegistryService {
               type: 'display',
               supportedOperations: ['read'],
               description: 'Conteneur modal du formulaire de dépense'
+            },
+            {
+              acomId: 'accounting.expense.form_title',
+              semanticId: 'accounting.modal_title',
+              label: 'Titre du Modal Nouvelle dépense manuelle',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Titre du modal de création de dépense'
+            },
+            {
+              acomId: 'accounting.expense.form_subtitle',
+              semanticId: 'accounting.modal_subtitle',
+              label: 'Sous-titre du Modal',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Sous-titre explicatif du modal'
             },
             {
               acomId: 'accounting.expense.title',
@@ -977,6 +1014,14 @@ class SaaSPageRegistryService {
               type: 'input',
               supportedOperations: ['read', 'write'],
               description: 'Commentaires ou justification détaillée de la dépense'
+            },
+            {
+              acomId: 'accounting.expense.cancel_btn',
+              semanticId: 'accounting.cancel_btn',
+              label: 'Bouton Annuler',
+              type: 'button',
+              supportedOperations: ['click'],
+              description: 'Annule la saisie et ferme le modal'
             },
             {
               acomId: 'accounting.expense.submit_btn',
@@ -1047,6 +1092,14 @@ class SaaSPageRegistryService {
               type: 'table',
               supportedOperations: ['read'],
               description: 'Liste chronologique et détaillée des décaissements et dépenses'
+            },
+            {
+              acomId: 'accounting.empty_state',
+              semanticId: 'accounting.empty',
+              label: 'Message Aucune Charge',
+              type: 'display',
+              supportedOperations: ['read'],
+              description: 'Affichage vide lorsqu\'aucune dépense ne correspond au filtre'
             }
           ]
         }
@@ -3260,6 +3313,105 @@ class SaaSPageRegistryService {
     this.registerPage({ ...billingDefinition, pageId: 'devis' });
     this.registerPage({ ...billingDefinition, pageId: 'factures' });
     this.registerPage({ ...billingDefinition, pageId: 'impayes' });
+
+    const auditDefinition: SaaSPageDefinition = {
+      pageId: 'audit',
+      name: "Journal d'Audit",
+      saasId: 'pressing',
+      purpose: "Traçabilité complète des flux de stock et opérations d'audit",
+      zones: [
+        {
+          id: 'audit_header_zone',
+          name: "En-tête Journal d'Audit",
+          description: "Titre principal et indicateur de statut temps réel",
+          elements: [
+            {
+              acomId: 'audit.title',
+              semanticId: 'audit.page_title',
+              label: "Titre Journal d'Audit",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Titre principal de la page d'audit de stock"
+            },
+            {
+              acomId: 'audit.realtime',
+              semanticId: 'audit.realtime_badge',
+              label: "Indicateur Temps Réel",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Indicateur de statut de synchronisation en temps réel"
+            }
+          ]
+        },
+        {
+          id: 'audit_table_zone',
+          name: "Tableau d'Audit",
+          description: "Liste des opérations, flux, quantités et deltas de stock",
+          elements: [
+            {
+              acomId: 'audit.table',
+              semanticId: 'audit.movements_table',
+              label: "Tableau d'Audit",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Tableau complet récapitulant l'historique des mouvements"
+            },
+            {
+              acomId: 'audit.col.timestamp',
+              semanticId: 'audit.col_timestamp',
+              label: "Colonne Horodatage",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Horodatage de l'enregistrement"
+            },
+            {
+              acomId: 'audit.col.product',
+              semanticId: 'audit.col_product',
+              label: "Colonne Produit",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Produit concerné par l'opération"
+            },
+            {
+              acomId: 'audit.col.type',
+              semanticId: 'audit.col_type',
+              label: "Colonne Type de Flux",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Type de flux (entrée/sortie/vente)"
+            },
+            {
+              acomId: 'audit.col.quantity',
+              semanticId: 'audit.col_quantity',
+              label: "Colonne Quantité",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Quantité déplacée"
+            },
+            {
+              acomId: 'audit.col.delta',
+              semanticId: 'audit.col_delta',
+              label: "Colonne Delta Stock",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Delta du niveau de stock"
+            },
+            {
+              acomId: 'audit.col.reason',
+              semanticId: 'audit.col_reason',
+              label: "Colonne Motif / Raison",
+              type: 'display',
+              supportedOperations: ['read'],
+              description: "Motif ou raison spécifiée"
+            }
+          ]
+        }
+      ]
+    };
+
+    this.registerPage(auditDefinition);
+    this.registerPage({ ...auditDefinition, pageId: 'journal_audit' });
+    this.registerPage({ ...auditDefinition, pageId: 'merchant_audit' });
   }
 }
 

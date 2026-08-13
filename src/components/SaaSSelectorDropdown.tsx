@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Merchant } from '../types';
 import { saasSubscriptionService, SAAS_CATALOG } from '../services/saasSubscriptionService';
-import { getSaasRouteConfig, isSaasType } from '../utils/saasRoutes';
+import { getSaasRouteConfig, isSaasType, getSaasDisplayName } from '../utils/saasRoutes';
 import { SaaSManagerModal } from './SaaSManagerModal';
 import toast from 'react-hot-toast';
 
@@ -101,7 +101,7 @@ export const SaaSSelectorDropdown: React.FC<SaaSSelectorDropdownProps> = ({
               SaaS Actif
             </div>
             <div className="text-xs font-black text-slate-800 tracking-tight leading-tight flex items-center gap-1.5 mt-0.5">
-              {currentCatalog.label.split('(')[0].trim()}
+              {getSaasDisplayName(merchant.type)}
             </div>
           </div>
 

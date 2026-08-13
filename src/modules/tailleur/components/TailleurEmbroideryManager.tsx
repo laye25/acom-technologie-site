@@ -926,6 +926,9 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
   const [showNightResearch, setShowNightResearch] = useState<boolean>(false);
   const [showPassportModal, setShowPassportModal] = useState<boolean>(false);
   const [showMorningReport, setShowMorningReport] = useState<boolean>(false);
+  const [workflowStep, setWorkflowStep] = useState<number>(3);
+  const [studioMode, setStudioMode] = useState<'standard' | 'advanced' | 'expert'>('standard');
+  const [libraryModalOpen, setLibraryModalOpen] = useState<boolean>(false);
 
 
 
@@ -4147,6 +4150,132 @@ export const TailleurEmbroideryManager = ({ merchant }: { merchant: any }) => {
           )}
         </button>
       </div>
+
+      {/* 6-Step Workflow Navigation Top Bar */}
+      <div className="flex flex-col xl:flex-row items-center justify-between gap-3 bg-slate-950 p-2.5 rounded-2xl border border-slate-800">
+        <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto w-full xl:w-auto">
+          {[
+            { step: 1, label: '1. Projet', sub: 'Infos & Fichiers' },
+            { step: 2, label: '2. Design', sub: 'Importer & Éditer' },
+            { step: 3, label: '3. Préparation', sub: 'Tissu, cadre, couleurs' },
+            { step: 4, label: '4. Numérisation', sub: 'Points & Paramètres' },
+            { step: 5, label: '5. Simulation', sub: 'Aperçu & Contrôle' },
+            { step: 6, label: '6. Production', sub: 'Machine & Export' }
+          ].map((item) => {
+            const isActive = workflowStep === item.step;
+            return (
+              <button
+                key={item.step}
+                onClick={() => setWorkflowStep(item.step)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                  isActive 
+                    ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/20' 
+                    : 'bg-slate-900 text-gray-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${isActive ? 'bg-white text-violet-700' : 'bg-slate-800 text-gray-300'}`}>
+                  {item.step}
+                </span>
+                <div className="text-left">
+                  <div className="text-xs font-bold leading-none">{item.label}</div>
+                  <div className={`text-[9px] mt-0.5 leading-none ${isActive ? 'text-violet-200' : 'text-gray-500'}`}>{item.sub}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Studio Mode Selector & Library Button */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 shrink-0">
+            {(['standard', 'advanced', 'expert'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setStudioMode(m)}
+                className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                  studioMode === m ? 'bg-violet-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {m === 'standard' ? 'Standard' : m === 'advanced' ? 'Avancé' : 'Expert'}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setLibraryModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-md cursor-pointer"
+            title="Bibliothèque de motifs professionnelle"
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span>Bibliothèque</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Motif Library Modal */}
+      {libraryModalOpen && (
+        <div className="fixed inset-0 z-[9995] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950">
+              <div className="flex items-center gap-2.5">
+                <Compass className="w-5 h-5 text-violet-400" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Bibliothèque de Motifs & Composants Paramétriques</h3>
+                  <p className="text-[11px] text-gray-400">Sélectionnez un motif professionnel à insérer instantanément dans votre projet</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setLibraryModalOpen(false)}
+                className="p-2 hover:bg-slate-800 text-gray-400 hover:text-white rounded-xl transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+              {['test_diamond_0', 'circle_patch', 'satin_border_box', 'star_5_points', 'leaf_vector', 'flower_petal_ring'].map((shapeKey) => {
+                const shape = EmbroideryLibrary[shapeKey] || { name: shapeKey, category: 'geometry' };
+                return (
+                  <div 
+                    key={shapeKey}
+                    onClick={() => {
+                      const newLayer: EmbroideryLayer = {
+                        id: `lib_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                        name: shape.name || shapeKey,
+                        stitchType: 'tatami',
+                        color: '#6366f1',
+                        colorName: 'Violet Royal',
+                        threadCode: 'RA-048',
+                        visible: true,
+                        locked: false,
+                        density: 0.4,
+                        angle: 45,
+                        pullComp: 0.2,
+                        underlay: true,
+                        points: [
+                          { x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 50, y: 150 }
+                        ]
+                      };
+                      setLayers([...layers, newLayer]);
+                      setLibraryModalOpen(false);
+                    }}
+                    className="bg-slate-950 border border-slate-800/80 hover:border-violet-500/50 p-4 rounded-2xl cursor-pointer transition flex flex-col justify-between group"
+                  >
+                    <div>
+                      <span className="text-[10px] font-mono text-violet-400 uppercase tracking-widest block mb-1">Motif CAO</span>
+                      <h4 className="text-xs font-bold text-white group-hover:text-violet-300">{shape.name || shapeKey}</h4>
+                      <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">Composant paramétrique vectoriel CAO/CAM optimisé pour broderie AEE.</p>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-900 text-[10px]">
+                      <span className="text-gray-500 font-mono">Prêt</span>
+                      <span className="text-violet-400 font-bold group-hover:underline">Insérer +</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. Main CAD Workspace Grid */}
       {activeTab === 'studio' && (

@@ -108,7 +108,7 @@ import { showMailSuccessToast } from '../components/MailSuccessToast';
 import { getApiUrl, sendEmailDirectlyOrViaBackend } from '../lib/api';
 import { triggerAcomAlert, AcomAlertEventProvider } from '../components/AcomAlertEventProvider';
 import { AcomZoneMerchantPanel } from '../components/AcomZoneMerchantPanel';
-import { getSaasRouteConfig, isSaasType } from '../utils/saasRoutes';
+import { getSaasRouteConfig, isSaasType, getSaasDisplayName } from '../utils/saasRoutes';
 import { DetergentSale, PressingTicket } from '../modules/pressing/types';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -215,6 +215,9 @@ const MerchantSaaS = () => {
 
     const defaultPage = newTabs[0]?.id || 'dashboard';
     console.log(`[SAAS_SWITCH] DEFAULT_PAGE\npage = ${defaultPage}`);
+
+    // Context & Tutorial synchronization: Abort previous speech, clear state, update context
+    TutorialEngine.onSaasChanged(resolvedType, defaultPage);
 
     setActiveTab(defaultPage);
 
@@ -891,7 +894,7 @@ const MerchantSaaS = () => {
             {/* ROW 1: BRANDING, BADGES & USER PROFILE BAR */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 pb-6 border-b border-slate-100">
               {/* Left: App Logo + Name + Sector + Plan Badge */}
-              <div className="flex items-center gap-4 sm:gap-5 flex-wrap">
+              <div data-acom-id="header.logo_and_title" className="flex items-center gap-4 sm:gap-5 flex-wrap">
                 <div className="w-14 h-14 bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 rounded-2xl flex items-center justify-center border border-violet-300/30 shadow-md shadow-violet-500/20 shrink-0 overflow-hidden p-1">
                   {merchant.logo ? (
                     <img src={merchant.logo} alt={merchant.name} className="w-full h-full object-contain rounded-xl bg-white/95 p-0.5" />
@@ -902,41 +905,36 @@ const MerchantSaaS = () => {
                   )}
                 </div>
 
-                <div className="flex flex-col">
+                <div data-acom-id="header.module_name" className="flex flex-col">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">
                       {merchant.name || 'Acom'}
                     </h1>
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-violet-50 border border-violet-200/80 text-violet-700 font-extrabold text-xs tracking-tight shadow-sm">
+                    <span data-acom-id="header.plan_badge" className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-violet-50 border border-violet-200/80 text-violet-700 font-extrabold text-xs tracking-tight shadow-sm">
                       <Crown className="w-3.5 h-3.5 text-violet-600 fill-violet-600" />
                       PLAN {merchant.plan || 'PREMIUM'}
                     </span>
                   </div>
 
                   <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 mt-1.5">
-                    {merchant.type === 'entreprise' ? 'MANAGEMENT ENTREPRISE' :
-                     merchant.type === 'chantier' ? 'MANAGEMENT BTP / CHANTIER' :
-                     merchant.type === 'transport' ? 'MANAGEMENT FLOTTE' :
-                     merchant.type === 'rh' ? 'MANAGEMENT RH' :
-                     merchant.type === 'scolaire' ? 'MANAGEMENT SCOLAIRE' :
-                     merchant.type === 'medical' ? 'CLINIQUE & MÉDICAL' :
-                     merchant.type === 'pressing' ? 'MANAGEMENT PRESSING' :
-                     merchant.type === 'tailleur' ? 'ATELIERS DE COUTURE' :
-                     merchant.type === 'broderie' ? 'ACOM CREATIVE STUDIO' :
-                     'MANAGEMENT COMMERCE'}
+                    {getSaasDisplayName(displayMerchant?.type).toUpperCase()}
                   </span>
                 </div>
               </div>
 
               {/* Right: Theme Toggle, Notifications & User Profile */}
               <div className="flex items-center gap-3 sm:gap-4 self-end lg:self-auto shrink-0">
-                <ThemeToggle showLabel={true} />
+                <div data-acom-id="header.theme_toggle">
+                  <ThemeToggle showLabel={true} />
+                </div>
 
-                <NotificationCenter />
+                <div data-acom-id="header.notifications">
+                  <NotificationCenter />
+                </div>
 
                 <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
 
-                <div className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 px-3.5 py-1.5 rounded-2xl transition-all cursor-pointer">
+                <div data-acom-id="header.user_profile" className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 px-3.5 py-1.5 rounded-2xl transition-all cursor-pointer">
                   <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-xs shadow-sm shrink-0">
                     {user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : (user?.email ? user.email.slice(0, 2).toUpperCase() : 'AN')}
                   </div>
@@ -956,7 +954,7 @@ const MerchantSaaS = () => {
             {/* ROW 2: STATUS INDICATORS & METRICS STRIP */}
             <div className="bg-slate-50/90 border border-slate-200/70 rounded-2xl p-2.5 sm:p-3 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
               {/* 1. Licence Status */}
-              <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
+              <div data-acom-id="header.licence_status" className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
                 <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
@@ -971,13 +969,13 @@ const MerchantSaaS = () => {
               </div>
 
               {/* 2. Sector Metric / Ateliers */}
-              <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
+              <div data-acom-id="header.stores_count" className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
                 <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 border border-violet-100 flex items-center justify-center shrink-0">
-                  {merchant.type === 'tailleur' || merchant.type === 'broderie' ? (
+                  {isSaasType(displayMerchant?.type, 'couture') || isSaasType(displayMerchant?.type, 'broderie') ? (
                     <Scissors className="w-5 h-5" />
-                  ) : merchant.type === 'medical' ? (
+                  ) : isSaasType(displayMerchant?.type, 'medical') ? (
                     <Stethoscope className="w-5 h-5" />
-                  ) : merchant.type === 'scolaire' ? (
+                  ) : isSaasType(displayMerchant?.type, 'school') ? (
                     <GraduationCap className="w-5 h-5" />
                   ) : (
                     <Store className="w-5 h-5" />
@@ -985,18 +983,18 @@ const MerchantSaaS = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10px] font-black font-mono uppercase tracking-wider text-slate-700 leading-tight truncate">
-                    {merchant.type === 'tailleur' ? 'ATELIERS' :
-                     merchant.type === 'scolaire' ? 'ÉTABLISSEMENT' :
-                     merchant.type === 'medical' ? 'CLINIQUE' : 'MAGASINS'}
+                    {isSaasType(displayMerchant?.type, 'couture') ? 'ATELIERS' :
+                     isSaasType(displayMerchant?.type, 'school') ? 'ÉTABLISSEMENT' :
+                     isSaasType(displayMerchant?.type, 'medical') ? 'CLINIQUE' : 'MAGASINS'}
                   </div>
                   <div className="text-xs font-bold text-slate-500 leading-tight truncate">
-                    2 {merchant.type === 'tailleur' ? 'ateliers actifs' : 'unités actives'}
+                    2 {isSaasType(displayMerchant?.type, 'couture') ? 'ateliers actifs' : 'unités actives'}
                   </div>
                 </div>
               </div>
 
               {/* 3. SaaS Actif Selector */}
-              <div className="flex items-center gap-2 px-2 py-1 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
+              <div data-acom-id="header.active_saas" className="flex items-center gap-2 px-2 py-1 bg-white rounded-xl border border-slate-200/60 shadow-2xl">
                 <div className="min-w-0 w-full">
                   {isSpecialManager ? (
                     <div className="flex flex-col">
@@ -1004,7 +1002,7 @@ const MerchantSaaS = () => {
                         SAAS ACTIF
                       </span>
                       <select
-                        value={merchant.type || 'boutique'}
+                        value={isSaasType(displayMerchant?.type, 'couture') ? 'tailleur' : displayMerchant?.type || 'boutique'}
                         onChange={(e) => {
                           executeSaasSwitch(e.target.value);
                         }}
@@ -1025,9 +1023,8 @@ const MerchantSaaS = () => {
                     </div>
                   ) : (
                     <SaaSSelectorDropdown 
-                      merchant={merchant} 
+                      merchant={displayMerchant || merchant} 
                       onUpdateMerchant={(updated) => {
-                        setMerchant(updated);
                         if (updated.type) {
                           executeSaasSwitch(updated.type);
                         }
@@ -1038,7 +1035,7 @@ const MerchantSaaS = () => {
               </div>
 
               {/* 5. Écrit. Disque / Sync Date */}
-              <div className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl col-span-2 sm:col-span-1">
+              <div data-acom-id="header.disk_write" className="flex items-center gap-3 px-3 py-2 bg-white rounded-xl border border-slate-200/60 shadow-2xl col-span-2 sm:col-span-1">
                 <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shrink-0">
                   <FileText className="w-5 h-5" />
                 </div>
@@ -1200,7 +1197,7 @@ const MerchantSaaS = () => {
             </div>
           </div>
           
-          <div className="space-y-4 mb-6 md:mb-8" data-acom-id="supplier.navbar">
+          <div className="space-y-4 mb-6 md:mb-8" data-acom-id="merchant.navbar">
             {Object.entries(
               tabs.reduce((acc, tab) => {
                 const group = tab.group || 'Général';
@@ -1297,7 +1294,7 @@ const MerchantSaaS = () => {
         </Suspense>
 
         {/* SaaS Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500 dark:text-slate-400 font-medium">
+        <div data-acom-id="dashboard.footer" className="mt-12 pt-8 border-t border-gray-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500 dark:text-slate-400 font-medium">
           <p>© {new Date().getFullYear()} Acom Technologie. Tous droits réservés.</p>
           <a 
             href="mailto:contact.abdoulayendiaye@gmail.com" 
@@ -1511,13 +1508,14 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
       className="space-y-6"
+      data-acom-id="audit.container"
     >
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div>
+        <div data-acom-id="audit.title">
           <h2 className="text-2xl font-bold text-ink">Journal d'Audit</h2>
           <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Traçabilité complète des flux de stock</p>
         </div>
-        <div className="flex items-center space-x-2 px-4 py-2 bg-white border border-black/5 rounded-xl shadow-sm">
+        <div data-acom-id="audit.realtime" className="flex items-center space-x-2 px-4 py-2 bg-white border border-black/5 rounded-xl shadow-sm">
           <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
           <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">Temps Réel</span>
         </div>
@@ -1526,17 +1524,17 @@ const MerchantAuditLog = ({ merchant }: { merchant: Merchant }) => {
       {loading ? (
         <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
       ) : (
-        <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+        <div data-acom-id="audit.table" className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50 text-[10px] font-mono font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-100">
-                  <th className="px-4 sm:px-8 py-3 md:py-5">Horodatage</th>
-                  <th className="px-4 sm:px-8 py-3 md:py-5">Produit</th>
-                  <th className="px-4 sm:px-8 py-3 md:py-5">Type de Flux</th>
-                  <th className="px-4 sm:px-8 py-3 md:py-5">Quantité</th>
-                  <th className="px-4 sm:px-8 py-3 md:py-5">Delta Stock</th>
-                  <th className="px-4 sm:px-8 py-3 md:py-5">Motif / Raison</th>
+                  <th data-acom-id="audit.col.timestamp" className="px-4 sm:px-8 py-3 md:py-5">Horodatage</th>
+                  <th data-acom-id="audit.col.product" className="px-4 sm:px-8 py-3 md:py-5">Produit</th>
+                  <th data-acom-id="audit.col.type" className="px-4 sm:px-8 py-3 md:py-5">Type de Flux</th>
+                  <th data-acom-id="audit.col.quantity" className="px-4 sm:px-8 py-3 md:py-5">Quantité</th>
+                  <th data-acom-id="audit.col.delta" className="px-4 sm:px-8 py-3 md:py-5">Delta Stock</th>
+                  <th data-acom-id="audit.col.reason" className="px-4 sm:px-8 py-3 md:py-5">Motif / Raison</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

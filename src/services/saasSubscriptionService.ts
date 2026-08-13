@@ -16,7 +16,7 @@ export interface SaasCatalogItem {
 export const SAAS_CATALOG: Record<string, SaasCatalogItem> = {
   stock: {
     type: 'stock',
-    label: 'Gestion de Stock (Commerce / Boutique)',
+    label: 'Management Commerce',
     description: 'Gestion complète des stocks, ventes comptoir POS, caisse, inventaire et réapprovisionnements.',
     dashboardRoute: '/merchant-dashboard',
     aliases: ['boutique', 'commerce'],
@@ -24,7 +24,7 @@ export const SAAS_CATALOG: Record<string, SaasCatalogItem> = {
   },
   pressing: {
     type: 'pressing',
-    label: 'Gestion Pressing & Laverie',
+    label: 'Management Pressing',
     description: 'Fiches de réception client, suivi de nettoyage au kilo/pièce, tickets d\'encaissement et livraisons.',
     dashboardRoute: '/pressing-dashboard',
     aliases: ['laverie', 'blanchisserie'],
@@ -32,7 +32,7 @@ export const SAAS_CATALOG: Record<string, SaasCatalogItem> = {
   },
   couture: {
     type: 'couture',
-    label: 'Gestion Couture & Sur-Mesure (Tailleur)',
+    label: 'Ateliers de Couture',
     description: 'Carnet de mesures clients, gestion d\'atelier, mercerie et commandes de sur-mesure.',
     dashboardRoute: '/tailor-dashboard',
     aliases: ['tailleur'],

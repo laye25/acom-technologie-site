@@ -11,6 +11,7 @@ import { SchoolAccountingSaaS } from '../../../components/admin/SchoolAccounting
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
 import { EventBus } from '../../../ai-demo/BusinessEvents/EventBus';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 interface AccountingOutflow {
   id: string;
@@ -71,6 +72,14 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
   useEffect(() => {
     syncService.syncExpenses(merchant.id);
   }, [merchant.id]);
+
+  useEffect(() => {
+    if (isAddingExpense) {
+      TutorialEngine.onModalOpened('accounting.expense_modal');
+    } else {
+      TutorialEngine.onModalClosed('accounting.expense_modal');
+    }
+  }, [isAddingExpense]);
 
   // Live queries for real-time offline-first updates
   const manualExpenses = useLiveQuery(() => 
@@ -456,6 +465,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
 
   return (
     <motion.div 
+      data-acom-id="accounting.container"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
@@ -464,8 +474,8 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-ink">Comptabilité</h2>
-          <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des flux financiers & dépenses générales de l'atelier</p>
+          <h2 data-acom-id="accounting.title" className="text-2xl font-bold text-ink">Comptabilité</h2>
+          <p data-acom-id="accounting.subtitle" className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-1">Gestion des flux financiers & dépenses générales de l'atelier</p>
         </div>
         <button 
           data-acom-id="accounting.btn.new_expense"
@@ -623,7 +633,7 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                       <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mb-3">
                         <Receipt className="w-6 h-6 text-gray-200" />
                       </div>
-                      <p className="text-gray-400 text-sm font-medium">Aucune charge enregistrée pour ce filtre</p>
+                      <p data-acom-id="accounting.empty_state" className="text-gray-400 text-sm font-medium">Aucune charge enregistrée pour ce filtre</p>
                     </div>
                   </td>
                 </tr>
@@ -759,8 +769,8 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
             >
               <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                 <div>
-                  <h3 className="text-lg font-bold text-ink">Nouvelle dépense manuelle</h3>
-                  <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">Comptabilité & Suivi Gérant</p>
+                  <h3 data-acom-id="accounting.expense.form_title" className="text-lg font-bold text-ink">Nouvelle dépense manuelle</h3>
+                  <p data-acom-id="accounting.expense.form_subtitle" className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mt-0.5">Comptabilité & Suivi Gérant</p>
                 </div>
                 <button onClick={() => setIsAddingExpense(false)} className="p-2 hover:bg-white rounded-xl transition-colors shadow-sm border border-black/5">
                   <X className="w-5 h-5 text-gray-400" />
@@ -913,7 +923,12 @@ const MerchantAccounting = ({ merchant, subTab }: { merchant: Merchant, subTab?:
                 </div>
 
                 <div className="flex space-x-3 pt-4 border-t border-gray-100">
-                  <button type="button" onClick={() => setIsAddingExpense(false)} className="flex-1 py-3.5 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors text-xs">
+                  <button 
+                    data-acom-id="accounting.expense.cancel_btn"
+                    type="button" 
+                    onClick={() => setIsAddingExpense(false)} 
+                    className="flex-1 py-3.5 border border-gray-200 rounded-2xl font-bold text-gray-600 hover:bg-gray-50 transition-colors text-xs"
+                  >
                     Annuler
                   </button>
                   <button 
