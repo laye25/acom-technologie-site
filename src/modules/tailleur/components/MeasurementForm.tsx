@@ -22,6 +22,7 @@ import {
 import { GarmentSelector } from './GarmentSelector';
 import { MeasurementValidator } from './MeasurementValidator';
 import { MeasurementHistoryViewer } from './MeasurementHistoryViewer';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 interface MeasurementFormProps {
   merchantId: string;
@@ -123,6 +124,9 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
     if (onActiveFieldChange) {
       onActiveFieldChange(key);
     }
+    const def = mandatoryDefinitions.find((d) => d.key === key) || optionalDefinitions.find((d) => d.key === key);
+    const isMandatory = mandatoryDefinitions.some((d) => d.key === key);
+    TutorialEngine.onMeasurementSelected(key, def?.label || key, isMandatory);
   };
 
   const handleClearAll = () => {
@@ -294,6 +298,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                 return (
                   <div
                     key={def.key}
+                    data-acom-id={`measurement.${def.key}`}
                     onClick={() => handleFieldFocus(def.key)}
                     className={`p-3 rounded-2xl border transition-all ${
                       isActive
@@ -345,6 +350,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                   return (
                     <div
                       key={def.key}
+                      data-acom-id={`measurement.${def.key}`}
                       onClick={() => handleFieldFocus(def.key)}
                       className={`p-3 rounded-2xl border transition-all ${
                         isActive

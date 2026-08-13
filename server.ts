@@ -226,22 +226,33 @@ async function startServer() {
       const text = (req.query.text as string) || "Démonstration";
       const lang = (req.query.lang as string) || "fr";
       
-      // Clean and truncate text for optimal TTS delivery
-      const cleanText = text.replace(/<[^>]*>/g, '').trim().substring(0, 300);
+      // Clean and truncate text for optimal TTS delivery (Google Translate limit is ~150 chars per request)
+      const cleanText = text.replace(/<[^>]*>/g, '').trim().substring(0, 150);
       if (!cleanText) {
         return res.status(400).json({ error: "Empty text" });
       }
 
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(cleanText)}`;
+      let ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(cleanText)}`;
       
-      const ttsRes = await fetch(ttsUrl, {
+      let ttsRes = await fetch(ttsUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
+      // Secondary fallback client if primary tw-ob fails
       if (!ttsRes.ok) {
-        throw new Error(`TTS upstream HTTP ${ttsRes.status}`);
+        ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=gtx&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(cleanText)}`;
+        ttsRes = await fetch(ttsUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          }
+        });
+      }
+
+      if (!ttsRes.ok) {
+        console.warn(`[TTS API Proxy] Upstream TTS returned status ${ttsRes.status}`);
+        return res.status(502).json({ error: `TTS upstream HTTP ${ttsRes.status}` });
       }
 
       const arrayBuffer = await ttsRes.arrayBuffer();
@@ -249,8 +260,8 @@ async function startServer() {
       res.setHeader("Cache-Control", "public, max-age=86400");
       return res.send(Buffer.from(arrayBuffer));
     } catch (err: any) {
-      console.error("[TTS API Proxy] Error generating TTS speech:", err);
-      return res.status(500).json({ error: err.message || "Failed to generate TTS audio" });
+      console.warn("[TTS API Proxy] Warning generating TTS speech:", err.message);
+      return res.status(502).json({ error: err.message || "Failed to generate TTS audio" });
     }
   });
 

@@ -1441,7 +1441,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4 text-left">
         <div>
-          <h2 className="text-2xl font-black text-ink">Gestion des Commandes Couture</h2>
+          <h2 data-acom-id="orders.title" className="text-2xl font-black text-ink">Gestion des Commandes Couture</h2>
           <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Conceptions en cours : {orders.filter(o => !o.isDeleted && o.status !== 'livre').length.toString().padStart(3, '0')}</p>
         </div>
         
@@ -1493,6 +1493,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </button>
 
           <button 
+            data-acom-id="orders.add_btn"
             onClick={handleCreateOrder}
             className="flex-1 xl:flex-none flex items-center justify-center space-x-2 px-4 py-2 bg-violet-600 text-white rounded-xl font-bold shadow-lg shadow-violet-600/20 hover:scale-[1.02] transition cursor-pointer"
           >
@@ -1502,7 +1503,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm justify-between text-left">
+      <div data-acom-id="orders.filters" className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm justify-between text-left">
         <div className="flex items-center gap-3 flex-1 w-full">
           <Search className="w-5 h-5 text-gray-400 dark:text-slate-500 shrink-0" />
           <input 
@@ -2399,7 +2400,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
             <p className="text-xs text-gray-400">Lancez une nouvelle création sur mesure en cliquant sur Créer une Commande.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+          <div data-acom-id="orders.list" className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
           {filteredOrders.map((order) => {
             const price = Number(order.price || 0);
             const advance = Number(order.advance || 0);

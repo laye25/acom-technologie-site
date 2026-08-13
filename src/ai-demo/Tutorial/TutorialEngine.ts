@@ -2564,6 +2564,328 @@ export const COUTURE_OVERVIEW_TUTORIAL: TutorialScenario = {
   ]
 };
 
+export const COUTURE_CLIENTS_TUTORIAL: TutorialScenario = {
+  id: 'couture.clients.add-client',
+  title: 'Ajouter un client — Parcours Client Couture',
+  description: 'Présentation complète du Moteur Intelligent de Prise de Mesures et création guidée de la fiche client.',
+  saasModule: 'couture',
+  estimatedDurationSec: 360,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Fichier Clients & Bouton "+ Ajouter un Client"',
+      description: 'Lancer la création d\'une nouvelle fiche client en atelier.',
+      targetAcomId: 'clients.add_btn',
+      actionToPerform: 'click',
+      speechFr: "Vous êtes dans votre fichier Clients Couture. Cliquez sur le bouton « + Ajouter un Client » pour ouvrir l'Assistant de Prise de Mesures et commencer l'enregistrement.",
+      speechWolof: "Yaa ngi ci Fichier Clients Couture. Bëssal ci « + Ajouter un Client » ngir ubbi assistant natt bi te tàmbli bind client bu bees bi.",
+      stepCategory: 'action'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Bandeau du Parcours (Étape 1/5)',
+      description: 'Présentation du Moteur Intelligent de Prise de Mesures v2.5.',
+      targetAcomId: 'add_client.stepper_banner',
+      actionToPerform: 'observe',
+      speechFr: "Bienvenue dans le Moteur Intelligent de Prise de Mesures d'Acom Tailleur v2.5. Le bandeau supérieur affiche la progression unifiée en 5 étapes. Nous sommes à l'étape active 1 : Informations Client.",
+      speechWolof: "Dalal ak jàmm ci Moteur Intelligent natt Acom Tailleur v2.5. Bandeau bi ci kaw da lay wone paas 5 yi. Yaa ngi ci paas bu 1 : Informations Client.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 3,
+      title: '3. Titre & Objectif : Informations Générales',
+      description: 'Définition de l\'objectif de la première étape.',
+      targetAcomId: 'add_client.step1_title',
+      actionToPerform: 'observe',
+      speechFr: "Cette première étape sert à renseigner les informations indispensables au suivi du client, à l'attribution de ses mensurations et à la gestion de ses commandes de confection.",
+      speechWolof: "Paas bu jëkk bi dafay servir ci bind tur, sant ak numéro client bi ngir mën a denc natt am ak commande am.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 4,
+      title: '4. Identité : Prénom & Nom de Famille',
+      description: 'Saisie des identifiants du client.',
+      targetAcomId: 'add_client.firstname',
+      actionToPerform: 'type',
+      speechFr: "Renseignez le prénom et le nom de famille du client. Ces informations permettront d'identifier précisément la fiche et d'y rattacher toutes les mensurations prises.",
+      speechWolof: "Bindal tur ak sant client bi. Loolu mooy tax nga mën a xam kooku ak natt am bu yàgg am.",
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 5,
+      title: '5. Genre / Silhouette d\'Atelier',
+      description: 'Sélection de la silhouette Homme, Femme ou Enfant.',
+      targetAcomId: 'add_client.gender_selector',
+      actionToPerform: 'observe',
+      speechFr: "Sélectionnez le genre ou la silhouette d'atelier : Homme, Femme ou Enfant. Ce choix est fondamental car il adapte le mannequin anatomique et les repères de mesure.",
+      speechWolof: "Tànnal silhouette atelier bi : Goor (Homme), Jigéen (Femme) walla Xalale (Enfant). Loolu dafay changé mannequin bi ak natt yi.",
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 6,
+      title: '6. Coordonnées : Téléphone & Email',
+      description: 'Enregistrement des moyens de contact.',
+      targetAcomId: 'add_client.phone',
+      actionToPerform: 'type',
+      speechFr: "Saisissez le numéro de téléphone et l'adresse e-mail du client pour le suivi des alertes de livraison et l'envoi des factures de confection.",
+      speechWolof: "Bindal numéro téléphone ak email client bi ngir yònee ko SMS walla factures.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 7,
+      title: '7. Adresse de Livraison / Quartier',
+      description: 'Localisation du client pour la remise des pièces.',
+      targetAcomId: 'add_client.address',
+      actionToPerform: 'type',
+      speechFr: "Indiquez l'adresse de livraison ou le quartier du client afin de faciliter la remise des tenues sur-mesure une fois terminées.",
+      speechWolof: "Bindal dëkkuwaay walla quartier client bi ngir yombal livraison sër yi sooy paré.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 8,
+      title: '8. Notes & Préférences Morphologiques',
+      description: 'Saisie des spécificités et préférences de style.',
+      targetAcomId: 'add_client.notes',
+      actionToPerform: 'type',
+      speechFr: "Inscrivez ici les particularités morphologiques du client ou ses préférences de coupe (ex: aisance au niveau de la taille, retouches habituelles).",
+      speechWolof: "Bindal fi lepp lu jëm ci style client bi walla li mu bëgg ci ñaw bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 9,
+      title: '9. Action : Continuer vers le Choix du Vêtement',
+      description: 'Passer à l\'étape 2 du parcours.',
+      targetAcomId: 'add_client.btn_step2',
+      actionToPerform: 'click',
+      speechFr: "Lorsque vos informations sont renseignées, cliquez sur « Continuer : Choix du Vêtement » pour passer à l'étape suivante.",
+      speechWolof: "Soo parée ci informations yi, bëssal ci « Continuer : Choix du Vêtement » ngir dem ci paas bu 2 bi.",
+      stepCategory: 'action'
+    },
+    {
+      stepNumber: 10,
+      title: '10. Choix du Vêtement à Confectionner (Étape 2/5)',
+      description: 'Sélection de la tenue dans le catalogue d\'atelier.',
+      targetAcomId: 'add_client.garment_selector',
+      actionToPerform: 'click',
+      speechFr: "Deuxième étape : Choix du vêtement. Sélectionnez le modèle à confectionner (Grand Boubou 3 pièces, Costume, Kaftan, Robe...). Le profil de mesures s'adaptera immédiatement.",
+      speechWolof: "Yaa ngi ci paas bu 2 : Tànnal modèle bi nga bëgg ñaw (Grand Boubou, Costume, Kaftan...). Natt yi dañuy adaptateur sur-le-champ.",
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 11,
+      title: '11. Bouton Lancer la Prise de Mesures',
+      description: 'Passer au guide dynamique de métrologie.',
+      targetAcomId: 'add_client.btn_step3',
+      actionToPerform: 'click',
+      speechFr: "Cliquez sur « Lancer la prise de mesures » pour ouvrir le mannequin anatomique interactif.",
+      speechWolof: "Bëssal ci « Lancer la prise de mesures » ngir ubbi mannequin bi ci paas 3 bi.",
+      stepCategory: 'action'
+    },
+    {
+      stepNumber: 12,
+      title: '12. Guide Anatomique & Saisie des Mesures (Étape 3/5)',
+      description: 'Saisie guidée des centimètres sur schéma anatomique.',
+      targetAcomId: 'add_client.guide_viewer',
+      actionToPerform: 'type',
+      speechFr: "Troisième étape : Prise de mesures métriques. Le schéma vectoriel indique précisément où positionner le mètre ruban pour chaque point d'anatomie. Renseignez les valeurs en centimètres.",
+      speechWolof: "Paas 3 : Natt yi. Natatukaay bi da lay wone fu mètre bi wara nekk ci yaram bi. Bindal lim yi ci centimètre.",
+      stepCategory: 'required'
+    },
+    {
+      stepNumber: 13,
+      title: '13. Contrôle & Validation Atelier (Étape 4/5)',
+      description: 'Vérification automatique de la cohérence anatomique.',
+      targetAcomId: 'add_client.btn_step4',
+      actionToPerform: 'click',
+      speechFr: "Cliquez sur « Suivant : Validation » pour soumettre la fiche au contrôle de cohérence anatomique d'Acom IA.",
+      speechWolof: "Bëssal ci « Suivant : Validation » ngir Acom IA vérifier proportions yaram bi.",
+      stepCategory: 'action'
+    },
+    {
+      stepNumber: 14,
+      title: '14. Synthèse & Résumé Final (Étape 5/5)',
+      description: 'Fiche récapitulative complète du client.',
+      targetAcomId: 'add_client.btn_step5',
+      actionToPerform: 'click',
+      speechFr: "Examinez la synthèse complète : identité du client, tenue choisie et tableau récapitulatif des mensurations enregistrées.",
+      speechWolof: "Xoolal résumé bi : client bi, modèle bi ak tableau natt yëpp bu mat.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 15,
+      title: '15. Enregistrer la Fiche Client',
+      description: 'Sauvegarde définitive en base de données.',
+      targetAcomId: 'add_client.save_btn',
+      actionToPerform: 'click',
+      speechFr: "Cliquez sur « Enregistrer la fiche client » pour sauvegarder la fiche dans votre base de données.",
+      speechWolof: "Bëssal ci « Enregistrer la fiche client » ngir denc lepp ci base de données bi.",
+      stepCategory: 'final'
+    },
+    {
+      stepNumber: 16,
+      title: '16. Confirmation & Fiche Enregistrée',
+      description: 'Retour au fichier clients avec confirmation.',
+      targetAcomId: 'clients.title',
+      actionToPerform: 'observe',
+      speechFr: "La fiche client et ses mensurations sont désormais enregistrées ! Le client est immédiatement disponible pour les prises de commandes en atelier.",
+      speechWolof: "Fiche client bi ak natt yi dencu nañu avec succès ! Client bi paré na ngir commande.",
+      stepCategory: 'final'
+    }
+  ]
+};
+
+export const COUTURE_ADD_CLIENT_TUTORIAL = COUTURE_CLIENTS_TUTORIAL;
+
+export const COUTURE_ORDERS_TUTORIAL: TutorialScenario = {
+  id: 'couture_tutorial_orders',
+  title: 'Suivi des Commandes de Confection Atelier',
+  description: 'Pilotage complet du cycle de fabrication en atelier, du dépôt initial jusqu\'à la livraison finale et encaissement.',
+  saasModule: 'couture',
+  estimatedDurationSec: 360,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Commandes Mesures & Confection',
+      description: 'Tableau de bord de suivi des commandes de confection sur-mesure.',
+      targetAcomId: 'orders.title',
+      actionToPerform: 'observe',
+      speechFr: "Nous sommes maintenant dans le suivi des Commandes Mesures. Cet espace gère l'ensemble du cycle de fabrication en atelier, du dépôt initial jusqu'à la livraison finale.",
+      speechWolof: "Yaa ngi léegi ci Commandes Mesures. Fi dafay saytu lepp lu jëm ci ñaw sur-mesure, tàmbli ba kérog ñuy livreur.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Enregistrer une Nouvelle Commande',
+      description: 'Prise de commande, attribution client, choix du modèle, tissu et acomptes.',
+      targetAcomId: 'orders.add_btn',
+      actionToPerform: 'observe',
+      speechFr: "Cliquez sur Nouvelle Commande pour sélectionner un client, choisir les modèles à confectionner, enregistrer les tissus et fixer la date d'essayage.",
+      speechWolof: "Bëssal ci Nouvelle Commande ngir tànn client, tànn modèle, def sër bi ak acompte bi.",
+      stepCategory: 'action'
+    },
+    {
+      stepNumber: 3,
+      title: '3. Filtres & Statuts d\'Atelier',
+      description: 'Filtrage par étape de fabrication : Mesures, Coupe, Couture, Retouche, Prêt, Livré.',
+      targetAcomId: 'orders.filters',
+      actionToPerform: 'observe',
+      speechFr: "Filtrez vos commandes par statut d'avancement : En attente de mesures, En coupe, En assemblage couture, Prêt pour essayage ou Livré.",
+      speechWolof: "Tànnal commande yi ci kanam : Natt, Coupe, Ñaw, Retouche, Paré ngir essayage wala Livré.",
+      stepCategory: 'control'
+    },
+    {
+      stepNumber: 4,
+      title: '4. Suivi Kanban / Liste des Commandes',
+      description: 'Vue d\'ensemble de l\'avancement des pièces, acomptes perçus et soldes restants.',
+      targetAcomId: 'orders.list',
+      actionToPerform: 'observe',
+      speechFr: "Visualisez en direct l'avancement des pièces en atelier, les acomptes versés et les soldes restants à l'encaissement.",
+      speechWolof: "Xoolal ci direct nax liggéey bi ngi doxee ci atelier bi, acompte yi jot a fay ak li des ci xalis bi.",
+      stepCategory: 'info'
+    }
+  ]
+};
+
+export const COUTURE_TEXTILES_TUTORIAL: TutorialScenario = {
+  id: 'couture_tutorial_textiles',
+  title: 'Gestion du Stock de Tissus & Coupons Wax',
+  description: 'Inventaire des coupons de tissus, métrages disponibles, Bazin, Wax et soieries.',
+  saasModule: 'couture',
+  estimatedDurationSec: 240,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Stock Tissus & Coupons Wax',
+      description: 'Espace de gestion des tissus, métrages disponibles et références textiles.',
+      targetAcomId: 'textiles.title',
+      actionToPerform: 'observe',
+      speechFr: "Voici votre espace Tissus & Wax. Il permet de répertorier tous vos coupons de tissus, Wax, Bazin, Soie et Dentelles disponibles en atelier.",
+      speechWolof: "Fi mooy sa dencukaay sër ak Wax. Dafay lim kuponu sër yi nga am ci atelier bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Enregistrer un Coupon de Tissu',
+      description: 'Ajout d\'un nouveau coupon avec métrage, largeur et type d\'étoffe.',
+      targetAcomId: 'textiles.add_btn',
+      actionToPerform: 'observe',
+      speechFr: "Enregistrez de nouvelles pièces de tissu avec leur métrage total, la largeur du coupon, la couleur et le motif.",
+      speechWolof: "Bindal sër bu bees ak limu mètre bi, yaatuyaay bi ak couleur bi.",
+      stepCategory: 'action'
+    },
+    {
+      stepNumber: 3,
+      title: '3. Suivi du Métrage & Déduction',
+      description: 'Mise à jour automatique du stock de tissu lors des commandes.',
+      targetAcomId: 'textiles.grid',
+      actionToPerform: 'observe',
+      speechFr: "Suivez l'utilisation de vos coupons en temps réel. Lors d'une commande client, le métrage utilisé est automatiquement déduit du stock.",
+      speechWolof: "Saytul mètre bi ci temps réel. Soo nattalée client, métre bi dafay wáññiku ci stock bi.",
+      stepCategory: 'info'
+    }
+  ]
+};
+
+export const COUTURE_READY_TO_WEAR_TUTORIAL: TutorialScenario = {
+  id: 'couture_tutorial_ready_to_wear',
+  title: 'Boutique Prêt-à-Porter Atelier',
+  description: 'Gestion des vêtements pré-confectionnés en rayon, tailles disponibles et ventes directes.',
+  saasModule: 'couture',
+  estimatedDurationSec: 240,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Boutique Prêt-à-Porter',
+      description: 'Espace de présentation des créations prêt-à-porter de votre atelier.',
+      targetAcomId: 'boutique.title',
+      actionToPerform: 'observe',
+      speechFr: "Bienvenue dans la Boutique Prêt-à-Porter. Gérez vos vêtements pré-confectionnés en atelier et prêts à la vente directe.",
+      speechWolof: "Dalal jàmm ci Boutique Prêt-à-Porter. Fi dafay saytu ñaw yu paré ngir jaay ci atelier bi.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Catalogue & Modèles en Rayon',
+      description: 'Visualisation des articles prêts à être vendus.',
+      targetAcomId: 'boutique.grid',
+      actionToPerform: 'observe',
+      speechFr: "Consultez vos modèles en rayon, les déclinaisons de tailles et enregistrez les ventes comptoir directes.",
+      speechWolof: "Xoolal modèle yi nga am ci rayon bi ak taille yi am ngir jaay leen ci gaaw.",
+      stepCategory: 'info'
+    }
+  ]
+};
+
+export const COUTURE_INSPIRATIONS_TUTORIAL: TutorialScenario = {
+  id: 'couture_tutorial_inspirations',
+  title: 'Galerie d\'Inspirations & Moodboards',
+  description: 'Catalogue visuel de modèles, tendances de mode et cahiers de styles pour vos clients.',
+  saasModule: 'couture',
+  estimatedDurationSec: 240,
+  steps: [
+    {
+      stepNumber: 1,
+      title: '1. Galerie d\'Inspirations & Moodboards',
+      description: 'Espace d\'exposition des modèles et idées de confection.',
+      targetAcomId: 'inspirations.title',
+      actionToPerform: 'observe',
+      speechFr: "Voici la Galerie d'Inspirations & Moodboards. Présentez à vos clients vos derniers catalogues de modèles, tendances et cahiers de styles.",
+      speechWolof: "Fi mooy Galerie d'Inspirations. Wanel sa client yi modèle bu bees ak style yu am xew.",
+      stepCategory: 'info'
+    },
+    {
+      stepNumber: 2,
+      title: '2. Catalogue Visuel & Créations',
+      description: 'Sélection directe de modèles pour de nouvelles commandes.',
+      targetAcomId: 'inspirations.grid',
+      actionToPerform: 'observe',
+      speechFr: "Accédez aux photos de réalisations et enregistrez des modèles directement pour de nouvelles commandes.",
+      speechWolof: "Sélectionnél modèle yi nga bëgg ngir bind commande bu bees ngir sa client.",
+      stepCategory: 'info'
+    }
+  ]
+};
+
 export const PRESSING_DASHBOARD_TUTORIAL: TutorialScenario = {
   id: 'pressing_tutorial_dashboard',
   title: 'Formation Aperçu & Tableau de Bord',
@@ -5338,6 +5660,22 @@ class TutorialEngineService {
     if (pageId === 'audit' || pageId === 'journal_audit' || pageId === 'merchant_audit' || pageId === 'audit_log') {
       return MERCHANT_AUDIT_LOG_TUTORIAL;
     }
+    // Couture / Tailleur tabs
+    if (pageId === 'tailleur_clients' || pageId === 'clients-couture' || pageId === 'clients') {
+      return COUTURE_CLIENTS_TUTORIAL;
+    }
+    if (pageId === 'tailleur_orders' || pageId === 'commandes-mesures' || pageId === 'orders') {
+      return COUTURE_ORDERS_TUTORIAL;
+    }
+    if (pageId === 'tailleur_tissus' || pageId === 'tissus-wax' || pageId === 'textiles') {
+      return COUTURE_TEXTILES_TUTORIAL;
+    }
+    if (pageId === 'tailleur_boutique' || pageId === 'boutique-pret-a-porter') {
+      return COUTURE_READY_TO_WEAR_TUTORIAL;
+    }
+    if (pageId === 'tailleur_gallery' || pageId === 'inspirations-moodboards' || pageId === 'moodboards') {
+      return COUTURE_INSPIRATIONS_TUTORIAL;
+    }
     return undefined;
   }
 
@@ -5383,6 +5721,11 @@ class TutorialEngineService {
       this.isActive = true;
       this.isFunctionChooserVisible = false;
       this.requestTutorialStep(0, 'immediate');
+    } else if (modalId === 'couture.add_client_modal' || modalId === 'smart_measurement_modal' || modalId === 'couture_add_client_modal') {
+      this.currentScenario = COUTURE_ADD_CLIENT_TUTORIAL;
+      this.isActive = true;
+      this.isFunctionChooserVisible = false;
+      this.requestTutorialStep(1, 'immediate');
     }
   }
 
@@ -5390,7 +5733,11 @@ class TutorialEngineService {
     if (this.activeModal === modalId) {
       this.activeModal = null;
     }
-    if (modalId === 'stock.reorder_modal' || modalId === 'stock_reorder_modal') {
+    if (modalId === 'couture.add_client_modal' || modalId === 'smart_measurement_modal' || modalId === 'couture_add_client_modal') {
+      if (this.isActive && this.currentScenario?.id === 'couture.clients.add-client') {
+        this.requestTutorialStep(15, 'immediate'); // Jump to step index 15 (Step 16: Confirmation & Fiche Enregistrée)
+      }
+    } else if (modalId === 'stock.reorder_modal' || modalId === 'stock_reorder_modal') {
       if (this.isActive && this.currentScenario?.id === 'commerce_reorder_po_tutorial') {
         this.currentScenario = COMMERCE_STOCK_TUTORIAL;
         this.requestTutorialStep(0, 'immediate');
@@ -5435,27 +5782,17 @@ class TutorialEngineService {
   }
 
   public async onPageSelected(pageId: string): Promise<void> {
-    if (!this.isWaitingForTab) return;
+    const activeSaas = ContextEngine.getContext().activeSaaS || 'couture';
+    const scenario = this.getScenarioForPage(pageId, activeSaas);
 
-    const pageDef = SaaSPageRegistry.getPage(pageId);
-    if (pageDef) {
-      const scenario = this.getScenarioForPage(pageId);
-      if (scenario) {
-        this.isWaitingForTab = false;
-        this.waitingMessage = null;
-        this.startTutorial(scenario);
-      } else {
-        const msg = "Cette page est bien reconnue, mais son tutoriel n'est pas encore disponible. Sélectionnez un autre onglet.";
-        this.waitingMessage = msg;
-        this.enqueueNarration({
-          id: 'tab_selection_unavailable',
-          text: msg,
-          lang: 'fr',
-          priority: 'immediate'
-        });
-        this.notify();
+    if (scenario) {
+      this.isWaitingForTab = false;
+      this.waitingMessage = null;
+      // If tutorial is active or scenario changes, switch to it seamlessly
+      if (this.currentScenario?.id !== scenario.id || this.isActive) {
+        this.startTutorial(scenario, 0);
       }
-    } else {
+    } else if (this.isWaitingForTab) {
       const msg = "Cette page n'est pas encore reconnue pour le tutoriel. Sélectionnez un autre onglet.";
       this.waitingMessage = msg;
       this.enqueueNarration({
@@ -5676,6 +6013,47 @@ class TutorialEngineService {
 
   public getActiveModal(): string | null {
     return this.activeModal;
+  }
+
+  public onSmartAssistantStepChange(stepNumber: number): void {
+    if (!this.isActive || this.currentScenario?.id !== 'couture.clients.add-client') return;
+    const stepMapping: Record<number, number> = {
+      1: 1,  // Step 1 modal: Info client -> step index 1 (Bandeau du parcours)
+      2: 9,  // Step 2 modal: Garment selector -> step index 9 (Choix du Vêtement à Confectionner)
+      3: 11, // Step 3 modal: Guide viewer & measurements -> step index 11 (Guide Anatomique & Mesures)
+      4: 12, // Step 4 modal: Validation -> step index 12 (Contrôle & Validation Atelier)
+      5: 13  // Step 5 modal: Summary -> step index 13 (Synthèse & Résumé Final)
+    };
+    const targetIndex = stepMapping[stepNumber];
+    if (targetIndex !== undefined) {
+      this.jumpToStepIndex(targetIndex);
+    }
+  }
+
+  public onGarmentSelected(garmentName: string, category: string, mandatoryCount: number, optionalCount: number): void {
+    if (!this.isActive || this.currentScenario?.id !== 'couture.clients.add-client') return;
+    const narrationText = `Vous avez sélectionné le modèle ${garmentName} (${category}). Ce vêtement nécessite ${mandatoryCount} mesures obligatoires et ${optionalCount} mesures optionnelles.`;
+    this.enqueueNarration({
+      id: `garment_selected_${garmentName}`,
+      text: narrationText,
+      lang: 'fr',
+      priority: 'immediate',
+      targetAcomId: 'add_client.garment_selector'
+    });
+  }
+
+  public onMeasurementSelected(fieldKey: string, fieldLabel: string, isMandatory: boolean): void {
+    if (!this.isActive || this.currentScenario?.id !== 'couture.clients.add-client') return;
+    const targetAcomId = `measurement.${fieldKey}`;
+    const statusText = isMandatory ? 'Mesure obligatoire pour la coupe exacte de cette tenue.' : 'Mesure optionnelle pour ajustement de confort.';
+    const narrationText = `Saisie de la mesure : ${fieldLabel}. ${statusText} Renseignez la valeur en centimètres.`;
+    this.enqueueNarration({
+      id: `measurement_focus_${fieldKey}`,
+      text: narrationText,
+      lang: 'fr',
+      priority: 'immediate',
+      targetAcomId
+    });
   }
 
   public startCsvExportSuccessTutorial(initialStepIndex = 0): void {

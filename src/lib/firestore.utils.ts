@@ -71,7 +71,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  const isTimeoutOrQuota = errorMessage.toLowerCase().includes('timed out') || errorMessage.toLowerCase().includes('quota');
+  if (isTimeoutOrQuota) {
+    console.warn('[Firestore Offline/Timeout Fallback]', JSON.stringify(errInfo));
+  } else {
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  }
   // Return the error info instead of throwing it, to allow callers to gracefully return their fallback (like null)
   return errInfo;
 }
