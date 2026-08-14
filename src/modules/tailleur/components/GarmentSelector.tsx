@@ -122,12 +122,13 @@ export const GarmentSelector: React.FC<GarmentSelectorProps> = ({
   return (
     <div className="space-y-3 text-left">
       <div className="flex justify-between items-center">
-        <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+        <label data-acom-id="add_client.garment_header_title" className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
           <Scissors className="w-4 h-4 text-emerald-600" />
           Modèle / Vêtement à Confectionner
         </label>
 
         <button
+          data-acom-id="add_client.btn_create_garment"
           type="button"
           onClick={() => setIsCreateModalOpen(true)}
           className="text-xs font-black text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-all flex items-center gap-1 cursor-pointer"
@@ -139,29 +140,41 @@ export const GarmentSelector: React.FC<GarmentSelectorProps> = ({
 
       {/* Category Pills Bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            type="button"
-            onClick={() => setActiveCategory(cat)}
-            className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
-              activeCategory === cat
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+        {categories.map((cat) => {
+          const categorySlugMap: Record<string, string> = {
+            'Toutes': 'filter_all',
+            'Couture Africaine': 'filter_couture_africaine',
+            'Femme': 'filter_femme',
+            'Enfant': 'filter_enfant',
+            'Couture Internationale': 'filter_couture_internationale'
+          };
+          const slug = categorySlugMap[cat] || `filter_${cat.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+          return (
+            <button
+              key={cat}
+              data-acom-id={`add_client.${slug}`}
+              type="button"
+              onClick={() => setActiveCategory(cat)}
+              className={`px-3 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                activeCategory === cat
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
       </div>
 
       {/* Grid des Vêtements Filtrés */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
-        {filteredGarments.map((g) => {
+      <div data-acom-id="add_client.garment_scroll_area" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto pr-1">
+        {filteredGarments.map((g, index) => {
           const isSelected = g.id === selectedGarmentId;
           return (
             <div
               key={g.id}
+              data-acom-id={`add_client.garment_card_${index + 1}`}
               onClick={() => handleSelect(g)}
               className={`p-3 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between ${
                 isSelected

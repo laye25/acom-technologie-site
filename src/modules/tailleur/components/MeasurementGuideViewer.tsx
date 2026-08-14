@@ -89,9 +89,9 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
             <Ruler className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <h3 className="text-sm font-black text-white tracking-wide uppercase flex items-center gap-2">
+            <h3 data-acom-id="add_client.guide_title" className="text-sm font-black text-white tracking-wide uppercase flex items-center gap-2">
               Guide & Silhouette
-              <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-mono border border-emerald-500/30">
+              <span data-acom-id="add_client.guide_badge_realtime" className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full font-mono border border-emerald-500/30">
                 Temps Réel
               </span>
             </h3>
@@ -102,8 +102,9 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
         </div>
 
         {/* Male / Female / Child Selector */}
-        <div className="bg-slate-800 p-1 rounded-2xl flex border border-slate-700">
+        <div data-acom-id="add_client.gender_selector_group" className="bg-slate-800 p-1 rounded-2xl flex border border-slate-700">
           <button
+            data-acom-id="add_client.gender_homme"
             type="button"
             onClick={() => handleGenderToggle('Homme')}
             className={`px-2.5 py-1 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 ${
@@ -115,6 +116,7 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
             <span>👨 Homme</span>
           </button>
           <button
+            data-acom-id="add_client.gender_femme"
             type="button"
             onClick={() => handleGenderToggle('Femme')}
             className={`px-2.5 py-1 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 ${
@@ -126,6 +128,7 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
             <span>👩 Femme</span>
           </button>
           <button
+            data-acom-id="add_client.gender_enfant"
             type="button"
             onClick={() => handleGenderToggle('Enfant')}
             className={`px-2.5 py-1 rounded-xl text-[11px] font-black transition-all cursor-pointer flex items-center gap-1 ${
@@ -141,7 +144,7 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
 
       {/* Selected Garment Context Banner */}
       {selectedGarment && (
-        <div className="mt-3 bg-slate-950/90 border border-slate-800 p-2.5 rounded-2xl flex items-center justify-between gap-2 shrink-0">
+        <div data-acom-id="add_client.guide_active_model_info" className="mt-3 bg-slate-950/90 border border-slate-800 p-2.5 rounded-2xl flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
               <GarmentVectorIcon id={selectedGarment.id} name={selectedGarment.name} category={selectedGarment.category} className="w-5 h-5" />
@@ -154,7 +157,7 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
             </div>
           </div>
           <div className="text-right shrink-0">
-            <span className="bg-emerald-500/20 text-emerald-300 font-mono font-black text-[10px] px-2 py-0.5 rounded-lg border border-emerald-500/30">
+            <span data-acom-id="add_client.guide_active_model_badge" className="bg-emerald-500/20 text-emerald-300 font-mono font-black text-[10px] px-2 py-0.5 rounded-lg border border-emerald-500/30">
               {selectedGarment.mandatoryMeasurements.length} requis
             </span>
           </div>
@@ -164,11 +167,12 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
       {/* Main Content Grid: SVG Silhouette + Guide Details */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 pt-3 flex-1 overflow-y-auto">
         {/* Silhouette SVG Column (5 Cols) */}
-        <div className="lg:col-span-5 bg-slate-950/90 rounded-2xl p-4 border border-slate-800/80 relative flex flex-col items-center justify-center min-h-[360px] shadow-inner">
+        <div data-acom-id="add_client.guide_silhouette_svg" className="lg:col-span-5 bg-slate-950/90 rounded-2xl p-4 border border-slate-800/80 relative flex flex-col items-center justify-center min-h-[360px] shadow-inner">
           {/* Active zone label top floating badge */}
           {activeDefinition ? (
             <motion.div
               key={activeDefinition.key}
+              data-acom-id="add_client.guide_selected_measure_badge"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="absolute top-3 left-3 right-3 bg-emerald-950/95 border border-emerald-500/40 p-2.5 rounded-xl backdrop-blur-md flex items-center justify-between z-10 shadow-lg"
@@ -388,7 +392,7 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
               className="space-y-4 flex-1 flex flex-col justify-between"
             >
               {/* Header Measurement Info */}
-              <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/80 space-y-2">
+              <div data-acom-id="add_client.guide_measure_info_header" className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/80 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold px-2.5 py-1 rounded-lg border border-emerald-500/30 uppercase">
@@ -400,18 +404,18 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
                     Sexe : {activeDefinition.gender}
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{activeDefinition.description}</p>
+                <p data-acom-id="add_client.guide_measure_description" className="text-xs text-slate-300 leading-relaxed">{activeDefinition.description}</p>
               </div>
 
               {/* Step-by-Step Instructions */}
-              <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 space-y-2">
+              <div data-acom-id="add_client.guide_steps_header" className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 space-y-2">
                 <h5 className="text-xs font-black uppercase text-emerald-400 flex items-center gap-1.5 tracking-wider">
                   <Zap className="w-4 h-4 text-emerald-400" />
                   Étapes de Prise de Mesure (Pas-à-Pas)
                 </h5>
                 <ul className="space-y-1.5 text-xs text-slate-300">
                   {activeDefinition.instructions.map((step, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
+                    <li key={idx} data-acom-id={`add_client.guide_step_${idx + 1}`} className="flex items-start gap-2">
                       <span className="w-4 h-4 bg-emerald-900/60 text-emerald-300 font-mono font-bold text-[10px] rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-emerald-700/50">
                         {idx + 1}
                       </span>
@@ -424,14 +428,14 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
               {/* Best Practices & Common Mistakes Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Best Practices */}
-                <div className="bg-emerald-950/30 border border-emerald-800/40 p-3.5 rounded-2xl space-y-1.5">
+                <div data-acom-id="add_client.guide_best_practices_header" className="bg-emerald-950/30 border border-emerald-800/40 p-3.5 rounded-2xl space-y-1.5">
                   <h6 className="text-[11px] font-black uppercase text-emerald-300 flex items-center gap-1.5">
                     <Lightbulb className="w-3.5 h-3.5 text-emerald-400" />
                     Bonnes Pratiques
                   </h6>
                   <ul className="space-y-1 text-[11px] text-emerald-100/90">
                     {activeDefinition.bestPractices.map((bp, i) => (
-                      <li key={i} className="flex items-start gap-1.5">
+                      <li key={i} data-acom-id={`add_client.guide_best_practice_${i + 1}`} className="flex items-start gap-1.5">
                         <span className="text-emerald-400 shrink-0">•</span>
                         <span>{bp}</span>
                       </li>
@@ -440,14 +444,14 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
                 </div>
 
                 {/* Common Mistakes */}
-                <div className="bg-rose-950/30 border border-rose-800/40 p-3.5 rounded-2xl space-y-1.5">
+                <div data-acom-id="add_client.guide_common_mistakes_header" className="bg-rose-950/30 border border-rose-800/40 p-3.5 rounded-2xl space-y-1.5">
                   <h6 className="text-[11px] font-black uppercase text-rose-300 flex items-center gap-1.5">
                     <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
                     Pièges à Éviter
                   </h6>
                   <ul className="space-y-1 text-[11px] text-rose-100/90">
                     {activeDefinition.commonMistakes.map((cm, i) => (
-                      <li key={i} className="flex items-start gap-1.5">
+                      <li key={i} data-acom-id={`add_client.guide_common_mistake_${i + 1}`} className="flex items-start gap-1.5">
                         <span className="text-rose-400 shrink-0">•</span>
                         <span>{cm}</span>
                       </li>
@@ -457,7 +461,7 @@ export const MeasurementGuideViewer: React.FC<MeasurementGuideViewerProps> = ({
               </div>
 
               {/* Normal CM Bounds Indicator */}
-              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+              <div data-acom-id="add_client.guide_normal_bounds" className="bg-slate-900 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
                 <span>Plage habituelle :</span>
                 <span className="text-white font-bold">
                   {activeDefinition.minNormalCm} cm à {activeDefinition.maxNormalCm} cm

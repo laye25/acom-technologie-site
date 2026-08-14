@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { db } from '../../../db/db';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 interface Merchant {
   id: string;
@@ -1527,6 +1528,42 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
   const filteredArtisans = getFilteredArtisans();
   const filteredAssignments = getFilteredAssignments();
 
+  // Synchronize state with TutorialEngine for full artisans interactive demo
+  useEffect(() => {
+    TutorialEngine.setArtisansPageState({
+      activeSubTab: subTab as any,
+      subTab: subTab as any,
+      totalArtisansCount: artisans.length,
+      totalArtisans: artisans.length,
+      totalAssignmentsCount: assignments.length,
+      totalPendingAssignmentsCount: assignments.filter(a => a.status !== 'Terminé' && (a.status as string) !== 'completed').length,
+      totalCompletedAssignmentsCount: assignments.filter(a => a.status === 'Terminé' || (a.status as string) === 'completed').length,
+      totalPayrollAmount: totalEarnedAll || 0,
+      totalEarnedAll: totalEarnedAll || 0,
+      totalPaidPayrollAmount: totalPaidAll || 0,
+      totalPaidAll: totalPaidAll || 0,
+      totalPendingPayrollAmount: remainingDueAll || 0,
+      remainingDueAll: remainingDueAll || 0,
+      currency,
+      search: searchQuery,
+      searchQuery,
+      filterSpecialty,
+      filterStatus: filterAssignStatus,
+      filterAssignStatus,
+      artisans: filteredArtisans,
+      assignments: filteredAssignments,
+      payments
+    });
+  }, [subTab, artisans, assignments, filteredArtisans, filteredAssignments, payments, salaryPayments, searchQuery, filterSpecialty, filterAssignStatus, artisanCategoryFilter, totalEarnedAll, totalPaidAll, remainingDueAll, currency]);
+
+  useEffect(() => {
+    if (isArtisanModalOpen) {
+      TutorialEngine.onModalOpened('couture.artisan_modal');
+    } else {
+      TutorialEngine.onModalClosed('couture.artisan_modal');
+    }
+  }, [isArtisanModalOpen]);
+
   return (
     <motion.div 
       id="tailleur-artisans-container"
@@ -1543,44 +1580,50 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Atelier & Artisans</h2>
-            <p className="text-xs text-gray-500 font-medium">Gérez votre personnel couture, assignez les tâches aux commandes et suivez les paiements à la pièce.</p>
+            <h2 data-acom-id="artisans.title" className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Atelier & Artisans</h2>
+            <p data-acom-id="artisans.description" className="text-xs text-gray-500 font-medium">Gérez votre personnel couture, assignez les tâches aux commandes et suivez les paiements à la pièce.</p>
           </div>
         </div>
 
         {/* Local Tab Navigation */}
-        <div className="flex flex-wrap bg-gray-100 p-1 rounded-xl self-start md:self-center gap-1">
+        <div data-acom-id="artisans.subtabs" className="flex flex-wrap bg-gray-100 p-1 rounded-xl self-start md:self-center gap-1">
           <button
+            data-acom-id="artisans.subtab_artisans"
             onClick={() => { setSubTab('artisans'); setSelectedArtisanId(null); }}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'artisans' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             <UserCheck className="w-3.5 h-3.5 inline mr-1.5" /> Équipe & Statuts
           </button>
           <button
+            data-acom-id="artisans.subtab_assignments"
             onClick={() => setSubTab('assignments')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'assignments' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             <Scissors className="w-3.5 h-3.5 inline mr-1.5" /> Plan de Travail (Assignations)
           </button>
           <button
+            data-acom-id="artisans.subtab_payments"
             onClick={() => setSubTab('payments')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'payments' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             <Wallet className="w-3.5 h-3.5 inline mr-1.5" /> Rémunération à la pièce
           </button>
           <button
+            data-acom-id="artisans.subtab_salaries_mensuel"
             onClick={() => setSubTab('salaries_mensuel')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'salaries_mensuel' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             <Calendar className="w-3.5 h-3.5 inline mr-1.5" /> Rémunération Mensuelle
           </button>
           <button
+            data-acom-id="artisans.subtab_salaries_hebdomadaire"
             onClick={() => setSubTab('salaries_hebdomadaire')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'salaries_hebdomadaire' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             <Clock className="w-3.5 h-3.5 inline mr-1.5" /> Rémunération Hebdomadaire
           </button>
           <button
+            data-acom-id="artisans.subtab_salaries_journalier"
             onClick={() => setSubTab('salaries_journalier')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${subTab === 'salaries_journalier' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
@@ -1590,8 +1633,8 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
       </div>
 
       {/* Mini Financial Dashboard banner */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-between">
+      <div data-acom-id="artisans.kpi_cards" className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div data-acom-id="artisans.kpi_earned" className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-2xl flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Total Terminé (À payer)</span>
             <p className="text-xl font-bold text-gray-900 mt-1">{totalEarnedAll.toLocaleString('fr-FR')} <span className="text-xs text-gray-500">{currency}</span></p>
@@ -1601,7 +1644,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
           </div>
         </div>
 
-        <div className="bg-violet-50/50 border border-violet-100 p-4 rounded-2xl flex items-center justify-between">
+        <div data-acom-id="artisans.kpi_paid" className="bg-violet-50/50 border border-violet-100 p-4 rounded-2xl flex items-center justify-between">
           <div>
             <span className="text-[10px] font-bold text-violet-700 uppercase tracking-wider">Acomptes versés</span>
             <p className="text-xl font-bold text-gray-900 mt-1">{totalPaidAll.toLocaleString('fr-FR')} <span className="text-xs text-gray-500">{currency}</span></p>
@@ -1611,9 +1654,9 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
           </div>
         </div>
 
-        <div className={`p-4 rounded-2xl border flex items-center justify-between ${remainingDueAll > 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+        <div data-acom-id="artisans.kpi_due" className={`p-4 rounded-2xl border flex items-center justify-between ${remainingDueAll > 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
           <div>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${remainingDueAll > 0 ? 'text-amber-700' : 'text-gray-500'}`}>Solde dû restant</span>
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${remainingDueAll > 0 ? 'text-amber-700' : 'text-gray-500'}`}>Solde du restant</span>
             <p className="text-xl font-bold text-gray-900 mt-1">{remainingDueAll.toLocaleString('fr-FR')} <span className="text-xs text-gray-500">{currency}</span></p>
           </div>
           <div className={`p-2.5 rounded-xl ${remainingDueAll > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -1628,7 +1671,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
           {/* Filters & Actions row */}
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-              <div className="relative flex-1 md:flex-initial min-w-[240px]">
+              <div data-acom-id="artisans.search_input" className="relative flex-1 md:flex-initial min-w-[240px]">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
@@ -1640,8 +1683,9 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
               </div>
 
               <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-gray-400 shrink-0" />
+                <Filter data-acom-id="artisans.filter_icon" className="w-4 h-4 text-gray-400 shrink-0" />
                 <select
+                  data-acom-id="artisans.filter_specialty"
                   value={filterSpecialty}
                   onChange={(e) => setFilterSpecialty(e.target.value)}
                   className="bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold py-2 px-3 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
@@ -1653,6 +1697,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             </div>
 
             <button
+              data-acom-id="artisans.add_artisan_btn"
               onClick={() => openArtisanForm()}
               className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer self-stretch md:self-auto justify-center"
             >
@@ -1661,8 +1706,9 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
           </div>
 
           {/* Sub-tab segment for payment profiles */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 p-1.5 bg-gray-50 border border-gray-100 rounded-2xl">
+          <div data-acom-id="artisans.remuneration_selectors" className="grid grid-cols-2 md:grid-cols-5 gap-2.5 p-1.5 bg-gray-50 border border-gray-100 rounded-2xl">
             <button
+              data-acom-id="artisans.category_all"
               onClick={() => setArtisanCategoryFilter('all')}
               className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all cursor-pointer border text-center ${
                 artisanCategoryFilter === 'all' 
@@ -1682,6 +1728,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
               return (
                 <button
                   key={cat.key}
+                  data-acom-id={`artisans.category_${cat.key}`}
                   onClick={() => setArtisanCategoryFilter(cat.key)}
                   className={`flex flex-col items-center justify-center p-3 rounded-xl transition-all cursor-pointer border text-center ${
                     isActive 
@@ -1698,25 +1745,25 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
           </div>
 
           {/* Active Category Header & Desc */}
-          <div className="bg-violet-50/20 border border-violet-100 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div data-acom-id="artisans.block_team_header" className="bg-violet-50/20 border border-violet-100 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-gray-900 text-sm">
+              <h3 data-acom-id="artisans.block_team_title" className="font-bold text-gray-900 text-sm">
                 {artisanCategoryFilter === 'all' ? 'Toute l’Équipe' : ARTISAN_CATEGORIES.find(c => c.key === artisanCategoryFilter)?.label}
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p data-acom-id="artisans.block_team_desc" className="text-xs text-gray-500 mt-0.5">
                 {artisanCategoryFilter === 'all' 
                   ? 'Consultez la liste complète des artisans de l’atelier et leur mode de rémunération.' 
                   : ARTISAN_CATEGORIES.find(c => c.key === artisanCategoryFilter)?.desc}
               </p>
             </div>
-            <div className="text-xs font-semibold text-gray-600 font-mono bg-white px-3 py-1 rounded-lg border border-gray-100 self-start md:self-auto">
+            <div data-acom-id="artisans.block_team_total" className="text-xs font-semibold text-gray-600 font-mono bg-white px-3 py-1 rounded-lg border border-gray-100 self-start md:self-auto">
               Total : {filteredArtisans.length} {filteredArtisans.length > 1 ? 'artisans' : 'artisan'}
             </div>
           </div>
 
           {/* Artisans Grid Cards */}
           {filteredArtisans.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-3xl">
+            <div data-acom-id="artisans.empty_state" className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-3xl">
               <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Users className="w-6 h-6" />
               </div>
@@ -1725,33 +1772,28 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             </div>
           ) : artisanCategoryFilter !== 'all' ? (
             /* Single Category Grid */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredArtisans.map((artisan) => {
+            <div data-acom-id="artisans.list" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-7">
+              {filteredArtisans.map((artisan, index) => {
                 const stats = getArtisanStats(artisan.id);
                 return (
                   <div
                     key={artisan.id}
-                    className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden"
+                    data-acom-id={`artisans.card_${index}`}
+                    className="bg-white border border-gray-100 rounded-2xl p-6 md:p-7 flex flex-col justify-between hover:shadow-lg transition-all relative overflow-hidden"
                   >
-                    {/* Status corner tag */}
-                    <span className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      artisan.status === 'Disponible' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                      artisan.status === 'Occupé' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                      'bg-rose-50 text-rose-700 border border-rose-100'
-                    }`}>
-                      ● {artisan.status}
-                    </span>
-
-                    <div className="space-y-4">
-                      {/* Name & Specialty */}
-                      <div>
-                        <div className="flex flex-wrap gap-1.5 items-center">
-                          <span className="text-[10px] uppercase font-bold text-violet-600 tracking-wider bg-violet-50 px-2 py-0.5 rounded-md">{artisan.specialty}</span>
+                    <div className="space-y-5">
+                      {/* Header in Flex with justify-content: space-between & align-items: center */}
+                      <div className="flex items-center justify-between gap-4 w-full min-h-[28px]">
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span data-acom-id={`artisans.card_specialty_${index}`} className="text-[10px] uppercase font-bold text-violet-600 tracking-wider bg-violet-50 px-2.5 py-1 rounded-md">
+                            {artisan.specialty}
+                          </span>
                           {(() => {
                             const badge = getProfileBadge(artisan.remunerationType);
                             return (
                               <span 
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badge.bg}`} 
+                                data-acom-id={`artisans.card_remuneration_${index}`}
+                                className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${badge.bg}`} 
                                 title={badge.desc}
                               >
                                 {badge.label}
@@ -1759,55 +1801,74 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                             );
                           })()}
                         </div>
-                        <h4 className="font-bold text-gray-900 text-sm mt-2">{artisan.name}</h4>
-                        <p className="text-xs text-gray-500 font-mono mt-0.5">{artisan.phone}</p>
+
+                        {/* Status tag clearly separated with horizontal gap */}
+                        <span 
+                          data-acom-id={`artisans.card_status_${index}`}
+                          className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold ${
+                            artisan.status === 'Disponible' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                            artisan.status === 'Occupé' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                            'bg-rose-50 text-rose-700 border border-rose-100'
+                          }`}
+                        >
+                          ● {artisan.status}
+                        </span>
+                      </div>
+
+                      {/* Name & Specialty */}
+                      <div className="pt-1">
+                        <h4 data-acom-id={`artisans.card_name_${index}`} className="font-bold text-gray-900 text-base md:text-lg">{artisan.name}</h4>
+                        <p data-acom-id={`artisans.card_phone_${index}`} className="text-xs text-gray-500 font-mono mt-1">{artisan.phone}</p>
                       </div>
 
                       {/* Brief description */}
                       {artisan.notes && (
-                        <p className="text-xs text-gray-600 italic line-clamp-2 h-8 leading-relaxed">
+                        <p data-acom-id={`artisans.card_desc_${index}`} className="text-xs text-gray-600 italic line-clamp-2 min-h-[2.5rem] leading-relaxed">
                           "{artisan.notes}"
                         </p>
                       )}
 
                       {/* Mini stats table */}
-                      <div className="grid grid-cols-3 gap-1 pt-3 border-t border-gray-100 text-center text-gray-600">
+                      <div data-acom-id={`artisans.card_stats_${index}`} className="grid grid-cols-3 gap-2 pt-4 border-t border-gray-100 text-center text-gray-600">
                         <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-medium">Assigné</p>
-                          <p className="text-xs font-bold text-gray-800">{stats.assignedCount}</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-medium tracking-wider mb-1">Assigné</p>
+                          <p data-acom-id={`artisans.card_assigned_cnt_${index}`} className="text-sm font-bold text-gray-800">{stats.assignedCount}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-medium">En cours</p>
-                          <p className="text-xs font-bold text-amber-600">{stats.inProgressCount}</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-medium tracking-wider mb-1">En cours</p>
+                          <p data-acom-id={`artisans.card_inprogress_cnt_${index}`} className="text-sm font-bold text-amber-600">{stats.inProgressCount}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-medium">Solde Dû</p>
-                          <p className={`text-xs font-bold ${stats.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{stats.balance.toLocaleString('fr-FR')} F</p>
+                          <p className="text-[10px] text-gray-400 uppercase font-medium tracking-wider mb-1">Solde Dû</p>
+                          <p data-acom-id={`artisans.card_balance_amt_${index}`} className={`text-sm font-bold ${stats.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{stats.balance.toLocaleString('fr-FR')} F</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex items-center gap-2 pt-4 mt-4 border-t border-gray-50">
+                    <div className="flex items-center gap-3 pt-4 mt-5 border-t border-gray-100">
                       <button
+                        data-acom-id={`artisans.card_pay_btn_${index}`}
                         onClick={() => {
                           setSelectedArtisanId(artisan.id);
                           setSubTab('fiche_artisan');
                         }}
-                        className="flex-1 py-2 text-center bg-gray-50 hover:bg-violet-50 hover:text-violet-700 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer"
+                        className="flex-1 py-2.5 px-3 text-center bg-gray-50 hover:bg-violet-50 hover:text-violet-700 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer"
                       >
                         Voir Fiche de Paie
                       </button>
                       <button
+                        data-acom-id={`artisans.card_edit_btn_${index}`}
                         onClick={() => openArtisanForm(artisan)}
-                        className="p-2 text-gray-400 hover:text-violet-600 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+                        className="p-2.5 text-gray-400 hover:text-violet-600 hover:bg-gray-50 rounded-xl border border-gray-100 transition-colors cursor-pointer"
                         title="Modifier"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
+                        data-acom-id={`artisans.card_delete_btn_${index}`}
                         onClick={() => handleDeleteArtisan(artisan.id)}
-                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+                        className="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-gray-50 rounded-xl border border-gray-100 transition-colors cursor-pointer"
                         title="Supprimer"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1819,7 +1880,7 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
             </div>
           ) : (
             /* Grouped Categories View */
-            <div className="space-y-10">
+            <div data-acom-id="artisans.list" className="space-y-10">
               {ARTISAN_CATEGORIES.map((category) => {
                 const categoryArtisans = filteredArtisans.filter(
                   (a) => getArtisanCategoryKey(a.remunerationType) === category.key
@@ -1841,33 +1902,30 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                     </div>
 
                     {/* Artisans Grid under Category */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-7">
                       {categoryArtisans.map((artisan) => {
+                        const globalIndex = filteredArtisans.findIndex(a => a.id === artisan.id);
+                        const index = globalIndex >= 0 ? globalIndex : 0;
                         const stats = getArtisanStats(artisan.id);
                         return (
                           <div
                             key={artisan.id}
-                            className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden"
+                            data-acom-id={`artisans.card_${index}`}
+                            className="bg-white border border-gray-100 rounded-2xl p-6 md:p-7 flex flex-col justify-between hover:shadow-lg transition-all relative overflow-hidden"
                           >
-                            {/* Status corner tag */}
-                            <span className={`absolute top-4 right-4 px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                              artisan.status === 'Disponible' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                              artisan.status === 'Occupé' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
-                              'bg-rose-50 text-rose-700 border border-rose-100'
-                            }`}>
-                              ● {artisan.status}
-                            </span>
-
-                            <div className="space-y-4">
-                              {/* Name & Specialty */}
-                              <div>
-                                <div className="flex flex-wrap gap-1.5 items-center">
-                                  <span className="text-[10px] uppercase font-bold text-violet-600 tracking-wider bg-violet-50 px-2 py-0.5 rounded-md">{artisan.specialty}</span>
+                            <div className="space-y-5">
+                              {/* Header in Flex with justify-content: space-between & align-items: center */}
+                              <div className="flex items-center justify-between gap-4 w-full min-h-[28px]">
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  <span data-acom-id={`artisans.card_specialty_${index}`} className="text-[10px] uppercase font-bold text-violet-600 tracking-wider bg-violet-50 px-2.5 py-1 rounded-md">
+                                    {artisan.specialty}
+                                  </span>
                                   {(() => {
                                     const badge = getProfileBadge(artisan.remunerationType);
                                     return (
                                       <span 
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badge.bg}`} 
+                                        data-acom-id={`artisans.card_remuneration_${index}`}
+                                        className={`text-[10px] font-bold px-2.5 py-1 rounded-md border ${badge.bg}`} 
                                         title={badge.desc}
                                       >
                                         {badge.label}
@@ -1875,55 +1933,74 @@ export const TailleurArtisansManager = ({ merchant }: TailleurArtisansManagerPro
                                     );
                                   })()}
                                 </div>
-                                <h4 className="font-bold text-gray-900 text-sm mt-2">{artisan.name}</h4>
-                                <p className="text-xs text-gray-500 font-mono mt-0.5">{artisan.phone}</p>
+
+                                {/* Status tag clearly separated with horizontal gap */}
+                                <span 
+                                  data-acom-id={`artisans.card_status_${index}`}
+                                  className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold ${
+                                    artisan.status === 'Disponible' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                    artisan.status === 'Occupé' ? 'bg-amber-50 text-amber-700 border border-amber-100' :
+                                    'bg-rose-50 text-rose-700 border border-rose-100'
+                                  }`}
+                                >
+                                  ● {artisan.status}
+                                </span>
+                              </div>
+
+                              {/* Name & Specialty */}
+                              <div className="pt-1">
+                                <h4 data-acom-id={`artisans.card_name_${index}`} className="font-bold text-gray-900 text-base md:text-lg">{artisan.name}</h4>
+                                <p data-acom-id={`artisans.card_phone_${index}`} className="text-xs text-gray-500 font-mono mt-1">{artisan.phone}</p>
                               </div>
 
                               {/* Brief description */}
                               {artisan.notes && (
-                                <p className="text-xs text-gray-600 italic line-clamp-2 h-8 leading-relaxed">
+                                <p data-acom-id={`artisans.card_desc_${index}`} className="text-xs text-gray-600 italic line-clamp-2 min-h-[2.5rem] leading-relaxed">
                                   "{artisan.notes}"
                                 </p>
                               )}
 
                               {/* Mini stats table */}
-                              <div className="grid grid-cols-3 gap-1 pt-3 border-t border-gray-100 text-center text-gray-600">
+                              <div data-acom-id={`artisans.card_stats_${index}`} className="grid grid-cols-3 gap-2 pt-4 border-t border-gray-100 text-center text-gray-600">
                                 <div>
-                                  <p className="text-[10px] text-gray-400 uppercase font-medium">Assigné</p>
-                                  <p className="text-xs font-bold text-gray-800">{stats.assignedCount}</p>
+                                  <p className="text-[10px] text-gray-400 uppercase font-medium tracking-wider mb-1">Assigné</p>
+                                  <p data-acom-id={`artisans.card_assigned_cnt_${index}`} className="text-sm font-bold text-gray-800">{stats.assignedCount}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[10px] text-gray-400 uppercase font-medium">En cours</p>
-                                  <p className="text-xs font-bold text-amber-600">{stats.inProgressCount}</p>
+                                  <p className="text-[10px] text-gray-400 uppercase font-medium tracking-wider mb-1">En cours</p>
+                                  <p data-acom-id={`artisans.card_inprogress_cnt_${index}`} className="text-sm font-bold text-amber-600">{stats.inProgressCount}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[10px] text-gray-400 uppercase font-medium">Solde Dû</p>
-                                  <p className={`text-xs font-bold ${stats.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{stats.balance.toLocaleString('fr-FR')} F</p>
+                                  <p className="text-[10px] text-gray-400 uppercase font-medium tracking-wider mb-1">Solde Dû</p>
+                                  <p data-acom-id={`artisans.card_balance_amt_${index}`} className={`text-sm font-bold ${stats.balance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{stats.balance.toLocaleString('fr-FR')} F</p>
                                 </div>
                               </div>
                             </div>
 
                             {/* Footer Actions */}
-                            <div className="flex items-center gap-2 pt-4 mt-4 border-t border-gray-50">
+                            <div className="flex items-center gap-3 pt-4 mt-5 border-t border-gray-100">
                               <button
+                                data-acom-id={`artisans.card_pay_btn_${index}`}
                                 onClick={() => {
                                   setSelectedArtisanId(artisan.id);
                                   setSubTab('fiche_artisan');
                                 }}
-                                className="flex-1 py-2 text-center bg-gray-50 hover:bg-violet-50 hover:text-violet-700 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer"
+                                className="flex-1 py-2.5 px-3 text-center bg-gray-50 hover:bg-violet-50 hover:text-violet-700 rounded-xl text-xs font-bold text-gray-700 transition-colors cursor-pointer"
                               >
                                 Voir Fiche de Paie
                               </button>
                               <button
+                                data-acom-id={`artisans.card_edit_btn_${index}`}
                                 onClick={() => openArtisanForm(artisan)}
-                                className="p-2 text-gray-400 hover:text-violet-600 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+                                className="p-2.5 text-gray-400 hover:text-violet-600 hover:bg-gray-50 rounded-xl border border-gray-100 transition-colors cursor-pointer"
                                 title="Modifier"
                               >
                                 <Edit className="w-4 h-4" />
                               </button>
                               <button
+                                data-acom-id={`artisans.card_delete_btn_${index}`}
                                 onClick={() => handleDeleteArtisan(artisan.id)}
-                                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer"
+                                className="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-gray-50 rounded-xl border border-gray-100 transition-colors cursor-pointer"
                                 title="Supprimer"
                               >
                                 <Trash2 className="w-4 h-4" />

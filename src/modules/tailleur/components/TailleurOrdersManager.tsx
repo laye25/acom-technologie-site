@@ -29,21 +29,73 @@ import {
   TailorActionButton,
   TailorDeleteConfirmModal
 } from './design-system/TailorDesignSystem';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
 import { showMailSuccessToast } from '../../../components/MailSuccessToast';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 
 export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [tissus, setTissus] = useState<any[]>([]);
-  const [mercerieItems, setMercerieItems] = useState<any[]>([]);
-  const [costSheets, setCostSheets] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>(() => {
+    try {
+      const savedOrders = localStorage.getItem(`tailleur_orders_${merchant.id}`);
+      return savedOrders ? JSON.parse(savedOrders) : [];
+    } catch (e) {
+      console.error("Erreur lecture initiale tailleur_orders :", e);
+      return [];
+    }
+  });
+
+  const [clients, setClients] = useState<any[]>(() => {
+    try {
+      const savedClients = localStorage.getItem(`tailleur_clients_${merchant.id}`);
+      return savedClients ? JSON.parse(savedClients) : [];
+    } catch (e) {
+      console.error("Erreur lecture initiale tailleur_clients :", e);
+      return [];
+    }
+  });
+
+  const [tissus, setTissus] = useState<any[]>(() => {
+    try {
+      const savedTissus = localStorage.getItem(`tailleur_tissus_${merchant.id}`);
+      return savedTissus ? JSON.parse(savedTissus) : [];
+    } catch (e) {
+      console.error("Erreur lecture initiale tailleur_tissus :", e);
+      return [];
+    }
+  });
+
+  const [mercerieItems, setMercerieItems] = useState<any[]>(() => {
+    try {
+      const savedMercerie = localStorage.getItem(`tailleur_mercerie_${merchant.id}`);
+      return savedMercerie ? JSON.parse(savedMercerie) : [];
+    } catch (e) {
+      console.error("Erreur lecture initiale tailleur_mercerie :", e);
+      return [];
+    }
+  });
+
+  const [costSheets, setCostSheets] = useState<any[]>(() => {
+    try {
+      const savedCosts = localStorage.getItem(`tailleur_costs_${merchant.id}`);
+      return savedCosts ? JSON.parse(savedCosts) : [];
+    } catch (e) {
+      console.error("Erreur lecture initiale tailleur_costs :", e);
+      return [];
+    }
+  });
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<any>(null);
   const [preparedContext, setPreparedContext] = useState<PreparedOrderContext | null>(null);
   const [updateClientGlobalMeasurements, setUpdateClientGlobalMeasurements] = useState<boolean>(true);
-  const [availableGarments, setAvailableGarments] = useState<any[]>([]);
+  const [availableGarments, setAvailableGarments] = useState<any[]>(() => {
+    try {
+      return GarmentLibraryService.getGarmentsForMerchant(merchant.id) || [];
+    } catch {
+      return [];
+    }
+  });
   const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(false);
   const [focusedMeasurement, setFocusedMeasurement] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -297,11 +349,79 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     localStorage.setItem(`tailleur_orders_${merchant.id}`, JSON.stringify(newOrders));
   };
 
-  const handleCreateOrder = () => {
-    if (clients.filter(c => !c.isDeleted).length === 0) {
-      toast.error("Veuillez d'abord ajouter des clients dans l'onglet 'Clients Couture'");
-      return;
+  // 1. Source de vérité : commandes actives (non supprimées)
+  const activeOrders = useMemo(() => {
+    return orders.filter(o => !o.isDeleted);
+  }, [orders]);
+
+  // 2. Commandes filtrées selon le statut sélectionné et la recherche
+  const filteredOrders = useMemo(() => {
+    return activeOrders.filter(o => {
+      if (filterStatus !== 'all' && o.status !== filterStatus) return false;
+      const query = search.toLowerCase().trim();
+      if (!query) return true;
+      const clientName = (o.clientName || '').toLowerCase();
+      const model = (o.model || '').toLowerCase();
+      const id = (o.id || '').toLowerCase();
+      const fabric = (o.tissuUsed || '').toLowerCase();
+      return clientName.includes(query) || model.includes(query) || id.includes(query) || fabric.includes(query);
+    });
+  }, [activeOrders, filterStatus, search]);
+
+  // 3. STATUTS COMPTABILISÉS POUR « CONCEPTIONS EN COURS » :
+  // Statuts d'atelier en production : 'mesures' | 'coupe' | 'retouche' | 'pret' (soit statut !== 'livre')
+  // - Si filtre 'all' sans recherche : total des conceptions actives en cours de fabrication
+  // - Si filtre 'all' avec recherche : conceptions actives correspondant à la recherche
+  // - Si statut spécifique filtré (ex: 'coupe', 'pret', 'livre') : nombre exact de commandes filtrées
+  const inProgressCount = useMemo(() => {
+    if (filterStatus === 'all') {
+      if (search.trim()) {
+        return filteredOrders.filter(o => o.status !== 'livre').length;
+      }
+      return activeOrders.filter(o => o.status !== 'livre').length;
     }
+    return filteredOrders.length;
+  }, [activeOrders, filteredOrders, filterStatus, search]);
+
+  const counterLabel = useMemo(() => {
+    if (filterStatus === 'livre') return 'Commandes livrées';
+    if (filterStatus === 'pret') return 'Commandes prêtes';
+    if (filterStatus === 'retouche') return 'En retouche';
+    if (filterStatus === 'coupe') return 'En couture';
+    if (filterStatus === 'mesures') return 'En prise de mesures';
+    if (search.trim()) return 'Conceptions trouvées';
+    return 'Conceptions en cours';
+  }, [filterStatus, search]);
+
+  // Synchronisation dynamique avec le moteur ACOM IA DÉMO Tutorial
+  useEffect(() => {
+    if (filteredOrders.length === 0 && activeOrders.length === 0) {
+      TutorialEngine.setOrdersPageState({
+        orderCount: 0,
+        currency: merchant.currency,
+        filterStatus,
+        search,
+        viewMode,
+        selectedCampaignHoliday,
+        campaignCustomText,
+        selectedCampaignClientsCount: selectedCampaignClients.length
+      });
+    } else {
+      TutorialEngine.setOrdersPageState({
+        orderCount: inProgressCount,
+        firstOrder: filteredOrders[0] || activeOrders[0],
+        currency: merchant.currency,
+        filterStatus,
+        search,
+        viewMode,
+        selectedCampaignHoliday,
+        campaignCustomText,
+        selectedCampaignClientsCount: selectedCampaignClients.length
+      });
+    }
+  }, [inProgressCount, filteredOrders, activeOrders, merchant.currency, filterStatus, search, viewMode, selectedCampaignHoliday, campaignCustomText, selectedCampaignClients.length]);
+
+  const handleCreateOrder = () => {
     const initialOrder = {
       clientId: '',
       clientName: '',
@@ -316,7 +436,41 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     setCurrentOrder(initialOrder);
     setPreparedContext(null);
     setIsFormOpen(true);
+    TutorialEngine.onModalOpened('couture.create_order_modal');
   };
+
+  // Synchronisation dynamique du formulaire de création de commande avec le tutoriel ACOM IA DÉMO
+  useEffect(() => {
+    if (isFormOpen && currentOrder) {
+      const selectedClient = clients.find(c => c.id === currentOrder.clientId);
+      TutorialEngine.setCreateOrderFormContext({
+        clients,
+        selectedClientId: currentOrder.clientId,
+        selectedClient: selectedClient || preparedContext?.client,
+        model: preparedContext?.garment?.name || currentOrder.model,
+        price: currentOrder.price,
+        advance: currentOrder.advance,
+        deliveryDate: currentOrder.deliveryDate,
+        status: currentOrder.status,
+        isUrgent: currentOrder.isUrgent,
+        isLater: currentOrder.isLater,
+        tissus,
+        selectedTissuId: currentOrder.selectedTissuId,
+        tissuLengthUsed: currentOrder.tissuLengthUsed,
+        mercerieItems,
+        selectedMercerieItems: currentOrder.selectedMercerieItems,
+        currency: merchant.currency
+      });
+    }
+  }, [
+    isFormOpen,
+    currentOrder,
+    preparedContext,
+    clients,
+    tissus,
+    mercerieItems,
+    merchant.currency
+  ]);
 
   const handleSelectClient = (clientId: string) => {
     if (!clientId) {
@@ -662,6 +816,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     if (savedMercerie) setMercerieItems(JSON.parse(savedMercerie));
 
     setIsFormOpen(false);
+    TutorialEngine.onModalClosed('couture.create_order_modal');
     setCurrentOrder(null);
     setPreparedContext(null);
     triggerSync();
@@ -1187,11 +1342,6 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
     printWindow.document.close();
   };
 
-  const filteredOrders = orders.filter(o => {
-    if (filterStatus !== 'all' && o.status !== filterStatus) return false;
-    return o.clientName.toLowerCase().includes(search.toLowerCase()) || o.model.toLowerCase().includes(search.toLowerCase());
-  });
-
   // Calculs du Planning de Livraison (Timeline / Kanban de Couture)
   const now = new Date();
   const urgentOrders = filteredOrders.filter(o => {
@@ -1442,25 +1592,37 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4 text-left">
         <div>
           <h2 data-acom-id="orders.title" className="text-2xl font-black text-ink">Gestion des Commandes Couture</h2>
-          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Conceptions en cours : {orders.filter(o => !o.isDeleted && o.status !== 'livre').length.toString().padStart(3, '0')}</p>
+          <p data-acom-id="orders.counter" className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">{counterLabel} : {inProgressCount.toString().padStart(3, '0')}</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-          <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex border border-slate-200 dark:border-slate-700">
+          <div data-acom-id="orders.view_modes" className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex border border-slate-200 dark:border-slate-700">
             <button
-              onClick={() => setViewMode('list')}
+              data-acom-id="orders.view_mode_list_btn"
+              onClick={() => {
+                setViewMode('list');
+                TutorialEngine.setOrdersPageState({ orderCount: inProgressCount, currency: merchant.currency, filterStatus, search, viewMode: 'list' });
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               Fiches Liste
             </button>
             <button
-              onClick={() => setViewMode('timeline')}
+              data-acom-id="orders.view_mode_timeline_btn"
+              onClick={() => {
+                setViewMode('timeline');
+                TutorialEngine.setOrdersPageState({ orderCount: inProgressCount, currency: merchant.currency, filterStatus, search, viewMode: 'timeline' });
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'timeline' ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               Planning
             </button>
             <button
-              onClick={() => setViewMode('campaigns')}
+              data-acom-id="orders.view_mode_campaigns_btn"
+              onClick={() => {
+                setViewMode('campaigns');
+                TutorialEngine.setOrdersPageState({ orderCount: inProgressCount, currency: merchant.currency, filterStatus, search, viewMode: 'campaigns' });
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${viewMode === 'campaigns' ? 'bg-white dark:bg-slate-900 text-violet-600 dark:text-violet-400 shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
             >
               Fidélisation 🌟
@@ -1468,6 +1630,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
 
           <button
+            data-acom-id="orders.sync_btn"
             onClick={() => triggerSync(true)}
             disabled={isSyncing}
             className="flex items-center justify-center space-x-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
@@ -1477,6 +1640,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </button>
 
           <button
+            data-acom-id="orders.export_excel_btn"
             onClick={exportOrdersToCSV}
             className="flex items-center justify-center space-x-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
@@ -1485,6 +1649,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </button>
 
           <button
+            data-acom-id="orders.export_pdf_btn"
             onClick={exportOrdersToPDF}
             className="flex items-center justify-center space-x-2 px-3 py-2 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800/60 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
@@ -1539,21 +1704,29 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       {isFormOpen && currentOrder && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
-            <div className="px-8 py-5 border-b border-gray-100 bg-violet-50/50 flex justify-between items-center shrink-0">
+            <div data-acom-id="orders.form_modal_title" className="px-8 py-5 border-b border-gray-100 bg-violet-50/50 flex justify-between items-center shrink-0">
               <div className="text-left">
                 <h3 className="text-xl font-black text-ink">{currentOrder.id ? 'Modifier la Commande' : 'Créer une Fiche Commande'}</h3>
                 <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Synchronisation automatique avec le dossier client couture</p>
               </div>
-              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors cursor-pointer">
+              <button 
+                type="button" 
+                onClick={() => {
+                  setIsFormOpen(false);
+                  TutorialEngine.onModalClosed('couture.create_order_modal');
+                }} 
+                className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors cursor-pointer"
+              >
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 md:p-8 overflow-y-auto space-y-6 flex-1 text-left">
               {/* 1. SELECTION CLIENT */}
-              <div className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
+              <div data-acom-id="orders.form_client" className="space-y-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
                 <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">👤 Client Couture *</label>
                 <select
+                  data-acom-id="orders.form_client_select"
                   value={currentOrder.clientId}
                   onChange={(e) => handleSelectClient(e.target.value)}
                   required
@@ -1588,7 +1761,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
               {/* 2. MODELE & VETEMENT A CONFECTIONNER */}
               {preparedContext && (
-                <div className="space-y-3 bg-violet-50/30 p-4 rounded-2xl border border-violet-100">
+                <div data-acom-id="orders.form_model" className="space-y-3 bg-violet-50/30 p-4 rounded-2xl border border-violet-100">
                   <div className="flex justify-between items-center">
                     <label className="block text-xs font-black text-violet-900 uppercase tracking-wider flex items-center gap-1.5">
                       <Scissors className="w-4 h-4 text-violet-600" />
@@ -1616,6 +1789,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   <div className="pt-1">
                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Changer le modèle pour cette commande :</label>
                     <select
+                      data-acom-id="orders.form_model_input"
                       value={preparedContext.garment.id}
                       onChange={(e) => handleChangeGarmentModel(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold bg-white text-slate-700 focus:ring-2 focus:ring-violet-500 outline-none cursor-pointer"
@@ -1632,9 +1806,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
               {/* DESCRIPTION MANUELLE DU MODEL SI SANS CONTEXTE PREPARE */}
               {!preparedContext && (
-                <div className="col-span-2">
+                <div data-acom-id="orders.form_model" className="col-span-2">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Description du Modèle Commandé *</label>
                   <input
+                    data-acom-id="orders.form_model_input"
                     type="text"
                     required
                     value={currentOrder.model}
@@ -1742,7 +1917,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
               {/* 4. DETAILS FINANCIERS & DATES */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div data-acom-id="orders.form_price">
                   <div className="flex justify-between items-center mb-1">
                     <label className="block text-xs font-bold text-gray-600">Prix de la Confection ({merchant.currency}) *</label>
                     {preparedContext && preparedContext.pricingProposal.basePrice > 0 && (
@@ -1756,6 +1931,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     )}
                   </div>
                   <input
+                    data-acom-id="orders.form_price_input"
                     type="number"
                     required
                     value={currentOrder.price || ''}
@@ -1765,9 +1941,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   />
                 </div>
 
-                <div>
+                <div data-acom-id="orders.form_advance">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Acompte Versé ({merchant.currency})</label>
                   <input
+                    data-acom-id="orders.form_advance_input"
                     type="number"
                     value={currentOrder.advance || ''}
                     placeholder="Ex: 25000"
@@ -1776,9 +1953,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   />
                 </div>
 
-                <div>
+                <div data-acom-id="orders.form_delivery_date">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Date Prévue de Livraison *</label>
                   <input
+                    data-acom-id="orders.form_delivery_date_input"
                     type="date"
                     required
                     value={currentOrder.deliveryDate ? currentOrder.deliveryDate.split('T')[0] : ''}
@@ -1787,9 +1965,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   />
                 </div>
 
-                <div>
+                <div data-acom-id="orders.form_status">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Statut de Fabrication *</label>
                   <select
+                    data-acom-id="orders.form_status_select"
                     value={currentOrder.status || 'mesures'}
                     onChange={e => setCurrentOrder({ ...currentOrder, status: e.target.value })}
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm bg-white cursor-pointer"
@@ -1804,8 +1983,9 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               </div>
 
               <div className="flex items-center gap-6 py-2">
-                <div className="flex items-center gap-2">
+                <div data-acom-id="orders.form_urgent" className="flex items-center gap-2">
                   <input
+                    data-acom-id="orders.form_urgent_input"
                     type="checkbox"
                     id="isUrgent"
                     checked={!!currentOrder.isUrgent}
@@ -1816,8 +1996,9 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     🚨 Marquer Urgent
                   </label>
                 </div>
-                <div className="flex items-center gap-2">
+                <div data-acom-id="orders.form_later" className="flex items-center gap-2">
                   <input
+                    data-acom-id="orders.form_later_input"
                     type="checkbox"
                     id="isLater"
                     checked={!!currentOrder.isLater}
@@ -1832,7 +2013,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               </div>
 
               {/* 5. TISSU DU STOCK ATELIER */}
-              <div className="border-t border-dashed border-gray-200 pt-4 space-y-3">
+              <div data-acom-id="orders.form_fabric_section" className="border-t border-dashed border-gray-200 pt-4 space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     🧵 Consommation Tissu Stock Atelier (Optionnel)
@@ -1902,6 +2083,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">Tissu sélectionné</label>
                     <select
+                      data-acom-id="orders.form_fabric_select"
                       value={currentOrder.selectedTissuId || ''}
                       onChange={e => setCurrentOrder({ ...currentOrder, selectedTissuId: e.target.value })}
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-semibold text-xs bg-white cursor-pointer"
@@ -1951,6 +2133,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">Mètres à déduire du stock</label>
                     <input
+                      data-acom-id="orders.form_fabric_meters"
                       type="number"
                       step="0.1"
                       value={currentOrder.tissuLengthUsed || ''}
@@ -1963,12 +2146,13 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               </div>
 
               {/* 6. MERCERIE RECOMMANDEE */}
-              <div className="border-t border-dashed border-gray-200 pt-4 space-y-3">
+              <div data-acom-id="orders.form_mercerie_section" className="border-t border-dashed border-gray-200 pt-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
                     🪡 Consommation Mercerie (Optionnel)
                   </h4>
                   <button
+                    data-acom-id="orders.form_add_mercerie_btn"
                     type="button"
                     onClick={() => {
                       const current = currentOrder.selectedMercerieItems || [];
@@ -2104,14 +2288,19 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               {/* BOUTONS D'ACTION */}
               <div className="border-t border-gray-150 pt-6 flex justify-end gap-3 shrink-0">
                 <button
+                  data-acom-id="orders.form_cancel_btn"
                   type="button"
-                  onClick={() => setIsFormOpen(false)}
+                  onClick={() => {
+                    setIsFormOpen(false);
+                    TutorialEngine.onModalClosed('couture.create_order_modal');
+                  }}
                   className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
                 >
                   Annuler
                 </button>
 
                 <button
+                  data-acom-id="orders.form_submit_btn"
                   type="submit"
                   className="px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-violet-600/20 transition cursor-pointer flex items-center gap-2"
                 >
@@ -2126,9 +2315,9 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
        {/* Orders List / Planning / Campaigns view */}
       {viewMode === 'campaigns' ? (
-        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-black/5 shadow-sm text-left space-y-6">
+        <div data-acom-id="orders.campaigns_section" className="bg-white p-6 md:p-8 rounded-[2rem] border border-black/5 shadow-sm text-left space-y-6">
           <div className="border-b border-gray-150 pb-5">
-            <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+            <h3 data-acom-id="orders.campaigns_title" className="text-xl font-black text-slate-900 flex items-center gap-2">
               <span>🎉</span> Campagnes de Fidélisation & Fêtes
             </h3>
             <p className="text-xs text-gray-400 font-medium mt-1">
@@ -2143,6 +2332,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1.5">Sélectionner l'Occasion / Fête</label>
                   <select
+                    data-acom-id="orders.campaigns_holiday_select"
                     value={selectedCampaignHoliday}
                     onChange={(e) => {
                       setSelectedCampaignHoliday(e.target.value);
@@ -2167,6 +2357,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1.5">Note Personnalisée (Ajout au message)</label>
                   <input
+                    data-acom-id="orders.campaigns_custom_text"
                     type="text"
                     placeholder="Ex : Remise de 10% sur les commandes groupées"
                     value={campaignCustomText || "A l'approche de la Tabaski 🐑, nous serions honorés de confectionner vos plus beaux modèles (Boubous, Bazin, Wax) !"}
@@ -2179,9 +2370,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               {/* Client Selection Table */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">Destinataires ({clients.length})</h4>
+                  <h4 data-acom-id="orders.campaigns_destinataires_header" className="text-xs font-black uppercase tracking-wider text-slate-500">Destinataires ({clients.length})</h4>
                   <div className="flex gap-2">
                     <button
+                      data-acom-id="orders.campaigns_select_all"
                       type="button"
                       onClick={() => setSelectedCampaignClients(clients.map(c => c.id))}
                       className="text-[10px] font-bold text-violet-600 hover:underline cursor-pointer"
@@ -2190,6 +2382,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     </button>
                     <span className="text-gray-300">|</span>
                     <button
+                      data-acom-id="orders.campaigns_deselect_all"
                       type="button"
                       onClick={() => setSelectedCampaignClients([])}
                       className="text-[10px] font-bold text-gray-400 hover:underline cursor-pointer"
@@ -2199,16 +2392,17 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   </div>
                 </div>
 
-                <div className="border border-gray-150 rounded-2xl overflow-hidden divide-y divide-gray-100 max-h-[350px] overflow-y-auto">
+                <div data-acom-id="orders.campaigns_clients_list" className="border border-gray-150 rounded-2xl overflow-hidden divide-y divide-gray-100 max-h-[350px] overflow-y-auto">
                   {clients.length === 0 ? (
                     <p className="text-xs text-gray-400 p-4 text-center font-medium">Aucun client enregistré pour le moment.</p>
                   ) : (
-                    clients.map((client) => {
+                    clients.map((client, index) => {
                       const isSelected = selectedCampaignClients.includes(client.id);
                       return (
                         <div key={client.id} className="flex items-center justify-between p-3.5 hover:bg-slate-50 transition-colors">
                           <div className="flex items-center gap-3">
                             <input
+                              data-acom-id={index === 0 ? "orders.campaigns_client_row_0" : undefined}
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => {
@@ -2243,7 +2437,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   Aperçu du message WhatsApp
                 </span>
 
-                <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative space-y-2">
+                <div data-acom-id="orders.campaigns_whatsapp_preview" className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm relative space-y-2">
                   <div className="absolute top-2 right-2 flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-[8px] font-bold text-gray-400 font-mono">Prêt</span>
@@ -2266,12 +2460,13 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               <div className="space-y-3 pt-4 border-t border-gray-150">
                 <div className="flex justify-between text-xs font-bold text-gray-500">
                   <span>Destinataires sélectionnés :</span>
-                  <span className="text-violet-600 font-mono">{selectedCampaignClients.length}</span>
+                  <span data-acom-id="orders.campaigns_selected_count" className="text-violet-600 font-mono">{selectedCampaignClients.length}</span>
                 </div>
 
                 <div className="space-y-2">
                   {selectedCampaignClients.length === 0 ? (
                     <button
+                      data-acom-id="orders.campaigns_send_button_placeholder"
                       disabled
                       type="button"
                       className="w-full py-3 bg-gray-100 text-gray-400 rounded-2xl font-bold text-xs cursor-not-allowed flex items-center justify-center gap-2"
@@ -2280,7 +2475,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     </button>
                   ) : (
                     <div className="space-y-2 max-h-[160px] overflow-y-auto">
-                      {selectedCampaignClients.map((clientId) => {
+                      {selectedCampaignClients.map((clientId, index) => {
                         const client = clients.find(c => c.id === clientId);
                         if (!client) return null;
                         const clientMsg = `Bonjour ${client.firstName},\n\nVotre atelier *${merchant.name}* vous souhaite le meilleur !\n\n${campaignCustomText || "A l'approche de la Tabaski 🐑, nous serions honorés de confectionner vos plus beaux modèles (Boubous, Bazin, Wax) !"}\n\nRéservez votre créneau au plus vite au *${merchant.phone || ""}*. À très bientôt ! ✨`;
@@ -2292,6 +2487,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
                         return (
                           <button
+                            data-acom-id={index === 0 ? "orders.campaigns_send_button_0" : undefined}
                             key={client.id}
                             type="button"
                             onClick={handleSend}
@@ -2314,7 +2510,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       ) : viewMode === 'timeline' ? (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 text-left">
           {/* URGENT COLUMN */}
-          <div className="bg-rose-50/25 border border-rose-100 p-5 rounded-3xl flex flex-col space-y-4">
+          <div data-acom-id="orders.planning_urgent_col" className="bg-rose-50/25 border border-rose-100 p-5 rounded-3xl flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-rose-100 pb-2">
               <span className="text-xs font-black text-rose-600 uppercase tracking-widest flex items-center gap-1.5">
                 🔴 En Retard / Urgents
@@ -2333,7 +2529,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
 
           {/* THIS WEEK COLUMN */}
-          <div className="bg-amber-50/25 border border-amber-100 p-5 rounded-3xl flex flex-col space-y-4">
+          <div data-acom-id="orders.planning_this_week_col" className="bg-amber-50/25 border border-amber-100 p-5 rounded-3xl flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-amber-100 pb-2">
               <span className="text-xs font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5">
                 🟡 Cette Semaine
@@ -2352,7 +2548,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
 
           {/* LATER COLUMN */}
-          <div className="bg-violet-50/25 border border-violet-100 p-5 rounded-3xl flex flex-col space-y-4">
+          <div data-acom-id="orders.planning_later_col" className="bg-violet-50/25 border border-violet-100 p-5 rounded-3xl flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-violet-100 pb-2">
               <span className="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center gap-1.5">
                 🟣 Planifiés Plus Tard
@@ -2371,7 +2567,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
 
           {/* DELIVERED COLUMN */}
-          <div className="bg-emerald-50/25 border border-emerald-100 p-5 rounded-3xl flex flex-col space-y-4">
+          <div data-acom-id="orders.planning_delivered_col" className="bg-emerald-50/25 border border-emerald-100 p-5 rounded-3xl flex flex-col space-y-4">
             <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
               <span className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
                 🟢 Livrés (Historique)
@@ -2392,7 +2588,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
       ) : (
         /* Original Orders List */
         filteredOrders.length === 0 ? (
-          <div className="bg-white py-16 text-center rounded-[2rem] border border-gray-150 shadow-sm flex flex-col items-center justify-center text-left">
+          <div data-acom-id="orders.empty_state" className="bg-white py-16 text-center rounded-[2rem] border border-gray-150 shadow-sm flex flex-col items-center justify-center text-left">
             <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mb-4 border border-violet-100">
               <Scissors className="w-8 h-8 text-violet-400" />
             </div>
@@ -2401,7 +2597,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
           </div>
         ) : (
           <div data-acom-id="orders.list" className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-          {filteredOrders.map((order) => {
+          {filteredOrders.map((order, idx) => {
             const price = Number(order.price || 0);
             const advance = Number(order.advance || 0);
             const rest = Math.max(0, price - advance);
@@ -2411,10 +2607,10 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
               : 8;
 
             return (
-              <TailorCard key={order.id}>
+              <TailorCard key={order.id} data-acom-id={idx === 0 ? 'orders.order_card_0' : undefined}>
                 <div>
                   {/* Card Header: CMD ID, Client Name, Update Date & Quick Actions */}
-                  <div className="flex justify-between items-start mb-4 gap-2">
+                  <div data-acom-id={idx === 0 ? 'orders.order_header_0' : undefined} className="flex justify-between items-start mb-4 gap-2">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center font-black text-violet-600 text-lg shrink-0 shadow-xs">
                         🧵
@@ -2435,7 +2631,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     </div>
 
                     {/* Header Quick Actions */}
-                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 shrink-0">
+                    <div data-acom-id={idx === 0 ? 'orders.quick_actions_0' : undefined} className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 shrink-0">
                       <button
                         onClick={() => {
                           const updated = orders.map(o => o.id === order.id ? { ...o, isUrgent: !o.isUrgent, isLater: !o.isUrgent ? false : o.isLater, syncStatus: 'pending', updatedAt: new Date().toISOString() } : o);
@@ -2496,6 +2692,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
                   {/* Main Hero Dark Banner Block (Identique à Clients Couture) */}
                   <TailorHeroGarmentBlock
+                    data-acom-id={idx === 0 ? 'orders.garment_banner_0' : undefined}
                     title="Commande à Confectionner"
                     garmentName={order.model || 'Création Sur-Mesure'}
                     garmentId={order.garmentId || 'garment-default'}
@@ -2507,7 +2704,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   />
 
                   {/* Delivery, Fabric & Workflow Status Row */}
-                  <div className="mt-3.5 bg-slate-50/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2.5">
+                  <div data-acom-id={idx === 0 ? 'orders.workflow_status_0' : undefined} className="mt-3.5 bg-slate-50/80 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2">
                       <div className="p-1.5 bg-violet-50 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400 rounded-xl border border-violet-100 dark:border-violet-800 shrink-0">
                         <Calendar className="w-3.5 h-3.5" />
@@ -2547,6 +2744,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                   {/* Financial Summary Block */}
                   <div className="mt-3.5">
                     <TailorFinancialCard
+                      data-acom-id={idx === 0 ? 'orders.financial_summary_0' : undefined}
                       price={price}
                       advance={advance}
                       currency={merchant.currency}
@@ -2559,6 +2757,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                 {/* Bottom Action Bar */}
                 <div className="mt-4 pt-3 border-t border-slate-100 flex flex-col gap-2">
                   <TailorActionButton
+                    data-acom-id={idx === 0 ? 'orders.action_whatsapp_artisan_0' : undefined}
                     variant="whatsapp"
                     onClick={() => handleOpenWhatsAppShare(order)}
                     title="Partager la commande aux artisans & équipes via WhatsApp"
@@ -2569,6 +2768,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
                   {rest > 0 && (
                     <TailorActionButton
+                      data-acom-id={idx === 0 ? 'orders.action_encaisser_0' : undefined}
                       variant="encaisser"
                       onClick={() => handleEncaisser(order.id)}
                     >
@@ -2579,6 +2779,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
 
                   <div className="grid grid-cols-3 gap-2">
                     <TailorActionButton
+                      data-acom-id={idx === 0 ? 'orders.action_print_a4_0' : undefined}
                       variant="pdf"
                       onClick={() => printOrderForm(order)}
                       title="Imprimer Fiche A4"
@@ -2588,6 +2789,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     </TailorActionButton>
 
                     <TailorActionButton
+                      data-acom-id={idx === 0 ? 'orders.action_print_ticket_0' : undefined}
                       variant="ticket"
                       onClick={() => printThermalReceipt(order)}
                       title="Ticket Thermique 80mm"
@@ -2597,6 +2799,7 @@ export const TailleurOrdersManager = ({ merchant }: { merchant: Merchant }) => {
                     </TailorActionButton>
 
                     <TailorActionButton
+                      data-acom-id={idx === 0 ? 'orders.action_whatsapp_client_0' : undefined}
                       variant="whatsapp"
                       onClick={() => handleOpenWhatsapp(order)}
                       title="Aviser le client via WhatsApp"

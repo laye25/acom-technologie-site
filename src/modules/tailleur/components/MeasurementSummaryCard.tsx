@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Scissors, ChevronDown, ChevronUp, Ruler, Sparkles, 
@@ -6,10 +6,12 @@ import {
 } from 'lucide-react';
 import { MeasurementDisplayService, MeasurementDisplayProfile, RenderedMeasurementItem } from '../services/MeasurementDisplayService';
 import { GarmentVectorIcon } from './GarmentVectorIcon';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 interface MeasurementSummaryCardProps {
   clientMeasurements?: Record<string, number | string>;
   merchantId?: string;
+  clientIndex?: number;
   preferredGarmentName?: string;
   onOpenSmartAssistant?: () => void;
   className?: string;
@@ -18,6 +20,7 @@ interface MeasurementSummaryCardProps {
 export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
   clientMeasurements = {},
   merchantId = 'default',
+  clientIndex = 0,
   preferredGarmentName,
   onOpenSmartAssistant,
   className = ''
@@ -35,6 +38,13 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
 
   const hasAnyMeasurement = totalFilledCount > 0;
 
+  useEffect(() => {
+    // Only set context for the first item in the list dynamically
+    if (clientIndex === 0 && primaryMeasurements.length > 0) {
+      TutorialEngine.setClientsMeasurementsContext(primaryMeasurements.length);
+    }
+  }, [primaryMeasurements.length, clientIndex]);
+
   return (
     <div className={`bg-slate-50/70 dark:bg-slate-900/60 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm text-left transition-all ${className}`}>
       {/* Header Context Banner with Garment Badge */}
@@ -43,7 +53,7 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
           <div className="p-1.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl border border-emerald-100 dark:border-emerald-800 shrink-0">
             <GarmentVectorIcon id={garment.id} name={garment.name} category={garment.category} className="w-4 h-4" />
           </div>
-          <div className="min-w-0">
+          <div data-acom-id={clientIndex === 0 ? "clients.profile_section_0" : undefined} className="min-w-0">
             <span className="text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest block truncate">
               Profil : {garment.category}
             </span>
@@ -55,6 +65,7 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
 
         {onOpenSmartAssistant && (
           <button
+            data-acom-id={clientIndex === 0 ? "clients.measure_btn_0" : undefined}
             type="button"
             onClick={onOpenSmartAssistant}
             className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition shadow-sm flex items-center gap-1 shrink-0 cursor-pointer"
@@ -73,16 +84,17 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
             <Scissors className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
             <span>Mesures Principales ({primaryMeasurements.length})</span>
           </h4>
-          <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 font-semibold">
-            {totalFilledCount} renseignée(s)
+          <span data-acom-id={clientIndex === 0 ? "clients.measurement_count_0" : undefined} className="text-[9px] font-mono text-slate-400 dark:text-slate-500 font-semibold">
+            {totalFilledCount} mesure(s) enregistrée(s)
           </span>
         </div>
 
         {primaryMeasurements.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {primaryMeasurements.map((m) => (
+          <div data-acom-id={clientIndex === 0 ? "clients.measurements_grid_0" : undefined} className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {primaryMeasurements.map((m, idx) => (
               <div 
                 key={m.key} 
+                data-acom-id={clientIndex === 0 ? `clients.measurement_0_${idx}` : undefined}
                 className={`p-2 rounded-xl text-center border transition-all ${
                   m.isFilled 
                     ? 'bg-white dark:bg-slate-800 border-slate-200/80 dark:border-slate-700 shadow-xs' 
@@ -173,6 +185,7 @@ export const MeasurementSummaryCard: React.FC<MeasurementSummaryCardProps> = ({
         )}
 
         <button
+          data-acom-id={clientIndex === 0 ? "clients.view_all_measurements_0" : undefined}
           type="button"
           onClick={() => setShowDetailModal(true)}
           className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition flex items-center gap-1 cursor-pointer ml-auto"

@@ -15,11 +15,13 @@ export interface TailorCardProps {
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;
+  'data-acom-id'?: string;
 }
 
-export const TailorCard: React.FC<TailorCardProps> = ({ children, className = '', onClick }) => {
+export const TailorCard: React.FC<TailorCardProps> = ({ children, className = '', onClick, 'data-acom-id': dataAcomId }) => {
   return (
     <motion.div
+      data-acom-id={dataAcomId}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
@@ -183,6 +185,7 @@ export interface TailorHeroGarmentBlockProps {
   isProfileSynced?: boolean;
   inspirationImage?: string;
   className?: string;
+  'data-acom-id'?: string;
 }
 
 export const TailorHeroGarmentBlock: React.FC<TailorHeroGarmentBlockProps> = ({
@@ -194,12 +197,13 @@ export const TailorHeroGarmentBlock: React.FC<TailorHeroGarmentBlockProps> = ({
   filledMeasurementsCount = 0,
   isProfileSynced = true,
   inspirationImage,
-  className = ''
+  className = '',
+  'data-acom-id': dataAcomId
 }) => {
   const genderLabel = gender === 'F' || gender === 'Femme' ? '🚺 Femme' : '👤 Homme';
 
   return (
-    <div className={`p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl border border-slate-800 shadow-inner flex flex-col gap-3 ${className}`}>
+    <div data-acom-id={dataAcomId} className={`p-4 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl border border-slate-800 shadow-inner flex flex-col gap-3 ${className}`}>
       {/* Top Banner Tag */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -286,6 +290,7 @@ export interface TailorFinancialCardProps {
   linkedProfit?: number;
   marginPercent?: number;
   className?: string;
+  'data-acom-id'?: string;
 }
 
 export const TailorFinancialCard: React.FC<TailorFinancialCardProps> = ({
@@ -294,13 +299,14 @@ export const TailorFinancialCard: React.FC<TailorFinancialCardProps> = ({
   currency = 'FCFA',
   linkedProfit,
   marginPercent,
-  className = ''
+  className = '',
+  'data-acom-id': dataAcomId
 }) => {
   const rest = Math.max(0, price - advance);
   const isFullyPaid = rest === 0;
 
   return (
-    <div className={`bg-slate-50/70 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm text-left space-y-3 ${className}`}>
+    <div data-acom-id={dataAcomId} className={`bg-slate-50/70 dark:bg-slate-900/90 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm text-left space-y-3 ${className}`}>
       <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 pb-2">
         <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
           <Banknote className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -355,6 +361,7 @@ export interface TailorActionButtonProps {
   disabled?: boolean;
   className?: string;
   title?: string;
+  'data-acom-id'?: string;
 }
 
 export const TailorActionButton: React.FC<TailorActionButtonProps> = ({
@@ -364,7 +371,8 @@ export const TailorActionButton: React.FC<TailorActionButtonProps> = ({
   onClick,
   disabled = false,
   className = '',
-  title
+  title,
+  'data-acom-id': dataAcomId
 }) => {
   let baseStyle = "px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs hover:scale-[1.01] active:scale-[0.99]";
 
@@ -395,6 +403,7 @@ export const TailorActionButton: React.FC<TailorActionButtonProps> = ({
 
   return (
     <button
+      data-acom-id={dataAcomId}
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -526,6 +535,9 @@ export interface ModalStickyFooterProps {
   cancelIcon?: React.ReactNode;
   className?: string;
   extraActions?: React.ReactNode;
+  cancelButtonId?: string;
+  submitButtonId?: string;
+  warningId?: string;
 }
 
 export const ModalStickyFooter: React.FC<ModalStickyFooterProps> = ({
@@ -536,20 +548,26 @@ export const ModalStickyFooter: React.FC<ModalStickyFooterProps> = ({
   isSubmitting = false,
   isSuccess = false,
   isError = false,
-  errorMessage,
+  errorMessage = '',
   disabled = false,
   disabledReason,
   submitVariant = 'primary',
   submitIcon,
   cancelIcon,
   className = '',
-  extraActions
+  extraActions,
+  cancelButtonId,
+  submitButtonId,
+  warningId
 }) => {
   return (
     <div className={`p-4 sm:p-5 bg-white/95 backdrop-blur-md border-t border-slate-200/80 shrink-0 sticky bottom-0 z-20 space-y-2 rounded-b-[2rem] ${className}`}>
       {/* Disabled reason or error guidance tooltip */}
       {disabledReason && disabled && !isSubmitting && (
-        <div className="text-[11px] font-bold text-amber-700 bg-amber-50/90 border border-amber-200/80 px-3.5 py-1.5 rounded-xl flex items-center justify-center gap-2 animate-in fade-in duration-200 shadow-2xs">
+        <div 
+          data-acom-id={warningId}
+          className="text-[11px] font-bold text-amber-700 bg-amber-50/90 border border-amber-200/80 px-3.5 py-1.5 rounded-xl flex items-center justify-center gap-2 animate-in fade-in duration-200 shadow-2xs"
+        >
           <span>💡 {disabledReason}</span>
         </div>
       )}
@@ -569,6 +587,7 @@ export const ModalStickyFooter: React.FC<ModalStickyFooterProps> = ({
               type="button"
               onClick={onCancel}
               disabled={isSubmitting}
+              data-acom-id={cancelButtonId}
               className="w-full sm:w-auto h-11 px-5 border border-slate-200 hover:bg-slate-100/80 text-slate-700 font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
             >
               {cancelIcon || <X className="w-4 h-4" />}
@@ -582,6 +601,7 @@ export const ModalStickyFooter: React.FC<ModalStickyFooterProps> = ({
           type={onSubmit ? "button" : "submit"}
           onClick={onSubmit}
           disabled={disabled || isSubmitting}
+          data-acom-id={submitButtonId}
           className={`w-full sm:w-auto h-11 px-6 font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500/50 active:scale-98 ${
             isSuccess
               ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'

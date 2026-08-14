@@ -88,7 +88,24 @@ const ID_ALIASES: Record<string, string[]> = {
   'pressing.cash_closure.form_card': ['cash_closure.form_card', 'pressing.cash_closure.form_card'],
   'pressing.cash_closure.validate': ['cash_closure.validate', 'pressing.cash_closure.validate'],
   'billing.quote_modal.title': ['quote_modal.title', 'billing.quote_modal.title'],
-  'billing.quote_modal.section_client': ['quote_modal.section_client', 'billing.quote_modal.client_section']
+  'billing.quote_modal.section_client': ['quote_modal.section_client', 'billing.quote_modal.client_section'],
+  'orders.form_modal_title': ['orders.form_modal_title', 'create_order_modal.title'],
+  'orders.form_client': ['orders.form_client', 'orders.form_client_select', 'orders.client_select'],
+  'orders.form_client_select': ['orders.form_client_select', 'orders.form_client', 'orders.client_select'],
+  'orders.form_model': ['orders.form_model', 'orders.form_model_input', 'orders.model_input'],
+  'orders.form_price': ['orders.form_price', 'orders.form_price_input', 'orders.price_input'],
+  'orders.form_advance': ['orders.form_advance', 'orders.form_advance_input', 'orders.advance_input'],
+  'orders.form_delivery_date': ['orders.form_delivery_date', 'orders.form_delivery_date_input', 'orders.delivery_date_input'],
+  'orders.form_status': ['orders.form_status', 'orders.form_status_select', 'orders.status_select'],
+  'orders.form_urgent': ['orders.form_urgent', 'orders.form_urgent_input', 'isUrgent'],
+  'orders.form_later': ['orders.form_later', 'orders.form_later_input', 'isLater'],
+  'orders.form_fabric_section': ['orders.form_fabric_section', 'orders.fabric_section'],
+  'orders.form_fabric_select': ['orders.form_fabric_select', 'orders.fabric_select'],
+  'orders.form_fabric_meters': ['orders.form_fabric_meters', 'orders.fabric_meters'],
+  'orders.form_mercerie_section': ['orders.form_mercerie_section', 'orders.mercerie_section'],
+  'orders.form_add_mercerie_btn': ['orders.form_add_mercerie_btn', 'orders.add_mercerie_btn'],
+  'orders.form_cancel_btn': ['orders.form_cancel_btn', 'orders.cancel_btn'],
+  'orders.form_submit_btn': ['orders.form_submit_btn', 'orders.submit_btn', 'orders.save_btn']
 };
 
 export const TargetHighlighter: React.FC<TargetHighlighterProps> = ({

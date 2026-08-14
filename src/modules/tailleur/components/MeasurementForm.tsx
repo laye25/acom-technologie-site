@@ -140,7 +140,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
   return (
     <div className="space-y-5 text-left">
       {/* Context Banner: Active Garment Summary & Technical Sewing Guidelines (No redundant library) */}
-      <div className="bg-gradient-to-br from-emerald-50/90 via-slate-50 to-teal-50/80 border border-emerald-200/80 rounded-2xl p-4 shadow-sm text-slate-900 space-y-3">
+      <div data-acom-id="add_client.form_garment_banner" className="bg-gradient-to-br from-emerald-50/90 via-slate-50 to-teal-50/80 border border-emerald-200/80 rounded-2xl p-4 shadow-sm text-slate-900 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-200/60 pb-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-emerald-600/10 text-emerald-700 rounded-2xl border border-emerald-300/60 shrink-0 shadow-inner">
@@ -172,6 +172,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
           {/* Return to Step 2 Button */}
           {onChangeGarmentRequested && (
             <button
+              data-acom-id="add_client.form_btn_change_garment"
               type="button"
               onClick={onChangeGarmentRequested}
               className="px-3.5 py-2 bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-xl text-xs font-black flex items-center gap-2 shadow-sm transition hover:scale-105 cursor-pointer shrink-0"
@@ -196,7 +197,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
           </div>
 
           {/* Profil & Recommandations de Couture */}
-          <div className="bg-white/90 dark:bg-slate-800/90 p-3 rounded-xl border border-emerald-200/70 dark:border-emerald-800/60 space-y-1.5 shadow-2xs">
+          <div data-acom-id="add_client.form_profile_summary" className="bg-white/90 dark:bg-slate-800/90 p-3 rounded-xl border border-emerald-200/70 dark:border-emerald-800/60 space-y-1.5 shadow-2xs">
             <div className="flex justify-between items-center">
               <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -223,6 +224,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
       {/* Tabs Form / History */}
       <div className="flex border-b border-slate-200 gap-2">
         <button
+          data-acom-id="add_client.form_tab_saisie"
           type="button"
           onClick={() => setActiveTab('form')}
           className={`pb-2.5 px-4 text-xs font-black border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
@@ -236,6 +238,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
         </button>
 
         <button
+          data-acom-id="add_client.form_tab_history"
           type="button"
           onClick={() => setActiveTab('history')}
           className={`pb-2.5 px-4 text-xs font-black border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
@@ -258,7 +261,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
           />
 
           {/* Quick Search */}
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2">
+          <div data-acom-id="add_client.form_search_input" className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="text"
@@ -280,7 +283,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
 
           {/* Section 1: Mesures Obligatoires pour ce vêtement */}
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
+            <div data-acom-id="add_client.form_mandatory_header" className="flex justify-between items-center">
               <h4 className="text-xs font-black uppercase text-emerald-800 flex items-center gap-1.5 tracking-wider">
                 <GarmentVectorIcon id={selectedGarment.id} name={selectedGarment.name} category={selectedGarment.category} className="w-4 h-4 text-emerald-600" />
                 Mesures Requises pour : {selectedGarment.name}
@@ -298,7 +301,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                 return (
                   <div
                     key={def.key}
-                    data-acom-id={`measurement.${def.key}`}
+                    data-acom-id={`add_client.form_input_${def.key}`}
                     onClick={() => handleFieldFocus(def.key)}
                     className={`p-3 rounded-2xl border transition-all ${
                       isActive
@@ -350,7 +353,7 @@ export const MeasurementForm: React.FC<MeasurementFormProps> = ({
                   return (
                     <div
                       key={def.key}
-                      data-acom-id={`measurement.${def.key}`}
+                      data-acom-id={`add_client.form_input_${def.key}`}
                       onClick={() => handleFieldFocus(def.key)}
                       className={`p-3 rounded-2xl border transition-all ${
                         isActive

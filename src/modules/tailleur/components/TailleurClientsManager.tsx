@@ -15,13 +15,23 @@ import { SmartMeasurementAssistant } from './SmartMeasurementAssistant';
 import { GarmentProfileCard } from './GarmentProfileCard';
 import { GarmentLibraryService } from '../services/GarmentLibraryService';
 import { GarmentResolverService } from '../services/GarmentResolverService';
+import { MeasurementDisplayService } from '../services/MeasurementDisplayService';
 import { TailorCard, TailorDeleteConfirmModal } from './design-system/TailorDesignSystem';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
 import { showMailSuccessToast } from '../../../components/MailSuccessToast';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => {
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(`tailleur_clients_${merchant.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Erreur lecture initiale tailleur_clients :", e);
+      return [];
+    }
+  });
   const [search, setSearch] = useState('');
   const [currentClient, setCurrentClient] = useState<any>(null);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -361,6 +371,29 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
       (c.phone && c.phone.includes(search))
     );
 
+  // Synchronisation dynamique avec le moteur ACOM IA DÉMO Tutorial
+  useEffect(() => {
+    if (filteredClients.length === 0) {
+      TutorialEngine.setClientsPageState({
+        clientCount: 0
+      });
+    } else {
+      const firstClient = filteredClients[0];
+      const resolved = GarmentResolverService.resolveClientGarment(firstClient, merchant.id);
+      const displayProfile = MeasurementDisplayService.getDisplayProfile(
+        firstClient.measurements,
+        merchant.id,
+        resolved.garmentName
+      );
+      TutorialEngine.setClientsPageState({
+        clientCount: filteredClients.length,
+        firstClient,
+        garmentProfile: resolved,
+        displayProfile
+      });
+    }
+  }, [filteredClients, merchant.id]);
+
   const MEASUREMENT_LABELS: Record<string, string> = {
     cou: 'Tour de Cou (cm)',
     poitrine: 'Tour de Poitrine (cm)',
@@ -405,11 +438,12 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
       <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 text-left">
         <div>
           <h2 data-acom-id="clients.title" className="text-2xl font-black text-ink">Fichier Clients Couture</h2>
-          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Clients actifs : {filteredClients.length.toString().padStart(3, '0')}</p>
+          <p data-acom-id="clients.counter" className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">Clients actifs : {filteredClients.length.toString().padStart(3, '0')}</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
           <button
+            data-acom-id="clients.sync_btn"
             onClick={() => triggerSync(true)}
             disabled={isSyncing}
             className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
@@ -419,6 +453,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
           </button>
 
           <button
+            data-acom-id="clients.export_excel_btn"
             onClick={exportClientsToCSV}
             className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
@@ -427,6 +462,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
           </button>
 
           <button
+            data-acom-id="clients.export_pdf_btn"
             onClick={exportClientsToPDF}
             className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
@@ -468,7 +504,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
 
       {/* Liste des Clients */}
       {filteredClients.length === 0 ? (
-        <div className="bg-white py-16 text-center rounded-[2rem] border border-gray-150 shadow-sm flex flex-col items-center justify-center text-left">
+        <div data-acom-id="clients.empty_state" className="bg-white py-16 text-center rounded-[2rem] border border-gray-150 shadow-sm flex flex-col items-center justify-center text-left">
           <div className="w-16 h-16 bg-violet-50 rounded-full flex items-center justify-center mb-4 border border-violet-100">
             <Users className="w-8 h-8 text-violet-400" />
           </div>
@@ -477,22 +513,26 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
         </div>
       ) : (
         <div data-acom-id="clients.list" className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-          {filteredClients.map((client) => (
+          {filteredClients.map((client, index) => (
             <TailorCard key={client.id}>
-              <div>
+              <div data-acom-id={index === 0 ? "clients.client_card_0" : undefined}>
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black ${client.gender === 'F' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600'}`}>
+                    <div 
+                      data-acom-id={index === 0 ? "clients.client_gender_0" : undefined}
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-black ${client.gender === 'F' ? 'bg-pink-50 text-pink-600' : 'bg-blue-50 text-blue-600'}`}
+                    >
                       {client.gender === 'F' ? '🚺' : '🚹'}
                     </div>
                     <div>
-                      <h3 className="font-black text-ink text-lg leading-tight">{client.firstName} {client.lastName}</h3>
-                      <p className="text-xs text-gray-400 font-medium">Modifié le {format(new Date(client.updatedAt), 'dd/MM/yyyy HH:mm')}</p>
+                      <h3 data-acom-id={index === 0 ? "clients.client_name_0" : undefined} className="font-black text-ink text-lg leading-tight">{client.firstName} {client.lastName}</h3>
+                      <p data-acom-id={index === 0 ? "clients.client_updated_0" : undefined} className="text-xs text-gray-400 font-medium">Modifié le {format(new Date(client.updatedAt), 'dd/MM/yyyy HH:mm')}</p>
                     </div>
                   </div>
 
-                  <div className="flex gap-1.5 bg-slate-50 p-1 rounded-xl">
+                  <div data-acom-id={index === 0 ? "clients.client_actions_0" : undefined} className="flex gap-1.5 bg-slate-50 p-1 rounded-xl">
                     <button 
+                      data-acom-id={index === 0 ? "clients.client_edit_btn_0" : undefined}
                       onClick={() => {
                         const resolved = GarmentResolverService.resolveClientGarment(client, merchant.id);
                         setCurrentClient({
@@ -510,6 +550,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button 
+                      data-acom-id={index === 0 ? "clients.client_delete_btn_0" : undefined}
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -524,15 +565,15 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs text-gray-500 border-t border-gray-100 pt-3">
+                <div data-acom-id={index === 0 ? "clients.client_contact_0" : undefined} className="grid grid-cols-2 gap-3 text-xs text-gray-500 border-t border-gray-100 pt-3">
                   {client.phone && (
-                    <div className="flex items-center gap-1.5 font-medium">
+                    <div data-acom-id={index === 0 ? "clients.client_phone_0" : undefined} className="flex items-center gap-1.5 font-medium">
                       <Phone className="w-3.5 h-3.5 text-gray-400" />
                       <span>{client.phone}</span>
                     </div>
                   )}
                   {client.address && (
-                    <div className="flex items-center gap-1.5 font-medium col-span-2">
+                    <div data-acom-id={index === 0 ? "clients.client_address_0" : undefined} className="flex items-center gap-1.5 font-medium col-span-2">
                       <MapPin className="w-3.5 h-3.5 text-gray-400" />
                       <span className="truncate">{client.address}</span>
                     </div>
@@ -543,6 +584,7 @@ export const TailleurClientsManager = ({ merchant }: { merchant: Merchant }) => 
                   <GarmentProfileCard
                     clientData={client}
                     merchantId={merchant.id}
+                    clientIndex={index}
                     onOpenSmartAssistant={() => {
                       setCurrentClient(client);
                       setIsSmartAssistantOpen(true);

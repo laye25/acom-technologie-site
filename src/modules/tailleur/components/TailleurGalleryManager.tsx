@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 // Interfaces
 interface Merchant {
@@ -235,6 +236,68 @@ export const TailleurGalleryManager = ({ merchant }: TailleurGalleryManagerProps
       localStorage.setItem(`tailleur_gallery_moodboards_${merchant.id}`, JSON.stringify(DEFAULT_MOODBOARDS));
     }
   }, [merchant.id]);
+
+  // Synchronize Inspirations & Moodboards state with TutorialEngine
+  useEffect(() => {
+    const currentFiltered = getFilteredModels();
+    TutorialEngine.setInspirationsPageState({
+      activeSubTab,
+      models,
+      filteredModels: currentFiltered,
+      moodboards,
+      searchQuery,
+      selectedDifficulty,
+      selectedFabric,
+      selectedMoodboardId,
+      currency: merchant.currency || 'FCFA'
+    });
+  }, [
+    activeSubTab,
+    models,
+    moodboards,
+    searchQuery,
+    selectedDifficulty,
+    selectedFabric,
+    selectedMoodboardId,
+    merchant.currency
+  ]);
+
+  // Sync modal state with TutorialEngine
+  useEffect(() => {
+    if (isModelModalOpen) {
+      TutorialEngine.setGalleryModelModalState({
+        isEditing: !!editingModel,
+        title: modelTitle,
+        description: modelDesc,
+        priceMin: modelPriceMin,
+        priceMax: modelPriceMax,
+        estimatedDays: modelEstimatedDays,
+        difficulty: modelDifficulty,
+        fabricType: modelFabricType,
+        yardage: modelYardage,
+        imageUrl: modelImageUrl,
+        tags: modelTagsInput,
+        currency: merchant.currency || 'FCFA'
+      });
+      TutorialEngine.onModalOpened('couture.gallery_model_modal');
+    } else {
+      TutorialEngine.onModalClosed('couture.gallery_model_modal');
+    }
+  }, [
+    isModelModalOpen,
+    editingModel,
+    modelTitle,
+    modelDesc,
+    modelPriceMin,
+    modelPriceMax,
+    modelEstimatedDays,
+    modelDifficulty,
+    modelFabricType,
+    modelYardage,
+    modelImageUrl,
+    modelTagsInput,
+    merchant.currency
+  ]);
 
   // Sync state helpers
   const saveModelsToLocal = (updatedModels: GalleryModel[]) => {
@@ -720,6 +783,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
   return (
     <motion.div 
       id="tailleur-gallery-container"
+      data-acom-id="inspirations.container"
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
@@ -733,26 +797,29 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
             <Palette className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Couture Design Studio</h2>
-            <p className="text-xs text-gray-500 font-medium">Gérez votre catalogue de modèles, créez des moodboards visuels et découvrez l'inspiration IA.</p>
+            <h2 data-acom-id="inspirations.title" className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Couture Design Studio</h2>
+            <p data-acom-id="inspirations.description" className="text-xs text-gray-500 font-medium">Gérez votre catalogue de modèles, créez des moodboards visuels et découvrez l'inspiration IA.</p>
           </div>
         </div>
         
         {/* Sub-navigation Tabs */}
-        <div className="flex bg-gray-100 p-1 rounded-xl self-start md:self-center">
+        <div data-acom-id="inspirations.subtabs" className="flex bg-gray-100 p-1 rounded-xl self-start md:self-center">
           <button
+            data-acom-id="inspirations.subtab_catalog"
             onClick={() => { setActiveSubTab('catalog'); setSelectedMoodboardId(null); }}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'catalog' && !selectedMoodboardId ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             <Layers className="w-3.5 h-3.5 inline mr-1.5" /> Galerie de Modèles
           </button>
           <button
+            data-acom-id="inspirations.subtab_moodboards"
             onClick={() => setActiveSubTab('moodboards')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'moodboards' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             <FolderHeart className="w-3.5 h-3.5 inline mr-1.5" /> Moodboards Clients
           </button>
           <button
+            data-acom-id="inspirations.subtab_ai"
             onClick={() => setActiveSubTab('ai_assistant')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'ai_assistant' ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
@@ -765,12 +832,13 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
       {activeSubTab === 'catalog' && (
         <div className="space-y-6">
           {/* Controls Panel */}
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+          <div data-acom-id="inspirations.controls_panel" className="flex flex-col lg:flex-row gap-4 items-center justify-between">
             {/* Left Search / Filters */}
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
               <div className="relative flex-1 md:flex-initial min-w-[240px]">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
+                  data-acom-id="inspirations.search_input"
                   type="text"
                   placeholder="Rechercher un modèle, tissu, tag..."
                   value={searchQuery}
@@ -782,6 +850,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-gray-400 shrink-0" />
                 <select
+                  data-acom-id="inspirations.filter_difficulty"
                   value={selectedDifficulty}
                   onChange={(e) => setSelectedDifficulty(e.target.value)}
                   className="bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
@@ -793,6 +862,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 </select>
 
                 <select
+                  data-acom-id="inspirations.filter_fabric"
                   value={selectedFabric}
                   onChange={(e) => setSelectedFabric(e.target.value)}
                   className="bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
@@ -811,6 +881,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
             <div className="flex items-center gap-2 w-full lg:w-auto justify-end">
               {selectedMoodboardId && (
                 <button
+                  data-acom-id="inspirations.back_catalog_btn"
                   onClick={() => setSelectedMoodboardId(null)}
                   className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-bold text-xs hover:bg-gray-50 cursor-pointer"
                 >
@@ -818,6 +889,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 </button>
               )}
               <button
+                data-acom-id="inspirations.add_model_btn"
                 onClick={() => handleOpenModelModal()}
                 className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
               >
@@ -835,6 +907,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 <p className="text-xs text-gray-500 mt-0.5">{moodboards.find(m => m.id === selectedMoodboardId)?.description}</p>
               </div>
               <button
+                data-acom-id="inspirations.present_client_btn"
                 onClick={() => {
                   const mb = moodboards.find(m => m.id === selectedMoodboardId);
                   if (mb) {
@@ -851,7 +924,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
 
           {/* Models Grid */}
           {filteredModels.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-3xl">
+            <div data-acom-id="inspirations.empty_state" className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-3xl">
               <div className="w-12 h-12 bg-violet-50 text-violet-400 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Scissors className="w-6 h-6" />
               </div>
@@ -859,16 +932,18 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <p className="text-xs text-gray-400">Essayez de modifier vos filtres ou créez votre premier modèle de vêtement.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredModels.map((model) => (
+            <div data-acom-id="inspirations.grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredModels.map((model, idx) => (
                 <motion.div
                   key={model.id}
                   layout
+                  data-acom-id={`inspirations.card_${idx}`}
                   className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-md transition-shadow group flex flex-col justify-between"
                 >
                   <div>
                     {/* Model Image */}
                     <div 
+                      data-acom-id={`inspirations.card_image_${idx}`}
                       onClick={() => setPreviewImage({
                         url: model.imageUrl,
                         title: model.title,
@@ -900,45 +975,51 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                         </div>
                       </div>
                       {/* Difficulty Badge */}
-                      <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold text-white shadow-sm z-20 ${
-                        model.difficulty === 'Facile' ? 'bg-emerald-500' :
-                        model.difficulty === 'Moyen' ? 'bg-amber-500' : 'bg-rose-500'
-                      }`}>
+                      <span 
+                        data-acom-id={`inspirations.card_difficulty_${idx}`}
+                        className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold text-white shadow-sm z-20 ${
+                          model.difficulty === 'Facile' ? 'bg-emerald-500' :
+                          model.difficulty === 'Moyen' ? 'bg-amber-500' : 'bg-rose-500'
+                        }`}
+                      >
                         {model.difficulty}
                       </span>
                       {/* Price Range Badge */}
-                      <span className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-gray-900/80 backdrop-blur-xs z-20">
+                      <span 
+                        data-acom-id={`inspirations.card_price_${idx}`}
+                        className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white bg-gray-900/80 backdrop-blur-xs z-20"
+                      >
                         {model.priceMin.toLocaleString('fr-FR')} - {model.priceMax.toLocaleString('fr-FR')} F
                       </span>
                     </div>
 
                     {/* Content */}
-                    <div className="p-5 space-y-3">
+                    <div data-acom-id={`inspirations.card_content_${idx}`} className="p-5 space-y-3">
                       <div>
-                        <h4 className="font-bold text-gray-900 text-sm tracking-tight line-clamp-1">{model.title}</h4>
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2 h-8">{model.description}</p>
+                        <h4 data-acom-id={`inspirations.card_title_${idx}`} className="font-bold text-gray-900 text-sm tracking-tight line-clamp-1">{model.title}</h4>
+                        <p data-acom-id={`inspirations.card_description_${idx}`} className="text-xs text-gray-500 mt-1 line-clamp-2 h-8">{model.description}</p>
                       </div>
 
                       {/* Technical specifications */}
                       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100 text-[11px] text-gray-600 font-medium">
-                        <div className="flex items-center gap-1.5">
+                        <div data-acom-id={`inspirations.card_fabric_${idx}`} className="flex items-center gap-1.5">
                           <Palette className="w-3.5 h-3.5 text-violet-500 shrink-0" />
                           <span className="truncate">Tissu : {model.fabricType}</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div data-acom-id={`inspirations.card_yardage_${idx}`} className="flex items-center gap-1.5">
                           <Scissors className="w-3.5 h-3.5 text-pink-500 shrink-0" />
                           <span className="truncate">Métrage : {model.yardageNeeded}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 col-span-2">
+                        <div data-acom-id={`inspirations.card_time_${idx}`} className="flex items-center gap-1.5 col-span-2">
                           <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                           <span>Temps de confection : ~{model.estimatedDays} jours</span>
                         </div>
                       </div>
 
                       {/* Tags */}
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {model.tags.map((tag, idx) => (
-                          <span key={idx} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-[10px] font-semibold">
+                      <div data-acom-id={`inspirations.card_tags_${idx}`} className="flex flex-wrap gap-1 pt-1">
+                        {model.tags.map((tag, tagIdx) => (
+                          <span key={tagIdx} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-md text-[10px] font-semibold">
                             #{tag}
                           </span>
                         ))}
@@ -947,8 +1028,9 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-2">
+                  <div data-acom-id={`inspirations.card_actions_${idx}`} className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-2">
                     <button
+                      data-acom-id={`inspirations.card_pin_${idx}`}
                       onClick={() => handleOpenPinModal(model.id)}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-violet-50 hover:text-violet-700 hover:border-violet-200 text-xs font-bold transition-all cursor-pointer"
                     >
@@ -957,6 +1039,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
 
                     <div className="flex items-center gap-1">
                       <button
+                        data-acom-id={`inspirations.card_edit_${idx}`}
                         onClick={() => handleOpenModelModal(model)}
                         className="p-1.5 text-gray-500 hover:text-violet-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
                         title="Modifier"
@@ -964,6 +1047,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
+                        data-acom-id={`inspirations.card_delete_${idx}`}
                         onClick={() => handleDeleteModel(model.id)}
                         className="p-1.5 text-gray-500 hover:text-rose-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
                         title="Supprimer"
@@ -982,9 +1066,10 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
       {activeSubTab === 'moodboards' && (
         <div className="space-y-6">
           {/* Header Controls */}
-          <div className="flex items-center justify-between">
+          <div data-acom-id="inspirations.moodboards_header" className="flex items-center justify-between">
             <h3 className="text-base font-bold text-gray-900">Vos Collections de Style</h3>
             <button
+              data-acom-id="inspirations.add_moodboard_btn"
               onClick={() => handleOpenMoodboardModal()}
               className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
             >
@@ -994,7 +1079,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
 
           {/* Moodboards Grid */}
           {moodboards.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-3xl">
+            <div data-acom-id="inspirations.moodboards_empty_state" className="text-center py-12 bg-gray-50 border border-dashed border-gray-200 rounded-3xl">
               <div className="w-12 h-12 bg-rose-50 text-rose-400 rounded-full flex items-center justify-center mx-auto mb-3">
                 <FolderHeart className="w-6 h-6" />
               </div>
@@ -1002,14 +1087,15 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <p className="text-xs text-gray-400">Créez des moodboards pour organiser vos collections saisonnières ou regrouper des modèles pour des événements clients.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {moodboards.map((mb) => (
+            <div data-acom-id="inspirations.moodboards_grid" className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {moodboards.map((mb, idx) => (
                 <div
                   key={mb.id}
+                  data-acom-id={`inspirations.moodboard_card_${idx}`}
                   className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-shadow flex flex-col md:flex-row h-full md:h-48"
                 >
                   {/* Left Column Cover Image */}
-                  <div className="w-full md:w-2/5 relative h-32 md:h-full bg-gray-100 shrink-0">
+                  <div data-acom-id={`inspirations.moodboard_cover_${idx}`} className="w-full md:w-2/5 relative h-32 md:h-full bg-gray-100 shrink-0">
                     <img
                       src={mb.coverImage}
                       alt={mb.name}
@@ -1027,12 +1113,13 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                   {/* Right Column Content */}
                   <div className="p-5 flex-1 flex flex-col justify-between text-left">
                     <div className="space-y-1">
-                      <h4 className="font-bold text-gray-900 text-sm tracking-tight line-clamp-1">{mb.name}</h4>
-                      <p className="text-xs text-gray-500 line-clamp-2 h-8">{mb.description}</p>
+                      <h4 data-acom-id={`inspirations.moodboard_name_${idx}`} className="font-bold text-gray-900 text-sm tracking-tight line-clamp-1">{mb.name}</h4>
+                      <p data-acom-id={`inspirations.moodboard_desc_${idx}`} className="text-xs text-gray-500 line-clamp-2 h-8">{mb.description}</p>
                     </div>
 
                     <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-2">
                       <button
+                        data-acom-id={`inspirations.moodboard_view_btn_${idx}`}
                         onClick={() => {
                           setSelectedMoodboardId(mb.id);
                           setActiveSubTab('catalog');
@@ -1044,6 +1131,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
 
                       <div className="flex items-center gap-1">
                         <button
+                          data-acom-id={`inspirations.moodboard_edit_btn_${idx}`}
                           onClick={() => handleOpenMoodboardModal(mb)}
                           className="p-1.5 text-gray-500 hover:text-violet-600 rounded-lg transition-colors cursor-pointer"
                           title="Modifier"
@@ -1051,6 +1139,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                           <Edit className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          data-acom-id={`inspirations.moodboard_delete_btn_${idx}`}
                           onClick={() => handleDeleteMoodboard(mb.id)}
                           className="p-1.5 text-gray-500 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                           title="Supprimer"
@@ -1070,7 +1159,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
       {activeSubTab === 'ai_assistant' && (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 text-left">
           {/* Form Settings Left Column */}
-          <div className="lg:col-span-2 space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+          <div data-acom-id="inspirations.ai_creator_panel" className="lg:col-span-2 space-y-4 bg-gray-50 p-5 rounded-2xl border border-gray-100">
             <div className="flex items-center gap-2 mb-2 text-violet-700">
               <Sparkles className="w-5 h-5" />
               <h3 className="font-bold text-sm uppercase tracking-wider">Créateur de Modèles IA</h3>
@@ -1082,6 +1171,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <div>
                 <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Description de l'idée couturière</label>
                 <textarea
+                  data-acom-id="inspirations.ai_prompt"
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   placeholder="Ex : Robe de mariée sirène, bustier croisé avec fine dentelle dorée sur les manches papillons, jupe évasée en basin plissé."
@@ -1092,6 +1182,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <div>
                 <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Client cible (Optionnel)</label>
                 <input
+                  data-acom-id="inspirations.ai_target_client"
                   type="text"
                   value={aiTargetClient}
                   onChange={(e) => setAiTargetClient(e.target.value)}
@@ -1100,7 +1191,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div data-acom-id="inspirations.ai_target_context" className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">Événement principal</label>
                   <select
@@ -1133,6 +1224,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               </div>
 
               <button
+                data-acom-id="inspirations.ai_generate_btn"
                 type="button"
                 onClick={handleGenerateAI}
                 disabled={isGeneratingAI || !aiPrompt.trim()}
@@ -1152,7 +1244,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
           </div>
 
           {/* AI Result Right Column */}
-          <div className="lg:col-span-3 min-h-[300px] border border-gray-100 rounded-2xl flex flex-col overflow-hidden relative bg-white">
+          <div data-acom-id="inspirations.ai_result_preview" className="lg:col-span-3 min-h-[300px] border border-gray-100 rounded-2xl flex flex-col overflow-hidden relative bg-white">
             <AnimatePresence mode="wait">
               {isGeneratingAI ? (
                 <motion.div
@@ -1282,6 +1374,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                       Effacer
                     </button>
                     <button
+                      data-acom-id="inspirations.ai_save_btn"
                       type="button"
                       onClick={saveAiModelToGallery}
                       className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-md cursor-pointer"
@@ -1320,10 +1413,14 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
             className="bg-white rounded-3xl max-w-2xl w-full border border-gray-100 shadow-xl overflow-hidden flex flex-col text-left"
           >
             <div className="p-5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-bold text-sm text-gray-900 uppercase tracking-wider">
+              <h3 data-acom-id="inspirations.modal_title" className="font-bold text-sm text-gray-900 uppercase tracking-wider">
                 {editingModel ? 'Modifier le modèle de robe' : 'Ajouter un nouveau modèle'}
               </h3>
-              <button onClick={() => setIsModelModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
+              <button 
+                data-acom-id="inspirations.modal_close_btn"
+                onClick={() => setIsModelModalOpen(false)} 
+                className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1333,6 +1430,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <div>
                 <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Nom du modèle *</label>
                 <input
+                  data-acom-id="inspirations.modal_title_input"
                   type="text"
                   required
                   value={modelTitle}
@@ -1346,6 +1444,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               <div>
                 <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Description & Finitions</label>
                 <textarea
+                  data-acom-id="inspirations.modal_desc_input"
                   value={modelDesc}
                   onChange={(e) => setModelDesc(e.target.value)}
                   placeholder="Expliquez la coupe, les finitions, l'ouverture..."
@@ -1358,6 +1457,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Prix Main d'Œuvre Min (FCFA)</label>
                   <input
+                    data-acom-id="inspirations.modal_pricemin_input"
                     type="number"
                     value={modelPriceMin}
                     onChange={(e) => setModelPriceMin(Number(e.target.value))}
@@ -1367,6 +1467,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Prix Main d'Œuvre Max (FCFA)</label>
                   <input
+                    data-acom-id="inspirations.modal_pricemax_input"
                     type="number"
                     value={modelPriceMax}
                     onChange={(e) => setModelPriceMax(Number(e.target.value))}
@@ -1376,6 +1477,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Temps estimé (jours)</label>
                   <input
+                    data-acom-id="inspirations.modal_days_input"
                     type="number"
                     value={modelEstimatedDays}
                     onChange={(e) => setModelEstimatedDays(Number(e.target.value))}
@@ -1389,6 +1491,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Difficulté de travail</label>
                   <select
+                    data-acom-id="inspirations.modal_difficulty_select"
                     value={modelDifficulty}
                     onChange={(e) => setModelDifficulty(e.target.value as any)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
@@ -1401,6 +1504,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Matière / Tissu principal</label>
                   <input
+                    data-acom-id="inspirations.modal_fabric_input"
                     type="text"
                     value={modelFabricType}
                     onChange={(e) => setModelFabricType(e.target.value)}
@@ -1411,6 +1515,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                 <div>
                   <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Métrage requis</label>
                   <input
+                    data-acom-id="inspirations.modal_yardage_input"
                     type="text"
                     value={modelYardage}
                     onChange={(e) => setModelYardage(e.target.value)}
@@ -1421,12 +1526,13 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
               </div>
 
               {/* Row 5: Photo upload & URL fallback */}
-              <div className="space-y-3">
+              <div data-acom-id="inspirations.modal_photo_section" className="space-y-3">
                 <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider">Photo du modèle *</label>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left: Interactive Drop Zone / Preview */}
                   <div 
+                    data-acom-id="inspirations.modal_image_dropzone"
                     onDragOver={(e) => {
                       e.preventDefault();
                       setIsDraggingImage(true);
@@ -1507,6 +1613,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Ou saisir une URL d'image existante</label>
                       <input
+                        data-acom-id="inspirations.modal_image_url_input"
                         type="url"
                         value={modelImageUrl.startsWith('data:') ? '' : modelImageUrl}
                         onChange={(e) => setModelImageUrl(e.target.value)}
@@ -1517,6 +1624,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                     <div>
                       <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">Tags (Séparés par virgules)</label>
                       <input
+                        data-acom-id="inspirations.modal_tags_input"
                         type="text"
                         value={modelTagsInput}
                         onChange={(e) => setModelTagsInput(e.target.value)}
@@ -1530,6 +1638,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
                 <button
+                  data-acom-id="inspirations.modal_cancel_btn"
                   type="button"
                   onClick={() => setIsModelModalOpen(false)}
                   className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl font-bold text-xs hover:bg-gray-50 cursor-pointer"
@@ -1537,6 +1646,7 @@ Format de réponse STRICT JSON (uniquement l'objet JSON valide sans markdown, sa
                   Annuler
                 </button>
                 <button
+                  data-acom-id="inspirations.modal_submit_btn"
                   type="submit"
                   className="flex items-center gap-1.5 px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold text-xs shadow-md cursor-pointer"
                 >

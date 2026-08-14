@@ -39,7 +39,7 @@ export const MeasurementValidator: React.FC<MeasurementValidatorProps> = ({
   }
 
   return (
-    <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3 text-left">
+    <div data-acom-id="add_client.validator_header" className="bg-slate-50 border border-slate-200 p-4 rounded-2xl space-y-3 text-left">
       {/* Header Score Bar */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
         <div className="flex items-center gap-2">
@@ -52,6 +52,7 @@ export const MeasurementValidator: React.FC<MeasurementValidatorProps> = ({
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-slate-500 font-mono">Score :</span>
           <span
+            data-acom-id="add_client.validator_score"
             className={`font-mono text-xs font-black px-2.5 py-1 rounded-xl text-white ${
               score >= 80
                 ? 'bg-emerald-600'
@@ -67,41 +68,49 @@ export const MeasurementValidator: React.FC<MeasurementValidatorProps> = ({
 
       {/* Alerts List */}
       <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-        {alerts.map((alt) => (
-          <div
-            key={alt.id}
-            onClick={() => onFixField && onFixField(alt.fieldKey)}
-            className={`p-2.5 rounded-xl border text-xs flex items-start justify-between gap-2 transition cursor-pointer hover:shadow-sm ${
-              alt.severity === 'error'
-                ? 'bg-rose-50/90 border-rose-200 text-rose-950'
-                : alt.severity === 'warning'
-                ? 'bg-amber-50/90 border-amber-200 text-amber-950'
-                : 'bg-sky-50/90 border-sky-200 text-sky-950'
-            }`}
-          >
-            <div className="flex items-start gap-2 min-w-0">
-              {alt.severity === 'error' ? (
-                <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              ) : alt.severity === 'warning' ? (
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              ) : (
-                <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-              )}
-              <div className="min-w-0">
-                <p className="font-extrabold text-[11px] leading-tight">
-                  {alt.fieldLabel} : {alt.message}
-                </p>
-                <p className="text-[10px] opacity-80 mt-0.5">{alt.recommendation}</p>
-              </div>
-            </div>
+        {alerts.map((alt) => {
+          let alertAcomId = undefined;
+          if (alt.fieldKey.includes('neck')) alertAcomId = 'add_client.validator_alert_cou';
+          else if (alt.fieldKey.includes('chest') || alt.fieldKey.includes('bust')) alertAcomId = 'add_client.validator_alert_poitrine';
+          else if (alt.fieldKey.includes('shoulder') || alt.fieldKey.includes('carrure')) alertAcomId = 'add_client.validator_alert_carrure';
 
-            {onFixField && (
-              <span className="text-[9px] font-black uppercase text-slate-600 bg-white/80 border px-2 py-0.5 rounded-md shrink-0">
-                Corriger
-              </span>
-            )}
-          </div>
-        ))}
+          return (
+            <div
+              key={alt.id}
+              data-acom-id={alertAcomId}
+              onClick={() => onFixField && onFixField(alt.fieldKey)}
+              className={`p-2.5 rounded-xl border text-xs flex items-start justify-between gap-2 transition cursor-pointer hover:shadow-sm ${
+                alt.severity === 'error'
+                  ? 'bg-rose-50/90 border-rose-200 text-rose-950'
+                  : alt.severity === 'warning'
+                  ? 'bg-amber-50/90 border-amber-200 text-amber-950'
+                  : 'bg-sky-50/90 border-sky-200 text-sky-950'
+              }`}
+            >
+              <div className="flex items-start gap-2 min-w-0">
+                {alt.severity === 'error' ? (
+                  <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                ) : alt.severity === 'warning' ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                ) : (
+                  <Info className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+                )}
+                <div className="min-w-0">
+                  <p className="font-extrabold text-[11px] leading-tight">
+                    {alt.fieldLabel} : {alt.message}
+                  </p>
+                  <p className="text-[10px] opacity-80 mt-0.5">{alt.recommendation}</p>
+                </div>
+              </div>
+
+              {onFixField && (
+                <span data-acom-id="add_client.validator_fix_btn" className="text-[9px] font-black uppercase text-slate-600 bg-white/80 border px-2 py-0.5 rounded-md shrink-0">
+                  Corriger
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

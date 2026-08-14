@@ -106,6 +106,17 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
     return MeasurementValidationService.validate(currentMeasurements, selectedGarment);
   }, [currentMeasurements, selectedGarment]);
 
+  useEffect(() => {
+    if (currentStep === 4) {
+      TutorialEngine.setValidationContext({
+        missingKeys: validationResult.missingMandatoryKeys,
+        alerts: validationResult.alerts
+      });
+    } else if (currentStep === 5) {
+      TutorialEngine.setSummaryContext(Object.keys(currentMeasurements).length);
+    }
+  }, [currentStep, validationResult, currentMeasurements]);
+
   if (!isOpen) return null;
 
   // Final submit handler
@@ -185,6 +196,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
               return (
                 <button
                   key={step.id}
+                  data-acom-id={`add_client.step_tab_${step.id}`}
                   type="button"
                   onClick={() => setCurrentStep(step.id as any)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
@@ -206,6 +218,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
           <div className="flex items-center gap-2">
             {currentStep === 5 ? (
               <button
+                data-acom-id="add_client.topbar_save_btn"
                 type="button"
                 onClick={handleFinalSave}
                 className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition shadow-lg shadow-emerald-900/30 flex items-center gap-2 cursor-pointer"
@@ -270,7 +283,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                     <User className="w-6 h-6 text-emerald-400" />
                     Informations Générales du Client
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p data-acom-id="add_client.step1_subtitle" className="text-xs text-slate-400 mt-1">
                     Renseignez les coordonnées de la personne pour l'attribution des mensurations et le suivi d'atelier.
                   </p>
                 </div>
@@ -309,6 +322,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                     </label>
                     <div className="grid grid-cols-3 gap-3">
                       <button
+                        data-acom-id="add_client.gender_male"
                         type="button"
                         onClick={() => setClientInfo({ ...clientInfo, gender: 'M' })}
                         className={`p-3.5 rounded-2xl border text-xs font-black transition cursor-pointer flex items-center justify-center gap-2 ${
@@ -322,6 +336,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                       </button>
 
                       <button
+                        data-acom-id="add_client.gender_female"
                         type="button"
                         onClick={() => setClientInfo({ ...clientInfo, gender: 'F' })}
                         className={`p-3.5 rounded-2xl border text-xs font-black transition cursor-pointer flex items-center justify-center gap-2 ${
@@ -335,6 +350,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                       </button>
 
                       <button
+                        data-acom-id="add_client.gender_child"
                         type="button"
                         onClick={() => setClientInfo({ ...clientInfo, gender: 'E' })}
                         className={`p-3.5 rounded-2xl border text-xs font-black transition cursor-pointer flex items-center justify-center gap-2 ${
@@ -410,7 +426,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 flex justify-end">
+                <div data-acom-id="add_client.form_footer_divider" className="pt-4 border-t border-slate-800 flex justify-end">
                   <button
                     data-acom-id="add_client.btn_step2"
                     type="button"
@@ -441,19 +457,19 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
               >
                 <div className="border-b border-slate-800 pb-4 flex justify-between items-start">
                   <div>
-                    <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">
+                    <span data-acom-id="add_client.step2_badge" className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">
                       Étape 2 sur 5
                     </span>
-                    <h3 className="text-xl font-black text-white flex items-center gap-2 mt-1">
+                    <h3 data-acom-id="add_client.step2_title" className="text-xl font-black text-white flex items-center gap-2 mt-1">
                       <Shirt className="w-6 h-6 text-emerald-400" />
                       Modèle & Vêtement à Confectionner
                     </h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p data-acom-id="add_client.step2_subtitle" className="text-xs text-slate-400 mt-1">
                       Sélectionnez le modèle cible pour charger automatiquement son profil de mesures d'atelier.
                     </p>
                   </div>
 
-                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3">
+                  <div data-acom-id="add_client.active_model_block" className="p-3 bg-slate-900 border border-slate-800 rounded-2xl flex items-center gap-3">
                     <GarmentVectorIcon
                       id={selectedGarment.id}
                       name={selectedGarment.name}
@@ -488,17 +504,17 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 </div>
 
                 {/* Selected Garment Details Card */}
-                <div className="bg-emerald-950/30 border border-emerald-800/50 p-4 rounded-2xl flex items-center justify-between">
+                <div data-acom-id="add_client.selected_garment_summary" className="bg-emerald-950/30 border border-emerald-800/50 p-4 rounded-2xl flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-lg text-xs font-bold border border-emerald-500/30">
+                      <span data-acom-id="add_client.selected_garment_category" className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-lg text-xs font-bold border border-emerald-500/30">
                         🏷️ {selectedGarment.category}
                       </span>
-                      <span className="px-2.5 py-0.5 bg-slate-800 text-slate-300 rounded-lg text-xs font-bold border border-slate-700">
+                      <span data-acom-id="add_client.selected_garment_gender" className="px-2.5 py-0.5 bg-slate-800 text-slate-300 rounded-lg text-xs font-bold border border-slate-700">
                         👤 {selectedGarment.gender}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 pt-1">
+                    <p data-acom-id="add_client.selected_garment_profile" className="text-xs text-slate-300 pt-1">
                       Profil de mesures chargé : <strong className="text-white font-mono">{selectedGarment.mandatoryMeasurements.length}</strong> mesures requises et <strong className="text-white font-mono">{selectedGarment.optionalMeasurements.length}</strong> facultatives.
                     </p>
                   </div>
@@ -591,14 +607,14 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 className="max-w-3xl mx-auto bg-slate-950/90 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl space-y-6"
               >
                 <div className="border-b border-slate-800 pb-4">
-                  <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">
+                  <span data-acom-id="add_client.step4_badge" className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">
                     Étape 4 sur 5
                   </span>
-                  <h3 className="text-xl font-black text-white flex items-center gap-2 mt-1">
+                  <h3 data-acom-id="add_client.step4_title" className="text-xl font-black text-white flex items-center gap-2 mt-1">
                     <ShieldCheck className="w-6 h-6 text-emerald-400" />
                     Contrôle Qualité & Conformité Atelier
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p data-acom-id="add_client.step4_subtitle" className="text-xs text-slate-400 mt-1">
                     Le moteur intelligent vérifie la complétude des mesures et détecte d'éventuelles incohérences anatomiques.
                   </p>
                 </div>
@@ -622,12 +638,12 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                       )}
                     </div>
                     <div>
-                      <h4 className="text-base font-black text-white">
+                      <h4 data-acom-id="add_client.validation_alert_banner" className="text-base font-black text-white">
                         {validationResult.isValid
                           ? '✓ Toutes les mesures requis sont valides et cohérentes'
                           : 'Attention : Des mesures requises sont manquantes ou incomplètes'}
                       </h4>
-                      <p className="text-xs text-slate-300">
+                      <p data-acom-id="add_client.reference_model" className="text-xs text-slate-300">
                         Modèle de référence : <strong className="text-white">{selectedGarment.name}</strong>
                       </p>
                     </div>
@@ -636,7 +652,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                   {/* Missing Mandatory Fields List */}
                   {validationResult.missingMandatoryKeys.length > 0 && (
                     <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800 space-y-2 mt-3">
-                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                      <span data-acom-id="add_client.missing_measurements_header" className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
                         Mesures Manquantes ({validationResult.missingMandatoryKeys.length}) :
                       </span>
                       <div className="flex flex-wrap gap-2">
@@ -645,6 +661,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                           return (
                             <button
                               key={key}
+                              data-acom-id={`add_client.missing_measure_${key}`}
                               type="button"
                               onClick={() => {
                                 setActiveMeasurementKey(key);
@@ -664,12 +681,12 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                   {/* Warnings & Suggestions */}
                   {validationResult.alerts.length > 0 && (
                     <div className="bg-slate-900/90 p-4 rounded-xl border border-slate-800 space-y-2 mt-3">
-                      <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">
+                      <span data-acom-id="add_client.warnings_header" className="text-xs font-bold text-amber-300 uppercase tracking-wider block">
                         Avertissements & Recommandations :
                       </span>
                       <ul className="space-y-1 text-xs text-amber-200/90">
-                        {validationResult.alerts.map((a) => (
-                          <li key={a.id} className="flex items-start gap-2">
+                        {validationResult.alerts.map((a, i) => (
+                          <li key={a.id} data-acom-id={`add_client.warning_${i}`} className="flex items-start gap-2">
                             <span>•</span>
                             <span><strong>{a.fieldLabel}:</strong> {a.message} {a.recommendation}</span>
                           </li>
@@ -681,9 +698,15 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
 
                 <div className="pt-4 border-t border-slate-800 flex justify-between items-center">
                   <button
+                    data-acom-id="add_client.btn_return_step3"
                     type="button"
                     onClick={() => setCurrentStep(3)}
-                    className="px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    disabled={validationResult.isValid}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                      validationResult.isValid
+                        ? 'bg-slate-800/50 text-slate-500 cursor-not-allowed'
+                        : 'bg-slate-800 text-slate-300 hover:text-white cursor-pointer'
+                    }`}
                   >
                     <ChevronLeft className="w-4 h-4" />
                     <span>Compléter dans la Prise de Mesures</span>
@@ -693,7 +716,12 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                     data-acom-id="add_client.btn_step5"
                     type="button"
                     onClick={() => setCurrentStep(5)}
-                    className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider rounded-2xl transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-500/20"
+                    disabled={!validationResult.isValid}
+                    className={`px-6 py-3 font-black text-xs uppercase tracking-wider rounded-2xl transition flex items-center gap-2 shadow-lg ${
+                      validationResult.isValid
+                        ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 cursor-pointer shadow-emerald-500/20'
+                        : 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                    }`}
                   >
                     <span>Voir le Résumé Final</span>
                     <ChevronRight className="w-4 h-4" />
@@ -711,7 +739,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 exit={{ opacity: 0, x: 10 }}
                 className="max-w-4xl mx-auto bg-slate-950/90 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-2xl space-y-6"
               >
-                <div className="border-b border-slate-800 pb-4">
+                <div data-acom-id="add_client.step5_header" className="border-b border-slate-800 pb-4">
                   <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-widest block">
                     Étape 5 sur 5 — Résumé
                   </span>
@@ -725,9 +753,9 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 </div>
 
                 {/* Recap Summary Grid */}
-                <div data-acom-id="add_client.summary_card" className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Client Recap */}
-                  <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+                  <div data-acom-id="add_client.summary_client_recap" className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
                     <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
                       <User className="w-4 h-4" />
                       Identité Client
@@ -749,7 +777,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                   </div>
 
                   {/* Garment Model Recap */}
-                  <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+                  <div data-acom-id="add_client.summary_garment_recap" className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
                     <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
                       <Shirt className="w-4 h-4" />
                       Vêtement Sélectionné
@@ -772,13 +800,14 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 </div>
 
                 {/* Measurements Summary Table */}
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
+                <div data-acom-id="add_client.summary_measurements_table" className="bg-slate-900 p-5 rounded-2xl border border-slate-800 space-y-3">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
                       <Ruler className="w-4 h-4" />
                       Mensurations Enregistrées ({Object.keys(currentMeasurements).length})
                     </h4>
                     <button
+                      data-acom-id="add_client.summary_edit_measurements_btn"
                       type="button"
                       onClick={() => setCurrentStep(3)}
                       className="text-xs font-bold text-emerald-400 hover:underline"
@@ -805,6 +834,7 @@ export const SmartMeasurementAssistant: React.FC<SmartMeasurementAssistantProps>
                 {/* Action Submit Button */}
                 <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
                   <button
+                    data-acom-id="add_client.summary_return_btn"
                     type="button"
                     onClick={() => setCurrentStep(4)}
                     className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-2xl transition cursor-pointer"

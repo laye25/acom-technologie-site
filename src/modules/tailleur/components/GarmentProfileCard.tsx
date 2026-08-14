@@ -16,6 +16,7 @@ import { MeasurementSummaryCard } from './MeasurementSummaryCard';
 interface GarmentProfileCardProps {
   clientData: any;
   merchantId?: string;
+  clientIndex?: number;
   onOpenSmartAssistant?: (garmentName?: string) => void;
   onProfileChange?: (profileId: string) => void;
   className?: string;
@@ -24,6 +25,7 @@ interface GarmentProfileCardProps {
 export const GarmentProfileCard: React.FC<GarmentProfileCardProps> = ({
   clientData,
   merchantId = 'default',
+  clientIndex = 0,
   onOpenSmartAssistant,
   onProfileChange,
   className = ''
@@ -58,7 +60,10 @@ export const GarmentProfileCard: React.FC<GarmentProfileCardProps> = ({
   };
 
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm overflow-hidden text-left ${className}`}>
+    <div 
+      data-acom-id={clientIndex === 0 ? "clients.garment_section_0" : undefined} 
+      className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm overflow-hidden text-left ${className}`}
+    >
       {/* Header Banner: Modèle & Vêtement à Confectionner */}
       <div className="p-3.5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2">
@@ -137,17 +142,26 @@ export const GarmentProfileCard: React.FC<GarmentProfileCardProps> = ({
               />
             </div>
             <div className="min-w-0 text-left">
-              <h3 className="text-sm font-black text-white truncate tracking-tight">
+              <h3 
+                data-acom-id={clientIndex === 0 ? "clients.garment_title_0" : undefined}
+                className="text-sm font-black text-white truncate tracking-tight"
+              >
                 {garmentDefinition.name}
               </h3>
               <div className="flex flex-wrap items-center gap-1.5 mt-1">
                 {/* Category Badge */}
-                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold border ${categoryBadgeColor.bg} ${categoryBadgeColor.text} ${categoryBadgeColor.border}`}>
+                <span 
+                  data-acom-id={clientIndex === 0 ? "clients.garment_category_0" : undefined}
+                  className={`px-2 py-0.5 rounded-lg text-[9px] font-bold border ${categoryBadgeColor.bg} ${categoryBadgeColor.text} ${categoryBadgeColor.border}`}
+                >
                   🏷️ {garmentDefinition.category}
                 </span>
 
                 {/* Target Gender Badge */}
-                <span className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded-lg text-[9px] font-bold border border-slate-700">
+                <span 
+                  data-acom-id={clientIndex === 0 ? "clients.garment_gender_0" : undefined}
+                  className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded-lg text-[9px] font-bold border border-slate-700"
+                >
                   👤 {garmentDefinition.gender}
                 </span>
               </div>
@@ -155,7 +169,10 @@ export const GarmentProfileCard: React.FC<GarmentProfileCardProps> = ({
           </div>
 
           {/* Measurements Counter Badge */}
-          <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-2xl text-right shrink-0">
+          <div 
+            data-acom-id={clientIndex === 0 ? "clients.garment_count_badge_0" : undefined}
+            className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-2xl text-right shrink-0"
+          >
             <span className="text-xs font-mono font-black block">
               📏 {totalFilledMeasurements}
             </span>
@@ -171,6 +188,7 @@ export const GarmentProfileCard: React.FC<GarmentProfileCardProps> = ({
         <MeasurementSummaryCard
           clientMeasurements={activeProfile.measurements}
           merchantId={merchantId}
+          clientIndex={clientIndex}
           preferredGarmentName={activeProfile.garmentName}
           onOpenSmartAssistant={() => {
             if (onOpenSmartAssistant) {

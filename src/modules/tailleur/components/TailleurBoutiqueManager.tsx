@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import { sendEmailDirectlyOrViaBackend } from '../../../lib/api';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 
 export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) => {
   const [articles, setArticles] = useState<any[]>([]);
@@ -1046,13 +1047,40 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
     };
   }, [sales]);
 
+  // Synchronize state with TutorialEngine for full boutique interactive demo
+  useEffect(() => {
+    TutorialEngine.setBoutiquePageState({
+      activeSubTab,
+      totalArticles: articles.length,
+      salesCount: sales.length,
+      totalSales: statsSummary.totalSales,
+      totalProfit: statsSummary.totalProfit,
+      currency: merchant.currency || 'FCFA',
+      search,
+      filterCategory,
+      filterStock,
+      articles: filteredArticles,
+      sales,
+      cartCount: cart.reduce((a, b) => a + b.qty, 0),
+      statsSummary
+    });
+  }, [activeSubTab, articles, filteredArticles, sales, search, filterCategory, filterStock, cart, statsSummary, merchant.currency]);
+
+  useEffect(() => {
+    if (isFormOpen) {
+      TutorialEngine.onModalOpened('couture.boutique_modal');
+    } else {
+      TutorialEngine.onModalClosed('couture.boutique_modal');
+    }
+  }, [isFormOpen]);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 text-left">
         <div>
-          <h2 className="text-2xl font-black text-ink">Boutique Prêt-à-porter</h2>
-          <p className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">
+          <h2 data-acom-id="boutique.title" className="text-2xl font-black text-ink">Boutique Prêt-à-porter</h2>
+          <p data-acom-id="boutique.description" className="text-xs text-gray-400 font-mono uppercase tracking-widest mt-1">
             Vente directe de tenues déjà confectionnées à l'atelier
           </p>
         </div>
@@ -1060,6 +1088,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
           {cart.length > 0 && (
             <button
+              data-acom-id="boutique.cart_btn"
               onClick={() => setIsSaleOpen(true)}
               className="flex items-center justify-center space-x-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-emerald-600/20 transition cursor-pointer"
             >
@@ -1069,6 +1098,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
           )}
 
           <button
+            data-acom-id="boutique.export_stock_btn"
             onClick={exportStockCSV}
             className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs uppercase tracking-wider transition cursor-pointer"
           >
@@ -1077,6 +1107,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
           </button>
 
           <button
+            data-acom-id="boutique.add_outfit_btn"
             onClick={() => {
               setCurrentArticle({
                 name: '',
@@ -1100,8 +1131,9 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
       </div>
 
       {/* Navigation Subtabs */}
-      <div className="flex border-b border-gray-100 gap-6 text-sm">
+      <div data-acom-id="boutique.subtabs" className="flex border-b border-gray-100 gap-6 text-sm">
         <button
+          data-acom-id="boutique.subtab_stock"
           onClick={() => setActiveSubTab('stock')}
           className={`pb-3 font-bold transition-colors flex items-center gap-2 relative ${activeSubTab === 'stock' ? 'text-violet-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
@@ -1110,6 +1142,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
           {activeSubTab === 'stock' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600" />}
         </button>
         <button
+          data-acom-id="boutique.subtab_sales"
           onClick={() => setActiveSubTab('sales')}
           className={`pb-3 font-bold transition-colors flex items-center gap-2 relative ${activeSubTab === 'sales' ? 'text-violet-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
@@ -1118,6 +1151,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
           {activeSubTab === 'sales' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600" />}
         </button>
         <button
+          data-acom-id="boutique.subtab_stats"
           onClick={() => setActiveSubTab('stats')}
           className={`pb-3 font-bold transition-colors flex items-center gap-2 relative ${activeSubTab === 'stats' ? 'text-violet-600' : 'text-gray-400 hover:text-gray-600'}`}
         >
@@ -1131,10 +1165,11 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
       {activeSubTab === 'stock' && (
         <div className="space-y-6">
           {/* Filters Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-black/[0.03]">
+          <div data-acom-id="boutique.filters" className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-black/[0.03]">
             <div className="relative md:col-span-2 text-left">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
+                data-acom-id="boutique.search_input"
                 type="text"
                 placeholder="Rechercher une tenue, tissu..."
                 value={search}
@@ -1145,6 +1180,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
 
             <div>
               <select
+                data-acom-id="boutique.filter_category"
                 value={filterCategory}
                 onChange={e => setFilterCategory(e.target.value)}
                 className="w-full px-3 py-2.5 bg-white border border-slate-150 rounded-xl outline-none focus:ring-2 focus:ring-violet-500 text-xs font-bold text-gray-600 cursor-pointer"
@@ -1161,6 +1197,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
 
             <div>
               <select
+                data-acom-id="boutique.filter_stock"
                 value={filterStock}
                 onChange={e => setFilterStock(e.target.value)}
                 className="w-full px-3 py-2.5 bg-white border border-slate-150 rounded-xl outline-none focus:ring-2 focus:ring-violet-500 text-xs font-bold text-gray-600 cursor-pointer"
@@ -1174,7 +1211,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
 
           {/* Cards Grid */}
           {filteredArticles.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 bg-white border border-slate-150 rounded-[2rem] shadow-sm">
+            <div data-acom-id="boutique.empty_state" className="py-16 text-center text-slate-400 bg-white border border-slate-150 rounded-[2rem] shadow-sm">
               <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-sm font-bold">Aucun vêtement de prêt-à-porter trouvé</p>
               <p className="text-xs text-slate-400 max-w-[300px] mx-auto mt-1 leading-normal">
@@ -1182,16 +1219,17 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-              {filteredArticles.map(art => {
+            <div data-acom-id="boutique.grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+              {filteredArticles.map((art, idx) => {
                 const isOutOfStock = art.quantity === 0;
                 const isLowStock = art.quantity === 1;
                 
                 return (
-                  <div key={art.id} className="bg-white rounded-[2rem] border border-black/5 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
+                  <div key={art.id} data-acom-id={`boutique.card_${idx}`} className="bg-white rounded-[2rem] border border-black/5 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col justify-between">
                     <div>
                       {/* Image section */}
                       <div 
+                        data-acom-id={`boutique.card_image_${idx}`}
                         onClick={() => {
                           if (art.image) {
                             setPreviewImage({ url: art.image, title: art.name, size: art.size, category: art.category, notes: art.notes, price: art.price });
@@ -1223,18 +1261,18 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
 
                         {/* Badges Overlay */}
                         <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
-                          <span className="text-[8px] bg-violet-600 text-white font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                          <span data-acom-id={`boutique.card_category_${idx}`} className="text-[8px] bg-violet-600 text-white font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                             {art.category}
                           </span>
                           {art.size && (
-                            <span className="text-[8px] bg-slate-900 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
+                            <span data-acom-id={`boutique.card_size_${idx}`} className="text-[8px] bg-slate-900 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
                               Taille {art.size}
                             </span>
                           )}
                         </div>
 
                         {/* Stock status indicator overlay */}
-                        <div className="absolute bottom-3 right-3">
+                        <div data-acom-id={`boutique.card_stock_${idx}`} className="absolute bottom-3 right-3">
                           {isOutOfStock ? (
                             <span className="text-[9px] bg-rose-100 text-rose-800 font-black px-2 py-0.5 rounded-lg border border-rose-200">
                               Rupture ❌
@@ -1254,16 +1292,16 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                       {/* Info section */}
                       <div className="p-5 space-y-3">
                         <div>
-                          <h3 className="font-extrabold text-ink text-sm leading-snug line-clamp-1">{art.name}</h3>
+                          <h3 data-acom-id={`boutique.card_name_${idx}`} className="font-extrabold text-ink text-sm leading-snug line-clamp-1">{art.name}</h3>
                           {art.fabric && (
-                            <p className="text-[10px] text-violet-600 font-bold mt-0.5 flex items-center gap-1">
+                            <p data-acom-id={`boutique.card_fabric_${idx}`} className="text-[10px] text-violet-600 font-bold mt-0.5 flex items-center gap-1">
                               🎨 Tissu : <span className="text-gray-600 font-semibold">{art.fabric}</span>
                             </p>
                           )}
                         </div>
 
                         {art.notes && (
-                          <p className="text-[10px] text-gray-400 font-medium leading-relaxed line-clamp-2">
+                          <p data-acom-id={`boutique.card_notes_${idx}`} className="text-[10px] text-gray-400 font-medium leading-relaxed line-clamp-2">
                             {art.notes}
                           </p>
                         )}
@@ -1274,16 +1312,20 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                     <div className="px-5 pb-5 pt-3 border-t border-slate-50 space-y-4">
                       {/* Price Tag & Profit */}
                       <div className="flex justify-between items-center">
-                        <div>
-                          <span className="text-[9px] font-bold text-gray-400 block">PRIX DE VENTE</span>
-                          <span className="font-black text-sm text-slate-900">
+                        <div data-acom-id={`boutique.card_price_${idx}`} className="p-1 rounded-lg">
+                          <span className="text-[9px] font-bold text-gray-400 block tracking-wider">PRIX DE VENTE</span>
+                          <span className="font-black text-sm text-slate-900 block">
                             {art.price.toLocaleString()} {merchant.currency || 'FCFA'}
                           </span>
                         </div>
                         {art.cost ? (
-                          <div className="text-right">
-                            <span className="text-[9px] font-bold text-emerald-500 block">MARGE +{(art.price - art.cost).toLocaleString()} {merchant.currency || 'FCFA'}</span>
-                            <span className="text-[8px] font-mono text-gray-400">Coût: {art.cost.toLocaleString()}</span>
+                          <div className="text-right flex flex-col items-end gap-0.5">
+                            <span data-acom-id={`boutique.card_margin_${idx}`} className="text-[9px] font-bold text-emerald-500 block px-1 py-0.5 rounded">
+                              MARGE +{(art.price - art.cost).toLocaleString()} {merchant.currency || 'FCFA'}
+                            </span>
+                            <span data-acom-id={`boutique.card_cost_${idx}`} className="text-[9px] font-mono text-gray-400 block px-1 py-0.5 rounded">
+                              Coût : {art.cost.toLocaleString()} {merchant.currency || 'FCFA'}
+                            </span>
                           </div>
                         ) : null}
                       </div>
@@ -1291,6 +1333,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                       {/* Action buttons */}
                       <div className="grid grid-cols-2 gap-2">
                         <button
+                          data-acom-id={`boutique.card_add_cart_${idx}`}
                           onClick={() => {
                             const existing = cart.find(c => c.article.id === art.id);
                             if (existing) {
@@ -1308,6 +1351,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                         </button>
 
                         <button
+                          data-acom-id={`boutique.card_edit_${idx}`}
                           onClick={() => {
                             setCurrentArticle(art);
                             setIsFormOpen(true);
@@ -1318,6 +1362,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                         </button>
 
                         <button
+                          data-acom-id={`boutique.card_restock_${idx}`}
                           onClick={() => handleRestock(art)}
                           className="py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-150 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                         >
@@ -1325,6 +1370,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                         </button>
 
                         <button
+                          data-acom-id={`boutique.card_delete_${idx}`}
                           onClick={() => handleDeleteArticle(art.id)}
                           className="col-span-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-[10px] font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                         >
@@ -1347,6 +1393,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
             <div className="relative w-full md:max-w-md text-left">
               <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
+                data-acom-id="boutique.sales_search"
                 type="text"
                 placeholder="Rechercher par client ou article..."
                 value={search}
@@ -1354,13 +1401,13 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-150 rounded-xl outline-none focus:ring-2 focus:ring-violet-500 text-xs font-medium"
               />
             </div>
-            <div className="text-xs text-gray-500 font-mono font-bold uppercase tracking-widest bg-white px-3.5 py-1.5 rounded-xl border border-slate-150">
+            <div data-acom-id="boutique.sales_total_ca" className="text-xs text-gray-500 font-mono font-bold uppercase tracking-widest bg-white px-3.5 py-1.5 rounded-xl border border-slate-150">
               CA Boutique : {statsSummary.totalSales.toLocaleString()} {merchant.currency || 'FCFA'}
             </div>
           </div>
 
           {sales.length === 0 ? (
-            <div className="py-16 text-center text-slate-400 bg-white border border-slate-150 rounded-[2rem] shadow-sm">
+            <div data-acom-id="boutique.sales_empty_state" className="py-16 text-center text-slate-400 bg-white border border-slate-150 rounded-[2rem] shadow-sm">
               <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-sm font-bold">Aucune vente enregistrée pour le moment</p>
               <p className="text-xs text-slate-400 max-w-[300px] mx-auto mt-1 leading-normal">
@@ -1368,7 +1415,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
               </p>
             </div>
           ) : (
-            <div className="bg-white border border-black/5 rounded-[2rem] shadow-sm overflow-hidden text-left">
+            <div data-acom-id="boutique.sales_table" className="bg-white border border-black/5 rounded-[2rem] shadow-sm overflow-hidden text-left">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -1439,7 +1486,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
       {activeSubTab === 'stats' && (
         <div className="space-y-6 text-left">
           {/* Key Metrics grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div data-acom-id="boutique.stats_overview" className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm">
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Chiffre d'Affaires</span>
               <span className="font-black text-2xl text-slate-900 block">{statsSummary.totalSales.toLocaleString()} {merchant.currency || 'FCFA'}</span>
@@ -1475,7 +1522,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+          <div data-acom-id="boutique.stats_charts" className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
             {/* Payment Mode distribution */}
             <div className="bg-white p-6 rounded-[2rem] border border-black/5 shadow-sm">
               <h3 className="font-extrabold text-ink text-sm uppercase tracking-wider mb-4">Répartition des Paiements Boutique</h3>
@@ -1551,10 +1598,10 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
           <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col text-left">
             <div className="px-8 py-6 border-b border-gray-100 bg-violet-50/50 flex justify-between items-center shrink-0">
               <div>
-                <h3 className="text-xl font-black text-ink">{currentArticle.id ? 'Modifier l\'Article' : 'Ajouter une Confection'}</h3>
+                <h3 data-acom-id="boutique.modal_title" className="text-xl font-black text-ink">{currentArticle.id ? 'Modifier l\'Article' : 'Ajouter une Confection'}</h3>
                 <p className="text-[10px] font-mono text-violet-600 uppercase tracking-widest mt-0.5">Enregistrement d'un modèle prêt-à-porter</p>
               </div>
-              <button type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
+              <button data-acom-id="boutique.modal_close_btn" type="button" onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-gray-200/50 rounded-xl transition-colors">
                 <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
@@ -1563,6 +1610,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Nom ou Modèle de la Tenue *</label>
                 <input
+                  data-acom-id="boutique.modal_name_input"
                   type="text"
                   required
                   value={currentArticle.name}
@@ -1576,6 +1624,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Catégorie *</label>
                   <select
+                    data-acom-id="boutique.modal_category_select"
                     value={currentArticle.category}
                     onChange={e => setCurrentArticle({ ...currentArticle, category: e.target.value })}
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm bg-white cursor-pointer"
@@ -1592,6 +1641,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Taille *</label>
                   <select
+                    data-acom-id="boutique.modal_size_select"
                     value={currentArticle.size}
                     onChange={e => setCurrentArticle({ ...currentArticle, size: e.target.value })}
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none font-bold text-sm bg-white cursor-pointer"
@@ -1611,6 +1661,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-gray-600 mb-1">Prix de Vente ({merchant.currency || 'FCFA'}) *</label>
                   <input
+                    data-acom-id="boutique.modal_price_input"
                     type="number"
                     required
                     value={currentArticle.price}
@@ -1623,6 +1674,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Quantité en Stock *</label>
                   <input
+                    data-acom-id="boutique.modal_quantity_input"
                     type="number"
                     required
                     value={currentArticle.quantity}
@@ -1637,6 +1689,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Coût de Revient Estimé ({merchant.currency || 'FCFA'})</label>
                   <input
+                    data-acom-id="boutique.modal_cost_input"
                     type="number"
                     value={currentArticle.cost || ''}
                     onChange={e => setCurrentArticle({ ...currentArticle, cost: Number(e.target.value) })}
@@ -1648,6 +1701,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Type de Tissu / Matière</label>
                   <input
+                    data-acom-id="boutique.modal_fabric_input"
                     type="text"
                     value={currentArticle.fabric || ''}
                     onChange={e => setCurrentArticle({ ...currentArticle, fabric: e.target.value })}
@@ -1661,7 +1715,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Lien de l'image ou Importation Photo</label>
                 {currentArticle.image ? (
-                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-32 group">
+                  <div data-acom-id="boutique.modal_image_upload" className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm h-32 group">
                     <img src={currentArticle.image} alt="Aperçu" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <button
                       type="button"
@@ -1672,7 +1726,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                     </button>
                   </div>
                 ) : (
-                  <div className="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center hover:border-violet-500 transition-colors bg-slate-50/50">
+                  <div data-acom-id="boutique.modal_image_upload" className="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center hover:border-violet-500 transition-colors bg-slate-50/50">
                     <input
                       type="file"
                       accept="image/*"
@@ -1701,6 +1755,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Notes Particulières & Finitions</label>
                 <textarea
+                  data-acom-id="boutique.modal_notes_input"
                   value={currentArticle.notes || ''}
                   onChange={e => setCurrentArticle({ ...currentArticle, notes: e.target.value })}
                   placeholder="Ex: Broderie col V, manches bouffantes, doublure satin douce..."
@@ -1710,6 +1765,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
 
               <div className="border-t border-gray-150 pt-4 flex justify-end gap-3 shrink-0 text-right">
                 <button
+                  data-acom-id="boutique.modal_cancel_btn"
                   type="button"
                   onClick={() => setIsFormOpen(false)}
                   className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition cursor-pointer"
@@ -1717,6 +1773,7 @@ export const TailleurBoutiqueManager = ({ merchant }: { merchant: Merchant }) =>
                   Annuler
                 </button>
                 <button
+                  data-acom-id="boutique.modal_submit_btn"
                   type="submit"
                   className="px-8 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-violet-600/20 transition cursor-pointer"
                 >

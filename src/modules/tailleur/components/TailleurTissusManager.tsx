@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { triggerAcomAlert } from '../../../components/AcomAlertEventProvider';
 import { syncService } from '../../../services/syncService';
+import { TutorialEngine } from '../../../ai-demo/Tutorial/TutorialEngine';
 import { ModalStickyFooter } from './design-system/TailorDesignSystem';
 import { 
   FABRIC_COLOR_PALETTE, 
@@ -164,7 +165,10 @@ const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
         </div>
 
         {/* Selected Color Badge Preview */}
-        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
+        <div 
+          data-acom-id="textiles.form_color_main"
+          className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs"
+        >
           <span 
             className="w-4 h-4 rounded-full border border-black/20 shrink-0 shadow-2xs"
             style={{ backgroundColor: currentColorHex || activeColorInfo.hex || '#50C878' }}
@@ -202,6 +206,7 @@ const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
           <div
             ref={categoryNavRef}
             onWheel={handleCategoryWheel}
+            data-acom-id="textiles.form_color_categories"
             className="flex-1 flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none scroll-smooth touch-pan-x"
           >
             {FABRIC_COLOR_FAMILIES.map(fam => {
@@ -238,7 +243,7 @@ const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
         </div>
 
         {/* Search Input Bar */}
-        <div className="relative">
+        <div className="relative" data-acom-id="textiles.form_color_search">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
@@ -260,18 +265,22 @@ const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
       </div>
 
       {/* Grid of Color Swatches */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1.5 max-h-52 sm:max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200/90 shadow-2inner">
+      <div 
+        data-acom-id="textiles.form_color_grid"
+        className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-1.5 max-h-52 sm:max-h-60 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200/90 shadow-2inner"
+      >
         {filteredSwatches.length === 0 ? (
           <div className="col-span-full py-6 text-center text-xs text-slate-400 font-medium">
             Aucune couleur trouvée pour "{searchQuery}"
           </div>
         ) : (
-          filteredSwatches.map(c => {
+          filteredSwatches.map((c, swatchIdx) => {
             const isSelected = currentColor.trim().toLowerCase() === c.name.toLowerCase();
             return (
               <button
                 key={c.id}
                 type="button"
+                data-acom-id={`textiles.form_color_swatch_${swatchIdx}`}
                 onClick={() => onChangeColor(c.name, c.hex)}
                 title={`${c.name} (${c.hex}) - Famille: ${c.family}`}
                 className={`relative p-1.5 rounded-xl border transition-all duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer text-center group focus:outline-none focus:ring-2 focus:ring-violet-500/50 ${
@@ -310,6 +319,7 @@ const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
           <input
             type="text"
             required
+            data-acom-id="textiles.form_color_custom_name"
             placeholder="Ex: Bleu Nuit, Blanc Cassé, Violet Impérial..."
             value={currentColor}
             onChange={e => {
@@ -328,7 +338,7 @@ const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
         {/* Hex Nuanceur */}
         <div>
           <span className="block text-[10px] text-slate-500 font-bold mb-1 font-mono">Nuanceur HEX :</span>
-          <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-xl border border-slate-200">
+          <div className="flex items-center gap-2 bg-white px-2 py-1.5 rounded-xl border border-slate-200" data-acom-id="textiles.form_color_hex">
             <input
               type="color"
               value={currentColorHex || '#50C878'}
@@ -359,6 +369,7 @@ const FabricColorSelector: React.FC<FabricColorSelectorProps> = ({
           <span className="block text-[10px] text-slate-500 font-bold mb-1">Couleur 2 (Option) :</span>
           <input
             type="text"
+            data-acom-id="textiles.form_color_secondary"
             placeholder="Ex: Doré, Argent..."
             value={secondaryColor}
             onChange={e => {
@@ -439,6 +450,15 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       setDynamicCategories(CATEGORIES);
     }
   }, [tissus]);
+
+  // Track Form Modal state with TutorialEngine
+  useEffect(() => {
+    if (isFormOpen) {
+      TutorialEngine.onModalOpened('couture.tissu_modal');
+    } else {
+      TutorialEngine.onModalClosed('couture.tissu_modal');
+    }
+  }, [isFormOpen]);
 
   // Helper to save fabrics to state and localStorage
   const saveFabrics = (newFabrics: Tissu[]) => {
@@ -712,6 +732,41 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       });
   }, [tissus, search, selectedCategory, selectedColorFamily, selectedPattern, stockFilter, sortBy]);
 
+  // Update Tutorial Engine with state of Tissus page
+  useEffect(() => {
+    try {
+      const firstTissu = filteredTissus[0];
+      TutorialEngine.setTissusPageState({
+        tissusCount: stats.totalTypes,
+        totalMeters: stats.totalMeters,
+        totalCost: stats.totalCost,
+        expectedProfit: stats.expectedProfit,
+        currency,
+        searchQuery: search,
+        selectedCategory,
+        selectedColorFamily,
+        selectedPattern,
+        stockFilter,
+        sortBy,
+        firstTissu,
+        allTissus: filteredTissus
+      });
+    } catch (err) {
+      console.error('Error updating tutorial engine for tissues:', err);
+    }
+  }, [
+    tissus,
+    stats,
+    currency,
+    search,
+    selectedCategory,
+    selectedColorFamily,
+    selectedPattern,
+    stockFilter,
+    sortBy,
+    filteredTissus
+  ]);
+
   return (
     <div className="w-full space-y-6" id="tailleur_tissus_container">
       {/* Header and Sync State */}
@@ -721,17 +776,18 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             <span className="p-2 rounded-xl bg-violet-100 text-violet-700">
               <Palette className="w-5 h-5" />
             </span>
-            <h1 className="text-xl md:text-2xl font-black font-sans tracking-tight text-slate-800">
+            <h1 data-acom-id="textiles.title" className="text-xl md:text-2xl font-black font-sans tracking-tight text-slate-800">
               Gestion du Stock de Tissus & Wax
             </h1>
           </div>
-          <p className="text-sm text-slate-500 font-medium ml-1">
+          <p data-acom-id="textiles.description" className="text-sm text-slate-500 font-medium ml-1">
             Suivez vos métrages disponibles, gérez vos approvisionnements et déduisez automatiquement vos tissus lors des commandes.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 self-start md:self-auto">
           <button
+            data-acom-id="textiles.refresh_btn"
             onClick={() => triggerSync(true)}
             disabled={isSyncing}
             className={`p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center gap-1.5 text-xs font-bold ${isSyncing ? 'opacity-80' : ''}`}
@@ -742,6 +798,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
           </button>
 
           <button
+            data-acom-id="textiles.add_btn"
             onClick={() => {
               setCurrentTissu({
                 name: '',
@@ -767,7 +824,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       {/* Stats Board */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Varieties */}
-        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+        <div data-acom-id="textiles.stat_varieties" className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-violet-50 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400">
             <Layers className="w-5 h-5" />
           </div>
@@ -778,7 +835,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
         </div>
 
         {/* Total Stock */}
-        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+        <div data-acom-id="textiles.stat_global_stock" className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
             <Package className="w-5 h-5" />
           </div>
@@ -789,7 +846,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
         </div>
 
         {/* Total Cost Value */}
-        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+        <div data-acom-id="textiles.stat_cost_value" className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
             <TrendingUp className="w-5 h-5" />
           </div>
@@ -800,7 +857,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
         </div>
 
         {/* Profit Estimé */}
-        <div className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
+        <div data-acom-id="textiles.stat_estimated_profit" className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
             <CheckCircle className="w-5 h-5" />
           </div>
@@ -818,6 +875,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input
+              data-acom-id="textiles.search_input"
               type="text"
               placeholder="Rechercher par nom, couleur (bleu, bordeaux...), motif (brodé...), réf, fournisseur..."
               value={search}
@@ -830,6 +888,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
           <div className="flex flex-wrap items-center gap-2">
             {/* Category Filter */}
             <select
+              data-acom-id="textiles.filter_category"
               value={selectedCategory}
               onChange={e => setSelectedCategory(e.target.value)}
               className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-violet-500/25"
@@ -842,6 +901,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
 
             {/* Color Family Filter */}
             <select
+              data-acom-id="textiles.filter_color"
               value={selectedColorFamily}
               onChange={e => setSelectedColorFamily(e.target.value)}
               className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-violet-500/25"
@@ -854,6 +914,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
 
             {/* Pattern Filter */}
             <select
+              data-acom-id="textiles.filter_pattern"
               value={selectedPattern}
               onChange={e => setSelectedPattern(e.target.value)}
               className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-violet-500/25"
@@ -866,6 +927,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
 
             {/* Stock Level Filter */}
             <select
+              data-acom-id="textiles.filter_stock"
               value={stockFilter}
               onChange={e => setStockFilter(e.target.value as any)}
               className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
@@ -878,6 +940,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
 
             {/* Sorting */}
             <select
+              data-acom-id="textiles.filter_sort"
               value={sortBy}
               onChange={e => setSortBy(e.target.value as any)}
               className="bg-slate-50 border-0 text-xs font-bold py-2.5 px-3 rounded-xl text-slate-700 outline-none focus:ring-2 focus:ring-violet-500/20"
@@ -894,6 +957,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
       {/* Main Grid List */}
       {filteredTissus.length === 0 ? (
         <motion.div
+          data-acom-id="textiles.empty_state"
           key="empty-tissus"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -914,6 +978,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
           </div>
           {tissus.length === 0 && (
             <button
+              data-acom-id="textiles.generate_samples_btn"
               onClick={handleGenerateSamples}
               className="px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-black rounded-xl border border-violet-100 flex items-center gap-1.5 active:scale-95 transition-all mt-2"
             >
@@ -923,8 +988,8 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
           )}
         </motion.div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTissus.map(tissu => {
+        <div data-acom-id="textiles.grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredTissus.map((tissu, index) => {
             const colorInfo = findColorInfo(tissu.color);
             const matchedTheme = COLOR_THEMES.find(c => c.name === tissu.colorTheme) || COLOR_THEMES[0];
             const quantity = tissu.quantity ?? 0;
@@ -937,6 +1002,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
             return (
               <div
                 key={tissu.id}
+                data-acom-id={`textiles.card_${index}`}
                 className={`rounded-2xl border ${
                   isCrit ? 'border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20' : 
                   'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
@@ -956,7 +1022,10 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-black/20 z-0" />
 
                     <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
-                      <span className="px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-md border border-white/35 text-[9px] font-black tracking-widest text-white uppercase">
+                      <span 
+                        data-acom-id={`textiles.card_category_${index}`}
+                        className="px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-md border border-white/35 text-[9px] font-black tracking-widest text-white uppercase"
+                      >
                         {tissu.category}
                       </span>
                       {tissu.internalRef && (
@@ -967,22 +1036,42 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                       )}
                     </div>
 
-                    {tissu.syncStatus === 'pending' && (
-                      <div className="absolute top-2.5 right-2.5 p-1 rounded-md bg-amber-500/90 text-white text-[9px] font-bold flex items-center gap-1 z-10">
-                        <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                        En attente
-                      </div>
-                    )}
+                    <div 
+                      data-acom-id={`textiles.card_status_${index}`}
+                      className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md text-[9px] font-bold flex items-center gap-1 z-10 ${
+                        tissu.syncStatus === 'pending' 
+                          ? 'bg-amber-500/90 text-white animate-pulse' 
+                          : 'bg-emerald-600/90 text-white'
+                      }`}
+                    >
+                      {tissu.syncStatus === 'pending' ? (
+                        <>
+                          <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                          En attente
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-2.5 h-2.5" />
+                          Synchronisé
+                        </>
+                      )}
+                    </div>
 
                     <div className="text-white w-full flex items-center justify-between z-10">
-                      <span className="font-mono text-xs font-black tracking-wider drop-shadow-sm bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-white/20">
+                      <span 
+                        data-acom-id={`textiles.card_price_${index}`}
+                        className="font-mono text-xs font-black tracking-wider drop-shadow-sm bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-white/20"
+                      >
                         {(tissu.pricePerMeter ?? tissu.price ?? 0).toLocaleString()} {currency} /m
                       </span>
 
                       {/* Stock Quantity Badge on Header */}
-                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 ${
-                        isOut ? 'bg-red-600 text-white' : isCrit ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'
-                      }`}>
+                      <span 
+                        data-acom-id={`textiles.card_qty_header_${index}`}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-black flex items-center gap-1 ${
+                          isOut ? 'bg-red-600 text-white' : isCrit ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white'
+                        }`}
+                      >
                         {quantity} m
                       </span>
                     </div>
@@ -993,7 +1082,10 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     <div className="space-y-2.5">
                       {/* Name */}
                       <div>
-                        <h3 className="text-sm font-black text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors">
+                        <h3 
+                          data-acom-id={`textiles.card_name_${index}`}
+                          className="text-sm font-black text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors"
+                        >
                           {tissu.name}
                         </h3>
                       </div>
@@ -1001,7 +1093,10 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                       {/* Color & Pattern Badge Row */}
                       <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                         {/* Main Color Pill with Hex Circle */}
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                        <div 
+                          data-acom-id={`textiles.card_color_${index}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                        >
                           <span 
                             className="w-3.5 h-3.5 rounded-full border border-black/20 dark:border-white/20 shadow-inner flex-shrink-0" 
                             style={{ backgroundColor: displayHex }}
@@ -1020,7 +1115,10 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
 
                         {/* Pattern Pill */}
                         {tissu.pattern && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-800">
+                          <span 
+                            data-acom-id={`textiles.card_pattern_${index}`}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border border-violet-100 dark:border-violet-800"
+                          >
                             🎨 {tissu.pattern}
                           </span>
                         )}
@@ -1028,18 +1126,21 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
 
                       {/* Price breakdown */}
                       <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700">
-                        <div>
+                        <div data-acom-id={`textiles.card_cost_${index}`}>
                           <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">COÛT ACHAT</span>
                           <span className="font-mono font-black text-slate-800 dark:text-slate-100">{(tissu.costPricePerMeter ?? 0).toLocaleString()} {currency}/m</span>
                         </div>
-                        <div>
+                        <div data-acom-id={`textiles.card_sale_${index}`}>
                           <span className="block text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">PRIX VENTE</span>
                           <span className="font-mono font-black text-violet-700 dark:text-violet-400">{(tissu.pricePerMeter ?? tissu.price ?? 0).toLocaleString()} {currency}/m</span>
                         </div>
                       </div>
 
                       {tissu.supplier && (
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                        <p 
+                          data-acom-id={`textiles.card_supplier_${index}`}
+                          className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1"
+                        >
                           <ShoppingCart className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                           Fournisseur : {tissu.supplier}
                         </p>
@@ -1064,7 +1165,10 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                       </div>
 
                       {/* Progress Bar */}
-                      <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div 
+                        data-acom-id={`textiles.card_progress_${index}`}
+                        className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"
+                      >
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${
                             isOut ? 'bg-red-500' : isCrit ? 'bg-amber-500' : 'bg-emerald-500'
@@ -1077,6 +1181,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                       <div className="flex items-center justify-between pt-1">
                         <div className="flex items-center gap-1">
                           <button
+                            data-acom-id={`textiles.card_edit_${index}`}
                             onClick={() => {
                               setCurrentTissu({ ...tissu });
                               setIsNewCategory(false);
@@ -1088,6 +1193,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
+                            data-acom-id={`textiles.card_delete_${index}`}
                             onClick={() => handleDelete(tissu.id)}
                             className="p-2 hover:bg-red-50 dark:hover:bg-red-950/50 text-slate-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-all"
                             title="Supprimer"
@@ -1097,6 +1203,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                         </div>
 
                         <button
+                          data-acom-id={`textiles.card_action_${index}`}
                           onClick={() => {
                             setCurrentTissu({ ...tissu });
                             setIsNewCategory(false);
@@ -1132,16 +1239,23 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     <Palette className="w-5 h-5" />
                   </span>
                   <div>
-                    <h2 className="text-base font-black text-slate-800 font-sans tracking-tight">
+                    <h2 
+                      data-acom-id="textiles.modal_title"
+                      className="text-base font-black text-slate-800 font-sans tracking-tight"
+                    >
                       {currentTissu?.id ? 'Modifier le Tissu' : 'Enregistrer un nouveau Tissu en Stock'}
                     </h2>
-                    <p className="text-[11px] text-slate-500 font-medium">
+                    <p 
+                      data-acom-id="textiles.modal_description"
+                      className="text-[11px] text-slate-500 font-medium"
+                    >
                       {currentTissu?.id ? 'Ajustez les détails du coupon ou rouleau' : 'Remplissez la fiche technique du tissu'}
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
+                  data-acom-id="textiles.modal_close"
                   onClick={() => setIsFormOpen(false)}
                   disabled={isSubmitting}
                   className="p-2 hover:bg-slate-200/60 rounded-xl text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
@@ -1162,6 +1276,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     <input
                       type="text"
                       required
+                      data-acom-id="textiles.form_name"
                       placeholder="Ex: Bazin Getzner VIP, Wax Hollandais Soleil, Lin Pur..."
                       value={currentTissu?.name || ''}
                       onChange={e => setCurrentTissu({ ...currentTissu, name: e.target.value })}
@@ -1174,7 +1289,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     <div>
                       <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">CATÉGORIE *</label>
                       {isNewCategory ? (
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1.5" data-acom-id="textiles.form_category">
                           <input
                             type="text"
                             required
@@ -1196,6 +1311,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                         </div>
                       ) : (
                         <select
+                          data-acom-id="textiles.form_category"
                           value={currentTissu?.category || 'Bazin'}
                           onChange={e => {
                             if (e.target.value === 'ADD_NEW') {
@@ -1220,7 +1336,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                       <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-1.5">
                         RÉFÉRENCE INTERNE (ROULEAU)
                       </label>
-                      <div className="relative">
+                      <div className="relative" data-acom-id="textiles.form_internal_ref">
                         <Hash className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
                           type="text"
@@ -1274,6 +1390,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                         MOTIF / STYLE
                       </label>
                       <select
+                        data-acom-id="textiles.form_pattern"
                         value={currentTissu?.pattern || 'Uni'}
                         onChange={e => setCurrentTissu({ ...currentTissu, pattern: e.target.value })}
                         className="w-full px-4 py-2.5 bg-slate-50 border-0 focus:bg-white focus:ring-2 focus:ring-violet-500/20 text-sm font-semibold rounded-xl transition-all outline-none"
@@ -1295,6 +1412,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                           step="0.01"
                           min="0"
                           required
+                          data-acom-id="textiles.form_qty"
                           placeholder="Ex: 12.5"
                           value={currentTissu?.quantity ?? ''}
                           onChange={e => setCurrentTissu({ ...currentTissu, quantity: e.target.value === '' ? '' as any : Number(e.target.value) })}
@@ -1309,6 +1427,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                           type="number"
                           step="0.1"
                           min="0"
+                          data-acom-id="textiles.form_alert_threshold"
                           placeholder="Ex: 5.0"
                           value={currentTissu?.minStock ?? ''}
                           onChange={e => setCurrentTissu({ ...currentTissu, minStock: e.target.value === '' ? undefined : Number(e.target.value) })}
@@ -1328,6 +1447,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                         type="number"
                         min="0"
                         required
+                        data-acom-id="textiles.form_cost_price"
                         placeholder="Ex: 3000"
                         value={currentTissu?.costPricePerMeter ?? currentTissu?.price ?? ''}
                         onChange={e => setCurrentTissu({ ...currentTissu, costPricePerMeter: e.target.value === '' ? '' as any : Number(e.target.value) })}
@@ -1344,6 +1464,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                         type="number"
                         min="0"
                         required
+                        data-acom-id="textiles.form_sale_price"
                         placeholder="Ex: 4500"
                         value={currentTissu?.pricePerMeter ?? currentTissu?.price ?? ''}
                         onChange={e => setCurrentTissu({ ...currentTissu, pricePerMeter: e.target.value === '' ? '' as any : Number(e.target.value) })}
@@ -1359,6 +1480,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     </label>
                     <input
                       type="text"
+                      data-acom-id="textiles.form_supplier"
                       placeholder="Ex: Maison Getzner Dakar, Boutique Amy Sandaga"
                       value={currentTissu?.supplier || ''}
                       onChange={e => setCurrentTissu({ ...currentTissu, supplier: e.target.value })}
@@ -1373,6 +1495,7 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                     </label>
                     <textarea
                       rows={2}
+                      data-acom-id="textiles.form_notes"
                       placeholder="Emplacement en atelier (ex: Étagère 3), texture, brillance..."
                       value={currentTissu?.notes || ''}
                       onChange={e => setCurrentTissu({ ...currentTissu, notes: e.target.value })}
@@ -1388,6 +1511,9 @@ export const TailleurTissusManager = ({ merchant }: TailleurTissusManagerProps) 
                   submitLabel={currentTissu?.id ? "Mettre à jour le Tissu" : "Enregistrer le Tissu"}
                   isSubmitting={isSubmitting}
                   isSuccess={isSuccess}
+                  cancelButtonId="textiles.modal_cancel"
+                  submitButtonId="textiles.modal_submit"
+                  warningId="textiles.modal_warning"
                   disabled={!currentTissu?.name || currentTissu?.quantity === undefined || currentTissu?.quantity === null || currentTissu?.quantity === ('' as any)}
                   disabledReason={
                     !currentTissu?.name 
